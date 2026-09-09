@@ -15,6 +15,8 @@ ApplicationWindow {
     minimumWidth: 720
     minimumHeight: 520
     visible: true
+    font.family: "Helvetica Neue"
+    font.pixelSize: 13
     title: (backend.modified ? "* " : "") + backend.fileName + " - Omawrite"
 
     readonly property bool isMac: Qt.platform.os === "osx"
@@ -22,13 +24,13 @@ ApplicationWindow {
     readonly property color pageColor: backend.themeBackground
     readonly property color textColor: backend.themeForeground
     readonly property color strongTextColor: backend.themeForeground
-    readonly property color mutedColor: darkMode ? "#909191" : "#aeb1b5"
+    readonly property color mutedColor: darkMode ? "#909191" : "#7b8490"
     readonly property color selectionFill: backend.themeSelection
     // The desktop's text size knob (GNOME's text-scaling-factor, which
     // `omarchy display text size` drives) anchored so its 12px default leaves
     // the app at the sizes it was designed around.
     readonly property real textScale: backend.textScale
-    readonly property int editorFontPixelSize: scaledSize(20)
+    readonly property int editorFontPixelSize: scaledSize(workspaceSettings.writingSize)
     readonly property int editorWidth: Math.min(
         Math.round(writerFontMetrics.averageCharacterWidth * 65),
         Math.max(180, editorPane.width - 64))
@@ -44,9 +46,17 @@ ApplicationWindow {
 
     Settings {
         id: workspaceSettings
+        objectName: "workspaceSettings"
         category: "workspace"
         property bool libraryVisible: true
         property int layoutMode: 1
+        property int writingSize: 20
+        property bool showMarkup: true
+        property bool typewriter: false
+        property bool paragraphFocus: false
+        onParagraphFocusChanged: backend.setFocusPosition(editor.cursorPosition, paragraphFocus)
+        property int previewStyle: 0
+        onShowMarkupChanged: backend.setShowMarkup(showMarkup)
     }
 
     header: ToolBar {
@@ -65,6 +75,7 @@ ApplicationWindow {
                 onClicked: workspaceSettings.libraryVisible = checked
             }
             Label { text: backend.fileName; elide: Text.ElideMiddle; Layout.fillWidth: true }
+            ToolButton { text: "Aa"; onClicked: writingOptions.open(); Accessible.name: "Writing options" }
             ComboBox {
                 objectName: "workspaceMode"
                 model: ["Editor", "Split", "Preview"]
@@ -72,6 +83,24 @@ ApplicationWindow {
                 onActivated: workspaceSettings.layoutMode = currentIndex
             }
         }
+    }
+
+    Menu {
+        id: writingOptions
+        width: 250
+        x: Math.max(0, win.width - width - 160)
+        y: 44
+        MenuItem { text: "Show Markdown syntax"; checkable: true; checked: workspaceSettings.showMarkup; onTriggered: workspaceSettings.showMarkup = !workspaceSettings.showMarkup }
+        MenuItem { text: "Paragraph focus"; checkable: true; checked: workspaceSettings.paragraphFocus; onTriggered: workspaceSettings.paragraphFocus = !workspaceSettings.paragraphFocus }
+        MenuItem { text: "Typewriter scrolling"; checkable: true; checked: workspaceSettings.typewriter; onTriggered: { workspaceSettings.typewriter = !workspaceSettings.typewriter; editorFlick.ensureCursorVisible(); } }
+        MenuSeparator {}
+        MenuItem { text: "Larger text"; enabled: workspaceSettings.writingSize < 32; onTriggered: workspaceSettings.writingSize += 2 }
+        MenuItem { text: "Smaller text"; enabled: workspaceSettings.writingSize > 12; onTriggered: workspaceSettings.writingSize -= 2 }
+        MenuItem { text: "Reset text size"; onTriggered: workspaceSettings.writingSize = 20 }
+        MenuSeparator {}
+        MenuItem { text: "Preview: Sans"; checkable: true; checked: workspaceSettings.previewStyle === 0; onTriggered: workspaceSettings.previewStyle = 0 }
+        MenuItem { text: "Preview: Serif"; checkable: true; checked: workspaceSettings.previewStyle === 1; onTriggered: workspaceSettings.previewStyle = 1 }
+        MenuItem { text: "Preview: Mono"; checkable: true; checked: workspaceSettings.previewStyle === 2; onTriggered: workspaceSettings.previewStyle = 2 }
     }
 
     Material.theme: darkMode ? Material.Dark : Material.Light
@@ -464,12 +493,13 @@ ApplicationWindow {
 
         Flickable {
             id: editorFlick
+            objectName: "editorScroll"
             anchors.fill: parent
             anchors.leftMargin: 24
             anchors.rightMargin: 24
             clip: true
             contentWidth: width
-            contentHeight: Math.max(height, editor.y + editor.implicitHeight + 220)
+            contentHeight: Math.max(height, editor.y + editor.implicitHeight + (workspaceSettings.typewriter ? height / 2 : 220))
             boundsBehavior: Flickable.StopAtBounds
             ScrollBar.vertical: ScrollBar {
                 policy: ScrollBar.AsNeeded
@@ -641,6 +671,10 @@ ApplicationWindow {
             // Keep the editing caret within the viewport so writing past the
             // bottom edge scrolls the page along with the text.
             function ensureCursorVisible() {
+                if (workspaceSettings.typewriter && editor.selectionStart === editor.selectionEnd) {
+                    scrollTo(clampContentY(editor.y + editor.cursorRectangle.y - height / 2 + editor.cursorRectangle.height / 2));
+                    return;
+                }
                 var margin = win.editorFontPixelSize * 2;
                 var cursorTop = editor.y + editor.cursorRectangle.y;
                 var cursorBottom = cursorTop + editor.cursorRectangle.height;
@@ -656,7 +690,7 @@ ApplicationWindow {
                 id: editor
                 objectName: "sourceEditor"
                 x: Math.round((editorFlick.width - width) / 2)
-                y: Math.max(42, Math.round(win.height * 0.05))
+                y: workspaceSettings.typewriter ? editorFlick.height / 2 : 42
                 width: win.editorWidth
                 height: Math.max(editorFlick.height - y - 96, implicitHeight + 20)
                 text: ""
@@ -682,6 +716,7 @@ ApplicationWindow {
                     color: win.strongTextColor
                 }
                 onCursorRectangleChanged: editorFlick.ensureCursorVisible()
+                onCursorPositionChanged: backend.setFocusPosition(cursorPosition, workspaceSettings.paragraphFocus)
 
                 function replaceSelectionWith(replacement) {
                     var start = Math.min(selectionStart, selectionEnd);
@@ -913,7 +948,9 @@ ApplicationWindow {
                 }
 
                 Component.onCompleted: {
+                    backend.setShowMarkup(workspaceSettings.showMarkup);
                     backend.attachDocument(textDocument);
+                    backend.setFocusPosition(cursorPosition, workspaceSettings.paragraphFocus);
                     forceActiveFocus();
                 }
             }
@@ -1124,6 +1161,7 @@ ApplicationWindow {
     }
 
         PreviewPane {
+            renderer: backend
             markdown: editor.text
             documentBaseUrl: backend.documentBaseUrl
             darkMode: win.darkMode
@@ -1131,7 +1169,15 @@ ApplicationWindow {
             SplitView.fillWidth: workspaceSettings.layoutMode === 2
             SplitView.preferredWidth: 450
             SplitView.minimumWidth: 220
-            onLinkRequested: function(link) { backend.openExternalUrl(link); }
+            typeface: ["Helvetica Neue", "Georgia", "iA Writer Mono S"][workspaceSettings.previewStyle]
+            textSize: Math.max(12, workspaceSettings.writingSize - 2)
+            onLinkRequested: function(link) {
+                var resolved = backend.resolveDocumentLink(link);
+                if (/^file:.*\.(md|markdown|mdown|txt|text)(#.*)?$/i.test(String(resolved)))
+                    win.requestOpen(resolved);
+                else
+                    backend.openExternalUrl(resolved);
+            }
         }
     }
 

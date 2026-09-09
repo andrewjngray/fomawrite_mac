@@ -27,3 +27,11 @@ Implemented a lazy, watched Markdown/text library with expandable folders, visib
 Validation: `./bin/build` passed; `./bin/test` 15 passed, 0 failed (library safety and preview source preservation included). Qt Material emits an intermittent SplitView teardown warning in tests; no runtime warning on launch. Not yet verified: local image preview, relative document links (currently external URL handling only), narrow layouts, final bundled packaging. Current preview is Qt Markdown, not browser CSS; paragraph spacing needs refinement.
 
 Reference: iA View menu directly inspected; [official focus documentation](https://ia.net/writer/support/editor/focus-mode/focus-mode-mac) confirms sentence/paragraph dimming and vertically centred typewriter mode. CUA later returns a stale View menu for iA and no screenshot, so further reference inspection may need a fresh app selection.
+
+## Batch 2 — writing presentation (11:50 UTC)
+
+Added persistent Aa controls: visible Markdown syntax (default), paragraph focus (physical text paragraph/line), vertically centered typewriter scrolling, 12–32 px writing size, and Sans/Serif/Mono preview typefaces. The editor remains the original source document; preview formatting operates on a separate read-only document. Improved preview line/paragraph spacing and neutral toolbar typography. Relative Markdown/text links resolve against the document folder and use protected file switching. Added examples/Workspace-tour.md.
+
+Validation: build passed; 17 tests passed, including source/undo preservation under syntax/focus changes, local image resources, relative link resolution and cursor centering. Native screenshots confirmed focus dimming, source markers, preview spacing, tables and task checkboxes. Runtime logs clean. Batch 1 timestamp above was estimated; clock at end of batch 2 was around 11:50 UTC.
+
+Remaining: preview fragment-only anchors not handled; library filter only searches visible expanded directories; no outline/quick open/global search yet; preview font is available system fonts and retained OFL mono. Package again after next batch or before handover. CUA app chooses earliest process by app bundle: close only known unchanged test windows with the AX close button, then select app again to inspect latest process. Keyboard commands did not reliably close these windows.

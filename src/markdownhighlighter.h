@@ -11,6 +11,8 @@ public:
     explicit MarkdownHighlighter(QTextDocument *document);
 
     void setDarkMode(bool darkMode);
+    void setShowMarkup(bool show);
+    void setFocusBlock(int block);
     void setColors(const QString &background, const QString &foreground, const QString &accent);
     void setSearch(const QString &query, int currentMatchStart);
 
@@ -41,6 +43,8 @@ private:
     void highlightInline(const QString &text);
     void highlightSearch(const QString &text);
 
+    int m_focusBlock = -1;
+    bool m_showMarkup = false;
     bool m_darkMode = true;
     QString m_customBackground;
     QString m_customForeground;

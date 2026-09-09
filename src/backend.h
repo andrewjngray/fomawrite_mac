@@ -59,6 +59,10 @@ public:
     static QString normalizedLinkUrl(const QString &clipboardText);
     static QString suggestedFileName(const QString &text);
 
+    Q_INVOKABLE void stylePreview(QObject *textDocument);
+    Q_INVOKABLE void setFocusPosition(int position, bool enabled);
+    Q_INVOKABLE void setShowMarkup(bool show);
+    Q_INVOKABLE QUrl resolveDocumentLink(const QString &link) const;
     Q_INVOKABLE void attachDocument(QObject *textDocument);
     Q_INVOKABLE void openDialog();
     Q_INVOKABLE void open(const QUrl &url);
@@ -118,6 +122,7 @@ private:
     void loadOmarchyTheme();
     void watchOmarchyTheme();
 
+    bool m_showMarkup = false;
     FileLibrary m_library;
     QUrl m_fileUrl;
     bool m_modified = false;

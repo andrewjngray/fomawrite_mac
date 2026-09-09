@@ -173,6 +173,35 @@ void Backend::setTextScale(qreal textScale) {
     emit textScaleChanged();
 }
 
+void Backend::stylePreview(QObject *textDocument) {
+    auto *quick = qobject_cast<QQuickTextDocument *>(textDocument);
+    if (!quick || !quick->textDocument() || quick->textDocument() == m_document) return;
+    QTextDocument *preview = quick->textDocument();
+    preview->setUndoRedoEnabled(false);
+    for (QTextBlock block = preview->begin(); block.isValid(); block = block.next()) {
+        QTextBlockFormat format = block.blockFormat();
+        format.setLineHeight(135, QTextBlockFormat::ProportionalHeight);
+        format.setTopMargin(format.headingLevel() > 0 && block.blockNumber() > 0 ? 18 : 0);
+        format.setBottomMargin(block.textList() ? 4 : 12);
+        QTextCursor cursor(block);
+        cursor.setBlockFormat(format);
+    }
+}
+
+void Backend::setFocusPosition(int position, bool enabled) {
+    if (m_document && m_highlighter)
+        m_highlighter->setFocusBlock(enabled ? m_document->findBlock(position).blockNumber() : -1);
+}
+
+void Backend::setShowMarkup(bool show) {
+    m_showMarkup = show;
+    if (m_highlighter) m_highlighter->setShowMarkup(show);
+}
+
+QUrl Backend::resolveDocumentLink(const QString &link) const {
+    return documentBaseUrl().resolved(QUrl(link));
+}
+
 void Backend::attachDocument(QObject *textDocument) {
     auto *quickDocument = qobject_cast<QQuickTextDocument *>(textDocument);
     if (!quickDocument || !quickDocument->textDocument()) {
@@ -187,6 +216,7 @@ void Backend::attachDocument(QObject *textDocument) {
     m_lastDocumentText = m_document->toPlainText();
     m_highlighter = new MarkdownHighlighter(m_document);
     m_highlighter->setDarkMode(m_darkMode);
+    m_highlighter->setShowMarkup(m_showMarkup);
     m_highlighter->setColors(m_themeBackground, m_themeForeground, m_themeAccent);
 
     connect(m_document, &QTextDocument::contentsChange, this,
@@ -373,7 +403,7 @@ bool Backend::editorTextChanged() {
 
 QVariantList Backend::hiddenRangesAt(int position) const {
     QVariantList ranges;
-    if (!m_document)
+    if (!m_document || m_showMarkup)
         return ranges;
 
     const QTextBlock block =

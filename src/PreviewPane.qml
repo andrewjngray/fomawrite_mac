@@ -5,6 +5,7 @@ import QtQuick.Layouts
 Rectangle {
     id: root
     objectName: "previewPane"
+    required property var renderer
     property string markdown: ""
     property url documentBaseUrl
     property bool darkMode: false
@@ -14,9 +15,13 @@ Rectangle {
     color: darkMode ? "#191b1e" : "#ffffff"
     property string renderedMarkdown: ""
     onMarkdownChanged: refreshTimer.restart()
-    Component.onCompleted: renderedMarkdown = markdown
+    function refresh() {
+        renderedMarkdown = markdown;
+        Qt.callLater(function() { root.renderer.stylePreview(previewText.textDocument); });
+    }
+    Component.onCompleted: refresh()
 
-    Timer { id: refreshTimer; interval: 120; onTriggered: root.renderedMarkdown = root.markdown }
+    Timer { id: refreshTimer; interval: 120; onTriggered: root.refresh() }
     Flickable {
         id: previewScroll
         objectName: "previewScroll"

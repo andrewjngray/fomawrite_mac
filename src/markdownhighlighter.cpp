@@ -4,6 +4,7 @@
 #include <QFont>
 #include <QFontMetricsF>
 #include <QTextDocument>
+#include <QTextBlock>
 
 MarkdownHighlighter::MarkdownHighlighter(QTextDocument *document)
     : QSyntaxHighlighter(document) {
@@ -103,12 +104,37 @@ void MarkdownHighlighter::rebuildFormats() {
                                                    : QColor(QStringLiteral("#ffad42")));
 }
 
+void MarkdownHighlighter::setShowMarkup(bool show) {
+    if (m_showMarkup == show) return;
+    m_showMarkup = show;
+    rehighlight();
+}
+
+void MarkdownHighlighter::setFocusBlock(int block) {
+    if (m_focusBlock == block) return;
+    const int old = m_focusBlock;
+    m_focusBlock = block;
+    if (old < 0 || block < 0) rehighlight();
+    else {
+        rehighlightBlock(document()->findBlockByNumber(old));
+        rehighlightBlock(document()->findBlockByNumber(block));
+    }
+}
+
 void MarkdownHighlighter::highlightBlock(const QString &text) {
     if (!text.isEmpty()) {
         highlightMarkers(text);
         if (text.contains(QLatin1Char('`')) || text.contains(QLatin1Char('*'))
             || text.contains(QLatin1Char('_')) || text.contains(QLatin1Char('['))) {
             highlightInline(text);
+        }
+    }
+    if (m_focusBlock >= 0 && currentBlock().blockNumber() != m_focusBlock) {
+        for (int i = 0; i < text.size(); ++i) {
+            QTextCharFormat dimmed = format(i);
+            if (dimmed.fontPointSize() == 1.0) continue;
+            dimmed.setForeground(m_darkMode ? QColor("#777c84") : QColor("#a1a6ad"));
+            setFormat(i, 1, dimmed);
         }
     }
     highlightSearch(text);
@@ -195,7 +221,7 @@ void MarkdownHighlighter::highlightInline(const QString &text) {
                                               : m_linkFormat;
         setFormat(item.content.start, item.content.length, contentFormat);
         for (const Span &marker : item.markers)
-            setFormat(marker.start, marker.length, m_hiddenMarkerFormat);
+            setFormat(marker.start, marker.length, m_showMarkup ? m_markerFormat : m_hiddenMarkerFormat);
     }
 }
 

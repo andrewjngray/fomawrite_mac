@@ -1,5 +1,10 @@
 #include <QtTest>
 #include <QFont>
+#include <QTextBlock>
+#include <QTextLayout>
+#include <QTextDocument>
+#include <QQuickTextDocument>
+#include <QImage>
 #include <QQmlComponent>
 #include <QQmlContext>
 #include <QQmlEngine>
@@ -71,6 +76,70 @@ private slots:
         QTRY_COMPARE(pane->property("renderedMarkdown").toString(), text);
         QCOMPARE(preview->property("readOnly").toBool(), true);
         QCOMPARE(editor->property("text").toString(), text);
+        backend.discardRecovery();
+    }
+
+    void presentationKeepsSourceAndUndoIntact() {
+        QTextDocument document;
+        document.setPlainText("**Bold**\n\nSecond paragraph");
+        MarkdownHighlighter highlighter(&document);
+        highlighter.setDarkMode(false);
+        highlighter.rehighlight();
+        const QString original = document.toPlainText();
+        auto markerSize = [&document]() {
+            for (const auto &range : document.firstBlock().layout()->formats())
+                if (range.start == 0) return range.format.fontPointSize();
+            return qreal(-1);
+        };
+        QCOMPARE(markerSize(), qreal(1));
+        highlighter.setShowMarkup(true);
+        QVERIFY(markerSize() != 1);
+        highlighter.setFocusBlock(0);
+        auto ranges = document.lastBlock().layout()->formats();
+        QVERIFY(!ranges.isEmpty());
+        QCOMPARE(ranges.first().format.foreground().color(), QColor("#a1a6ad"));
+        highlighter.setFocusBlock(2);
+        ranges = document.lastBlock().layout()->formats();
+        QVERIFY(ranges.isEmpty() || ranges.first().format.foreground().color() != QColor("#a1a6ad"));
+        highlighter.setFocusBlock(-1);
+        QCOMPARE(document.toPlainText(), original);
+        QVERIFY(!document.isUndoAvailable());
+    }
+
+    void previewsRelativeImagesAndCentersTypewriter() {
+        QTemporaryDir directory;
+        QImage image(24, 24, QImage::Format_ARGB32);
+        image.fill(Qt::cyan);
+        QVERIFY(image.save(directory.filePath("asset.png")));
+        Backend backend;
+        QQmlEngine engine;
+        engine.rootContext()->setContextProperty("backend", &backend);
+        QQmlComponent component(&engine, QUrl::fromLocalFile(QFINDTESTDATA("../src/Main.qml")));
+        QVERIFY2(component.isReady(), qPrintable(component.errorString()));
+        QScopedPointer<QObject> window(component.create());
+        QVERIFY(window);
+        auto *editor = window->findChild<QObject *>("sourceEditor");
+        auto *preview = window->findChild<QObject *>("renderedPreview");
+        auto *settings = window->findChild<QObject *>("workspaceSettings");
+        auto *scroll = window->findChild<QObject *>("editorScroll");
+        QVERIFY(editor && preview && settings && scroll);
+        const QString markdown = "# Image\n\n![Test](asset.png)\n\n" + QString("Paragraph.\n\n").repeated(40);
+        editor->setProperty("text", markdown);
+        backend.saveAs(QUrl::fromLocalFile(directory.filePath("draft.md")));
+        auto *quick = qvariant_cast<QQuickTextDocument *>(preview->property("textDocument"));
+        QVERIFY(quick);
+        QTRY_VERIFY(!quick->textDocument()->resource(QTextDocument::ImageResource,
+            QUrl::fromLocalFile(directory.filePath("asset.png"))).isNull());
+        QCOMPARE(backend.resolveDocumentLink("sibling.md"), QUrl::fromLocalFile(directory.filePath("sibling.md")));
+        settings->setProperty("typewriter", true);
+        editor->setProperty("cursorPosition", markdown.size() - 2);
+        QTRY_VERIFY(scroll->property("contentY").toReal() > 0);
+        const QRectF caret = editor->property("cursorRectangle").toRectF();
+        const qreal screenCenter = editor->property("y").toReal() + caret.center().y() - scroll->property("contentY").toReal();
+        QVERIFY(qAbs(screenCenter - scroll->property("height").toReal() / 2) < 2);
+        settings->setProperty("typewriter", false);
+        QCOMPARE(editor->property("text").toString(), markdown);
+        QVERIFY(!backend.modified());
         backend.discardRecovery();
     }
 
