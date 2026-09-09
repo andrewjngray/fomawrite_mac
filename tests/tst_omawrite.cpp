@@ -14,6 +14,8 @@ class OmawriteTest : public QObject {
 private slots:
     void initTestCase() {
         QVERIFY(m_settingsDirectory.isValid());
+        QCoreApplication::setAttribute(Qt::AA_DontUseNativeDialogs);
+        QStandardPaths::setTestModeEnabled(true);
         QQuickStyle::setStyle(QStringLiteral("Material"));
         QSettings::setDefaultFormat(QSettings::IniFormat);
         QSettings::setPath(QSettings::IniFormat, QSettings::UserScope,
@@ -216,6 +218,47 @@ private slots:
         backend.setTextScale(9.0 / 12.0);
         QCOMPARE(window->property("editorFontPixelSize").toInt(), 15);
         QCOMPARE(editor->property("font").value<QFont>().pixelSize(), 15);
+    }
+
+    void preservesMarkdownAndProtectsUnsavedOpen() {
+        QTemporaryDir directory;
+        QVERIFY(directory.isValid());
+        Backend backend;
+        QQmlEngine engine;
+        engine.rootContext()->setContextProperty(QStringLiteral("backend"), &backend);
+        QQmlComponent component(&engine, QUrl::fromLocalFile(
+            QFINDTESTDATA("../src/Main.qml")));
+        QVERIFY2(component.isReady(), qPrintable(component.errorString()));
+        QScopedPointer<QObject> window(component.create());
+        QVERIFY2(window, qPrintable(component.errorString()));
+        QObject *editor = window->findChild<QObject *>(QStringLiteral("sourceEditor"));
+        QVERIFY(editor);
+
+        const QString markdown = QString::fromUtf8(
+            "# Draft\n\n**Bold** and *italic* — café 你好\n\n- One\n- Two\n");
+        QVERIFY(editor->setProperty("text", markdown));
+        QVERIFY(backend.modified());
+        const QUrl saved = QUrl::fromLocalFile(directory.filePath("draft.md"));
+        backend.saveAs(saved);
+        QVERIFY(!backend.modified());
+        QFile file(saved.toLocalFile());
+        QVERIFY(file.open(QIODevice::ReadOnly));
+        QCOMPARE(file.readAll(), markdown.toUtf8());
+        file.close();
+
+        QVERIFY(editor->setProperty("text", QStringLiteral("Unsaved work")));
+        QVERIFY(backend.modified());
+        QVERIFY(QMetaObject::invokeMethod(window.data(), "requestOpen",
+            Q_ARG(QVariant, QVariant::fromValue(saved))));
+        QCOMPARE(editor->property("text").toString(), QStringLiteral("Unsaved work"));
+        QCOMPARE(window->property("pendingAction").toString(), QStringLiteral("open"));
+        // Cancelling a pending Save As must never complete the document switch.
+        backend.fileDialogCanceled();
+        QCOMPARE(editor->property("text").toString(), QStringLiteral("Unsaved work"));
+        backend.open(saved);
+        QCOMPARE(editor->property("text").toString(), markdown);
+        QVERIFY(!backend.modified());
+        backend.discardRecovery();
     }
 
     void remembersLastSaveDirectory() {

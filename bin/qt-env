@@ -1,0 +1,14 @@
+# Sourced by build scripts. Honour an explicit QMAKE before discovering Qt.
+if [ -z "${QMAKE:-}" ]; then
+  for candidate in qmake6 qmake /opt/homebrew/opt/qtbase/bin/qmake /opt/homebrew/opt/qt/bin/qmake /usr/local/opt/qtbase/bin/qmake /usr/local/opt/qt/bin/qmake; do
+    if command -v "$candidate" >/dev/null 2>&1; then
+      QMAKE="$candidate"
+      break
+    fi
+  done
+fi
+if [ -z "${QMAKE:-}" ]; then
+  echo "Qt 6 is required. On macOS: brew install qtbase qtdeclarative qttools" >&2
+  exit 1
+fi
+JOBS="${JOBS:-$(getconf _NPROCESSORS_ONLN 2>/dev/null || echo 2)}"

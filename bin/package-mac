@@ -1,0 +1,22 @@
+#!/usr/bin/env sh
+set -eu
+ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
+[ "$(uname -s)" = Darwin ] || { echo 'Run on macOS.' >&2; exit 1; }
+. "$ROOT/bin/qt-env"
+"$ROOT/bin/build"
+QT_BIN="$("$QMAKE" -query QT_INSTALL_BINS)"
+mkdir -p "$ROOT/dist"
+# ditto replaces matching files; remove only the generated bundle for a clean deployment.
+rm -rf "$ROOT/dist/Omawrite.app"
+ditto "$ROOT/build/Omawrite.app" "$ROOT/dist/Omawrite.app"
+# Preload QtQml so nested modules from split Homebrew packages participate
+# in the initial dependency scan, including their own framework paths.
+QML_CORE="$("$QMAKE" -query QT_INSTALL_QML)/QtQml"
+ditto "$QML_CORE" "$ROOT/dist/Omawrite.app/Contents/Resources/qml/QtQml"
+
+DYLD_FRAMEWORK_PATH="$("$QMAKE" -query QT_INSTALL_LIBS)" "$QT_BIN/macdeployqt" "$ROOT/dist/Omawrite.app" -qmldir="$ROOT/src" -libpath="$("$QMAKE" -query QT_INSTALL_LIBS)" -always-overwrite -no-codesign -no-strip
+mkdir -p "$ROOT/dist/Omawrite.app/Contents/Resources/licenses"
+cp "$ROOT/LICENSE" "$ROOT/dist/Omawrite.app/Contents/Resources/licenses/Omawrite-MIT.txt"
+cp "$ROOT/fonts/OFL.txt" "$ROOT/dist/Omawrite.app/Contents/Resources/licenses/Fonts-OFL.txt"
+codesign --force --deep --sign - "$ROOT/dist/Omawrite.app"
+echo "Packaged $ROOT/dist/Omawrite.app (local ad-hoc signature)"

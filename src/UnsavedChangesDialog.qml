@@ -5,6 +5,7 @@ Dialog {
     id: root
 
     property string fileName: "Untitled.md"
+    property string pendingAction: "close"
     property bool darkMode: true
     property color textColor: darkMode ? "#d0d0d0" : "#42464c"
     property color strongTextColor: darkMode ? "#eeeeee" : "#222324"
@@ -47,7 +48,7 @@ Dialog {
 
         Label {
             width: parent.width
-            text: "Save changes to " + root.fileName + " before closing?"
+            text: "Save changes to " + root.fileName + (root.pendingAction === "open" ? " before opening another document?" : " before closing?")
             color: root.textColor
             wrapMode: Text.Wrap
             font.family: "iA Writer Mono S"

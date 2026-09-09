@@ -9,12 +9,34 @@
 #include <QUrl>
 #include <QWindow>
 #include <QFile>
+#include <QFileOpenEvent>
+#include <functional>
 
 #include "backend.h"
 #include "systemtheme.h"
 
+// Finder delivers documents as events, rather than command-line arguments.
+class WriterApplication : public QApplication {
+public:
+    using QApplication::QApplication;
+    std::function<void(const QUrl &)> openDocument;
+    QList<QUrl> pendingDocuments;
+
+    bool event(QEvent *event) override {
+        if (event->type() == QEvent::FileOpen) {
+            const QUrl url = static_cast<QFileOpenEvent *>(event)->url();
+            if (openDocument)
+                openDocument(url);
+            else
+                pendingDocuments.append(url);
+            return true;
+        }
+        return QApplication::event(event);
+    }
+};
+
 int main(int argc, char *argv[]) {
-    QApplication app(argc, argv);
+    WriterApplication app(argc, argv);
     app.setApplicationName(QStringLiteral("omawrite"));
     app.setDesktopFileName(QStringLiteral("omawrite"));
     app.setWindowIcon(QIcon::fromTheme(QStringLiteral("omawrite")));
@@ -23,8 +45,10 @@ int main(int argc, char *argv[]) {
     QFontDatabase::addApplicationFont(QStringLiteral(":/fonts/iAWriterMonoS-Italic.ttf"));
     QFontDatabase::addApplicationFont(QStringLiteral(":/fonts/iAWriterMonoS-Bold.ttf"));
     QFontDatabase::addApplicationFont(QStringLiteral(":/fonts/iAWriterMonoS-BoldItalic.ttf"));
-    app.setOrganizationName(QStringLiteral("Omacom"));
-    app.setOrganizationDomain(QStringLiteral("omacom.io"));
+    app.setOrganizationName(QStringLiteral("AndrewGray"));
+    app.setOrganizationDomain(QStringLiteral("andrewjngray.github.io"));
+    app.setApplicationDisplayName(QStringLiteral("Omawrite Mac"));
+    app.setApplicationVersion(QStringLiteral("0.1.0"));
 
     QQuickStyle::setStyle(QStringLiteral("Material"));
 
@@ -70,6 +94,14 @@ int main(int argc, char *argv[]) {
     }
 
     backend.setParentWindow(qobject_cast<QWindow *>(engine.rootObjects().constFirst()));
+
+    app.openDocument = [&engine](const QUrl &url) {
+        QMetaObject::invokeMethod(engine.rootObjects().constFirst(), "requestOpen",
+                                  Q_ARG(QVariant, QVariant::fromValue(url)));
+    };
+    for (const QUrl &url : app.pendingDocuments)
+        app.openDocument(url);
+    app.pendingDocuments.clear();
 
     const QStringList args = app.arguments();
     if (args.size() > 1 && !backend.modified())

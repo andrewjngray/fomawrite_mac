@@ -1,41 +1,52 @@
-# Omawrite
+# Omawrite Mac
 
-A dead-simple Markdown writing app built with Qt Quick and C++ that automatically follows system dark/light mode.
+Andrew Gray's personal Markdown editor, forked from [omacom/omawrite](https://github.com/omacom/omawrite). Built with Qt Quick, QML and C++.
 
-<img width="2948" height="3227" alt="screenshot-2026-06-23_15-24-08" src="https://github.com/user-attachments/assets/4e930c0d-edda-4046-b444-a59eff523329" />
-<img width="2948" height="3227" alt="screenshot-2026-06-23_15-23-23" src="https://github.com/user-attachments/assets/8ced7c26-961b-4ded-b263-84403001a951" />
+The aim is a calm, extensible reading and writing tool inspired by the parts of iA Writer and Typora we use daily. This is an early macOS port of Omawrite, not a feature-complete replacement for either product.
 
+## Build and run on macOS
 
-## Install
+Install Apple's Command Line Tools (`xcode-select --install`) and Homebrew, then:
 
-Install via the Omarchy Package Repository via the `omawrite` package. It's installed by default in new installations of Omarchy (from Quattro forward).
+```sh
+brew install qtbase qtdeclarative qttools
+./bin/build
+./bin/run examples/Welcome.md
+./bin/test
+```
 
-## Shortcuts
+A full `brew install qt` also works. Build scripts discover Homebrew Qt on Apple Silicon or Intel; set `QMAKE=/path/to/qmake` to use another Qt 6 installation. The initial build is tested on Apple Silicon with Qt 6.11.2. Other Macs and older macOS versions still need validation.
 
-- `Ctrl+S` saves. Unsaved documents use the XDG desktop portal file picker.
-- `Ctrl+Shift+S` saves as.
-- `Ctrl+O` opens a Markdown file through the portal picker.
-- `Ctrl+P` opens the system print dialog.
-- `Ctrl+N` opens a new Omawrite window.
-- `Ctrl+Z`, `Ctrl+Shift+Z`, and `Ctrl+Y` handle undo and redo.
-- `Super+F` toggles fullscreen. Qt maps this key as `Meta+F`.
-- `Ctrl+F` searches the document. Use `Enter` or `Ctrl+G` for the next match and `Shift+Enter` for the previous match.
-- `Ctrl+H` opens find and replace.
-- `Ctrl+B`, `Ctrl+I`, and `Ctrl+K` insert bold, italic, and link Markdown.
-- `Ctrl+?` shows the keyboard shortcut reference.
+To create an app with its Qt libraries included:
 
-Unsaved drafts are recovered after an abnormal exit. Omawrite also watches open files
-and warns before an external change can replace local work.
+```sh
+./bin/package-mac
+open dist/Omawrite.app
+```
 
-Text follows the desktop text size — `omarchy display text size`, or GNOME's
-`text-scaling-factor` — and re-flows without a restart. The default of 12px leaves
-Omawrite at the size it is designed around; larger and smaller sizes scale from there.
+The package is locally ad-hoc signed, not notarised for public distribution. You can copy it to Applications for personal use. Build outputs are ignored by Git.
 
-## Requirements
+## What works in the foundation
 
-- Qt 6: `qt6-base`, `qt6-declarative`, `qt6-quickcontrols2`
-- `xdg-desktop-portal` and a portal backend
+- Local Markdown editing with styled headings, emphasis and links.
+- Open, Save, Save As, print and word count.
+- Find/replace, undo/redo and Markdown formatting shortcuts.
+- Recovery snapshots and warnings for external file changes inherited from Omawrite.
+- macOS menus, native file pickers, Finder Open With support and system light/dark appearance.
 
-The iA Writer Mono font is bundled under the SIL Open Font License 1.1; see
-`fonts/OFL.txt`. The font is copyright Information Architects Inc. and based on
-IBM Plex, copyright IBM Corp.
+On macOS use **Command-S/O/N/P/F/B/I/K**, **Shift-Command-S** for Save As, **Option-Command-F** for replace, **Command-W** to close, and **Control-Command-F** for full screen. Qt maps its internal `Ctrl` shortcut notation to Command on macOS.
+
+## Project map
+
+- `src/`: QML interface, C++ document backend, Markdown highlighter and platform appearance code.
+- `tests/`: Qt tests for editor operations and document behaviour.
+- `macos/`: application bundle metadata and Markdown file association.
+- `bin/`: build, test, run and packaging commands.
+- `examples/`: documents for trying features.
+- `docs/`: [project direction](docs/roadmap.md), [interview summary](docs/interview-summary.md) and [development guide](docs/development.md).
+
+`origin` points to [andrewjngray/omawrite_mac](https://github.com/andrewjngray/omawrite_mac); `upstream` points to the original Omawrite repository. Keep upstream updates separate from personal changes and review before merging.
+
+## Attribution
+
+Omawrite is copyright David Heinemeier Hansson, under the [MIT license](LICENSE), retained here. Bundled iA Writer Mono fonts are copyright Information Architects Inc., based on IBM Plex, and distributed under the [SIL Open Font License](fonts/OFL.txt).

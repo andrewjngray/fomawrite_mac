@@ -2,6 +2,7 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Controls.Material
 import QtQuick.Dialogs as Dialogs
+import Qt.labs.platform as Platform
 import QtQuick.Layouts
 import QtQuick.Window
 import "EditorMutations.js" as EditorMutations
@@ -15,6 +16,7 @@ ApplicationWindow {
     visible: true
     title: (backend.modified ? "* " : "") + backend.fileName + " - Omawrite"
 
+    readonly property bool isMac: Qt.platform.os === "osx"
     readonly property bool darkMode: backend.darkMode
     readonly property color pageColor: backend.themeBackground
     readonly property color textColor: backend.themeForeground
@@ -144,7 +146,7 @@ ApplicationWindow {
     }
 
     Shortcut {
-        sequence: "Ctrl+H"
+        sequence: win.isMac ? "Ctrl+Alt+F" : "Ctrl+H"
         context: Qt.ApplicationShortcut
         onActivated: {
             searchOpen = true;
@@ -203,7 +205,7 @@ ApplicationWindow {
     }
 
     Shortcut {
-        sequences: ["Meta+F", "F11"]
+        sequences: win.isMac ? ["Ctrl+Meta+F"] : ["Meta+F", "F11"]
         context: Qt.ApplicationShortcut
         onActivated: toggleFullScreen()
     }
@@ -235,6 +237,65 @@ ApplicationWindow {
         context: Qt.ApplicationShortcut
         enabled: win.searchOpen
         onActivated: win.moveSearch(1)
+    }
+
+    Shortcut {
+        sequences: [StandardKey.Close]
+        onActivated: win.close()
+    }
+
+    Loader {
+        active: win.isMac
+        sourceComponent: Component {
+    Platform.MenuBar {
+        Platform.Menu {
+            title: "File"
+            Platform.MenuItem { text: "New Window"; onTriggered: backend.newWindow() }
+            Platform.MenuItem { text: "Open…"; onTriggered: backend.openDialog() }
+            Platform.MenuItem { text: "Save"; onTriggered: backend.save() }
+            Platform.MenuItem { text: "Save As…"; onTriggered: backend.saveAsDialog() }
+            Platform.MenuItem { text: "Print…"; onTriggered: backend.printDocument() }
+            Platform.MenuItem { text: "Close Window"; onTriggered: win.close() }
+            Platform.MenuItem {
+                text: "Quit Omawrite"
+                role: Platform.MenuItem.QuitRole
+                onTriggered: win.close()
+            }
+        }
+        Platform.Menu {
+            title: "Edit"
+            Platform.MenuItem { text: "Undo"; onTriggered: editor.undo() }
+            Platform.MenuItem { text: "Redo"; onTriggered: editor.redo() }
+            Platform.MenuItem { text: "Cut"; onTriggered: editor.cut() }
+            Platform.MenuItem { text: "Copy"; onTriggered: editor.copy() }
+            Platform.MenuItem { text: "Paste"; onTriggered: editor.pasteClipboardAsPlainText() }
+            Platform.MenuItem { text: "Select All"; onTriggered: editor.selectAll() }
+            Platform.MenuItem {
+                text: "Find…"
+                onTriggered: {
+                    win.searchOpen = true;
+                    searchField.forceActiveFocus();
+                    searchField.selectAll();
+                }
+            }
+        }
+        Platform.Menu {
+            title: "Format"
+            Platform.MenuItem { text: "Bold"; onTriggered: editor.wrapSelection("**", "**") }
+            Platform.MenuItem { text: "Italic"; onTriggered: editor.wrapSelection("*", "*") }
+            Platform.MenuItem { text: "Link…"; onTriggered: editor.insertLink() }
+        }
+        Platform.Menu {
+            title: "View"
+            Platform.MenuItem { text: "Toggle Full Screen"; onTriggered: win.toggleFullScreen() }
+        }
+        Platform.Menu {
+            title: "Help"
+            Platform.MenuItem { text: "Keyboard Shortcuts"; onTriggered: shortcutsDialog.open() }
+        }
+    }
+
+        }
     }
 
     Connections {
@@ -290,6 +351,7 @@ ApplicationWindow {
 
     UnsavedChangesDialog {
         id: unsavedChangesDialog
+        pendingAction: win.pendingAction
         fileName: backend.fileName
         darkMode: win.darkMode
         textScale: win.textScale
@@ -328,10 +390,11 @@ ApplicationWindow {
         id: shortcutsDialog
         modal: true
         title: "Keyboard shortcuts"
+        width: Math.min(win.width - 40, win.scaledSize(440))
         standardButtons: Dialog.Close
         anchors.centerIn: parent
         contentItem: Label {
-            text: "Ctrl+S  Save\nCtrl+Shift+S  Save As\nCtrl+O  Open\nCtrl+N  New Window\nCtrl+F  Find\nCtrl+H  Find and Replace\nCtrl+B  Bold\nCtrl+I  Italic\nCtrl+K  Link\nCtrl+P  Print\nF11 / Super+F  Fullscreen\nCtrl+?  Shortcuts"
+            text: win.isMac ? "⌘S  Save\n⇧⌘S  Save As\n⌘O  Open\n⌘N  New Window\n⌘W  Close Window\n⌘F  Find\n⌥⌘F  Find and Replace\n⌘B  Bold\n⌘I  Italic\n⌘K  Link\n⌘P  Print\n⌃⌘F  Fullscreen\n⌘?  Shortcuts" : "Ctrl+S  Save\nCtrl+Shift+S  Save As\nCtrl+O  Open\nCtrl+N  New Window\nCtrl+F  Find\nCtrl+H  Find and Replace\nCtrl+B  Bold\nCtrl+I  Italic\nCtrl+K  Link\nCtrl+P  Print\nF11 / Super+F  Fullscreen\nCtrl+?  Shortcuts"
             lineHeight: 1.5
         }
     }

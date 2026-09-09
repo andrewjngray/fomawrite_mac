@@ -21,8 +21,10 @@ public slots:
     void refresh();
 
 private slots:
+#ifndef Q_OS_MACOS
     void handlePortalSettingChanged(const QString &nameSpace, const QString &key,
                                     const QDBusVariant &value);
+#endif
 
 private:
     bool detectDarkMode() const;
