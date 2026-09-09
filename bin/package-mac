@@ -12,9 +12,10 @@ ditto "$ROOT/build/Omawrite.app" "$ROOT/dist/Omawrite.app"
 # Preload QtQml so nested modules from split Homebrew packages participate
 # in the initial dependency scan, including their own framework paths.
 QML_CORE="$("$QMAKE" -query QT_INSTALL_QML)/QtQml"
-ditto "$QML_CORE" "$ROOT/dist/Omawrite.app/Contents/Resources/qml/QtQml"
+mkdir -p "$ROOT/dist/Omawrite.app/Contents/Resources/qml"
+cp -RL "$QML_CORE" "$ROOT/dist/Omawrite.app/Contents/Resources/qml/QtQml"
 
-DYLD_FRAMEWORK_PATH="$("$QMAKE" -query QT_INSTALL_LIBS)" "$QT_BIN/macdeployqt" "$ROOT/dist/Omawrite.app" -qmldir="$ROOT/src" -libpath="$("$QMAKE" -query QT_INSTALL_LIBS)" -always-overwrite -no-codesign -no-strip
+DYLD_FRAMEWORK_PATH="$("$QMAKE" -query QT_INSTALL_LIBS)" "$QT_BIN/macdeployqt" "$ROOT/dist/Omawrite.app" -qmldir="$ROOT/src" -libpath="$("$QMAKE" -query QT_INSTALL_LIBS)" -no-codesign -no-strip
 mkdir -p "$ROOT/dist/Omawrite.app/Contents/Resources/licenses"
 cp "$ROOT/LICENSE" "$ROOT/dist/Omawrite.app/Contents/Resources/licenses/Omawrite-MIT.txt"
 cp "$ROOT/fonts/OFL.txt" "$ROOT/dist/Omawrite.app/Contents/Resources/licenses/Fonts-OFL.txt"
