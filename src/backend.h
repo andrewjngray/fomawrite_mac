@@ -9,6 +9,7 @@
 #include <QUrl>
 #include <QVariantList>
 #include <memory>
+#include "filelibrary.h"
 
 class MarkdownHighlighter;
 class QTextDocument;
@@ -17,6 +18,8 @@ class QLockFile;
 
 class Backend : public QObject {
     Q_OBJECT
+    Q_PROPERTY(QObject *library READ library CONSTANT)
+    Q_PROPERTY(QUrl documentBaseUrl READ documentBaseUrl NOTIFY fileUrlChanged)
     Q_PROPERTY(QUrl fileUrl READ fileUrl NOTIFY fileUrlChanged)
     Q_PROPERTY(QString fileName READ fileName NOTIFY fileUrlChanged)
     Q_PROPERTY(bool modified READ modified NOTIFY modifiedChanged)
@@ -32,6 +35,9 @@ class Backend : public QObject {
 public:
     explicit Backend(QObject *parent = nullptr);
     ~Backend() override;
+
+    QObject *library() { return &m_library; }
+    QUrl documentBaseUrl() const;
 
     void setParentWindow(QWindow *window);
 
@@ -76,6 +82,7 @@ public:
     Q_INVOKABLE void saveWindowGeometry(int x, int y, int width, int height, bool maximized);
 
 signals:
+    void documentLoaded();
     void fileUrlChanged();
     void modifiedChanged();
     void statusChanged();
@@ -111,6 +118,7 @@ private:
     void loadOmarchyTheme();
     void watchOmarchyTheme();
 
+    FileLibrary m_library;
     QUrl m_fileUrl;
     bool m_modified = false;
     QString m_status;

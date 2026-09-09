@@ -71,7 +71,8 @@ QString Backend::normalizedLinkUrl(const QString &clipboardText) {
     return url.toString();
 }
 
-Backend::Backend(QObject *parent) : QObject(parent) {
+Backend::Backend(QObject *parent) : QObject(parent), m_library(this) {
+    connect(&m_library, &FileLibrary::rootFolderChanged, this, &Backend::fileUrlChanged);
     const QString stateDirectory = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
     QDir().mkpath(stateDirectory);
     // Claim an orphaned snapshot before taking an empty slot. This ensures a
@@ -130,6 +131,12 @@ Backend::Backend(QObject *parent) : QObject(parent) {
 }
 
 Backend::~Backend() = default;
+
+QUrl Backend::documentBaseUrl() const {
+    const QString path = m_fileUrl.isLocalFile() ? QFileInfo(m_fileUrl.toLocalFile()).absolutePath()
+        : m_library.rootFolder().toLocalFile();
+    return path.isEmpty() ? QUrl() : QUrl::fromLocalFile(path + QDir::separator());
+}
 
 void Backend::setParentWindow(QWindow *window) {
     m_parentWindow = window;
@@ -217,6 +224,9 @@ void Backend::open(const QUrl &url) {
     m_lastKnownFileContents = contents;
     m_hasKnownFileContents = true;
     setFileUrl(url);
+    if (m_library.rootFolder().isEmpty())
+        m_library.setRootFolder(QUrl::fromLocalFile(QFileInfo(url.toLocalFile()).absolutePath()));
+    m_library.revealFile(url);
     watchCurrentFile();
     setModified(false);
     setStatus(QStringLiteral("Opened %1").arg(fileName()));
@@ -436,6 +446,7 @@ void Backend::loadDocumentText(const QString &text) {
     applyDocumentTypography();
     m_wordCountTimer.stop();
     setWordCount(countWords(text));
+    emit documentLoaded();
 }
 
 void Backend::setFileUrl(const QUrl &url) {

@@ -1,4 +1,5 @@
 import QtQuick
+import QtCore
 import QtQuick.Controls
 import QtQuick.Controls.Material
 import QtQuick.Dialogs as Dialogs
@@ -30,7 +31,7 @@ ApplicationWindow {
     readonly property int editorFontPixelSize: scaledSize(20)
     readonly property int editorWidth: Math.min(
         Math.round(writerFontMetrics.averageCharacterWidth * 65),
-        Math.max(360, width - Math.round(writerFontMetrics.averageCharacterWidth * 20)))
+        Math.max(180, editorPane.width - 64))
     property bool closeConfirmed: false
     property bool searchOpen: false
     property bool searchUpdating: false
@@ -40,6 +41,38 @@ ApplicationWindow {
     property string pendingAction: ""
     property bool replaceOpen: false
     property bool awaitingPendingSave: false
+
+    Settings {
+        id: workspaceSettings
+        category: "workspace"
+        property bool libraryVisible: true
+        property int layoutMode: 1
+    }
+
+    header: ToolBar {
+        font.family: "Helvetica Neue"
+        font.pixelSize: 13
+        Material.foreground: win.textColor
+        background: Rectangle { color: win.darkMode ? "#25272b" : "#f4f5f7" }
+        RowLayout {
+            anchors.fill: parent
+            anchors.leftMargin: 12
+            anchors.rightMargin: 12
+            ToolButton {
+                text: "Library"
+                checkable: true
+                checked: workspaceSettings.libraryVisible
+                onClicked: workspaceSettings.libraryVisible = checked
+            }
+            Label { text: backend.fileName; elide: Text.ElideMiddle; Layout.fillWidth: true }
+            ComboBox {
+                objectName: "workspaceMode"
+                model: ["Editor", "Split", "Preview"]
+                currentIndex: workspaceSettings.layoutMode
+                onActivated: workspaceSettings.layoutMode = currentIndex
+            }
+        }
+    }
 
     Material.theme: darkMode ? Material.Dark : Material.Light
     Material.accent: backend.themeAccent
@@ -301,6 +334,13 @@ ApplicationWindow {
     Connections {
         target: backend
 
+        function onDocumentLoaded() {
+            Qt.callLater(function() {
+                editor.cursorPosition = 0;
+                editorFlick.contentY = 0;
+            });
+        }
+
         function onOpenDialogRequested() {
             openFileDialog.open();
         }
@@ -399,8 +439,28 @@ ApplicationWindow {
         }
     }
 
-    Item {
+    SplitView {
         anchors.fill: parent
+        orientation: Qt.Horizontal
+        handle: Rectangle {
+            implicitWidth: 5
+            color: SplitHandle.hovered || SplitHandle.pressed ? "#63b9d4" : (win.darkMode ? "#35383c" : "#e5e7eb")
+        }
+        LibraryPane {
+            library: backend.library
+            currentFile: backend.fileUrl
+            darkMode: win.darkMode
+            visible: workspaceSettings.libraryVisible
+            SplitView.preferredWidth: 240
+            SplitView.minimumWidth: 180
+            SplitView.maximumWidth: 420
+            onOpenRequested: function(file) { win.requestOpen(file); }
+        }
+        Item {
+            id: editorPane
+            visible: workspaceSettings.layoutMode !== 2
+            SplitView.fillWidth: true
+            SplitView.minimumWidth: 260
 
         Flickable {
             id: editorFlick
@@ -1060,6 +1120,18 @@ ApplicationWindow {
                     onClicked: win.closeSearch()
                 }
             }
+        }
+    }
+
+        PreviewPane {
+            markdown: editor.text
+            documentBaseUrl: backend.documentBaseUrl
+            darkMode: win.darkMode
+            visible: workspaceSettings.layoutMode !== 0
+            SplitView.fillWidth: workspaceSettings.layoutMode === 2
+            SplitView.preferredWidth: 450
+            SplitView.minimumWidth: 220
+            onLinkRequested: function(link) { backend.openExternalUrl(link); }
         }
     }
 

@@ -14,3 +14,6 @@ HEADERS += \
 
 QT += widgets printsupport quickcontrols2 quickdialogs2
 CONFIG -= app_bundle
+
+SOURCES += ../src/filelibrary.cpp
+HEADERS += ../src/filelibrary.h

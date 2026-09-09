@@ -25,3 +25,6 @@ macx {
 }
 
 RESOURCES += src/resources.qrc
+
+SOURCES += src/filelibrary.cpp
+HEADERS += src/filelibrary.h

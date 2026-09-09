@@ -13,6 +13,8 @@ class OmawriteTest : public QObject {
 
 private slots:
     void initTestCase() {
+        QCoreApplication::setOrganizationName("OmawriteTests");
+        QCoreApplication::setApplicationName("OmawriteTests");
         QVERIFY(m_settingsDirectory.isValid());
         QCoreApplication::setAttribute(Qt::AA_DontUseNativeDialogs);
         QStandardPaths::setTestModeEnabled(true);
@@ -20,6 +22,56 @@ private slots:
         QSettings::setDefaultFormat(QSettings::IniFormat);
         QSettings::setPath(QSettings::IniFormat, QSettings::UserScope,
                            m_settingsDirectory.path());
+    }
+
+    void browsesAndCreatesLibraryFilesSafely() {
+        QTemporaryDir directory;
+        QVERIFY(directory.isValid());
+        FileLibrary library;
+        library.setRootFolder(QUrl::fromLocalFile(directory.path()));
+        QVERIFY(library.createFolder("Notes"));
+        const QUrl draft = library.createDocument("Draft");
+        QVERIFY(draft.isLocalFile());
+        QFile file(draft.toLocalFile());
+        QVERIFY(file.open(QIODevice::WriteOnly));
+        file.write("preserve me");
+        file.close();
+        QVERIFY(library.createDocument("Draft").isEmpty());
+        QVERIFY(file.open(QIODevice::ReadOnly));
+        QCOMPARE(file.readAll(), QByteArray("preserve me"));
+        QVERIFY(library.createDocument("../escape").isEmpty());
+        QFile nested(directory.filePath("Notes/Nested.md"));
+        QVERIFY(nested.open(QIODevice::WriteOnly)); nested.close();
+        library.refresh();
+        QCOMPARE(library.entries().size(), 2);
+        library.toggleFolder(QUrl::fromLocalFile(directory.filePath("Notes")));
+        QCOMPARE(library.entries().size(), 3);
+        library.setFilter("nested");
+        QCOMPARE(library.entries().size(), 2);
+        QCOMPARE(library.entries().at(1).toMap().value("name").toString(), QString("Nested.md"));
+        library.setRootFolder(QUrl("https://example.com"));
+        QCOMPARE(library.rootFolder(), QUrl::fromLocalFile(QFileInfo(directory.path()).canonicalFilePath()));
+        QVERIFY(!library.error().isEmpty());
+    }
+
+    void rendersPreviewWithoutChangingMarkdown() {
+        Backend backend;
+        QQmlEngine engine;
+        engine.rootContext()->setContextProperty("backend", &backend);
+        QQmlComponent component(&engine, QUrl::fromLocalFile(QFINDTESTDATA("../src/Main.qml")));
+        QVERIFY2(component.isReady(), qPrintable(component.errorString()));
+        QScopedPointer<QObject> window(component.create());
+        QVERIFY2(window, qPrintable(component.errorString()));
+        QObject *editor = window->findChild<QObject *>("sourceEditor");
+        QObject *preview = window->findChild<QObject *>("renderedPreview");
+        QObject *pane = window->findChild<QObject *>("previewPane");
+        QVERIFY(editor && preview && pane);
+        const QString text = "# Title\n\n**Bold** and café\n\n| A | B |\n|---|---|\n| 1 | 2 |\n";
+        editor->setProperty("text", text);
+        QTRY_COMPARE(pane->property("renderedMarkdown").toString(), text);
+        QCOMPARE(preview->property("readOnly").toBool(), true);
+        QCOMPARE(editor->property("text").toString(), text);
+        backend.discardRecovery();
     }
 
     void countsWords() {
@@ -177,7 +229,7 @@ private slots:
         QVERIFY2(window, qPrintable(component.errorString()));
 
         QVERIFY(window->findChild<QObject *>(QStringLiteral("sourceEditor")));
-        QVERIFY(!window->findChild<QObject *>(QStringLiteral("renderedPreview")));
+        QVERIFY(window->findChild<QObject *>(QStringLiteral("renderedPreview")));
         QVERIFY(!window->findChild<QObject *>(QStringLiteral("modeToggle")));
 
         QObject *saveButton = window->findChild<QObject *>(QStringLiteral("saveButton"));
