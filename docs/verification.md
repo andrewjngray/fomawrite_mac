@@ -1,10 +1,10 @@
-# Initial macOS port verification
+# macOS development verification
 
 Environment: Apple Silicon, macOS 26.6.2, Qt 6.11.2, Apple Command Line Tools.
 
 ## Automated checks
 
-`./bin/build` produces an arm64 application bundle. The Qt test suite reports **13 passed, 0 failed**, including a new regression for UTF-8 Markdown round trips and preservation of unsaved content when opening another document.
+`./bin/build` produces an arm64 application bundle. The Qt test suite reports **18 passed, 0 failed**, including a new regression for UTF-8 Markdown round trips and preservation of unsaved content when opening another document.
 
 The offscreen native-dialog fallback emits warnings inside Qt's Material SplitView during dialog teardown. Tests pass; the real macOS Save As dialog was separately checked.
 
@@ -27,3 +27,9 @@ The offscreen native-dialog fallback emits warnings inside Qt's Material SplitVi
 Only this Mac has been tested. Linux changes were reviewed but not built here. Printing, live system appearance changes, crash recovery, multiple simultaneous Finder selections and a full accessibility audit still need manual validation. Recovery, printing and external-change handling largely retain upstream behaviour.
 
 The app remains an initial development milestone, with one process per window. Public distribution needs signing/notarisation and broader compatibility testing.
+
+## Writing workspace — 9 September 2026
+
+The current suite adds folder expansion and safe file creation, source preservation during preview updates, presentation changes without undo mutations, local image resources, relative file-link resolution, typewriter centering, and outline parsing around fences/front matter. Native screenshots checked the three-pane layout, focused paragraphs, source syntax, preview paragraph spacing, task checkboxes and tables. The standalone bundle is rebuilt after these milestones.
+
+Still to check manually: clicking relative links and image display in a real document, large-library performance, narrow window layouts and long-document interactions. Outline is a practical ATX/setext parser, not a complete Markdown parser. Focus follows physical text paragraphs; wrapped lines within one paragraph stay active together.

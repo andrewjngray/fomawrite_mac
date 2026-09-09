@@ -143,6 +143,24 @@ private slots:
         backend.discardRecovery();
     }
 
+    void outlinesHeadingsOutsideCodeAndFrontMatter() {
+        Backend backend;
+        const QString text = "---\ntitle: Hidden\n---\n# First ###\n\n````md\n# Hidden\n```\n# Also hidden\n````\n\nSecond\n------\n\n### C#\n";
+        const auto outline = backend.documentOutline(text);
+        QCOMPARE(outline.size(), 3);
+        QCOMPARE(outline.at(0).toMap().value("title").toString(), QString("First"));
+        QCOMPARE(outline.at(1).toMap().value("level").toInt(), 2);
+        QCOMPARE(outline.at(1).toMap().value("position").toInt(), text.indexOf("Second"));
+        QCOMPARE(outline.at(2).toMap().value("title").toString(), QString("C#"));
+        QCOMPARE(backend.documentOutline("---\n# Visible").size(), 1);
+        const auto stats = backend.documentStatistics("**Hello** world");
+        QCOMPARE(stats.value("words").toInt(), 2);
+        QCOMPARE(stats.value("characters").toInt(), 11);
+        QCOMPARE(stats.value("charactersWithoutSpaces").toInt(), 10);
+        QCOMPARE(stats.value("readingMinutes").toInt(), 1);
+        QCOMPARE(backend.documentStatistics("").value("readingMinutes").toInt(), 0);
+    }
+
     void countsWords() {
         QCOMPARE(Backend::countWords(QStringLiteral("one two-three don't 42")), 4);
         QCOMPARE(Backend::countWords(QStringLiteral("你好 世界")), 2);

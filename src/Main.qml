@@ -75,6 +75,7 @@ ApplicationWindow {
                 onClicked: workspaceSettings.libraryVisible = checked
             }
             Label { text: backend.fileName; elide: Text.ElideMiddle; Layout.fillWidth: true }
+            ToolButton { text: "Outline"; onClicked: { outlineDrawer.headings = backend.documentOutline(editor.text); outlineDrawer.open(); } }
             ToolButton { text: "Aa"; onClicked: writingOptions.open(); Accessible.name: "Writing options" }
             ComboBox {
                 objectName: "workspaceMode"
@@ -82,6 +83,34 @@ ApplicationWindow {
                 currentIndex: workspaceSettings.layoutMode
                 onActivated: workspaceSettings.layoutMode = currentIndex
             }
+        }
+    }
+
+    DocumentOutline {
+        id: outlineDrawer
+        onJumpRequested: function(position) {
+            if (workspaceSettings.layoutMode === 2) workspaceSettings.layoutMode = 1;
+            editor.cursorPosition = position;
+            editor.forceActiveFocus();
+            editorFlick.ensureCursorVisible();
+        }
+    }
+
+    Dialog {
+        id: statisticsDialog
+        property var statistics: ({})
+        title: "Document statistics"
+        anchors.centerIn: parent
+        width: 300
+        modal: true
+        standardButtons: Dialog.Close
+        onOpened: statistics = backend.documentStatistics(editor.text)
+        Label {
+            text: (statisticsDialog.statistics.words || 0) + " words\n"
+                + (statisticsDialog.statistics.characters || 0) + " characters\n"
+                + (statisticsDialog.statistics.charactersWithoutSpaces || 0) + " excluding whitespace\n\n"
+                + (statisticsDialog.statistics.readingMinutes || 0) + " min estimated reading time"
+            lineHeight: 1.6
         }
     }
 
@@ -1000,6 +1029,8 @@ ApplicationWindow {
             anchors.rightMargin: 12
             anchors.bottomMargin: 10
             text: backend.wordCount + (backend.wordCount === 1 ? " Word" : " Words")
+            TapHandler { onTapped: statisticsDialog.open() }
+            Accessible.name: "Document word count; click for statistics"
             color: win.mutedColor
             opacity: 0.75
             font.family: "iA Writer Mono S"

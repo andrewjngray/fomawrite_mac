@@ -173,6 +173,64 @@ void Backend::setTextScale(qreal textScale) {
     emit textScaleChanged();
 }
 
+QVariantList Backend::documentOutline(const QString &markdown) const {
+    QVariantList headings;
+    const QStringList lines = markdown.split('\n');
+    int position = 0;
+    QChar fence;
+    int fenceLength = 0;
+    bool frontMatter = false;
+    if (!lines.isEmpty() && lines.first().trimmed() == "---") {
+        for (int i = 1; i < lines.size(); ++i)
+            if (lines[i].trimmed() == "---" || lines[i].trimmed() == "...") { frontMatter = true; break; }
+    }
+    static const QRegularExpression atx("^ {0,3}(#{1,6})[ \t]+(.+)$");
+    static const QRegularExpression delimiter("^ {0,3}(`{3,}|~{3,})(.*)$");
+    static const QRegularExpression setext("^ {0,3}(=+|-+)[ \t]*$");
+    for (int index = 0; index < lines.size(); ++index) {
+        const QString &line = lines[index];
+        if (frontMatter) {
+            if (index > 0 && (line.trimmed() == "---" || line.trimmed() == "...")) frontMatter = false;
+            position += line.size() + 1;
+            continue;
+        }
+        const auto marker = delimiter.match(line);
+        if (marker.hasMatch()) {
+            const QString sequence = marker.captured(1);
+            if (fence.isNull()) { fence = sequence.at(0); fenceLength = sequence.size(); }
+            else if (sequence.at(0) == fence && sequence.size() >= fenceLength && marker.captured(2).trimmed().isEmpty()) fence = QChar();
+        } else if (fence.isNull()) {
+            const auto heading = atx.match(line);
+            if (heading.hasMatch()) {
+                QString title = heading.captured(2).trimmed();
+                title.remove(QRegularExpression("[ \t]+#+$"));
+                headings.append(QVariantMap{{"title", title}, {"level", heading.captured(1).size()}, {"position", position}});
+            } else if (!line.trimmed().isEmpty() && index + 1 < lines.size() && setext.match(lines[index + 1]).hasMatch()
+                       && !line.startsWith("    ") && !line.startsWith('>')) {
+                headings.append(QVariantMap{{"title", line.trimmed()}, {"level", lines[index + 1].trimmed().startsWith('=') ? 1 : 2}, {"position", position}});
+                position += line.size() + 1;
+                ++index;
+                position += lines[index].size() + 1;
+                continue;
+            }
+        }
+        position += line.size() + 1;
+    }
+    return headings;
+}
+
+QVariantMap Backend::documentStatistics(const QString &markdown) const {
+    QTextDocument rendered;
+    rendered.setMarkdown(markdown);
+    const QString plain = rendered.toPlainText();
+    const int words = countWords(plain);
+    QString compact = plain;
+    compact.remove(QRegularExpression("\\s"));
+    return {{"words", words}, {"characters", plain.toUcs4().size()},
+            {"charactersWithoutSpaces", compact.toUcs4().size()},
+            {"readingMinutes", words == 0 ? 0 : qMax(1, (words + 199) / 200)}};
+}
+
 void Backend::stylePreview(QObject *textDocument) {
     auto *quick = qobject_cast<QQuickTextDocument *>(textDocument);
     if (!quick || !quick->textDocument() || quick->textDocument() == m_document) return;

@@ -59,6 +59,8 @@ public:
     static QString normalizedLinkUrl(const QString &clipboardText);
     static QString suggestedFileName(const QString &text);
 
+    Q_INVOKABLE QVariantList documentOutline(const QString &markdown) const;
+    Q_INVOKABLE QVariantMap documentStatistics(const QString &markdown) const;
     Q_INVOKABLE void stylePreview(QObject *textDocument);
     Q_INVOKABLE void setFocusPosition(int position, bool enabled);
     Q_INVOKABLE void setShowMarkup(bool show);

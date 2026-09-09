@@ -26,8 +26,14 @@ open dist/Omawrite.app
 
 The package is locally ad-hoc signed, not notarised for public distribution. You can copy it to Applications for personal use. Build outputs are ignored by Git.
 
-## What works in the foundation
+## Writing workspace
 
+- Resizable file library, Markdown editor and live rendered preview; Editor/Split/Preview layouts.
+- Expandable writing folders, file filtering, and safe new-file/new-folder creation.
+- Visible Markdown syntax or styled editing, paragraph focus and centered typewriter scrolling.
+- Adjustable writing size and Sans/Serif/Mono preview typography.
+- Rendered tables, task lists, local images and relative links to Markdown documents.
+- Heading outline navigation and reading statistics.
 - Local Markdown editing with styled headings, emphasis and links.
 - Open, Save, Save As, print and word count.
 - Find/replace, undo/redo and Markdown formatting shortcuts.
@@ -35,6 +41,8 @@ The package is locally ad-hoc signed, not notarised for public distribution. You
 - macOS menus, native file pickers, Finder Open With support and system light/dark appearance.
 
 On macOS use **Command-S/O/N/P/F/B/I/K**, **Shift-Command-S** for Save As, **Option-Command-F** for replace, **Command-W** to close, and **Control-Command-F** for full screen. Qt maps its internal `Ctrl` shortcut notation to Command on macOS.
+
+Try `./bin/run examples/Workspace-tour.md`. Use **Library** to show/hide the file pane, **Outline** to jump to headings, **Aa** for writing options, and the word count for statistics. Files remain ordinary UTF-8 Markdown. The library filter currently covers files in expanded folders. Preview uses Qt Markdown; it does not yet offer iA Writer's complete extensions, web/PDF template system or publishing integrations.
 
 ## Project map
 
