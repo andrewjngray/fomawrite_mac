@@ -17,6 +17,7 @@ SOURCES += \
 
 macx {
     SOURCES += src/systemtheme_mac.cpp
+    OBJECTIVE_SOURCES += src/windowchrome_mac.mm
     TARGET = Omawrite
     QMAKE_INFO_PLIST = macos/Info.plist
     QMAKE_MACOSX_DEPLOYMENT_TARGET = 14.0

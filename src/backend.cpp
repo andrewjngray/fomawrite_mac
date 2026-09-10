@@ -247,7 +247,7 @@ void Backend::stylePreview(QObject *textDocument) {
             QTextCharFormat heading;
             // Qt Quick applies its pixel font separately from the document default.
             // Relative adjustment follows the actual preview font at every size.
-            heading.setProperty(QTextFormat::FontSizeAdjustment, format.headingLevel() == 1 ? 2 : format.headingLevel() == 2 ? 1 : 0);
+            heading.setProperty(QTextFormat::FontSizeAdjustment, format.headingLevel() == 1 ? 3 : format.headingLevel() == 2 ? 2 : 0);
             heading.setFontWeight(QFont::Bold);
             cursor.select(QTextCursor::BlockUnderCursor);
             cursor.mergeCharFormat(heading);

@@ -16,7 +16,7 @@ Status: **Have** = implemented in Omawrite; **Partial** = some behavior exists; 
 | Tree/list navigation | Partial: expandable tree | 5 |
 | Sort by name, modified, created, extension | Have | 4 |
 | Ascending/descending; folders pinned first | Have | 4 |
-| Dates and text excerpts in file list | Planned | 5 |
+| Dates and text excerpts in file list | Partial: dates and bounded source snippets; no excerpt display options | 7 |
 | Separate organizer, file list, editor, preview | Have; organizer collapses below 1,000 px | 4 |
 | Folder/file creation | Have: within selected root | 1 |
 | Back/forward library navigation | Planned | 5 |
@@ -98,3 +98,7 @@ Context menus, every popup option, export formats, publishing provider choices, 
 ### Cycle 6 visual refinement
 
 Implemented original line icons for workspace controls and file rows, with Andrew's requested navy-blue active states. These are visual affordances for existing actions; no additional iA menu functionality or feature parity is implied. Dark appearance still needs a manual visual audit.
+
+### Cycle 7 visual alignment
+
+Unified macOS title/toolbar area, wider navigation, balanced source/preview, smaller type, file snippets, bottom preview controls, and persistent status are implemented. Qt preview template details still differ from iA (tables, code/quote blocks and heading separators). This is closer layout alignment, not full UI or feature parity.

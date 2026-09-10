@@ -29,6 +29,25 @@ private slots:
                            m_settingsDirectory.path());
     }
 
+    void boundsLibraryExcerptsAndPreservesFiles() {
+        QTemporaryDir directory;
+        QTemporaryDir outside;
+        FileLibrary library;
+        library.setRootFolder(QUrl::fromLocalFile(directory.path()));
+        QFile file(directory.filePath("sample.md"));
+        QVERIFY(file.open(QIODevice::WriteOnly));
+        const QByteArray source = "# Heading\n\nA readable note.\n" + QByteArray(4096, 'x');
+        QCOMPARE(file.write(source), qint64(source.size()));
+        file.close();
+        const QString snippet = library.excerpt(QUrl::fromLocalFile(file.fileName()));
+        QVERIFY(snippet.startsWith("Heading A readable note."));
+        QVERIFY(snippet.size() <= 160);
+        QVERIFY(file.open(QIODevice::ReadOnly));
+        QCOMPARE(file.readAll(), source);
+        QVERIFY(library.excerpt(QUrl::fromLocalFile(outside.filePath("sample.md"))).isEmpty());
+        QVERIFY(library.excerpt(QUrl("https://example.com/sample.md")).isEmpty());
+    }
+
     void browsesAndCreatesLibraryFilesSafely() {
         QTemporaryDir directory;
         QVERIFY(directory.isValid());
@@ -77,6 +96,32 @@ private slots:
         QCOMPARE(preview->property("readOnly").toBool(), true);
         QCOMPARE(editor->property("text").toString(), text);
         backend.discardRecovery();
+    }
+
+    void typographyDoesNotDirtySavedDocument() {
+        QTemporaryDir directory;
+        QFile file(directory.filePath("saved.md"));
+        QVERIFY(file.open(QIODevice::WriteOnly));
+        file.write("# Saved note\n\nSome **words**.\n");
+        file.close();
+        Backend backend;
+        QQmlEngine engine;
+        engine.rootContext()->setContextProperty("backend", &backend);
+        QQmlComponent component(&engine, QUrl::fromLocalFile(QFINDTESTDATA("../src/Main.qml")));
+        QVERIFY2(component.isReady(), qPrintable(component.errorString()));
+        QScopedPointer<QObject> window(component.create());
+        QVERIFY(window);
+        backend.open(QUrl::fromLocalFile(file.fileName()));
+        auto *editor = window->findChild<QObject *>("sourceEditor");
+        auto *settings = window->findChild<QObject *>("workspaceSettings");
+        const QString original = editor->property("text").toString();
+        settings->setProperty("writingSize", 22);
+        settings->setProperty("paragraphFocus", true);
+        settings->setProperty("writingSize", 16);
+        settings->setProperty("paragraphFocus", false);
+        QCoreApplication::processEvents();
+        QCOMPARE(editor->property("text").toString(), original);
+        QVERIFY(!backend.modified());
     }
 
     void presentationKeepsSourceAndUndoIntact() {
@@ -377,7 +422,7 @@ private slots:
         QCOMPARE(editor->property("wrappedSelectionEnd").toInt(), 12);
     }
 
-    void savesAndOpensFromFooterButtons() {
+    void savesAndOpensFromFooterMenu() {
         const QString mainQmlPath = QFINDTESTDATA("../src/Main.qml");
         QVERIFY(!mainQmlPath.isEmpty());
 
@@ -399,11 +444,11 @@ private slots:
         QVERIFY(openButton);
 
         QSignalSpy saveDialogSpy(&backend, &Backend::saveDialogRequested);
-        QVERIFY(QMetaObject::invokeMethod(saveButton, "clicked"));
+        QVERIFY(QMetaObject::invokeMethod(saveButton, "triggered"));
         QCOMPARE(saveDialogSpy.count(), 1);
 
         QSignalSpy openDialogSpy(&backend, &Backend::openDialogRequested);
-        QVERIFY(QMetaObject::invokeMethod(openButton, "clicked"));
+        QVERIFY(QMetaObject::invokeMethod(openButton, "triggered"));
         QCOMPARE(openDialogSpy.count(), 1);
     }
 
@@ -421,16 +466,16 @@ private slots:
 
         QObject *editor = window->findChild<QObject *>(QStringLiteral("sourceEditor"));
         QVERIFY(editor);
-        QCOMPARE(editor->property("font").value<QFont>().pixelSize(), 20);
+        QCOMPARE(editor->property("font").value<QFont>().pixelSize(), 16);
 
         // `omarchy display text size 16` sets the GNOME factor to 16/12.
         backend.setTextScale(16.0 / 12.0);
-        QCOMPARE(window->property("editorFontPixelSize").toInt(), 27);
-        QCOMPARE(editor->property("font").value<QFont>().pixelSize(), 27);
+        QCOMPARE(window->property("editorFontPixelSize").toInt(), 21);
+        QCOMPARE(editor->property("font").value<QFont>().pixelSize(), 21);
 
         backend.setTextScale(9.0 / 12.0);
-        QCOMPARE(window->property("editorFontPixelSize").toInt(), 15);
-        QCOMPARE(editor->property("font").value<QFont>().pixelSize(), 15);
+        QCOMPARE(window->property("editorFontPixelSize").toInt(), 12);
+        QCOMPARE(editor->property("font").value<QFont>().pixelSize(), 12);
     }
 
     void preservesMarkdownAndProtectsUnsavedOpen() {

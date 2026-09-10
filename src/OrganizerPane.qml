@@ -18,7 +18,7 @@ Rectangle {
     ScrollView {
         anchors.fill: parent
         id: organizerScroll
-        anchors.margins: 8
+        anchors.margins: 12
         contentWidth: availableWidth
         ColumnLayout {
             width: organizerScroll.availableWidth
@@ -34,6 +34,8 @@ Rectangle {
                     Layout.fillWidth: true
                     ChromeButton {
                         text: modelData.name
+                        iconName: modelData.directory ? "folder" : "editor"
+                        alignLeft: true
                         darkMode: root.darkMode
                         enabled: modelData.available
                         checked: modelData.url.toString() === root.library.rootFolder.toString()
@@ -53,6 +55,8 @@ Rectangle {
                     Layout.fillWidth: true
                     ChromeButton {
                         text: modelData.name
+                        iconName: modelData.directory ? "folder" : "editor"
+                        alignLeft: true
                         darkMode: root.darkMode
                         Layout.fillWidth: true
                         enabled: modelData.available
@@ -72,12 +76,16 @@ Rectangle {
             }
             Repeater {
                 model: root.library.recentFiles
-                delegate: ItemDelegate {
+                delegate: ChromeButton {
+                    darkMode: root.darkMode
                     required property var modelData
                     Layout.fillWidth: true
                     implicitHeight: 30
                     font.pixelSize: 12
+                    font.bold: false
                     text: modelData.name
+                        iconName: modelData.directory ? "folder" : "editor"
+                        alignLeft: true
                     enabled: modelData.available
                     onClicked: root.openRequested(modelData.url)
                     ToolTip.visible: hovered

@@ -4,6 +4,7 @@
 #include <QFile>
 #include <QFileInfo>
 #include <QSettings>
+#include <QRegularExpression>
 #include <algorithm>
 
 FileLibrary::FileLibrary(QObject *parent) : QObject(parent) {
@@ -242,4 +243,17 @@ void FileLibrary::revealFile(const QUrl &url) {
         if (!parent.cdUp()) break;
     }
     refresh();
+}
+
+QString FileLibrary::excerpt(const QUrl &url) const {
+    if (!url.isLocalFile()) return {};
+    const QFileInfo info(url.toLocalFile());
+    if (!info.isFile() || !containsPath(info.canonicalFilePath()) || !isTextFile(info.fileName())) return {};
+    QFile file(info.absoluteFilePath());
+    if (!file.open(QIODevice::ReadOnly)) return {};
+    // Called only for instantiated rows; never scan full documents for a snippet.
+    QString sample = QString::fromUtf8(file.read(1024));
+    sample.remove(QRegularExpression(QStringLiteral("(?m)^ {0,3}#{1,6} +")));
+    sample = sample.simplified();
+    return sample.isEmpty() ? QStringLiteral("Empty document") : sample.left(160);
 }

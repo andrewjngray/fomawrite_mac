@@ -14,6 +14,9 @@
 
 #include "backend.h"
 #include "systemtheme.h"
+#ifdef Q_OS_MACOS
+void configureMacWindowChrome(QWindow *window);
+#endif
 
 // Finder delivers documents as events, rather than command-line arguments.
 class WriterApplication : public QApplication {
@@ -96,6 +99,10 @@ int main(int argc, char *argv[]) {
                     << QFile::exists(QStringLiteral(":/Main.qml"));
         return -1;
     }
+
+#ifdef Q_OS_MACOS
+    configureMacWindowChrome(qobject_cast<QWindow *>(engine.rootObjects().constFirst()));
+#endif
 
     backend.setParentWindow(qobject_cast<QWindow *>(engine.rootObjects().constFirst()));
 

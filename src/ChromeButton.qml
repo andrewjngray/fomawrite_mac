@@ -5,6 +5,7 @@ Button {
     id: control
     property bool darkMode: false
     property string iconName: ""
+    property bool alignLeft: false
     property string hint: text
     implicitHeight: 28
     implicitWidth: Math.max(28, label.implicitWidth + (iconName ? 18 + (text ? 6 : 0) : 0) + 16)
@@ -28,7 +29,7 @@ Button {
             name: control.iconName
             ink: parent.ink
             anchors.verticalCenter: parent.verticalCenter
-            x: control.text ? Math.max(0, (parent.width - label.implicitWidth - 24) / 2) : (parent.width - width) / 2
+            x: control.alignLeft ? 0 : control.text ? Math.max(0, (parent.width - label.implicitWidth - 24) / 2) : (parent.width - width) / 2
         }
         Text {
             id: label
@@ -40,12 +41,12 @@ Button {
             font.pixelSize: 12
             font.bold: control.checked
             color: parent.ink
-            horizontalAlignment: Text.AlignHCenter
+            horizontalAlignment: control.alignLeft ? Text.AlignLeft : Text.AlignHCenter
             elide: Text.ElideRight
         }
     }
     background: Rectangle {
-        radius: 5
+        radius: 12
         color: control.checked ? (control.darkMode ? "#293c57" : "#e5ecf7") : control.down || control.hovered ? (control.darkMode ? "#303339" : "#e8eaed") : "transparent"
         border.width: control.activeFocus ? 1 : 0
         border.color: "#426da7"

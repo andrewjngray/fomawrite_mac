@@ -45,6 +45,7 @@ public:
     void setFilter(const QString &filter);
     Q_INVOKABLE void toggleFolder(const QUrl &folder);
     Q_INVOKABLE void refresh();
+    Q_INVOKABLE QString excerpt(const QUrl &url) const;
     Q_INVOKABLE QUrl createDocument(const QString &name);
     Q_INVOKABLE bool createFolder(const QString &name);
     Q_INVOKABLE void revealFile(const QUrl &url);

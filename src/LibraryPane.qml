@@ -11,16 +11,14 @@ Rectangle {
     signal openRequested(url file)
     color: darkMode ? "#202124" : "#fbfbfc"
     objectName: "libraryPane"
+    function chooseFolder() { folderDialog.open(); }
+    function newDocument() { newFileDialog.open(); }
+    function showOptions() { folderMenu.open(); }
 
     ColumnLayout {
         anchors.fill: parent
         anchors.margins: 8
         spacing: 4
-        RowLayout {
-            ChromeButton { text: root.library.rootName || "Choose folder…"; hint: "Choose library folder"; darkMode: root.darkMode; Layout.fillWidth: true; onClicked: folderDialog.open() }
-            ChromeButton { iconName: "plus"; hint: "New document"; darkMode: root.darkMode; enabled: root.library.rootFolder.toString() !== ""; onClicked: newFileDialog.open() }
-            ChromeButton { iconName: "more"; hint: "Library options and sorting"; darkMode: root.darkMode; onClicked: folderMenu.open() }
-        }
         ChromeButton {
             objectName: "librarySort"
             text: "Sort by " + ["name", "modified", "created", "extension"][root.library.sortMode] + (root.library.ascending ? " ↑" : " ↓")
@@ -48,7 +46,7 @@ Rectangle {
                 id: entry
                 required property var modelData
                 width: fileList.width
-                height: 32
+                height: modelData.directory ? 30 : 54
                 leftPadding: 8 + modelData.depth * 16
                 highlighted: !modelData.directory && modelData.url.toString() === root.currentFile.toString()
                 Accessible.name: modelData.name
@@ -58,19 +56,31 @@ Rectangle {
                     else root.openRequested(modelData.url)
                 }
                 background: Rectangle {
-                    radius: 4
-                    color: entry.highlighted ? (root.darkMode ? "#293c57" : "#e5ecf7")
+                    radius: 0
+                    color: entry.highlighted ? (root.darkMode ? "#293c57" : "#f1f4f9")
                         : entry.hovered ? (root.darkMode ? "#2b2d31" : "#e9ecf0") : "transparent"
                 }
+                Rectangle { anchors.left: parent.left; anchors.top: parent.top; anchors.bottom: parent.bottom; width: 2; visible: entry.highlighted; color: root.darkMode ? "#8eb5f0" : "#244f88" }
+                Rectangle { anchors.bottom: parent.bottom; x: 24; width: parent.width - 24; height: 1; color: root.darkMode ? "#303237" : "#ededee" }
                 contentItem: RowLayout {
                     spacing: 7
                     LineIcon {
-                        name: entry.modelData.directory ? (entry.modelData.expanded ? "down" : "right") : "editor"
+                        name: entry.modelData.directory ? "folder" : "editor"
                         ink: entry.highlighted ? (root.darkMode ? "#8eb5f0" : "#244f88") : (root.darkMode ? "#9ba2ae" : "#737b87")
                         Layout.preferredWidth: 16
                         Layout.preferredHeight: 16
                     }
-                    Label { text: entry.modelData.name; font.pixelSize: 12; color: root.darkMode ? "#e3e5e9" : "#30343b"; elide: Text.ElideMiddle; Layout.fillWidth: true }
+                    ColumnLayout {
+                        spacing: 3
+                        Layout.fillWidth: true
+                        RowLayout {
+                            Layout.fillWidth: true
+                            Label { text: entry.modelData.name; font.pixelSize: 12; color: root.darkMode ? "#e3e5e9" : "#30343b"; elide: Text.ElideMiddle; Layout.fillWidth: true }
+                            Label { visible: !entry.modelData.directory; text: entry.modelData.modified; font.pixelSize: 10; color: "#92969e" }
+                        }
+                        Label { visible: !entry.modelData.directory; text: root.library.excerpt(entry.modelData.url); elide: Text.ElideRight; font.pixelSize: 11; color: "#92969e"; Layout.fillWidth: true }
+                    }
+                    LineIcon { visible: entry.modelData.directory; name: entry.modelData.expanded ? "down" : "right"; ink: "#92969e"; Layout.preferredWidth: 14; Layout.preferredHeight: 14 }
                 }
                 ToolTip.visible: hovered
                 ToolTip.text: modelData.url.toString()
@@ -90,14 +100,14 @@ Rectangle {
             id: filterField
             objectName: "libraryFilter"
             Layout.fillWidth: true
-            implicitHeight: 30
+            implicitHeight: 26
             placeholderText: "Filter files"
             leftPadding: 8
             font.pixelSize: 12
             text: root.library.filter
             onTextEdited: root.library.filter = text
             Accessible.name: "Filter visible library files"
-            background: Rectangle { radius: 5; color: root.darkMode ? "#292c31" : "#f0f1f3"; border.width: filterField.activeFocus ? 1 : 0; border.color: "#426da7" }
+            background: Rectangle { radius: 13; color: root.darkMode ? "#292c31" : "#f0f1f3"; border.width: filterField.activeFocus ? 1 : 0; border.color: "#426da7" }
             Keys.onEscapePressed: { text = ""; root.library.filter = ""; }
         }
     }

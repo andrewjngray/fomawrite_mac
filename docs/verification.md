@@ -39,3 +39,7 @@ Cycle 5: compact UI and fenced-code/heading consistency verified with 20 passing
 ## Cycle 6
 
 Build and package passed; 20 regression tests passed. Deep/strict package signature verification passed. Native sample checks verified navy/icon rendering and Split/Preview switching; records and screenshots live in `research/cycle-06/`. No sample edits or runtime warnings. Dark appearance and full keyboard-only accessibility remain untested manually.
+
+## Cycle 7
+
+Build, 22 tests, package and strict/deep signature verification passed. Final runtime log empty. Native checks covered title/content alignment, library toggling, Split/Full and Find opening. Two new regressions cover excerpts and saved-document typography changes. See `research/cycle-07/README.md` for screenshots, intermediate failures and known untested workflows.

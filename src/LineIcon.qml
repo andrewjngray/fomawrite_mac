@@ -22,6 +22,8 @@ Canvas {
         function line(x, y, a, b) { c.moveTo(x,y); c.lineTo(a,b) }
         c.beginPath()
         switch (name) {
+        case "search": c.arc(8.5,8.5,5,0,Math.PI*2); line(12.5,12.5,17,17); break
+        case "folder": c.moveTo(2.5,5); c.lineTo(8,5); c.lineTo(10,7); c.lineTo(17.5,7); c.lineTo(17.5,16); c.lineTo(2.5,16); c.closePath(); break
         case "library": c.rect(2.5,3.5,15,13); line(7,4,7,16); break
         case "organizer": c.rect(2.5,3.5,15,13); line(6,4,6,16); line(10,4,10,16); break
         case "outline": for (let y=5;y<=15;y+=5) { line(3,y,4,y); line(8,y,17,y) } break

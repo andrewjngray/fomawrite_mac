@@ -14,6 +14,8 @@ ApplicationWindow {
     height: 820
     minimumWidth: 720
     minimumHeight: 520
+    flags: isMac ? Qt.Window | Qt.ExpandedClientAreaHint | Qt.NoTitleBarBackgroundHint : Qt.Window
+    topPadding: 0
     visible: true
     font.family: "Helvetica Neue"
     font.pixelSize: 13
@@ -51,7 +53,8 @@ ApplicationWindow {
         property bool libraryVisible: true
         property bool organizerVisible: true
         property int layoutMode: 1
-        property int writingSize: 20
+        property int writingSize: 16
+        property int appearanceRevision: 0
         property bool showMarkup: true
         property bool typewriter: false
         property bool paragraphFocus: false
@@ -60,54 +63,56 @@ ApplicationWindow {
         onShowMarkupChanged: backend.setShowMarkup(showMarkup)
     }
 
-    header: ToolBar {
-        implicitHeight: 38
+    ToolBar {
+        id: topChrome
+        padding: 0
+        topPadding: 0
+        bottomPadding: 0
+        anchors.top: parent.top
+        width: parent.width
+        height: 44
+        z: 20
         background: Rectangle {
-            color: win.darkMode ? "#24262a" : "#f8f8f9"
-            Rectangle { anchors.bottom: parent.bottom; width: parent.width; height: 1; color: win.darkMode ? "#373a40" : "#e5e6e8" }
+            color: win.darkMode ? "#24262a" : "#f7f7f7"
+            MouseArea { anchors.fill: parent; onPressed: win.startSystemMove(); onDoubleClicked: win.visibility === Window.Maximized ? win.showNormal() : win.showMaximized() }
         }
+        // Align the toolbar groups with the panes below, including native window controls.
         RowLayout {
             anchors.fill: parent
-            anchors.leftMargin: 10
+            anchors.leftMargin: win.isMac ? 84 : 8
             anchors.rightMargin: 10
-            spacing: 4
+            spacing: 5
             ChromeButton { iconName: "library"; hint: "Show or hide library"; darkMode: win.darkMode; checkable: true; checked: workspaceSettings.libraryVisible; onClicked: workspaceSettings.libraryVisible = checked }
-            ChromeButton { iconName: "organizer"; hint: "Show or hide organizer"; darkMode: win.darkMode; checkable: true; checked: workspaceSettings.organizerVisible; onClicked: workspaceSettings.organizerVisible = checked }
-            Label { text: backend.fileName; color: win.textColor; font.pixelSize: 12; elide: Text.ElideMiddle; horizontalAlignment: Text.AlignHCenter; Layout.fillWidth: true }
+            ChromeButton { iconName: "organizer"; hint: "Show or hide organizer"; darkMode: win.darkMode; visible: workspaceSettings.libraryVisible; onClicked: workspaceSettings.organizerVisible = !workspaceSettings.organizerVisible }
+            Item { visible: organizerPane.visible; Layout.preferredWidth: Math.max(0, organizerPane.width - (win.isMac ? 164 : 88)) }
+            RowLayout {
+                visible: libraryPane.visible
+                Layout.preferredWidth: libraryPane.width - 10
+                Layout.minimumWidth: libraryPane.width - 10
+                Layout.maximumWidth: libraryPane.width - 10
+                ChromeButton { iconName: "folder"; text: backend.library.rootName || "Choose folder"; hint: "Choose library folder"; darkMode: win.darkMode; Layout.fillWidth: true; onClicked: libraryPane.chooseFolder() }
+                ChromeButton { iconName: "plus"; hint: "New document"; darkMode: win.darkMode; onClicked: libraryPane.newDocument() }
+                ChromeButton { iconName: "down"; hint: "Library options"; darkMode: win.darkMode; onClicked: libraryPane.showOptions() }
+            }
+            Label { Accessible.description: backend.status; text: backend.fileName; color: win.mutedColor; font.pixelSize: 12; elide: Text.ElideMiddle; horizontalAlignment: Text.AlignHCenter; Layout.fillWidth: true }
             ChromeButton { iconName: "outline"; hint: "Document outline"; darkMode: win.darkMode; onClicked: { outlineDrawer.headings = backend.documentOutline(editor.text); outlineDrawer.open(); } }
             ChromeButton { text: "Aa"; hint: "Writing options"; darkMode: win.darkMode; onClicked: writingOptions.open() }
-            Row {
-                objectName: "workspaceMode"
-                Repeater {
-                    model: ["Editor", "Split", "Preview"]
-                    ChromeButton {
-                        required property int index
-                        required property string modelData
-                        text: modelData
-                        iconName: ["editor", "split", "preview"][index]
-                        hint: modelData + " layout"
-                        darkMode: win.darkMode
-                        checked: workspaceSettings.layoutMode === index
-                        onClicked: workspaceSettings.layoutMode = index
-                    }
-                }
-            }
+            ChromeButton { iconName: "search"; hint: "Find in document"; darkMode: win.darkMode; onClicked: { if (workspaceSettings.layoutMode === 2) workspaceSettings.layoutMode = 1; win.searchOpen = true; searchField.forceActiveFocus(); searchField.selectAll(); } }
+            ChromeButton { iconName: "preview"; hint: "Show or hide preview"; darkMode: win.darkMode; checked: workspaceSettings.layoutMode !== 0; onClicked: workspaceSettings.layoutMode = workspaceSettings.layoutMode === 0 ? 1 : 0 }
         }
     }
 
     footer: ToolBar {
-        implicitHeight: 22
-        background: Rectangle { color: win.darkMode ? "#24262a" : "#f7f7f8" }
+        implicitHeight: 18
+        background: Rectangle { color: win.darkMode ? "#24262a" : "#f7f7f7" }
         Label {
-            anchors.fill: parent
-            anchors.leftMargin: 12
-            anchors.rightMargin: 12
-            verticalAlignment: Text.AlignVCenter
-            text: backend.status
-            elide: Text.ElideRight
-            color: win.mutedColor
-            font.pixelSize: 11
+            anchors.fill: parent; anchors.leftMargin: 12; anchors.rightMargin: 12
+            text: backend.status; font.pixelSize: 10; color: win.mutedColor
+            elide: Text.ElideRight; verticalAlignment: Text.AlignVCenter
             Accessible.name: "Document status: " + backend.status
+            ToolTip.visible: statusHover.hovered
+            ToolTip.text: backend.status
+            HoverHandler { id: statusHover }
         }
     }
 
@@ -140,6 +145,16 @@ ApplicationWindow {
     }
 
     Menu {
+        id: formatPopover
+        x: Math.max(0, editorPane.x + 12)
+        y: Math.max(0, win.contentItem.height - height - 38)
+        MenuItem { objectName: "saveButton"; text: "Save"; onTriggered: backend.save() }
+        MenuItem { objectName: "openButton"; text: "Open…"; onTriggered: backend.openDialog() }
+        MenuSeparator {}
+        MenuItem { text: "Strikethrough"; onTriggered: editor.wrapSelection("~~", "~~") }
+        MenuItem { text: "Inline code"; onTriggered: editor.wrapSelection("`", "`") }
+    }
+    Menu {
         id: writingOptions
         width: 250
         x: Math.max(0, win.width - width - 160)
@@ -150,7 +165,7 @@ ApplicationWindow {
         MenuSeparator {}
         MenuItem { text: "Larger text"; enabled: workspaceSettings.writingSize < 32; onTriggered: workspaceSettings.writingSize += 2 }
         MenuItem { text: "Smaller text"; enabled: workspaceSettings.writingSize > 12; onTriggered: workspaceSettings.writingSize -= 2 }
-        MenuItem { text: "Reset text size"; onTriggered: workspaceSettings.writingSize = 20 }
+        MenuItem { text: "Reset text size"; onTriggered: workspaceSettings.writingSize = 16 }
         MenuSeparator {}
         MenuItem { text: "Preview: Sans"; checkable: true; checked: workspaceSettings.previewStyle === 0; onTriggered: workspaceSettings.previewStyle = 0 }
         MenuItem { text: "Preview: Serif"; checkable: true; checked: workspaceSettings.previewStyle === 1; onTriggered: workspaceSettings.previewStyle = 1 }
@@ -523,34 +538,40 @@ ApplicationWindow {
     }
 
     SplitView {
-        anchors.fill: parent
+        anchors.top: topChrome.bottom
+        anchors.bottom: parent.bottom
+        anchors.left: parent.left
+        anchors.right: parent.right
         orientation: Qt.Horizontal
         handle: Rectangle {
             implicitWidth: 1
             color: SplitHandle.hovered || SplitHandle.pressed ? "#426da7" : (win.darkMode ? "#35383c" : "#e1e3e6")
         }
         OrganizerPane {
+            id: organizerPane
             library: backend.library
             currentFile: backend.fileUrl
             darkMode: win.darkMode
             visible: workspaceSettings.libraryVisible && workspaceSettings.organizerVisible && win.width >= 1000
-            SplitView.preferredWidth: 170
+            SplitView.preferredWidth: 210
             SplitView.minimumWidth: 160
             SplitView.maximumWidth: 300
             onOpenRequested: function(file) { win.requestOpen(file); }
         }
         LibraryPane {
+            id: libraryPane
             library: backend.library
             currentFile: backend.fileUrl
             darkMode: win.darkMode
             visible: workspaceSettings.libraryVisible
-            SplitView.preferredWidth: 220
+            SplitView.preferredWidth: 290
             SplitView.minimumWidth: 180
             SplitView.maximumWidth: 420
             onOpenRequested: function(file) { win.requestOpen(file); }
         }
-        Item {
+        Rectangle {
             id: editorPane
+            color: win.darkMode ? "#202124" : "#f7f7f7"
             visible: workspaceSettings.layoutMode !== 2
             SplitView.fillWidth: true
             SplitView.minimumWidth: 260
@@ -755,7 +776,7 @@ ApplicationWindow {
                 id: editor
                 objectName: "sourceEditor"
                 x: Math.round((editorFlick.width - width) / 2)
-                y: workspaceSettings.typewriter ? editorFlick.height / 2 : 42
+                y: workspaceSettings.typewriter ? editorFlick.height / 2 : 10
                 width: win.editorWidth
                 height: Math.max(editorFlick.height - y - 96, implicitHeight + 20)
                 text: ""
@@ -765,7 +786,7 @@ ApplicationWindow {
                 persistentSelection: true
                 activeFocusOnPress: true
                 color: win.textColor
-                selectedTextColor: win.strongTextColor
+                selectedTextColor: "#ffffff"
                 selectionColor: win.selectionFill
                 font.family: "iA Writer Mono S"
                 font.pixelSize: win.editorFontPixelSize
@@ -1033,10 +1054,10 @@ ApplicationWindow {
                 anchors.leftMargin: 6
                 anchors.rightMargin: 10
                 spacing: 2
-                ChromeButton { objectName: "saveButton"; text: "Save"; darkMode: win.darkMode; onClicked: backend.save() }
-                ChromeButton { objectName: "openButton"; text: "Open"; darkMode: win.darkMode; onClicked: backend.openDialog() }
-                ChromeButton { text: "B"; hint: "Bold selection"; darkMode: win.darkMode; onClicked: editor.wrapSelection("**", "**") }
-                ChromeButton { text: "I"; hint: "Italic selection"; darkMode: win.darkMode; onClicked: editor.wrapSelection("*", "*") }
+                ChromeButton { text: "Bold"; hint: "Bold selection"; darkMode: win.darkMode; onClicked: editor.wrapSelection("**", "**") }
+                ChromeButton { text: "Italic"; hint: "Italic selection"; darkMode: win.darkMode; onClicked: editor.wrapSelection("*", "*") }
+                ChromeButton { text: "Link"; hint: "Insert link"; darkMode: win.darkMode; onClicked: editor.insertLink() }
+                ChromeButton { text: "More"; hint: "More formatting"; darkMode: win.darkMode; onClicked: formatPopover.open() }
                 Item { Layout.fillWidth: true }
                 ChromeButton { text: backend.wordCount + " words"; hint: "Document statistics"; darkMode: win.darkMode; onClicked: statisticsDialog.open() }
             }
@@ -1082,7 +1103,7 @@ ApplicationWindow {
                         selectByMouse: true
                         color: win.textColor
                         selectionColor: win.selectionFill
-                        selectedTextColor: win.strongTextColor
+                        selectedTextColor: "#ffffff"
                         font.pixelSize: win.scaledSize(17)
                         clip: true
                         onTextChanged: win.updateSearch()
@@ -1106,7 +1127,7 @@ ApplicationWindow {
                         verticalAlignment: TextInput.AlignVCenter
                         color: win.textColor
                         selectionColor: win.selectionFill
-                        selectedTextColor: win.strongTextColor
+                        selectedTextColor: "#ffffff"
                         font.pixelSize: win.scaledSize(17)
                         Keys.onReturnPressed: replaceCurrentButton.clicked()
                     }
@@ -1203,10 +1224,12 @@ ApplicationWindow {
             darkMode: win.darkMode
             visible: workspaceSettings.layoutMode !== 0
             SplitView.fillWidth: workspaceSettings.layoutMode === 2
-            SplitView.preferredWidth: 400
+            SplitView.preferredWidth: Math.max(260, (win.width - (organizerPane.visible ? organizerPane.width : 0) - (libraryPane.visible ? libraryPane.width : 0)) / 2)
             SplitView.minimumWidth: 220
             typeface: ["Helvetica Neue", "Georgia", "iA Writer Mono S"][workspaceSettings.previewStyle]
-            textSize: Math.max(12, workspaceSettings.writingSize - 4)
+            textSize: Math.max(12, workspaceSettings.writingSize - 2)
+            layoutMode: workspaceSettings.layoutMode
+            onLayoutRequested: function(mode) { workspaceSettings.layoutMode = mode; }
             onLinkRequested: function(link) {
                 var resolved = backend.resolveDocumentLink(link);
                 if (/^file:.*\.(md|markdown|mdown|txt|text)(#.*)?$/i.test(String(resolved)))
@@ -1218,6 +1241,10 @@ ApplicationWindow {
     }
 
     Component.onCompleted: {
+        if (workspaceSettings.appearanceRevision < 1) {
+            if (workspaceSettings.writingSize === 20) workspaceSettings.writingSize = 16;
+            workspaceSettings.appearanceRevision = 1;
+        }
         var geometry = backend.windowGeometry();
         if (geometry.x >= 0) x = geometry.x;
         if (geometry.y >= 0) y = geometry.y;

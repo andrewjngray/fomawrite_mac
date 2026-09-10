@@ -1,0 +1,4 @@
+make: Nothing to be done for `first'.
+Built /Users/andrewgray/repo/projects/omawrite_mac/build/Omawrite.app
+/Users/andrewgray/repo/projects/omawrite_mac/dist/Omawrite.app: replacing existing signature
+Packaged /Users/andrewgray/repo/projects/omawrite_mac/dist/Omawrite.app (local ad-hoc signature)
