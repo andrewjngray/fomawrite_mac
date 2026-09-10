@@ -71,10 +71,10 @@ ApplicationWindow {
             anchors.leftMargin: 10
             anchors.rightMargin: 10
             spacing: 4
-            ChromeButton { text: "▥"; hint: "Show or hide library"; darkMode: win.darkMode; checkable: true; checked: workspaceSettings.libraryVisible; onClicked: workspaceSettings.libraryVisible = checked }
-            ChromeButton { text: "☷"; hint: "Show or hide organizer"; darkMode: win.darkMode; checkable: true; checked: workspaceSettings.organizerVisible; onClicked: workspaceSettings.organizerVisible = checked }
+            ChromeButton { iconName: "library"; hint: "Show or hide library"; darkMode: win.darkMode; checkable: true; checked: workspaceSettings.libraryVisible; onClicked: workspaceSettings.libraryVisible = checked }
+            ChromeButton { iconName: "organizer"; hint: "Show or hide organizer"; darkMode: win.darkMode; checkable: true; checked: workspaceSettings.organizerVisible; onClicked: workspaceSettings.organizerVisible = checked }
             Label { text: backend.fileName; color: win.textColor; font.pixelSize: 12; elide: Text.ElideMiddle; horizontalAlignment: Text.AlignHCenter; Layout.fillWidth: true }
-            ChromeButton { text: "≡"; hint: "Document outline"; darkMode: win.darkMode; onClicked: { outlineDrawer.headings = backend.documentOutline(editor.text); outlineDrawer.open(); } }
+            ChromeButton { iconName: "outline"; hint: "Document outline"; darkMode: win.darkMode; onClicked: { outlineDrawer.headings = backend.documentOutline(editor.text); outlineDrawer.open(); } }
             ChromeButton { text: "Aa"; hint: "Writing options"; darkMode: win.darkMode; onClicked: writingOptions.open() }
             Row {
                 objectName: "workspaceMode"
@@ -84,6 +84,7 @@ ApplicationWindow {
                         required property int index
                         required property string modelData
                         text: modelData
+                        iconName: ["editor", "split", "preview"][index]
                         hint: modelData + " layout"
                         darkMode: win.darkMode
                         checked: workspaceSettings.layoutMode === index
@@ -526,7 +527,7 @@ ApplicationWindow {
         orientation: Qt.Horizontal
         handle: Rectangle {
             implicitWidth: 1
-            color: SplitHandle.hovered || SplitHandle.pressed ? "#63b9d4" : (win.darkMode ? "#35383c" : "#e1e3e6")
+            color: SplitHandle.hovered || SplitHandle.pressed ? "#426da7" : (win.darkMode ? "#35383c" : "#e1e3e6")
         }
         OrganizerPane {
             library: backend.library

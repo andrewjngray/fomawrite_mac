@@ -44,9 +44,9 @@ On macOS use **Command-S/O/N/P/F/B/I/K**, **Shift-Command-S** for Save As, **Opt
 
 Try `./bin/run examples/Workspace-tour.md`. Use the sidebar toggles to show/hide the library and organizer, the outline icon to jump to headings, and **Aa** for writing options, and the word count for statistics. Files remain ordinary UTF-8 Markdown. The library filter currently covers files in expanded folders. Preview uses Qt Markdown; it does not yet offer iA Writer's complete extensions, web/PDF template system or publishing integrations.
 
-## Latest review: Cycle 5
+## Latest review: Cycle 6
 
-The interface now uses compact controls and tighter sidebar rows. The preview check fixture is `examples/Preview-check.md`: `# title` is a heading; `#title` remains literal text. Fenced Markdown stays literal in both panes. See [screenshots and verification records](research/cycle-05/README.md) and [the short usability checklist](research/usability/cycle-05.md).
+The interface now uses a navy-blue accent, original line icons, compact controls and tighter sidebar rows. The preview check fixture is `examples/Preview-check.md`: `# title` is a heading; `#title` remains literal text. Fenced Markdown stays literal in both panes. See [screenshots and verification records](research/cycle-06/README.md) and [the short usability checklist](research/usability/cycle-06.md).
 
 ## Build cycles and feedback
 

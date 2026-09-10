@@ -25,7 +25,7 @@ Rectangle {
             spacing: 4
             RowLayout {
                 Label { text: "Locations"; font.pixelSize: 11; font.bold: false; color: root.darkMode ? "#92969e" : "#777c83"; Layout.fillWidth: true }
-                ChromeButton { darkMode: root.darkMode; text: "+"; Accessible.name: "Add library location"; onClicked: locationDialog.open() }
+                ChromeButton { darkMode: root.darkMode; iconName: "plus"; Accessible.name: "Add library location"; onClicked: locationDialog.open() }
             }
             Repeater {
                 model: root.library.locations
@@ -42,7 +42,7 @@ Rectangle {
                         ToolTip.visible: hovered
                         ToolTip.text: modelData.url.toString()
                     }
-                    ChromeButton { darkMode: root.darkMode; text: "×"; Accessible.name: "Remove location shortcut " + modelData.name; onClicked: root.library.removeLocation(modelData.url) }
+                    ChromeButton { darkMode: root.darkMode; iconName: "close"; Accessible.name: "Remove location shortcut " + modelData.name; onClicked: root.library.removeLocation(modelData.url) }
                 }
             }
             Label { text: "Favorites"; font.pixelSize: 11; font.bold: false; color: root.darkMode ? "#92969e" : "#777c83"; Layout.topMargin: 14 }
@@ -60,7 +60,7 @@ Rectangle {
                         ToolTip.visible: hovered
                         ToolTip.text: modelData.url.toString()
                     }
-                    ChromeButton { darkMode: root.darkMode; text: "×"; Accessible.name: "Remove favorite " + modelData.name; onClicked: root.library.toggleFavorite(modelData.url) }
+                    ChromeButton { darkMode: root.darkMode; iconName: "close"; Accessible.name: "Remove favorite " + modelData.name; onClicked: root.library.toggleFavorite(modelData.url) }
                 }
             }
             ChromeButton { text: "+ Favorite folder"; darkMode: root.darkMode; Layout.fillWidth: true; onClicked: root.library.toggleFavorite(root.library.rootFolder) }
@@ -68,7 +68,7 @@ Rectangle {
             RowLayout {
                 Layout.topMargin: 14
                 Label { text: "Recents"; font.pixelSize: 11; font.bold: false; color: root.darkMode ? "#92969e" : "#777c83"; Layout.fillWidth: true }
-                ChromeButton { darkMode: root.darkMode; text: "×"; Accessible.name: "Clear recent file shortcuts"; onClicked: root.library.clearRecentFiles() }
+                ChromeButton { darkMode: root.darkMode; iconName: "close"; Accessible.name: "Clear recent file shortcuts"; onClicked: root.library.clearRecentFiles() }
             }
             Repeater {
                 model: root.library.recentFiles

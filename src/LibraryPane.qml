@@ -18,8 +18,8 @@ Rectangle {
         spacing: 4
         RowLayout {
             ChromeButton { text: root.library.rootName || "Choose folder…"; hint: "Choose library folder"; darkMode: root.darkMode; Layout.fillWidth: true; onClicked: folderDialog.open() }
-            ChromeButton { text: "+"; hint: "New document"; darkMode: root.darkMode; enabled: root.library.rootFolder.toString() !== ""; onClicked: newFileDialog.open() }
-            ChromeButton { text: "…"; hint: "Library options and sorting"; darkMode: root.darkMode; onClicked: folderMenu.open() }
+            ChromeButton { iconName: "plus"; hint: "New document"; darkMode: root.darkMode; enabled: root.library.rootFolder.toString() !== ""; onClicked: newFileDialog.open() }
+            ChromeButton { iconName: "more"; hint: "Library options and sorting"; darkMode: root.darkMode; onClicked: folderMenu.open() }
         }
         ChromeButton {
             objectName: "librarySort"
@@ -59,16 +59,16 @@ Rectangle {
                 }
                 background: Rectangle {
                     radius: 4
-                    color: entry.highlighted ? (root.darkMode ? "#244354" : "#dceef8")
+                    color: entry.highlighted ? (root.darkMode ? "#293c57" : "#e5ecf7")
                         : entry.hovered ? (root.darkMode ? "#2b2d31" : "#e9ecf0") : "transparent"
                 }
                 contentItem: RowLayout {
                     spacing: 7
-                    Label {
-                        text: entry.modelData.directory ? (entry.modelData.expanded ? "▾" : "▸") : "≡"
-                        color: entry.modelData.directory ? "#2896c4" : (root.darkMode ? "#9ba2ae" : "#8a93a0")
-                        font.pixelSize: 16
-                        Layout.preferredWidth: 14
+                    LineIcon {
+                        name: entry.modelData.directory ? (entry.modelData.expanded ? "down" : "right") : "editor"
+                        ink: entry.highlighted ? (root.darkMode ? "#8eb5f0" : "#244f88") : (root.darkMode ? "#9ba2ae" : "#737b87")
+                        Layout.preferredWidth: 16
+                        Layout.preferredHeight: 16
                     }
                     Label { text: entry.modelData.name; font.pixelSize: 12; color: root.darkMode ? "#e3e5e9" : "#30343b"; elide: Text.ElideMiddle; Layout.fillWidth: true }
                 }
@@ -97,7 +97,7 @@ Rectangle {
             text: root.library.filter
             onTextEdited: root.library.filter = text
             Accessible.name: "Filter visible library files"
-            background: Rectangle { radius: 5; color: root.darkMode ? "#292c31" : "#f0f1f3"; border.width: filterField.activeFocus ? 1 : 0; border.color: "#08a5c8" }
+            background: Rectangle { radius: 5; color: root.darkMode ? "#292c31" : "#f0f1f3"; border.width: filterField.activeFocus ? 1 : 0; border.color: "#426da7" }
             Keys.onEscapePressed: { text = ""; root.library.filter = ""; }
         }
     }

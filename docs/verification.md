@@ -35,3 +35,7 @@ The current suite adds folder expansion and safe file creation, source preservat
 Still to check manually: clicking relative links and image display in a real document, large-library performance, narrow window layouts and long-document interactions. Outline is a practical ATX/setext parser, not a complete Markdown parser. Focus follows physical text paragraphs; wrapped lines within one paragraph stay active together.
 
 Cycle 5: compact UI and fenced-code/heading consistency verified with 20 passing tests, packaged signature verification, native live-heading updates and layout switching. Screenshots and logs: research/cycle-05/.
+
+## Cycle 6
+
+Build and package passed; 20 regression tests passed. Deep/strict package signature verification passed. Native sample checks verified navy/icon rendering and Split/Preview switching; records and screenshots live in `research/cycle-06/`. No sample edits or runtime warnings. Dark appearance and full keyboard-only accessibility remain untested manually.

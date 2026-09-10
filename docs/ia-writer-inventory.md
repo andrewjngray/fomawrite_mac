@@ -94,3 +94,7 @@ Help search, iA Writer Help, What's New, online support. Omawrite needs its own 
 ## Boundaries of this inspection
 
 Context menus, every popup option, export formats, publishing provider choices, and commands requiring content modification or account setup were not exhaustively exercised. Future cycles should inspect the relevant controls using our sample documents before implementation. The complete product remains a multi-cycle target, not a one-build parity claim.
+
+### Cycle 6 visual refinement
+
+Implemented original line icons for workspace controls and file rows, with Andrew's requested navy-blue active states. These are visual affordances for existing actions; no additional iA menu functionality or feature parity is implied. Dark appearance still needs a manual visual audit.

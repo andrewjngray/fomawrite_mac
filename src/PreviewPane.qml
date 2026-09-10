@@ -49,7 +49,7 @@ Rectangle {
             font.family: root.typeface
             font.pixelSize: root.textSize
             color: root.darkMode ? "#e6e8ec" : "#242831"
-            selectionColor: "#b8def4"
+            selectionColor: "#c9d9f0"
             onLinkActivated: function(link) { root.linkRequested(link) }
             Accessible.name: "Rendered Markdown preview"
         }

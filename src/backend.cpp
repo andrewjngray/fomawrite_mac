@@ -686,8 +686,14 @@ void Backend::watchCurrentFile() {
 void Backend::loadOmarchyTheme() {
     m_themeBackground = m_darkMode ? QStringLiteral("#101010") : QStringLiteral("#ffffff");
     m_themeForeground = m_darkMode ? QStringLiteral("#eeeeee") : QStringLiteral("#222324");
+#ifdef Q_OS_MACOS
+    m_themeAccent = m_darkMode ? QStringLiteral("#8eb5f0") : QStringLiteral("#244f88");
+    m_themeSelection = m_darkMode ? QStringLiteral("#345783") : QStringLiteral("#345f98");
+#else
     m_themeAccent = m_darkMode ? QStringLiteral("#5584aa") : QStringLiteral("#2077b2");
     m_themeSelection = m_darkMode ? QStringLiteral("#186a9a") : QStringLiteral("#2077b2");
+
+#endif
 
     const QString colorsPath = QDir::homePath()
         + QStringLiteral("/.local/state/omarchy/current/theme/colors.toml");

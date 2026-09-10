@@ -45,7 +45,7 @@ Earlier execution detail, including the overnight computer-use stall, is in [ove
 | Cycle | Planned features | Acceptance focus |
 |---|---|---|
 | Next navigation cycle | Quick open, back/forward, tree/list, date/excerpt options; bounded recursive search | Deferred in favor of Andrew’s requested UI tuning |
-| 6 | Hashtags and smart folders | Accurate indexing; ordinary Markdown stays portable |
+| Later navigation cycle | Hashtags and smart folders | Accurate indexing; ordinary Markdown stays portable |
 | 7 | Preview sync, anchors, output templates, HTML/PDF export | Source/output consistency; local images; pagination |
 | 8 | Expanded Format menu and editing toolbar | One-step undo; selection/cursor stability; Markdown round trip |
 | 9 | Sentence focus, spelling and writing aids | Useful behavior without false linguistic/provenance claims |
@@ -78,3 +78,18 @@ Earlier execution detail, including the overnight computer-use stall, is in [ove
 **Deferred:** exact iA template rendering, synced scroll, excerpt rows, full icon/accessibility polish, sentence focus and broader Markdown extensions. This is closer visual alignment, not a parity claim. Preview/Editor still scroll independently.
 
 **Cycle 5 final result:** build/package and deep/strict signature verification passed. Native checks confirmed organizer visibility, heading rendering, live heading updates, and Preview/Split switching. The sample was restored and saved; existing unsaved user windows were not touched. Four final/reference screenshots plus an intermediate screenshot and test/package logs are retained under `research/cycle-05/`. Runnable artifact: `dist/Omawrite.app`; review fixture: `examples/Preview-check.md`. For a fresh process when an older Omawrite is already open, run `./dist/Omawrite.app/Contents/MacOS/Omawrite examples/Preview-check.md` from this project folder.
+
+
+## Cycle 6 — navy palette and line icons
+
+**Planned scope / feedback:** Andrew found teal unpleasant and preferred iA Writer's icon treatment. Prioritize color and control clarity before expanding features.
+
+**Implemented:** navy active controls, pale blue selected rows, consistent blue focus/selection accents; original line icons replace symbol-font glyphs in the toolbar and library. Editor/Split/Preview retain labels and accessible names. macOS document accent defaults changed separately from Linux.
+
+**Checks:** build succeeds; all 20 existing regression tests pass. No document-format or I/O behavior was changed. Native verification and screenshots are recorded in [cycle 6 research](../research/cycle-06/README.md).
+
+**Known gaps:** full dark-appearance and keyboard accessibility audit remains outstanding; synced preview and advanced navigation remain deferred. This pass does not claim iA feature parity.
+
+**Runnable artifact:** `dist/Omawrite.app`. [Optional usability exercise](../research/usability/cycle-06.md): try layout icons, select files/text, and judge blue contrast and icon clarity.
+
+**Native result:** sample opened, navy/icon rendering reviewed, Preview/Split switching verified, screenshots saved. Package and deep/strict signature check passed. Runtime log empty; sample unchanged. Dark appearance not manually verified.
