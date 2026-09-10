@@ -11,3 +11,6 @@ This is Andrew Gray's personal Markdown editor, forked from omacom/omawrite.
 - Run ./bin/build and ./bin/test for editor changes; verify affected native workflows in the app.
 - Never commit build/, build-tests/ or dist/.
 - Explain what changed, how it was verified and what remains untested.
+- Keep docs/build-cycles.md current for every feature cycle: planned scope, changes, tests, native verification, known gaps, runnable artifact and a short optional usability exercise for Andrew. Incorporate his feedback into the next cycle.
+- Use docs/ia-writer-inventory.md as the reference backlog; distinguish implemented behavior from partial support and future work. Do not claim feature parity from matching menu labels alone.
+- Save cycle screenshots and verification logs under research/cycle-NN/ and keep research/usability/ checklists current. Use sample documents and exclude private writing from committed screenshots.

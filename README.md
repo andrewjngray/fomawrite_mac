@@ -29,7 +29,7 @@ The package is locally ad-hoc signed, not notarised for public distribution. You
 ## Writing workspace
 
 - Resizable file library, Markdown editor and live rendered preview; Editor/Split/Preview layouts.
-- Expandable writing folders, file filtering, and safe new-file/new-folder creation.
+- Organizer with saved locations, favorites and recent files; expandable folders, sorting, filtering and safe new-file/new-folder creation.
 - Visible Markdown syntax or styled editing, paragraph focus and centered typewriter scrolling.
 - Adjustable writing size and Sans/Serif/Mono preview typography.
 - Rendered tables, task lists, local images and relative links to Markdown documents.
@@ -42,7 +42,15 @@ The package is locally ad-hoc signed, not notarised for public distribution. You
 
 On macOS use **Command-S/O/N/P/F/B/I/K**, **Shift-Command-S** for Save As, **Option-Command-F** for replace, **Command-W** to close, and **Control-Command-F** for full screen. Qt maps its internal `Ctrl` shortcut notation to Command on macOS.
 
-Try `./bin/run examples/Workspace-tour.md`. Use **Library** to show/hide the file pane, **Outline** to jump to headings, **Aa** for writing options, and the word count for statistics. Files remain ordinary UTF-8 Markdown. The library filter currently covers files in expanded folders. Preview uses Qt Markdown; it does not yet offer iA Writer's complete extensions, web/PDF template system or publishing integrations.
+Try `./bin/run examples/Workspace-tour.md`. Use the sidebar toggles to show/hide the library and organizer, the outline icon to jump to headings, and **Aa** for writing options, and the word count for statistics. Files remain ordinary UTF-8 Markdown. The library filter currently covers files in expanded folders. Preview uses Qt Markdown; it does not yet offer iA Writer's complete extensions, web/PDF template system or publishing integrations.
+
+## Latest review: Cycle 5
+
+The interface now uses compact controls and tighter sidebar rows. The preview check fixture is `examples/Preview-check.md`: `# title` is a heading; `#title` remains literal text. Fenced Markdown stays literal in both panes. See [screenshots and verification records](research/cycle-05/README.md) and [the short usability checklist](research/usability/cycle-05.md).
+
+## Build cycles and feedback
+
+See [the cycle log and short usability exercises](docs/build-cycles.md) for each working checkpoint. The [iA Writer menu inventory](docs/ia-writer-inventory.md) records observed features and remaining gaps. Tell Codex what to keep, change or add; the next cycle will incorporate that feedback.
 
 ## Project map
 

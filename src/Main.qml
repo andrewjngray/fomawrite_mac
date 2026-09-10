@@ -49,6 +49,7 @@ ApplicationWindow {
         objectName: "workspaceSettings"
         category: "workspace"
         property bool libraryVisible: true
+        property bool organizerVisible: true
         property int layoutMode: 1
         property int writingSize: 20
         property bool showMarkup: true
@@ -60,29 +61,52 @@ ApplicationWindow {
     }
 
     header: ToolBar {
-        font.family: "Helvetica Neue"
-        font.pixelSize: 13
-        Material.foreground: win.textColor
-        background: Rectangle { color: win.darkMode ? "#25272b" : "#f4f5f7" }
+        implicitHeight: 38
+        background: Rectangle {
+            color: win.darkMode ? "#24262a" : "#f8f8f9"
+            Rectangle { anchors.bottom: parent.bottom; width: parent.width; height: 1; color: win.darkMode ? "#373a40" : "#e5e6e8" }
+        }
         RowLayout {
+            anchors.fill: parent
+            anchors.leftMargin: 10
+            anchors.rightMargin: 10
+            spacing: 4
+            ChromeButton { text: "▥"; hint: "Show or hide library"; darkMode: win.darkMode; checkable: true; checked: workspaceSettings.libraryVisible; onClicked: workspaceSettings.libraryVisible = checked }
+            ChromeButton { text: "☷"; hint: "Show or hide organizer"; darkMode: win.darkMode; checkable: true; checked: workspaceSettings.organizerVisible; onClicked: workspaceSettings.organizerVisible = checked }
+            Label { text: backend.fileName; color: win.textColor; font.pixelSize: 12; elide: Text.ElideMiddle; horizontalAlignment: Text.AlignHCenter; Layout.fillWidth: true }
+            ChromeButton { text: "≡"; hint: "Document outline"; darkMode: win.darkMode; onClicked: { outlineDrawer.headings = backend.documentOutline(editor.text); outlineDrawer.open(); } }
+            ChromeButton { text: "Aa"; hint: "Writing options"; darkMode: win.darkMode; onClicked: writingOptions.open() }
+            Row {
+                objectName: "workspaceMode"
+                Repeater {
+                    model: ["Editor", "Split", "Preview"]
+                    ChromeButton {
+                        required property int index
+                        required property string modelData
+                        text: modelData
+                        hint: modelData + " layout"
+                        darkMode: win.darkMode
+                        checked: workspaceSettings.layoutMode === index
+                        onClicked: workspaceSettings.layoutMode = index
+                    }
+                }
+            }
+        }
+    }
+
+    footer: ToolBar {
+        implicitHeight: 22
+        background: Rectangle { color: win.darkMode ? "#24262a" : "#f7f7f8" }
+        Label {
             anchors.fill: parent
             anchors.leftMargin: 12
             anchors.rightMargin: 12
-            ToolButton {
-                text: "Library"
-                checkable: true
-                checked: workspaceSettings.libraryVisible
-                onClicked: workspaceSettings.libraryVisible = checked
-            }
-            Label { text: backend.fileName; elide: Text.ElideMiddle; Layout.fillWidth: true }
-            ToolButton { text: "Outline"; onClicked: { outlineDrawer.headings = backend.documentOutline(editor.text); outlineDrawer.open(); } }
-            ToolButton { text: "Aa"; onClicked: writingOptions.open(); Accessible.name: "Writing options" }
-            ComboBox {
-                objectName: "workspaceMode"
-                model: ["Editor", "Split", "Preview"]
-                currentIndex: workspaceSettings.layoutMode
-                onActivated: workspaceSettings.layoutMode = currentIndex
-            }
+            verticalAlignment: Text.AlignVCenter
+            text: backend.status
+            elide: Text.ElideRight
+            color: win.mutedColor
+            font.pixelSize: 11
+            Accessible.name: "Document status: " + backend.status
         }
     }
 
@@ -501,15 +525,25 @@ ApplicationWindow {
         anchors.fill: parent
         orientation: Qt.Horizontal
         handle: Rectangle {
-            implicitWidth: 5
-            color: SplitHandle.hovered || SplitHandle.pressed ? "#63b9d4" : (win.darkMode ? "#35383c" : "#e5e7eb")
+            implicitWidth: 1
+            color: SplitHandle.hovered || SplitHandle.pressed ? "#63b9d4" : (win.darkMode ? "#35383c" : "#e1e3e6")
+        }
+        OrganizerPane {
+            library: backend.library
+            currentFile: backend.fileUrl
+            darkMode: win.darkMode
+            visible: workspaceSettings.libraryVisible && workspaceSettings.organizerVisible && win.width >= 1000
+            SplitView.preferredWidth: 170
+            SplitView.minimumWidth: 160
+            SplitView.maximumWidth: 300
+            onOpenRequested: function(file) { win.requestOpen(file); }
         }
         LibraryPane {
             library: backend.library
             currentFile: backend.fileUrl
             darkMode: win.darkMode
             visible: workspaceSettings.libraryVisible
-            SplitView.preferredWidth: 240
+            SplitView.preferredWidth: 220
             SplitView.minimumWidth: 180
             SplitView.maximumWidth: 420
             onOpenRequested: function(file) { win.requestOpen(file); }
@@ -526,6 +560,7 @@ ApplicationWindow {
             anchors.fill: parent
             anchors.leftMargin: 24
             anchors.rightMargin: 24
+            anchors.bottomMargin: 34
             clip: true
             contentWidth: width
             contentHeight: Math.max(height, editor.y + editor.implicitHeight + (workspaceSettings.typewriter ? height / 2 : 220))
@@ -985,56 +1020,25 @@ ApplicationWindow {
             }
         }
 
-        Row {
-            id: footerStatus
+        Rectangle {
             anchors.left: parent.left
-            anchors.bottom: parent.bottom
-            anchors.leftMargin: 12
-            anchors.bottomMargin: 10
-            spacing: 12
-            opacity: 0.55
-
-            FooterIconButton {
-                objectName: "saveButton"
-                iconName: "save"
-                iconColor: win.mutedColor
-                tooltip: "Save"
-                onClicked: backend.save()
-            }
-
-            FooterIconButton {
-                objectName: "openButton"
-                iconName: "open"
-                iconColor: win.mutedColor
-                tooltip: "Open"
-                onClicked: backend.openDialog()
-            }
-
-            Label {
-                text: backend.status
-                color: win.mutedColor
-                font.family: "iA Writer Mono S"
-                font.pixelSize: win.scaledSize(11)
-                visible: text !== ""
-                elide: Text.ElideRight
-                width: Math.min(360, win.width / 3)
-                height: win.scaledSize(16)
-                verticalAlignment: Text.AlignVCenter
-            }
-        }
-
-        Label {
             anchors.right: parent.right
             anchors.bottom: parent.bottom
-            anchors.rightMargin: 12
-            anchors.bottomMargin: 10
-            text: backend.wordCount + (backend.wordCount === 1 ? " Word" : " Words")
-            TapHandler { onTapped: statisticsDialog.open() }
-            Accessible.name: "Document word count; click for statistics"
-            color: win.mutedColor
-            opacity: 0.75
-            font.family: "iA Writer Mono S"
-            font.pixelSize: win.scaledSize(11)
+            height: 34
+            color: win.darkMode ? "#24262a" : "#fafafa"
+            Rectangle { width: parent.width; height: 1; color: win.darkMode ? "#373a40" : "#e5e6e8" }
+            RowLayout {
+                anchors.fill: parent
+                anchors.leftMargin: 6
+                anchors.rightMargin: 10
+                spacing: 2
+                ChromeButton { objectName: "saveButton"; text: "Save"; darkMode: win.darkMode; onClicked: backend.save() }
+                ChromeButton { objectName: "openButton"; text: "Open"; darkMode: win.darkMode; onClicked: backend.openDialog() }
+                ChromeButton { text: "B"; hint: "Bold selection"; darkMode: win.darkMode; onClicked: editor.wrapSelection("**", "**") }
+                ChromeButton { text: "I"; hint: "Italic selection"; darkMode: win.darkMode; onClicked: editor.wrapSelection("*", "*") }
+                Item { Layout.fillWidth: true }
+                ChromeButton { text: backend.wordCount + " words"; hint: "Document statistics"; darkMode: win.darkMode; onClicked: statisticsDialog.open() }
+            }
         }
 
 
@@ -1198,10 +1202,10 @@ ApplicationWindow {
             darkMode: win.darkMode
             visible: workspaceSettings.layoutMode !== 0
             SplitView.fillWidth: workspaceSettings.layoutMode === 2
-            SplitView.preferredWidth: 450
+            SplitView.preferredWidth: 400
             SplitView.minimumWidth: 220
             typeface: ["Helvetica Neue", "Georgia", "iA Writer Mono S"][workspaceSettings.previewStyle]
-            textSize: Math.max(12, workspaceSettings.writingSize - 2)
+            textSize: Math.max(12, workspaceSettings.writingSize - 4)
             onLinkRequested: function(link) {
                 var resolved = backend.resolveDocumentLink(link);
                 if (/^file:.*\.(md|markdown|mdown|txt|text)(#.*)?$/i.test(String(resolved)))

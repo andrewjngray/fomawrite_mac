@@ -9,36 +9,23 @@ Rectangle {
     property url currentFile
     property bool darkMode: false
     signal openRequested(url file)
-    color: darkMode ? "#202124" : "#f4f5f7"
+    color: darkMode ? "#202124" : "#fbfbfc"
     objectName: "libraryPane"
 
     ColumnLayout {
         anchors.fill: parent
-        anchors.margins: 12
-        spacing: 8
+        anchors.margins: 8
+        spacing: 4
         RowLayout {
-            Label { text: "LIBRARY"; font.pixelSize: 11; font.bold: true; color: root.darkMode ? "#9ca3af" : "#737b87"; Layout.fillWidth: true }
-            ToolButton { text: "+"; font.pixelSize: 22; enabled: root.library.rootFolder.toString() !== ""; Accessible.name: "New document"; onClicked: newFileDialog.open(); ToolTip.visible: hovered; ToolTip.text: "New Markdown document" }
-            ToolButton { text: "…"; font.pixelSize: 22; Accessible.name: "Library actions"; onClicked: folderMenu.open() }
+            ChromeButton { text: root.library.rootName || "Choose folder…"; hint: "Choose library folder"; darkMode: root.darkMode; Layout.fillWidth: true; onClicked: folderDialog.open() }
+            ChromeButton { text: "+"; hint: "New document"; darkMode: root.darkMode; enabled: root.library.rootFolder.toString() !== ""; onClicked: newFileDialog.open() }
+            ChromeButton { text: "…"; hint: "Library options and sorting"; darkMode: root.darkMode; onClicked: folderMenu.open() }
         }
-        Button {
-            Layout.fillWidth: true
-            text: root.library.rootName || "Choose Folder…"
-            Accessible.name: "Choose library folder"
-            onClicked: folderDialog.open()
-            ToolTip.visible: hovered
-            ToolTip.text: root.library.rootFolder.toString()
-        }
-        TextField {
-            id: filterField
-            objectName: "libraryFilter"
-            Layout.fillWidth: true
-            placeholderText: "Filter visible files"
-            font.pixelSize: 13
-            text: root.library.filter
-            onTextEdited: root.library.filter = text
-            Accessible.name: "Filter library files"
-            Keys.onEscapePressed: { text = ""; root.library.filter = ""; }
+        ChromeButton {
+            objectName: "librarySort"
+            text: "Sort by " + ["name", "modified", "created", "extension"][root.library.sortMode] + (root.library.ascending ? " ↑" : " ↓")
+            darkMode: root.darkMode
+            onClicked: folderMenu.open()
         }
         Label {
             visible: root.library.error !== ""
@@ -61,7 +48,7 @@ Rectangle {
                 id: entry
                 required property var modelData
                 width: fileList.width
-                height: 36
+                height: 32
                 leftPadding: 8 + modelData.depth * 16
                 highlighted: !modelData.directory && modelData.url.toString() === root.currentFile.toString()
                 Accessible.name: modelData.name
@@ -71,7 +58,7 @@ Rectangle {
                     else root.openRequested(modelData.url)
                 }
                 background: Rectangle {
-                    radius: 5
+                    radius: 4
                     color: entry.highlighted ? (root.darkMode ? "#244354" : "#dceef8")
                         : entry.hovered ? (root.darkMode ? "#2b2d31" : "#e9ecf0") : "transparent"
                 }
@@ -83,7 +70,7 @@ Rectangle {
                         font.pixelSize: 16
                         Layout.preferredWidth: 14
                     }
-                    Label { text: entry.modelData.name; font.pixelSize: 13; color: root.darkMode ? "#e3e5e9" : "#30343b"; elide: Text.ElideMiddle; Layout.fillWidth: true }
+                    Label { text: entry.modelData.name; font.pixelSize: 12; color: root.darkMode ? "#e3e5e9" : "#30343b"; elide: Text.ElideMiddle; Layout.fillWidth: true }
                 }
                 ToolTip.visible: hovered
                 ToolTip.text: modelData.url.toString()
@@ -99,13 +86,32 @@ Rectangle {
                 font.pixelSize: 13
             }
         }
-        Label { text: "Markdown & text · A–Z"; font.pixelSize: 11; color: root.darkMode ? "#929aa6" : "#78808c" }
+        TextField {
+            id: filterField
+            objectName: "libraryFilter"
+            Layout.fillWidth: true
+            implicitHeight: 30
+            placeholderText: "Filter files"
+            leftPadding: 8
+            font.pixelSize: 12
+            text: root.library.filter
+            onTextEdited: root.library.filter = text
+            Accessible.name: "Filter visible library files"
+            background: Rectangle { radius: 5; color: root.darkMode ? "#292c31" : "#f0f1f3"; border.width: filterField.activeFocus ? 1 : 0; border.color: "#08a5c8" }
+            Keys.onEscapePressed: { text = ""; root.library.filter = ""; }
+        }
     }
 
     Menu {
         id: folderMenu
         MenuItem { text: "Choose Folder…"; onTriggered: folderDialog.open() }
         MenuItem { text: "New Folder…"; enabled: root.library.rootFolder.toString() !== ""; onTriggered: newFolderDialog.open() }
+        MenuItem { text: "Sort by name"; onTriggered: root.library.sortMode = 0 }
+        MenuItem { text: "Sort by modified date"; onTriggered: root.library.sortMode = 1 }
+        MenuItem { text: "Sort by created date"; onTriggered: root.library.sortMode = 2 }
+        MenuItem { text: "Sort by extension"; onTriggered: root.library.sortMode = 3 }
+        MenuItem { text: "Ascending order"; checkable: true; checked: root.library.ascending; onTriggered: root.library.ascending = !root.library.ascending }
+        MenuItem { text: "Pin folders to top"; checkable: true; checked: root.library.foldersFirst; onTriggered: root.library.foldersFirst = !root.library.foldersFirst }
         MenuItem { text: "Refresh"; onTriggered: root.library.refresh() }
     }
     Dialogs.FolderDialog {

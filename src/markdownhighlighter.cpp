@@ -122,7 +122,20 @@ void MarkdownHighlighter::setFocusBlock(int block) {
 }
 
 void MarkdownHighlighter::highlightBlock(const QString &text) {
-    if (!text.isEmpty()) {
+    // Fenced source is literal: never style headings or hide emphasis markers in it.
+    static const QRegularExpression fenceRe(QStringLiteral("^ {0,3}(`{3,}|~{3,})(.*)$"));
+    const auto fence = fenceRe.match(text);
+    int state = previousBlockState() > 0 ? previousBlockState() : 0;
+    bool literal = state > 0;
+    if (fence.hasMatch()) {
+        const QString marker = fence.captured(1);
+        const int kind = marker.startsWith('`') ? 1 : 2;
+        if (!state) { state = marker.size() * 10 + kind; literal = true; }
+        else if (state % 10 == kind && marker.size() >= state / 10 && fence.captured(2).trimmed().isEmpty()) state = 0;
+    }
+    setCurrentBlockState(state);
+    if (literal) setFormat(0, text.size(), m_codeFormat);
+    if (!literal && !text.isEmpty()) {
         highlightMarkers(text);
         if (text.contains(QLatin1Char('`')) || text.contains(QLatin1Char('*'))
             || text.contains(QLatin1Char('_')) || text.contains(QLatin1Char('['))) {
@@ -164,11 +177,11 @@ void MarkdownHighlighter::highlightMarkers(const QString &text) {
         return;
 
     const QChar firstChar = text.at(first);
-    if (first == 0 && firstChar == QLatin1Char('#')) {
-        static const QRegularExpression headingRe(QStringLiteral("^(#{1,6})(\\s+)(.*)$"));
+    if (first <= 3 && firstChar == QLatin1Char('#')) {
+        static const QRegularExpression headingRe(QStringLiteral("^ {0,3}(#{1,6})([ \\t]+)(.*)$"));
         const QRegularExpressionMatch heading = headingRe.match(text);
         if (heading.hasMatch()) {
-            setFormat(0, heading.capturedLength(1) + heading.capturedLength(2),
+            setFormat(0, heading.capturedStart(3),
                       m_markerFormat);
             setFormat(heading.capturedStart(3), heading.capturedLength(3),
                       m_headingFormat);

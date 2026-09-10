@@ -161,6 +161,80 @@ private slots:
         QCOMPARE(backend.documentStatistics("").value("readingMinutes").toInt(), 0);
     }
 
+    void organizesShortcutsAndSortsWithoutMovingFiles() {
+        QTemporaryDir directory;
+        FileLibrary library;
+        library.setRootFolder(QUrl::fromLocalFile(directory.path()));
+        const QUrl root = library.rootFolder();
+        const QUrl alpha = library.createDocument("Alpha.md");
+        const QUrl beta = library.createDocument("Beta.txt");
+        library.toggleFavorite(alpha);
+        library.recordRecentFile(alpha);
+        library.recordRecentFile(beta);
+        library.recordRecentFile(alpha);
+        QCOMPARE(library.recentFiles().first().toMap().value("url").toUrl(), alpha);
+        int matches = 0;
+        for (const auto &entry : library.recentFiles()) if (entry.toMap().value("url").toUrl() == alpha) ++matches;
+        QCOMPARE(matches, 1);
+        library.setSortMode(0);
+        library.setAscending(false);
+        QCOMPARE(library.entries().first().toMap().value("name").toString(), QString("Beta.txt"));
+        {
+            FileLibrary restored;
+            QCOMPARE(restored.ascending(), false);
+            QVERIFY(restored.favorites().contains(library.favorites().last()));
+        }
+        library.removeLocation(root);
+        QVERIFY(QFileInfo::exists(alpha.toLocalFile()));
+        QVERIFY(QFileInfo::exists(beta.toLocalFile()));
+        QVERIFY(library.rootFolder().isEmpty());
+        library.toggleFavorite(alpha);
+        library.clearRecentFiles();
+        QVERIFY(library.recentFiles().isEmpty());
+        library.setAscending(true);
+    }
+
+    void headingAndFencePreviewMatchesSource() {
+        Backend backend;
+        QQmlEngine engine;
+        engine.rootContext()->setContextProperty("backend", &backend);
+        QQmlComponent component(&engine, QUrl::fromLocalFile(QFINDTESTDATA("../src/Main.qml")));
+        QVERIFY2(component.isReady(), qPrintable(component.errorString()));
+        QScopedPointer<QObject> window(component.create());
+        QVERIFY(window);
+        auto *editor = window->findChild<QObject *>("sourceEditor");
+        auto *preview = window->findChild<QObject *>("renderedPreview");
+        const QString markdown = "#title\n\n# title\n\n## Second\n\n```md\n# Literal\n**Stars**\n```\n";
+        editor->setProperty("text", markdown);
+        auto *quick = qvariant_cast<QQuickTextDocument *>(preview->property("textDocument"));
+        QVERIFY(quick);
+        QTRY_VERIFY(quick->textDocument()->toPlainText().contains("# Literal"));
+        auto *doc = quick->textDocument();
+        QCOMPARE(doc->firstBlock().text(), QString("#title"));
+        QCOMPARE(doc->firstBlock().blockFormat().headingLevel(), 0);
+        bool heading = false, literal = false;
+        for (auto block = doc->begin(); block.isValid(); block = block.next()) {
+            if (block.text() == "title") { QCOMPARE(block.blockFormat().headingLevel(), 1); heading = true; }
+            if (block.text() == "# Literal") { QCOMPARE(block.blockFormat().headingLevel(), 0); literal = true; }
+        }
+        QVERIFY(heading && literal);
+        QCOMPARE(editor->property("text").toString(), markdown);
+        backend.setShowMarkup(false);
+        QVERIFY(backend.hiddenRangesAt(markdown.indexOf("**Stars**")).isEmpty());
+        QTextDocument source;
+        source.setPlainText("#title\n# title\n```\n# Literal\n**Stars**\n```\n  # Indented");
+        MarkdownHighlighter highlighter(&source);
+        highlighter.rehighlight();
+        QVERIFY(source.firstBlock().layout()->formats().isEmpty());
+        for (auto block = source.findBlockByNumber(3); block.blockNumber() <= 4; block = block.next())
+            for (const auto &range : block.layout()->formats()) {
+                QVERIFY(range.format.fontWeight() != QFont::Bold);
+                QVERIFY(range.format.fontPointSize() != 1.0);
+            }
+        QVERIFY(!source.lastBlock().layout()->formats().isEmpty());
+        backend.discardRecovery();
+    }
+
     void countsWords() {
         QCOMPARE(Backend::countWords(QStringLiteral("one two-three don't 42")), 4);
         QCOMPARE(Backend::countWords(QStringLiteral("你好 世界")), 2);

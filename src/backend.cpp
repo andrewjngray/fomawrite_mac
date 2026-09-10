@@ -243,6 +243,15 @@ void Backend::stylePreview(QObject *textDocument) {
         format.setBottomMargin(block.textList() ? 4 : 12);
         QTextCursor cursor(block);
         cursor.setBlockFormat(format);
+        if (format.headingLevel() > 0) {
+            QTextCharFormat heading;
+            // Qt Quick applies its pixel font separately from the document default.
+            // Relative adjustment follows the actual preview font at every size.
+            heading.setProperty(QTextFormat::FontSizeAdjustment, format.headingLevel() == 1 ? 2 : format.headingLevel() == 2 ? 1 : 0);
+            heading.setFontWeight(QFont::Bold);
+            cursor.select(QTextCursor::BlockUnderCursor);
+            cursor.mergeCharFormat(heading);
+        }
     }
 }
 
@@ -312,6 +321,7 @@ void Backend::open(const QUrl &url) {
     m_lastKnownFileContents = contents;
     m_hasKnownFileContents = true;
     setFileUrl(url);
+    m_library.recordRecentFile(url);
     if (m_library.rootFolder().isEmpty())
         m_library.setRootFolder(QUrl::fromLocalFile(QFileInfo(url.toLocalFile()).absolutePath()));
     m_library.revealFile(url);
@@ -466,7 +476,7 @@ QVariantList Backend::hiddenRangesAt(int position) const {
 
     const QTextBlock block =
         m_document->findBlock(qBound(0, position, m_document->characterCount() - 1));
-    if (!block.isValid())
+    if (!block.isValid() || block.userState() > 0 || (block.previous().isValid() && block.previous().userState() > 0))
         return ranges;
 
     const int lineStart = block.position();
@@ -600,6 +610,7 @@ void Backend::saveTo(const QUrl &url) {
     m_lastKnownFileContents = contents;
     m_hasKnownFileContents = true;
     setFileUrl(url);
+    m_library.recordRecentFile(url);
     watchCurrentFile();
     QSettings().setValue(lastSaveDirectorySetting,
                          QFileInfo(url.toLocalFile()).absolutePath());

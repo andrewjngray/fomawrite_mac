@@ -15,6 +15,8 @@ Rectangle {
     color: darkMode ? "#191b1e" : "#ffffff"
     property string renderedMarkdown: ""
     onMarkdownChanged: refreshTimer.restart()
+    onTextSizeChanged: refreshTimer.restart()
+    onTypefaceChanged: refreshTimer.restart()
     function refresh() {
         renderedMarkdown = markdown;
         Qt.callLater(function() { root.renderer.stylePreview(previewText.textDocument); });
@@ -35,7 +37,7 @@ Rectangle {
             id: previewText
             objectName: "renderedPreview"
             x: Math.max(24, (previewScroll.width - 740) / 2)
-            y: 32
+            y: 24
             width: Math.max(100, Math.min(740, previewScroll.width - 48))
             height: implicitHeight
             readOnly: true
