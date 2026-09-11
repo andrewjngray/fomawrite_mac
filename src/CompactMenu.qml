@@ -4,6 +4,7 @@ import QtQuick.Controls
 Menu {
     id: menu
     property bool darkMode: false
+    delegate: CompactMenuItem {}
     width: 224
     padding: 5
     font.family: "Helvetica Neue"

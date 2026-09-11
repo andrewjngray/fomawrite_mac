@@ -72,6 +72,37 @@ private slots:
         QVERIFY(!previews->property("checked").toBool());
     }
 
+    void libraryBarsCanBeHiddenAndRestored() {
+        Backend backend;
+        QQmlEngine engine;
+        engine.rootContext()->setContextProperty("backend", &backend);
+        QQmlComponent component(&engine, QUrl::fromLocalFile(QFINDTESTDATA("../src/Main.qml")));
+        QVERIFY2(component.isReady(), qPrintable(component.errorString()));
+        QScopedPointer<QObject> window(component.create());
+        QVERIFY(window);
+        for (const auto &pair : {qMakePair("toggleSortBar", "librarySortBar"), qMakePair("toggleFilterBar", "libraryFilter")}) {
+            auto *action = window->findChild<QObject *>(pair.first);
+            auto *bar = window->findChild<QObject *>(pair.second);
+            QVERIFY(action);
+            QVERIFY(bar);
+            QVERIFY(QMetaObject::invokeMethod(action, "triggered"));
+            QVERIFY(!bar->property("visible").toBool());
+            QVERIFY(action->property("text").toString().startsWith("Show"));
+            QVERIFY(QMetaObject::invokeMethod(action, "triggered"));
+            QVERIFY(action->property("text").toString().startsWith("Hide"));
+        }
+        auto *sort = window->findChild<QObject *>("libraryOptionsSortMenu");
+        QVERIFY(sort);
+        for (auto *item : sort->findChildren<QObject *>()) {
+            if (item->property("text").toString() == "Extension") {
+                QVERIFY(QMetaObject::invokeMethod(item, "triggered"));
+                QCOMPARE(backend.library()->property("sortMode").toInt(), 3);
+                return;
+            }
+        }
+        QFAIL("Missing Extension submenu action");
+    }
+
     void boundsLibraryExcerptsAndPreservesFiles() {
         QTemporaryDir directory;
         QTemporaryDir outside;

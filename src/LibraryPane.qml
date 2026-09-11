@@ -12,6 +12,8 @@ Rectangle {
     Settings {
         id: displaySettings
         category: "libraryDisplay"
+        property bool showSortBar: true
+        property bool showFilterBar: true
         property bool showDates: false
         property bool showExcerpts: false
         property int compactListRevision: 0
@@ -28,13 +30,15 @@ Rectangle {
     objectName: "libraryPane"
     function chooseFolder() { folderDialog.open(); }
     function newDocument() { newFileDialog.open(); }
-    function showOptions() { folderMenu.open(); }
+    function showOptions(anchor) { folderMenu.parent = anchor; folderMenu.x = anchor.width - folderMenu.width; folderMenu.y = anchor.height + 3; folderMenu.open(); }
 
     ColumnLayout {
         anchors.fill: parent
         anchors.margins: 8
         spacing: 4
         RowLayout {
+            objectName: "librarySortBar"
+            visible: displaySettings.showSortBar
             Layout.fillWidth: true
             ChromeButton {
                 id: sortButton
@@ -138,6 +142,7 @@ Rectangle {
         TextField {
             id: filterField
             objectName: "libraryFilter"
+            visible: displaySettings.showFilterBar
             Layout.fillWidth: true
             implicitHeight: 26
             placeholderText: "Filter files"
@@ -151,14 +156,9 @@ Rectangle {
         }
     }
 
-    CompactMenu {
-        id: sortMenu
-        objectName: "librarySortMenu"
+    component LibrarySortMenu: CompactMenu {
         ButtonGroup { id: sortFieldGroup }
         ButtonGroup { id: sortDirectionGroup }
-        parent: sortButton
-        x: 0
-        y: sortButton.height + 3
         darkMode: root.darkMode
         CompactMenuItem { text: "Date Modified"; ButtonGroup.group: sortFieldGroup; checkable: true; checked: root.library.sortMode === 1; onTriggered: root.library.sortMode = 1 }
         CompactMenuItem { text: "Date Created"; ButtonGroup.group: sortFieldGroup; checkable: true; checked: root.library.sortMode === 2; onTriggered: root.library.sortMode = 2 }
@@ -173,11 +173,31 @@ Rectangle {
         CompactMenuItem { text: "Show Date"; checkable: true; checked: displaySettings.showDates; onTriggered: displaySettings.showDates = !displaySettings.showDates }
         CompactMenuItem { text: "Show Text Excerpts"; checkable: true; checked: displaySettings.showExcerpts; onTriggered: displaySettings.showExcerpts = !displaySettings.showExcerpts }
     }
+    LibrarySortMenu {
+        id: sortMenu
+        objectName: "librarySortMenu"
+        parent: sortButton
+        y: sortButton.height + 3
+    }
     CompactMenu {
         id: folderMenu
+        objectName: "libraryOptionsMenu"
         darkMode: root.darkMode
+        CompactMenuItem { text: "New File"; iconName: "plus"; enabled: root.library.rootFolder.toString() !== ""; onTriggered: newFileDialog.open() }
+        CompactMenuItem { text: "New Folder"; iconName: "folder"; enabled: root.library.rootFolder.toString() !== ""; onTriggered: newFolderDialog.open() }
+        MenuSeparator {}
+        LibrarySortMenu { title: "Sort By"; objectName: "libraryOptionsSortMenu" }
+        CompactMenu {
+            title: "View Options"
+            darkMode: root.darkMode
+            CompactMenuItem { text: "Show Date"; checkable: true; checked: displaySettings.showDates; onTriggered: displaySettings.showDates = !displaySettings.showDates }
+            CompactMenuItem { text: "Show Text Excerpts"; checkable: true; checked: displaySettings.showExcerpts; onTriggered: displaySettings.showExcerpts = !displaySettings.showExcerpts }
+        }
+        MenuSeparator {}
+        CompactMenuItem { objectName: "toggleSortBar"; iconName: "sort"; text: displaySettings.showSortBar ? "Hide Sort Bar" : "Show Sort Bar"; onTriggered: displaySettings.showSortBar = !displaySettings.showSortBar }
+        CompactMenuItem { objectName: "toggleFilterBar"; iconName: "filter"; text: displaySettings.showFilterBar ? "Hide Filter Bar" : "Show Filter Bar"; onTriggered: displaySettings.showFilterBar = !displaySettings.showFilterBar }
+        MenuSeparator {}
         CompactMenuItem { text: "Choose Folder…"; onTriggered: folderDialog.open() }
-        CompactMenuItem { text: "New Folder…"; enabled: root.library.rootFolder.toString() !== ""; onTriggered: newFolderDialog.open() }
         CompactMenuItem { text: "Refresh"; onTriggered: root.library.refresh() }
     }
     Dialogs.FolderDialog {

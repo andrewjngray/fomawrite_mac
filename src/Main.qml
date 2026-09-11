@@ -92,7 +92,7 @@ ApplicationWindow {
                 Layout.maximumWidth: libraryPane.width - 10
                 ChromeButton { iconName: "folder"; text: backend.library.rootName || "Choose folder"; hint: "Choose library folder"; darkMode: win.darkMode; Layout.fillWidth: true; onClicked: libraryPane.chooseFolder() }
                 ChromeButton { iconName: "plus"; hint: "New document"; darkMode: win.darkMode; onClicked: libraryPane.newDocument() }
-                ChromeButton { iconName: "down"; hint: "Library options"; darkMode: win.darkMode; onClicked: libraryPane.showOptions() }
+                ChromeButton { iconName: "down"; hint: "Library options"; darkMode: win.darkMode; onClicked: libraryPane.showOptions(this) }
             }
             Label { Accessible.description: backend.status; text: backend.fileName; color: win.mutedColor; font.pixelSize: 12; elide: Text.ElideMiddle; horizontalAlignment: Text.AlignHCenter; Layout.fillWidth: true }
             ChromeButton { iconName: "outline"; hint: "Document outline"; darkMode: win.darkMode; onClicked: { outlineDrawer.headings = backend.documentOutline(editor.text); outlineDrawer.open(); } }

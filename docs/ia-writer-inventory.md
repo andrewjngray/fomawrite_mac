@@ -105,3 +105,7 @@ Unified macOS title/toolbar area, wider navigation, balanced source/preview, sma
 
 ### Cycle 8 sorting menu
 Rounded compact dropdown with Date Modified/Date Created/Name/Extension, exclusive A to Z/Z to A, folder pinning and persistent Show Date/Show Text Excerpts. Navigation and date-format submenus remain future work.
+
+### Cycle 10 menu update
+
+Library dropdown now includes New File/New Folder, Sort By and View Options submenus, and persistent hide/show actions for sort and filter bars. View Options currently supports dates and excerpts only; other iA navigation and date-format options remain deferred.
