@@ -20,6 +20,7 @@ Button {
     bottomInset: 0
     focusPolicy: Qt.StrongFocus
     Accessible.name: hint
+    ToolTip.delay: 700
     ToolTip.visible: hovered && hint !== ""
     ToolTip.text: hint
     contentItem: Item {

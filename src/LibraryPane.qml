@@ -9,7 +9,20 @@ Rectangle {
     required property var library
     property url currentFile
     property bool darkMode: false
-    Settings { id: displaySettings; category: "libraryDisplay"; property bool showDates: true; property bool showExcerpts: true }
+    Settings {
+        id: displaySettings
+        category: "libraryDisplay"
+        property bool showDates: false
+        property bool showExcerpts: false
+        property int compactListRevision: 0
+        Component.onCompleted: {
+            if (compactListRevision < 1) {
+                showDates = false
+                showExcerpts = false
+                compactListRevision = 1
+            }
+        }
+    }
     signal openRequested(url file)
     color: darkMode ? "#202124" : "#fbfbfc"
     objectName: "libraryPane"
@@ -21,20 +34,34 @@ Rectangle {
         anchors.fill: parent
         anchors.margins: 8
         spacing: 4
-        ChromeButton {
-            id: sortButton
-            objectName: "librarySort"
-            implicitHeight: 24
-            implicitWidth: sortLabel.implicitWidth + 34
-            text: "Sort by " + ["Name", "Date Modified", "Date Created", "Extension"][root.library.sortMode]
-            darkMode: root.darkMode
-            onClicked: sortMenu.open()
-            contentItem: RowLayout {
-                spacing: 3
-                Text { id: sortLabel; text: sortButton.text; font.family: "Helvetica Neue"; font.pixelSize: 12; color: root.darkMode ? "#c3c7ce" : "#777c83" }
-                LineIcon { name: "down"; ink: root.darkMode ? "#c3c7ce" : "#777c83"; Layout.preferredWidth: 12; Layout.preferredHeight: 12 }
+        RowLayout {
+            Layout.fillWidth: true
+            ChromeButton {
+                id: sortButton
+                objectName: "librarySort"
+                implicitHeight: 24
+                implicitWidth: sortLabel.implicitWidth + 34
+                text: "Sort by " + ["Name", "Date Modified", "Date Created", "Extension"][root.library.sortMode]
+                darkMode: root.darkMode
+                onClicked: sortMenu.open()
+                contentItem: RowLayout {
+                    spacing: 3
+                    Text { id: sortLabel; text: sortButton.text; font.family: "Helvetica Neue"; font.pixelSize: 12; color: root.darkMode ? "#c3c7ce" : "#777c83" }
+                    LineIcon { name: "down"; ink: root.darkMode ? "#c3c7ce" : "#777c83"; Layout.preferredWidth: 12; Layout.preferredHeight: 12 }
+                }
+                background: Rectangle { radius: height / 2; color: root.darkMode ? "#303238" : "#eff0f2"; border.width: sortButton.activeFocus ? 1 : 0; border.color: "#426da7" }
             }
-            background: Rectangle { radius: height / 2; color: root.darkMode ? "#303238" : "#eff0f2"; border.width: sortButton.activeFocus ? 1 : 0; border.color: "#426da7" }
+            Item { Layout.fillWidth: true }
+            ChromeButton {
+                objectName: "libraryPreviewToggle"
+                text: "Previews"
+                hint: "Show or hide file text previews"
+                implicitHeight: 24
+                darkMode: root.darkMode
+                checkable: true
+                checked: displaySettings.showExcerpts
+                onClicked: displaySettings.showExcerpts = checked
+            }
         }
         Label {
             visible: root.library.error !== ""
@@ -93,6 +120,7 @@ Rectangle {
                     }
                     LineIcon { visible: entry.modelData.directory; name: entry.modelData.expanded ? "down" : "right"; ink: "#92969e"; Layout.preferredWidth: 14; Layout.preferredHeight: 14 }
                 }
+                ToolTip.delay: 700
                 ToolTip.visible: hovered
                 ToolTip.text: modelData.url.toString()
             }

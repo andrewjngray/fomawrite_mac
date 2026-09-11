@@ -16,7 +16,7 @@ Status: **Have** = implemented in Omawrite; **Partial** = some behavior exists; 
 | Tree/list navigation | Partial: expandable tree | 5 |
 | Sort by name, modified, created, extension | Have | 4 |
 | Ascending/descending; folders pinned first | Have | 4 |
-| Dates and text excerpts in file list | Partial: modified dates and bounded source snippets with visibility toggles; no date-format options | 7 |
+| Dates and text excerpts in file list | Partial: modified dates and bounded source snippets with visibility toggles; compact default and top-level Previews button; no date-format options | 9 |
 | Separate organizer, file list, editor, preview | Have; organizer collapses below 1,000 px | 4 |
 | Folder/file creation | Have: within selected root | 1 |
 | Back/forward library navigation | Planned | 5 |

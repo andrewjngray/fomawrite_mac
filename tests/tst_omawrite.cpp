@@ -58,8 +58,18 @@ private slots:
         QVERIFY(!backend.library()->property("ascending").toBool());
         QVERIFY(trigger("A to Z"));
         QVERIFY(backend.library()->property("ascending").toBool());
+        auto *previews = window->findChild<QObject *>("libraryPreviewToggle");
+        QVERIFY(previews);
+        QVERIFY(!previews->property("checked").toBool());
         QVERIFY(trigger("Show Text Excerpts"));
+        QVERIFY(previews->property("checked").toBool());
+        // A button click changes the same preference used by the menu.
+        previews->setProperty("checked", false);
+        QVERIFY(QMetaObject::invokeMethod(previews, "clicked"));
         QVERIFY(trigger("Show Text Excerpts"));
+        QVERIFY(previews->property("checked").toBool());
+        QVERIFY(trigger("Show Text Excerpts"));
+        QVERIFY(!previews->property("checked").toBool());
     }
 
     void boundsLibraryExcerptsAndPreservesFiles() {

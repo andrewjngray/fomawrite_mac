@@ -111,3 +111,15 @@ Andrew identified repeated app-access approvals as the cause of long attachment 
 **Implemented:** rounded Sort by pill, separate compact menu, four sort fields, exclusive A to Z/Z to A choices, folder pinning, persistent date/excerpt visibility toggles, checkmarks and standard interface typography. The folder-actions menu shares the style. Navigation and date-format submenus remain deferred.
 
 **Verification:** build and 23 tests passed, including menu action coverage. Native menu inspected and captured in the stable development app; saved sample closed normally before refreshing it. Dark appearance/full keyboard audit untested. [Records](../research/cycle-08/README.md), [optional usability exercise](../research/usability/cycle-08.md). Runnable artifacts: `dist/Omawrite Dev.app` and packaged `dist/Omawrite.app`. Final packaging and strict signature verification passed.
+
+## Cycle 9 — quieter file browsing
+
+**Planned scope / feedback:** Andrew requested delayed filename tooltips and compact file rows, with a top-level excerpt toggle.
+
+**Implemented:** 700ms hover delay for file rows and shared chrome controls (including organizer paths); a rounded Previews toggle beside Sort by, synchronized with Show Text Excerpts. Compact filename-and-icon rows retain extensions. Dates and excerpts start hidden through a one-time preference migration; subsequent choices persist. Hidden excerpts are not fetched. Document preview is unaffected.
+
+**Checks:** build succeeded; all 23 tests passed with normal macOS access, including button/menu synchronization. The initial restricted run failed the existing file-watcher check; the native rerun passed. Native QA verified the migrated compact default and toggling excerpts on/off with sample files. Screenshots saved in [cycle 9 records](../research/cycle-09/README.md). Exact hover timing and dark appearance remain manual checks.
+
+**Runnable artifacts:** `dist/Omawrite Dev.app` (stable QA identity) and `dist/Omawrite.app`. See [optional usability exercise](../research/usability/cycle-09.md). No source documents changed.
+
+Final packaging and deep/strict signature verification passed.
