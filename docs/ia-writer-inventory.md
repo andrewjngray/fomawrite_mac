@@ -113,3 +113,7 @@ Library dropdown now includes New File/New Folder, Sort By and View Options subm
 ### Cycle 11 visual update
 
 Original filled blue folder/white document icons, blue outline location markers, macOS system interface font and larger header labels. Native outer corners are unchanged; this does not claim exact asset or window-shape parity.
+
+### Cycle 12 organizer update
+
+Favorites and Recents have persistent collapsible sections; favorite actions are left-aligned. macOS uses a native unified title-bar style. Exact traffic-light geometry/corner matching remains unverified while the sharing badge covers the controls.

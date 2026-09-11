@@ -103,6 +103,30 @@ private slots:
         QFAIL("Missing Extension submenu action");
     }
 
+    void organizerSectionsCollapseWithoutChangingShortcuts() {
+        Backend backend;
+        QQmlEngine engine;
+        engine.rootContext()->setContextProperty("backend", &backend);
+        QQmlComponent component(&engine, QUrl::fromLocalFile(QFINDTESTDATA("../src/Main.qml")));
+        QVERIFY2(component.isReady(), qPrintable(component.errorString()));
+        QScopedPointer<QObject> window(component.create());
+        QVERIFY(window);
+        const auto favorites = backend.library()->property("favorites");
+        const auto recents = backend.library()->property("recentFiles");
+        for (const auto &name : {"favoritesDisclosure", "recentsDisclosure"}) {
+            auto *button = window->findChild<QObject *>(name);
+            QVERIFY(button);
+            QCOMPARE(button->property("iconName").toString(), QString("down"));
+            QVERIFY(QMetaObject::invokeMethod(button, "clicked"));
+            QCOMPARE(button->property("iconName").toString(), QString("right"));
+            QVERIFY(button->property("hint").toString().startsWith("Expand"));
+            QVERIFY(QMetaObject::invokeMethod(button, "clicked"));
+            QCOMPARE(button->property("iconName").toString(), QString("down"));
+        }
+        QCOMPARE(backend.library()->property("favorites"), favorites);
+        QCOMPARE(backend.library()->property("recentFiles"), recents);
+    }
+
     void boundsLibraryExcerptsAndPreservesFiles() {
         QTemporaryDir directory;
         QTemporaryDir outside;

@@ -1,4 +1,5 @@
 import QtQuick
+import QtCore
 import QtQuick.Controls
 import QtQuick.Layouts
 import QtQuick.Dialogs as Dialogs
@@ -9,6 +10,12 @@ Rectangle {
     required property var library
     property url currentFile
     property bool darkMode: false
+    Settings {
+        id: sectionSettings
+        category: "organizerSections"
+        property bool favoritesExpanded: true
+        property bool recentsExpanded: true
+    }
     signal openRequested(url file)
     color: darkMode ? "#1c1e22" : "#f5f5f7"
     function activate(entry) {
@@ -48,51 +55,84 @@ Rectangle {
                     ChromeButton { darkMode: root.darkMode; iconName: "close"; Accessible.name: "Remove location shortcut " + modelData.name; onClicked: root.library.removeLocation(modelData.url) }
                 }
             }
-            Label { text: "Favorites"; font.pixelSize: 11; font.bold: false; color: root.darkMode ? "#92969e" : "#777c83"; Layout.topMargin: 14 }
-            Repeater {
-                model: root.library.favorites
-                delegate: RowLayout {
-                    required property var modelData
+            ChromeButton {
+                objectName: "favoritesDisclosure"
+                Layout.topMargin: 14
+                Layout.fillWidth: true
+                text: "Favorites"
+                hint: (sectionSettings.favoritesExpanded ? "Collapse" : "Expand") + " Favorites"
+                iconName: sectionSettings.favoritesExpanded ? "down" : "right"
+                alignLeft: true
+                darkMode: root.darkMode
+                font.pixelSize: 11
+                onClicked: sectionSettings.favoritesExpanded = !sectionSettings.favoritesExpanded
+            }
+            ColumnLayout {
+                objectName: "favoritesContents"
+                visible: sectionSettings.favoritesExpanded
+                Layout.fillWidth: true
+                spacing: 4
+                Repeater {
+                    model: root.library.favorites
+                    delegate: RowLayout {
+                        required property var modelData
+                        Layout.fillWidth: true
+                        ChromeButton {
+                            text: modelData.name
+                            iconName: modelData.directory ? "folder" : "document"
+                            iconColor: modelData.directory ? "#00aeef" : "transparent"
+                            alignLeft: true
+                            darkMode: root.darkMode
+                            Layout.fillWidth: true
+                            enabled: modelData.available
+                            onClicked: root.activate(modelData)
+                            ToolTip.visible: hovered
+                            ToolTip.text: modelData.url.toString()
+                        }
+                        ChromeButton { darkMode: root.darkMode; iconName: "close"; Accessible.name: "Remove favorite " + modelData.name; onClicked: root.library.toggleFavorite(modelData.url) }
+                    }
+                }
+                ChromeButton { text: "Favorite folder"; iconName: "plus"; alignLeft: true; darkMode: root.darkMode; Layout.fillWidth: true; onClicked: root.library.toggleFavorite(root.library.rootFolder) }
+                ChromeButton { text: "Favorite document"; iconName: "plus"; alignLeft: true; darkMode: root.darkMode; Layout.fillWidth: true; enabled: root.currentFile.toString() !== ""; onClicked: root.library.toggleFavorite(root.currentFile) }
+            }
+            RowLayout {
+                Layout.topMargin: 14
+                ChromeButton {
+                    objectName: "recentsDisclosure"
                     Layout.fillWidth: true
-                    ChromeButton {
+                    text: "Recents"
+                    hint: (sectionSettings.recentsExpanded ? "Collapse" : "Expand") + " Recents"
+                    iconName: sectionSettings.recentsExpanded ? "down" : "right"
+                    alignLeft: true
+                    darkMode: root.darkMode
+                    font.pixelSize: 11
+                    onClicked: sectionSettings.recentsExpanded = !sectionSettings.recentsExpanded
+                }
+                ChromeButton { darkMode: root.darkMode; iconName: "close"; Accessible.name: "Clear recent file shortcuts"; onClicked: root.library.clearRecentFiles() }
+            }
+            ColumnLayout {
+                objectName: "recentsContents"
+                visible: sectionSettings.recentsExpanded
+                Layout.fillWidth: true
+                spacing: 4
+                Repeater {
+                    model: root.library.recentFiles
+                    delegate: ChromeButton {
+                        darkMode: root.darkMode
+                        required property var modelData
+                        Layout.fillWidth: true
+                        implicitHeight: 30
+                        font.pixelSize: 12
+                        font.bold: false
                         text: modelData.name
                         iconName: modelData.directory ? "folder" : "document"
                         iconColor: modelData.directory ? "#00aeef" : "transparent"
                         alignLeft: true
-                        darkMode: root.darkMode
-                        Layout.fillWidth: true
                         enabled: modelData.available
-                        onClicked: root.activate(modelData)
+                        onClicked: root.openRequested(modelData.url)
                         ToolTip.visible: hovered
                         ToolTip.text: modelData.url.toString()
                     }
-                    ChromeButton { darkMode: root.darkMode; iconName: "close"; Accessible.name: "Remove favorite " + modelData.name; onClicked: root.library.toggleFavorite(modelData.url) }
-                }
-            }
-            ChromeButton { text: "+ Favorite folder"; darkMode: root.darkMode; Layout.fillWidth: true; onClicked: root.library.toggleFavorite(root.library.rootFolder) }
-            ChromeButton { text: "+ Favorite document"; darkMode: root.darkMode; Layout.fillWidth: true; enabled: root.currentFile.toString() !== ""; onClicked: root.library.toggleFavorite(root.currentFile) }
-            RowLayout {
-                Layout.topMargin: 14
-                Label { text: "Recents"; font.pixelSize: 11; font.bold: false; color: root.darkMode ? "#92969e" : "#777c83"; Layout.fillWidth: true }
-                ChromeButton { darkMode: root.darkMode; iconName: "close"; Accessible.name: "Clear recent file shortcuts"; onClicked: root.library.clearRecentFiles() }
-            }
-            Repeater {
-                model: root.library.recentFiles
-                delegate: ChromeButton {
-                    darkMode: root.darkMode
-                    required property var modelData
-                    Layout.fillWidth: true
-                    implicitHeight: 30
-                    font.pixelSize: 12
-                    font.bold: false
-                    text: modelData.name
-                        iconName: modelData.directory ? "folder" : "document"
-                        iconColor: modelData.directory ? "#00aeef" : "transparent"
-                        alignLeft: true
-                    enabled: modelData.available
-                    onClicked: root.openRequested(modelData.url)
-                    ToolTip.visible: hovered
-                    ToolTip.text: modelData.url.toString()
                 }
             }
         }
