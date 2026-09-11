@@ -50,7 +50,7 @@ Rectangle {
                 onClicked: sortMenu.open()
                 contentItem: RowLayout {
                     spacing: 3
-                    Text { id: sortLabel; text: sortButton.text; font.family: "Helvetica Neue"; font.pixelSize: 12; color: root.darkMode ? "#c3c7ce" : "#777c83" }
+                    Text { id: sortLabel; text: sortButton.text; font.family: Qt.platform.os === "osx" ? Qt.application.font.family : "Helvetica Neue"; font.pixelSize: 12; color: root.darkMode ? "#c3c7ce" : "#777c83" }
                     LineIcon { name: "down"; ink: root.darkMode ? "#c3c7ce" : "#777c83"; Layout.preferredWidth: 12; Layout.preferredHeight: 12 }
                 }
                 background: Rectangle { radius: height / 2; color: root.darkMode ? "#303238" : "#eff0f2"; border.width: sortButton.activeFocus ? 1 : 0; border.color: "#426da7" }
@@ -107,17 +107,17 @@ Rectangle {
                 contentItem: RowLayout {
                     spacing: 7
                     LineIcon {
-                        name: entry.modelData.directory ? "folder" : "editor"
+                        name: entry.modelData.directory ? "folder-filled" : "document"
                         ink: entry.highlighted ? (root.darkMode ? "#8eb5f0" : "#244f88") : (root.darkMode ? "#9ba2ae" : "#737b87")
-                        Layout.preferredWidth: 16
-                        Layout.preferredHeight: 16
+                        Layout.preferredWidth: 18
+                        Layout.preferredHeight: 18
                     }
                     ColumnLayout {
                         spacing: 3
                         Layout.fillWidth: true
                         RowLayout {
                             Layout.fillWidth: true
-                            Label { text: entry.modelData.name; font.pixelSize: 12; color: root.darkMode ? "#e3e5e9" : "#30343b"; elide: Text.ElideMiddle; Layout.fillWidth: true }
+                            Label { text: entry.modelData.name; font.pixelSize: 13; color: root.darkMode ? "#e3e5e9" : "#30343b"; elide: Text.ElideMiddle; Layout.fillWidth: true }
                             Label { visible: !entry.modelData.directory && displaySettings.showDates; text: entry.modelData.modified; font.pixelSize: 10; color: "#92969e" }
                         }
                         Label { visible: !entry.modelData.directory && displaySettings.showExcerpts; text: visible ? root.library.excerpt(entry.modelData.url) : ""; elide: Text.ElideRight; font.pixelSize: 11; color: "#92969e"; Layout.fillWidth: true }

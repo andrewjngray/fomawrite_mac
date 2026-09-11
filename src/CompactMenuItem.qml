@@ -10,7 +10,7 @@ MenuItem {
     rightPadding: 10
     topPadding: 0
     bottomPadding: 0
-    font.family: "Helvetica Neue"
+    font.family: Qt.platform.os === "osx" ? Qt.application.font.family : "Helvetica Neue"
     font.pixelSize: 13
     LineIcon {
         x: 5; width: 16; height: 16

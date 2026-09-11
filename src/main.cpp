@@ -64,7 +64,7 @@ int main(int argc, char *argv[]) {
     // Carry the desktop's text scale into the default font, so the chrome that
     // inherits it (dialog titles, buttons) grows along with the writing area.
 #ifdef Q_OS_MAC
-    const QFont interfaceFont(QStringLiteral("Helvetica Neue"));
+    const QFont interfaceFont = QFontDatabase::systemFont(QFontDatabase::GeneralFont);
 #else
     const QFont interfaceFont(QStringLiteral("iA Writer Mono S"));
 #endif

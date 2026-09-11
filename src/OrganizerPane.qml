@@ -34,7 +34,8 @@ Rectangle {
                     Layout.fillWidth: true
                     ChromeButton {
                         text: modelData.name
-                        iconName: modelData.directory ? "folder" : "editor"
+                        iconName: modelData.directory ? "folder" : "document"
+                        iconColor: modelData.directory ? "#00aeef" : "transparent"
                         alignLeft: true
                         darkMode: root.darkMode
                         enabled: modelData.available
@@ -55,7 +56,8 @@ Rectangle {
                     Layout.fillWidth: true
                     ChromeButton {
                         text: modelData.name
-                        iconName: modelData.directory ? "folder" : "editor"
+                        iconName: modelData.directory ? "folder" : "document"
+                        iconColor: modelData.directory ? "#00aeef" : "transparent"
                         alignLeft: true
                         darkMode: root.darkMode
                         Layout.fillWidth: true
@@ -84,7 +86,8 @@ Rectangle {
                     font.pixelSize: 12
                     font.bold: false
                     text: modelData.name
-                        iconName: modelData.directory ? "folder" : "editor"
+                        iconName: modelData.directory ? "folder" : "document"
+                        iconColor: modelData.directory ? "#00aeef" : "transparent"
                         alignLeft: true
                     enabled: modelData.available
                     onClicked: root.openRequested(modelData.url)

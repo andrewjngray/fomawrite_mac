@@ -109,3 +109,7 @@ Rounded compact dropdown with Date Modified/Date Created/Name/Extension, exclusi
 ### Cycle 10 menu update
 
 Library dropdown now includes New File/New Folder, Sort By and View Options submenus, and persistent hide/show actions for sort and filter bars. View Options currently supports dates and excerpts only; other iA navigation and date-format options remain deferred.
+
+### Cycle 11 visual update
+
+Original filled blue folder/white document icons, blue outline location markers, macOS system interface font and larger header labels. Native outer corners are unchanged; this does not claim exact asset or window-shape parity.

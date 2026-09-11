@@ -7,7 +7,7 @@ Menu {
     delegate: CompactMenuItem {}
     width: 224
     padding: 5
-    font.family: "Helvetica Neue"
+    font.family: Qt.platform.os === "osx" ? Qt.application.font.family : "Helvetica Neue"
     font.pixelSize: 13
     popupType: Popup.Item
     background: Rectangle {

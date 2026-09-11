@@ -4,6 +4,8 @@ import QtQuick.Controls
 Button {
     id: control
     property bool darkMode: false
+    property color iconColor: "transparent"
+    font.pixelSize: 13
     property string iconName: ""
     property bool alignLeft: false
     property string hint: text
@@ -28,7 +30,7 @@ Button {
         LineIcon {
             visible: control.iconName !== ""
             name: control.iconName
-            ink: parent.ink
+            ink: control.enabled && control.iconColor.a > 0 ? control.iconColor : parent.ink
             anchors.verticalCenter: parent.verticalCenter
             x: control.alignLeft ? 0 : control.text ? Math.max(0, (parent.width - label.implicitWidth - 24) / 2) : (parent.width - width) / 2
         }
@@ -38,9 +40,9 @@ Button {
             x: control.iconName ? 24 : 0
             width: Math.max(0, parent.width - x)
             anchors.verticalCenter: parent.verticalCenter
-            font.family: "Helvetica Neue"
-            font.pixelSize: 12
-            font.bold: control.checked
+            font.family: Qt.platform.os === "osx" ? Qt.application.font.family : "Helvetica Neue"
+            font.pixelSize: control.font.pixelSize
+            font.bold: control.checked || control.font.bold
             color: parent.ink
             horizontalAlignment: control.alignLeft ? Text.AlignLeft : Text.AlignHCenter
             elide: Text.ElideRight
