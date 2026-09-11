@@ -5,7 +5,7 @@ Button {
     id: control
     property bool darkMode: false
     property color iconColor: "transparent"
-    font.pixelSize: 13
+    font.pixelSize: 14
     property string iconName: ""
     property bool alignLeft: false
     property string hint: text
@@ -26,7 +26,7 @@ Button {
     ToolTip.visible: hovered && hint !== ""
     ToolTip.text: hint
     contentItem: Item {
-        readonly property color ink: !control.enabled ? "#96999e" : control.checked ? (control.darkMode ? "#8eb5f0" : "#244f88") : control.darkMode ? "#d5d8dd" : "#40444b"
+        readonly property color ink: !control.enabled ? "#96999e" : control.checked ? (control.darkMode ? "#eeeeee" : "#292929") : control.darkMode ? "#d5d8dd" : "#595959"
         LineIcon {
             visible: control.iconName !== ""
             name: control.iconName
@@ -42,16 +42,16 @@ Button {
             anchors.verticalCenter: parent.verticalCenter
             font.family: Qt.platform.os === "osx" ? Qt.application.font.family : "Helvetica Neue"
             font.pixelSize: control.font.pixelSize
-            font.bold: control.checked || control.font.bold
+            font.bold: control.font.bold
             color: parent.ink
             horizontalAlignment: control.alignLeft ? Text.AlignLeft : Text.AlignHCenter
             elide: Text.ElideRight
         }
     }
     background: Rectangle {
-        radius: 12
-        color: control.checked ? (control.darkMode ? "#293c57" : "#e5ecf7") : control.down || control.hovered ? (control.darkMode ? "#303339" : "#e8eaed") : "transparent"
-        border.width: control.activeFocus ? 1 : 0
+        radius: 8
+        color: control.checked ? (control.darkMode ? "#343434" : "#ebebea") : control.down || control.hovered ? (control.darkMode ? "#303339" : "#e8eaed") : "transparent"
+        border.width: control.visualFocus ? 1 : 0
         border.color: "#426da7"
     }
 }

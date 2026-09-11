@@ -27,3 +27,10 @@ Sources: https://learn.chatgpt.com/docs/notifications and https://learn.chatgpt.
 ## Verification and old windows
 
 `sh -n bin/prepare-dev-app`, bundle preparation and strict/deep signature verification passed. The new bundle was prepared without launching another window or requesting new app access. Two inspected clean QA windows (Cycle7b and Cycle7c) were closed. Cycle7-final had recovered unsaved content and was left open. Other unsaved windows were not discarded. Persistence of Always allow across a subsequent rebuilt binary remains to be checked after Andrew grants it.
+
+## Which app should Andrew use?
+
+- **Omawrite.app** is the packaged build for everyday writing. It bundles Qt dependencies and is refreshed by `bin/package-mac`.
+- **Omawrite Dev.app** is our workshop/test build. It uses the local Qt installation and one stable macOS identity so repeated UI checks cause fewer new access prompts.
+
+Both come from the same source code; Dev is not a separate feature edition, nor does it make disposable copies of documents. Both edit the real Markdown file that you open. They can be at different revisions until both bundles are refreshed; an already-running process also keeps its old code until reopened. Prefer Omawrite for daily writing and Dev for cycle reviews. Avoid editing the same document in both simultaneously. Closing either should preserve unsaved-change prompts. The Dev bundle must not be replaced while running.

@@ -17,7 +17,7 @@ Rectangle {
         property bool recentsExpanded: true
     }
     signal openRequested(url file)
-    color: darkMode ? "#1c1e22" : "#f5f5f7"
+    color: darkMode ? "#1c1e22" : "#fafaf9"
     function activate(entry) {
         if (entry.directory) library.rootFolder = entry.url;
         else openRequested(entry.url);
@@ -29,9 +29,9 @@ Rectangle {
         contentWidth: availableWidth
         ColumnLayout {
             width: organizerScroll.availableWidth
-            spacing: 4
+            spacing: 2
             RowLayout {
-                Label { text: "Locations"; font.pixelSize: 11; font.bold: false; color: root.darkMode ? "#92969e" : "#777c83"; Layout.fillWidth: true }
+                Label { text: "Locations"; font.pixelSize: 12; font.bold: false; color: root.darkMode ? "#92969e" : "#777c83"; Layout.fillWidth: true }
                 ChromeButton { darkMode: root.darkMode; iconName: "plus"; Accessible.name: "Add library location"; onClicked: locationDialog.open() }
             }
             Repeater {
@@ -41,8 +41,8 @@ Rectangle {
                     Layout.fillWidth: true
                     ChromeButton {
                         text: modelData.name
-                        iconName: modelData.directory ? "folder" : "document"
-                        iconColor: modelData.directory ? "#00aeef" : "transparent"
+                        iconName: modelData.directory ? "folder" : "editor"
+                        iconColor: "transparent"
                         alignLeft: true
                         darkMode: root.darkMode
                         enabled: modelData.available
@@ -64,14 +64,14 @@ Rectangle {
                 iconName: sectionSettings.favoritesExpanded ? "down" : "right"
                 alignLeft: true
                 darkMode: root.darkMode
-                font.pixelSize: 11
+                font.pixelSize: 12
                 onClicked: sectionSettings.favoritesExpanded = !sectionSettings.favoritesExpanded
             }
             ColumnLayout {
                 objectName: "favoritesContents"
                 visible: sectionSettings.favoritesExpanded
                 Layout.fillWidth: true
-                spacing: 4
+                spacing: 2
                 Repeater {
                     model: root.library.favorites
                     delegate: RowLayout {
@@ -79,8 +79,8 @@ Rectangle {
                         Layout.fillWidth: true
                         ChromeButton {
                             text: modelData.name
-                            iconName: modelData.directory ? "folder" : "document"
-                            iconColor: modelData.directory ? "#00aeef" : "transparent"
+                            iconName: modelData.directory ? "folder" : "editor"
+                            iconColor: "transparent"
                             alignLeft: true
                             darkMode: root.darkMode
                             Layout.fillWidth: true
@@ -105,7 +105,7 @@ Rectangle {
                     iconName: sectionSettings.recentsExpanded ? "down" : "right"
                     alignLeft: true
                     darkMode: root.darkMode
-                    font.pixelSize: 11
+                    font.pixelSize: 12
                     onClicked: sectionSettings.recentsExpanded = !sectionSettings.recentsExpanded
                 }
                 ChromeButton { darkMode: root.darkMode; iconName: "close"; Accessible.name: "Clear recent file shortcuts"; onClicked: root.library.clearRecentFiles() }
@@ -114,7 +114,7 @@ Rectangle {
                 objectName: "recentsContents"
                 visible: sectionSettings.recentsExpanded
                 Layout.fillWidth: true
-                spacing: 4
+                spacing: 2
                 Repeater {
                     model: root.library.recentFiles
                     delegate: ChromeButton {
@@ -122,11 +122,11 @@ Rectangle {
                         required property var modelData
                         Layout.fillWidth: true
                         implicitHeight: 30
-                        font.pixelSize: 12
+                        font.pixelSize: 14
                         font.bold: false
                         text: modelData.name
-                        iconName: modelData.directory ? "folder" : "document"
-                        iconColor: modelData.directory ? "#00aeef" : "transparent"
+                        iconName: modelData.directory ? "folder" : "editor"
+                        iconColor: "transparent"
                         alignLeft: true
                         enabled: modelData.available
                         onClicked: root.openRequested(modelData.url)

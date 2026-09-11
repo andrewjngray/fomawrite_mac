@@ -73,7 +73,7 @@ ApplicationWindow {
         height: 44
         z: 20
         background: Rectangle {
-            color: win.darkMode ? "#24262a" : "#f7f7f7"
+            color: win.darkMode ? "#24262a" : "#fafaf9"
             MouseArea { anchors.fill: parent; onPressed: win.startSystemMove(); onDoubleClicked: win.visibility === Window.Maximized ? win.showNormal() : win.showMaximized() }
         }
         // Align the toolbar groups with the panes below, including native window controls.
@@ -90,11 +90,11 @@ ApplicationWindow {
                 Layout.preferredWidth: libraryPane.width - 10
                 Layout.minimumWidth: libraryPane.width - 10
                 Layout.maximumWidth: libraryPane.width - 10
-                ChromeButton { iconName: "folder-filled"; font.pixelSize: 15; font.bold: true; text: backend.library.rootName || "Choose folder"; hint: "Choose library folder"; darkMode: win.darkMode; Layout.fillWidth: true; onClicked: libraryPane.chooseFolder() }
+                ChromeButton { iconName: "folder"; font.pixelSize: 15; font.bold: false; text: backend.library.rootName || "Choose folder"; hint: "Choose library folder"; darkMode: win.darkMode; Layout.fillWidth: true; onClicked: libraryPane.chooseFolder() }
                 ChromeButton { iconName: "plus"; hint: "New document"; darkMode: win.darkMode; onClicked: libraryPane.newDocument() }
                 ChromeButton { iconName: "down"; hint: "Library options"; darkMode: win.darkMode; onClicked: libraryPane.showOptions(this) }
             }
-            Label { Accessible.description: backend.status; text: backend.fileName; color: win.darkMode ? "#d5d8dd" : "#54585f"; font.pixelSize: 15; font.weight: Font.DemiBold; elide: Text.ElideMiddle; horizontalAlignment: Text.AlignHCenter; Layout.fillWidth: true }
+            Label { Accessible.description: backend.status; text: backend.fileName; color: win.darkMode ? "#d5d8dd" : "#54585f"; font.pixelSize: 15; font.weight: Font.Normal; elide: Text.ElideMiddle; horizontalAlignment: Text.AlignLeft; Layout.fillWidth: true }
             ChromeButton { iconName: "outline"; hint: "Document outline"; darkMode: win.darkMode; onClicked: { outlineDrawer.headings = backend.documentOutline(editor.text); outlineDrawer.open(); } }
             ChromeButton { text: "Aa"; hint: "Writing options"; darkMode: win.darkMode; onClicked: writingOptions.open() }
             ChromeButton { iconName: "search"; hint: "Find in document"; darkMode: win.darkMode; onClicked: { if (workspaceSettings.layoutMode === 2) workspaceSettings.layoutMode = 1; win.searchOpen = true; searchField.forceActiveFocus(); searchField.selectAll(); } }

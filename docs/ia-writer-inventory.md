@@ -117,3 +117,7 @@ Original filled blue folder/white document icons, blue outline location markers,
 ### Cycle 12 organizer update
 
 Favorites and Recents have persistent collapsible sections; favorite actions are left-aligned. macOS uses a native unified title-bar style. Exact traffic-light geometry/corner matching remains unverified while the sharing badge covers the controls.
+
+### Cycle 13 reference change
+
+Codex is now the visual reference for navigation icons, font treatment and spacing. This inventory remains the functional backlog; prior iA visual styling is no longer the target.

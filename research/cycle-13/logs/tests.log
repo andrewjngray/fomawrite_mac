@@ -1,0 +1,33 @@
+make: Nothing to be done for `first'.
+********* Start testing of OmawriteTest *********
+Config: Using QtTest library 6.11.2, Qt 6.11.2 (arm64-little_endian-lp64 shared (dynamic) release build; by Apple LLVM 21.0.0 (clang-2100.1.1.101)), macos 26.6.2
+PASS   : OmawriteTest::initTestCase()
+QWARN  : OmawriteTest::sortMenuAppliesFieldAndDirection() qt.qpa.fonts: Populating font family aliases took 66 ms. Replace uses of missing font family "Sans Serif" with one that exists to avoid this cost. 
+PASS   : OmawriteTest::sortMenuAppliesFieldAndDirection()
+PASS   : OmawriteTest::libraryBarsCanBeHiddenAndRestored()
+PASS   : OmawriteTest::organizerSectionsCollapseWithoutChangingShortcuts()
+PASS   : OmawriteTest::boundsLibraryExcerptsAndPreservesFiles()
+PASS   : OmawriteTest::browsesAndCreatesLibraryFilesSafely()
+PASS   : OmawriteTest::rendersPreviewWithoutChangingMarkdown()
+PASS   : OmawriteTest::typographyDoesNotDirtySavedDocument()
+PASS   : OmawriteTest::presentationKeepsSourceAndUndoIntact()
+PASS   : OmawriteTest::previewsRelativeImagesAndCentersTypewriter()
+PASS   : OmawriteTest::outlinesHeadingsOutsideCodeAndFrontMatter()
+PASS   : OmawriteTest::organizesShortcutsAndSortsWithoutMovingFiles()
+PASS   : OmawriteTest::headingAndFencePreviewMatchesSource()
+PASS   : OmawriteTest::countsWords()
+PASS   : OmawriteTest::normalizesLinks()
+PASS   : OmawriteTest::suggestsSafeNames()
+PASS   : OmawriteTest::findsInlineMarkdownRanges()
+PASS   : OmawriteTest::loadsCurrentOmarchyTheme()
+PASS   : OmawriteTest::ignoresFileWatcherEventsForSavedContents()
+PASS   : OmawriteTest::keepsCursorAndSelectionStableAcrossInsertions()
+QWARN  : OmawriteTest::savesAndOpensFromFooterMenu() qrc:/qt-project.org/imports/QtQuick/Controls/Material/SplitView.qml:29:13: TypeError: Cannot read property 'parent' of null
+QWARN  : OmawriteTest::savesAndOpensFromFooterMenu() qrc:/qt-project.org/imports/QtQuick/Controls/Material/SplitView.qml:29:13: TypeError: Cannot read property 'parent' of null
+PASS   : OmawriteTest::savesAndOpensFromFooterMenu()
+PASS   : OmawriteTest::scalesTextWithDesktopTextSize()
+PASS   : OmawriteTest::preservesMarkdownAndProtectsUnsavedOpen()
+PASS   : OmawriteTest::remembersLastSaveDirectory()
+PASS   : OmawriteTest::cleanupTestCase()
+Totals: 25 passed, 0 failed, 0 skipped, 0 blacklisted, 1371ms
+********* Finished testing of OmawriteTest *********

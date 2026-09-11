@@ -26,7 +26,7 @@ Rectangle {
         }
     }
     signal openRequested(url file)
-    color: darkMode ? "#202124" : "#fbfbfc"
+    color: darkMode ? "#202124" : "#fafaf9"
     objectName: "libraryPane"
     function chooseFolder() { folderDialog.open(); }
     function newDocument() { newFileDialog.open(); }
@@ -88,7 +88,7 @@ Rectangle {
                 id: entry
                 required property var modelData
                 width: fileList.width
-                height: modelData.directory || !displaySettings.showExcerpts ? 30 : 54
+                height: modelData.directory || !displaySettings.showExcerpts ? 28 : 50
                 leftPadding: 8 + modelData.depth * 16
                 highlighted: !modelData.directory && modelData.url.toString() === root.currentFile.toString()
                 Accessible.name: modelData.name
@@ -98,17 +98,15 @@ Rectangle {
                     else root.openRequested(modelData.url)
                 }
                 background: Rectangle {
-                    radius: 0
-                    color: entry.highlighted ? (root.darkMode ? "#293c57" : "#f1f4f9")
+                    radius: 7
+                    color: entry.highlighted ? (root.darkMode ? "#343434" : "#ebebea")
                         : entry.hovered ? (root.darkMode ? "#2b2d31" : "#e9ecf0") : "transparent"
                 }
-                Rectangle { anchors.left: parent.left; anchors.top: parent.top; anchors.bottom: parent.bottom; width: 2; visible: entry.highlighted; color: root.darkMode ? "#8eb5f0" : "#244f88" }
-                Rectangle { anchors.bottom: parent.bottom; x: 24; width: parent.width - 24; height: 1; color: root.darkMode ? "#303237" : "#ededee" }
                 contentItem: RowLayout {
                     spacing: 7
                     LineIcon {
-                        name: entry.modelData.directory ? "folder-filled" : "document"
-                        ink: entry.highlighted ? (root.darkMode ? "#8eb5f0" : "#244f88") : (root.darkMode ? "#9ba2ae" : "#737b87")
+                        name: entry.modelData.directory ? "folder" : "editor"
+                        ink: root.darkMode ? "#b4b4b4" : "#666666"
                         Layout.preferredWidth: 18
                         Layout.preferredHeight: 18
                     }
@@ -117,7 +115,7 @@ Rectangle {
                         Layout.fillWidth: true
                         RowLayout {
                             Layout.fillWidth: true
-                            Label { text: entry.modelData.name; font.pixelSize: 13; color: root.darkMode ? "#e3e5e9" : "#30343b"; elide: Text.ElideMiddle; Layout.fillWidth: true }
+                            Label { text: entry.modelData.name; font.pixelSize: 14; color: root.darkMode ? "#e3e5e9" : "#30343b"; elide: Text.ElideMiddle; Layout.fillWidth: true }
                             Label { visible: !entry.modelData.directory && displaySettings.showDates; text: entry.modelData.modified; font.pixelSize: 10; color: "#92969e" }
                         }
                         Label { visible: !entry.modelData.directory && displaySettings.showExcerpts; text: visible ? root.library.excerpt(entry.modelData.url) : ""; elide: Text.ElideRight; font.pixelSize: 11; color: "#92969e"; Layout.fillWidth: true }
