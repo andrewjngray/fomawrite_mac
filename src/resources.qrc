@@ -2,6 +2,8 @@
     <qresource prefix="/">
         <file>LibraryPane.qml</file>
         <file>ChromeButton.qml</file>
+        <file>CompactMenu.qml</file>
+        <file>CompactMenuItem.qml</file>
         <file>LineIcon.qml</file>
         <file>OrganizerPane.qml</file>
         <file>DocumentOutline.qml</file>

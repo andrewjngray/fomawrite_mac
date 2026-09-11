@@ -16,7 +16,7 @@ Status: **Have** = implemented in Omawrite; **Partial** = some behavior exists; 
 | Tree/list navigation | Partial: expandable tree | 5 |
 | Sort by name, modified, created, extension | Have | 4 |
 | Ascending/descending; folders pinned first | Have | 4 |
-| Dates and text excerpts in file list | Partial: dates and bounded source snippets; no excerpt display options | 7 |
+| Dates and text excerpts in file list | Partial: modified dates and bounded source snippets with visibility toggles; no date-format options | 7 |
 | Separate organizer, file list, editor, preview | Have; organizer collapses below 1,000 px | 4 |
 | Folder/file creation | Have: within selected root | 1 |
 | Back/forward library navigation | Planned | 5 |
@@ -102,3 +102,6 @@ Implemented original line icons for workspace controls and file rows, with Andre
 ### Cycle 7 visual alignment
 
 Unified macOS title/toolbar area, wider navigation, balanced source/preview, smaller type, file snippets, bottom preview controls, and persistent status are implemented. Qt preview template details still differ from iA (tables, code/quote blocks and heading separators). This is closer layout alignment, not full UI or feature parity.
+
+### Cycle 8 sorting menu
+Rounded compact dropdown with Date Modified/Date Created/Name/Extension, exclusive A to Z/Z to A, folder pinning and persistent Show Date/Show Text Excerpts. Navigation and date-format submenus remain future work.

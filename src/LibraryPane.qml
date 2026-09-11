@@ -1,4 +1,5 @@
 import QtQuick
+import QtCore
 import QtQuick.Controls
 import QtQuick.Layouts
 import QtQuick.Dialogs as Dialogs
@@ -8,6 +9,7 @@ Rectangle {
     required property var library
     property url currentFile
     property bool darkMode: false
+    Settings { id: displaySettings; category: "libraryDisplay"; property bool showDates: true; property bool showExcerpts: true }
     signal openRequested(url file)
     color: darkMode ? "#202124" : "#fbfbfc"
     objectName: "libraryPane"
@@ -20,10 +22,19 @@ Rectangle {
         anchors.margins: 8
         spacing: 4
         ChromeButton {
+            id: sortButton
             objectName: "librarySort"
-            text: "Sort by " + ["name", "modified", "created", "extension"][root.library.sortMode] + (root.library.ascending ? " ↑" : " ↓")
+            implicitHeight: 24
+            implicitWidth: sortLabel.implicitWidth + 34
+            text: "Sort by " + ["Name", "Date Modified", "Date Created", "Extension"][root.library.sortMode]
             darkMode: root.darkMode
-            onClicked: folderMenu.open()
+            onClicked: sortMenu.open()
+            contentItem: RowLayout {
+                spacing: 3
+                Text { id: sortLabel; text: sortButton.text; font.family: "Helvetica Neue"; font.pixelSize: 12; color: root.darkMode ? "#c3c7ce" : "#777c83" }
+                LineIcon { name: "down"; ink: root.darkMode ? "#c3c7ce" : "#777c83"; Layout.preferredWidth: 12; Layout.preferredHeight: 12 }
+            }
+            background: Rectangle { radius: height / 2; color: root.darkMode ? "#303238" : "#eff0f2"; border.width: sortButton.activeFocus ? 1 : 0; border.color: "#426da7" }
         }
         Label {
             visible: root.library.error !== ""
@@ -46,7 +57,7 @@ Rectangle {
                 id: entry
                 required property var modelData
                 width: fileList.width
-                height: modelData.directory ? 30 : 54
+                height: modelData.directory || !displaySettings.showExcerpts ? 30 : 54
                 leftPadding: 8 + modelData.depth * 16
                 highlighted: !modelData.directory && modelData.url.toString() === root.currentFile.toString()
                 Accessible.name: modelData.name
@@ -76,9 +87,9 @@ Rectangle {
                         RowLayout {
                             Layout.fillWidth: true
                             Label { text: entry.modelData.name; font.pixelSize: 12; color: root.darkMode ? "#e3e5e9" : "#30343b"; elide: Text.ElideMiddle; Layout.fillWidth: true }
-                            Label { visible: !entry.modelData.directory; text: entry.modelData.modified; font.pixelSize: 10; color: "#92969e" }
+                            Label { visible: !entry.modelData.directory && displaySettings.showDates; text: entry.modelData.modified; font.pixelSize: 10; color: "#92969e" }
                         }
-                        Label { visible: !entry.modelData.directory; text: root.library.excerpt(entry.modelData.url); elide: Text.ElideRight; font.pixelSize: 11; color: "#92969e"; Layout.fillWidth: true }
+                        Label { visible: !entry.modelData.directory && displaySettings.showExcerpts; text: visible ? root.library.excerpt(entry.modelData.url) : ""; elide: Text.ElideRight; font.pixelSize: 11; color: "#92969e"; Layout.fillWidth: true }
                     }
                     LineIcon { visible: entry.modelData.directory; name: entry.modelData.expanded ? "down" : "right"; ink: "#92969e"; Layout.preferredWidth: 14; Layout.preferredHeight: 14 }
                 }
@@ -112,17 +123,34 @@ Rectangle {
         }
     }
 
-    Menu {
+    CompactMenu {
+        id: sortMenu
+        objectName: "librarySortMenu"
+        ButtonGroup { id: sortFieldGroup }
+        ButtonGroup { id: sortDirectionGroup }
+        parent: sortButton
+        x: 0
+        y: sortButton.height + 3
+        darkMode: root.darkMode
+        CompactMenuItem { text: "Date Modified"; ButtonGroup.group: sortFieldGroup; checkable: true; checked: root.library.sortMode === 1; onTriggered: root.library.sortMode = 1 }
+        CompactMenuItem { text: "Date Created"; ButtonGroup.group: sortFieldGroup; checkable: true; checked: root.library.sortMode === 2; onTriggered: root.library.sortMode = 2 }
+        CompactMenuItem { text: "Name"; ButtonGroup.group: sortFieldGroup; checkable: true; checked: root.library.sortMode === 0; onTriggered: root.library.sortMode = 0 }
+        CompactMenuItem { text: "Extension"; ButtonGroup.group: sortFieldGroup; checkable: true; checked: root.library.sortMode === 3; onTriggered: root.library.sortMode = 3 }
+        MenuSeparator { padding: 4; implicitHeight: 9; contentItem: Rectangle { implicitHeight: 1; color: root.darkMode ? "#45484e" : "#dedfe2" } }
+        CompactMenuItem { text: "A to Z"; ButtonGroup.group: sortDirectionGroup; checkable: true; checked: root.library.ascending; onTriggered: root.library.ascending = true }
+        CompactMenuItem { text: "Z to A"; ButtonGroup.group: sortDirectionGroup; checkable: true; checked: !root.library.ascending; onTriggered: root.library.ascending = false }
+        MenuSeparator { padding: 4; implicitHeight: 9; contentItem: Rectangle { implicitHeight: 1; color: root.darkMode ? "#45484e" : "#dedfe2" } }
+        CompactMenuItem { text: "Pin Folders to Top"; checkable: true; checked: root.library.foldersFirst; onTriggered: root.library.foldersFirst = !root.library.foldersFirst }
+        MenuSeparator { padding: 4; implicitHeight: 9; contentItem: Rectangle { implicitHeight: 1; color: root.darkMode ? "#45484e" : "#dedfe2" } }
+        CompactMenuItem { text: "Show Date"; checkable: true; checked: displaySettings.showDates; onTriggered: displaySettings.showDates = !displaySettings.showDates }
+        CompactMenuItem { text: "Show Text Excerpts"; checkable: true; checked: displaySettings.showExcerpts; onTriggered: displaySettings.showExcerpts = !displaySettings.showExcerpts }
+    }
+    CompactMenu {
         id: folderMenu
-        MenuItem { text: "Choose Folder…"; onTriggered: folderDialog.open() }
-        MenuItem { text: "New Folder…"; enabled: root.library.rootFolder.toString() !== ""; onTriggered: newFolderDialog.open() }
-        MenuItem { text: "Sort by name"; onTriggered: root.library.sortMode = 0 }
-        MenuItem { text: "Sort by modified date"; onTriggered: root.library.sortMode = 1 }
-        MenuItem { text: "Sort by created date"; onTriggered: root.library.sortMode = 2 }
-        MenuItem { text: "Sort by extension"; onTriggered: root.library.sortMode = 3 }
-        MenuItem { text: "Ascending order"; checkable: true; checked: root.library.ascending; onTriggered: root.library.ascending = !root.library.ascending }
-        MenuItem { text: "Pin folders to top"; checkable: true; checked: root.library.foldersFirst; onTriggered: root.library.foldersFirst = !root.library.foldersFirst }
-        MenuItem { text: "Refresh"; onTriggered: root.library.refresh() }
+        darkMode: root.darkMode
+        CompactMenuItem { text: "Choose Folder…"; onTriggered: folderDialog.open() }
+        CompactMenuItem { text: "New Folder…"; enabled: root.library.rootFolder.toString() !== ""; onTriggered: newFolderDialog.open() }
+        CompactMenuItem { text: "Refresh"; onTriggered: root.library.refresh() }
     }
     Dialogs.FolderDialog {
         id: folderDialog

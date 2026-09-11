@@ -103,3 +103,11 @@ Andrew said the open apps still looked very different and requested direct compa
 ## Workflow follow-up — approval visibility and reusable QA app
 
 Andrew identified repeated app-access approvals as the cause of long attachment waits. Changed macOS ChatGPT notification style to Persistent (notifications and sounds were already enabled). Added `bin/prepare-dev-app` with one stable QA path/ID and a running-process guard; no global security policies changed. Preparation, shell syntax and strict signature verification passed. Closed two inspected clean QA windows; preserved recovered unsaved content. In-app permission/question alerts and the one-app Always allow selection require Andrew's own interaction; Computer Use cannot operate Codex itself. [Details and procedure](development-app-approvals.md).
+
+## Cycle 8 — rounded Sort by menu
+
+**Planned scope:** Andrew asked for rounded controls and a compact dropdown matching the sorting menu in his iA screenshot.
+
+**Implemented:** rounded Sort by pill, separate compact menu, four sort fields, exclusive A to Z/Z to A choices, folder pinning, persistent date/excerpt visibility toggles, checkmarks and standard interface typography. The folder-actions menu shares the style. Navigation and date-format submenus remain deferred.
+
+**Verification:** build and 23 tests passed, including menu action coverage. Native menu inspected and captured in the stable development app; saved sample closed normally before refreshing it. Dark appearance/full keyboard audit untested. [Records](../research/cycle-08/README.md), [optional usability exercise](../research/usability/cycle-08.md). Runnable artifacts: `dist/Omawrite Dev.app` and packaged `dist/Omawrite.app`. Final packaging and strict signature verification passed.

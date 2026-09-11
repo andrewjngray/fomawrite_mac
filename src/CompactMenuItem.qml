@@ -1,0 +1,31 @@
+import QtQuick
+import QtQuick.Controls
+
+MenuItem {
+    id: item
+    property bool darkMode: menu ? menu.darkMode : false
+    implicitHeight: 28
+    leftPadding: 24
+    rightPadding: 10
+    topPadding: 0
+    bottomPadding: 0
+    font.family: "Helvetica Neue"
+    font.pixelSize: 13
+    indicator: Text {
+        x: 7
+        anchors.verticalCenter: parent.verticalCenter
+        text: item.checked ? "✓" : ""
+        font.pixelSize: 13
+        color: item.highlighted ? "#ffffff" : item.darkMode ? "#e5e7eb" : "#30343b"
+    }
+    contentItem: Text {
+        text: item.text
+        font: item.font
+        verticalAlignment: Text.AlignVCenter
+        color: !item.enabled ? "#92969e" : item.highlighted ? "#ffffff" : item.darkMode ? "#e5e7eb" : "#30343b"
+    }
+    background: Rectangle {
+        radius: 5
+        color: item.highlighted ? "#244f88" : "transparent"
+    }
+}

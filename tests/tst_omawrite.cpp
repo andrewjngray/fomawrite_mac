@@ -29,6 +29,39 @@ private slots:
                            m_settingsDirectory.path());
     }
 
+    void sortMenuAppliesFieldAndDirection() {
+        Backend backend;
+        QQmlEngine engine;
+        engine.rootContext()->setContextProperty("backend", &backend);
+        QQmlComponent component(&engine, QUrl::fromLocalFile(QFINDTESTDATA("../src/Main.qml")));
+        QVERIFY2(component.isReady(), qPrintable(component.errorString()));
+        QScopedPointer<QObject> window(component.create());
+        QVERIFY(window);
+        auto *menu = window->findChild<QObject *>("librarySortMenu");
+        QVERIFY(menu);
+        auto trigger = [menu](const QString &label) {
+            for (auto *item : menu->findChildren<QObject *>()) {
+                if (item->property("text").toString() == label)
+                    return QMetaObject::invokeMethod(item, "triggered");
+            }
+            return false;
+        };
+        QVERIFY(trigger("Date Modified"));
+        QCOMPARE(backend.library()->property("sortMode").toInt(), 1);
+        QVERIFY(trigger("Date Created"));
+        QCOMPARE(backend.library()->property("sortMode").toInt(), 2);
+        QVERIFY(trigger("Extension"));
+        QCOMPARE(backend.library()->property("sortMode").toInt(), 3);
+        QVERIFY(trigger("Name"));
+        QCOMPARE(backend.library()->property("sortMode").toInt(), 0);
+        QVERIFY(trigger("Z to A"));
+        QVERIFY(!backend.library()->property("ascending").toBool());
+        QVERIFY(trigger("A to Z"));
+        QVERIFY(backend.library()->property("ascending").toBool());
+        QVERIFY(trigger("Show Text Excerpts"));
+        QVERIFY(trigger("Show Text Excerpts"));
+    }
+
     void boundsLibraryExcerptsAndPreservesFiles() {
         QTemporaryDir directory;
         QTemporaryDir outside;
