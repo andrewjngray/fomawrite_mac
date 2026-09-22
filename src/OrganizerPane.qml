@@ -42,15 +42,15 @@ Rectangle {
                     ChromeButton {
                         text: modelData.name
                         iconName: modelData.directory ? "folder" : "editor"
-                        iconColor: "transparent"
                         alignLeft: true
                         darkMode: root.darkMode
                         enabled: modelData.available
                         checked: modelData.url.toString() === root.library.rootFolder.toString()
                         Layout.fillWidth: true
                         onClicked: root.library.rootFolder = modelData.url
-                        ToolTip.visible: hovered
-                        ToolTip.text: modelData.url.toString()
+                        hint: modelData.url.toString()
+                        Accessible.name: text
+                        tooltipDelay: 2000
                     }
                     ChromeButton { darkMode: root.darkMode; iconName: "close"; Accessible.name: "Remove location shortcut " + modelData.name; onClicked: root.library.removeLocation(modelData.url) }
                 }
@@ -80,14 +80,14 @@ Rectangle {
                         ChromeButton {
                             text: modelData.name
                             iconName: modelData.directory ? "folder" : "editor"
-                            iconColor: "transparent"
                             alignLeft: true
                             darkMode: root.darkMode
                             Layout.fillWidth: true
                             enabled: modelData.available
                             onClicked: root.activate(modelData)
-                            ToolTip.visible: hovered
-                            ToolTip.text: modelData.url.toString()
+                            hint: modelData.url.toString()
+                            Accessible.name: text
+                            tooltipDelay: 2000
                         }
                         ChromeButton { darkMode: root.darkMode; iconName: "close"; Accessible.name: "Remove favorite " + modelData.name; onClicked: root.library.toggleFavorite(modelData.url) }
                     }
@@ -126,12 +126,12 @@ Rectangle {
                         font.bold: false
                         text: modelData.name
                         iconName: modelData.directory ? "folder" : "editor"
-                        iconColor: "transparent"
                         alignLeft: true
                         enabled: modelData.available
                         onClicked: root.openRequested(modelData.url)
-                        ToolTip.visible: hovered
-                        ToolTip.text: modelData.url.toString()
+                        hint: modelData.url.toString()
+                        Accessible.name: text
+                        tooltipDelay: 2000
                     }
                 }
             }

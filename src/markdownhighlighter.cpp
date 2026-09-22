@@ -110,15 +110,18 @@ void MarkdownHighlighter::setShowMarkup(bool show) {
     rehighlight();
 }
 
+void MarkdownHighlighter::setFocusRange(int start, int end) {
+    if (m_focusStart == start && m_focusEnd == end) return;
+    m_focusStart = start;
+    m_focusEnd = end;
+    rehighlight();
+}
+
 void MarkdownHighlighter::setFocusBlock(int block) {
-    if (m_focusBlock == block) return;
-    const int old = m_focusBlock;
     m_focusBlock = block;
-    if (old < 0 || block < 0) rehighlight();
-    else {
-        rehighlightBlock(document()->findBlockByNumber(old));
-        rehighlightBlock(document()->findBlockByNumber(block));
-    }
+    const auto current = document()->findBlockByNumber(block);
+    setFocusRange(block < 0 ? -1 : current.position(),
+                  block < 0 ? -1 : current.position() + current.length());
 }
 
 void MarkdownHighlighter::highlightBlock(const QString &text) {
@@ -142,8 +145,10 @@ void MarkdownHighlighter::highlightBlock(const QString &text) {
             highlightInline(text);
         }
     }
-    if (m_focusBlock >= 0 && currentBlock().blockNumber() != m_focusBlock) {
+    if (m_focusStart >= 0) {
         for (int i = 0; i < text.size(); ++i) {
+            const int offset = currentBlock().position() + i;
+            if (offset >= m_focusStart && offset < m_focusEnd) continue;
             QTextCharFormat dimmed = format(i);
             if (dimmed.fontPointSize() == 1.0) continue;
             dimmed.setForeground(m_darkMode ? QColor("#777c84") : QColor("#a1a6ad"));

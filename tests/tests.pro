@@ -17,3 +17,13 @@ CONFIG -= app_bundle
 
 SOURCES += ../src/filelibrary.cpp
 HEADERS += ../src/filelibrary.h
+
+QT += concurrent
+
+SOURCES += ../src/markdownextensions.cpp
+HEADERS += ../src/markdownextensions.h
+
+macx {
+    OBJECTIVE_SOURCES += ../src/windowchrome_mac.mm
+    LIBS += -framework AppKit
+}

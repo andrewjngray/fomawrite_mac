@@ -12,6 +12,14 @@ Rectangle {
     property string typeface: "Helvetica Neue"
     property int textSize: 17
     property int layoutMode: 1
+    signal scrollFractionChanged(real fraction)
+    function scrollToFraction(fraction) { previewScroll.contentY = Math.max(0, previewScroll.contentHeight - previewScroll.height) * fraction; }
+    function jumpToAnchor(anchor) {
+        var position = renderer.previewAnchorPosition(previewText.textDocument, decodeURIComponent(anchor));
+        if (position < 0) return false;
+        previewScroll.contentY = Math.max(0, Math.min(previewScroll.contentHeight - previewScroll.height, previewText.positionToRectangle(position).y));
+        return true;
+    }
     signal layoutRequested(int mode)
     signal linkRequested(url link)
     color: darkMode ? "#191b1e" : "#ffffff"
@@ -20,8 +28,14 @@ Rectangle {
     onTextSizeChanged: refreshTimer.restart()
     onTypefaceChanged: refreshTimer.restart()
     function refresh() {
-        renderedMarkdown = markdown;
+        renderedMarkdown = renderer.previewMarkdown(markdown);
         Qt.callLater(function() { root.renderer.stylePreview(previewText.textDocument); });
+    }
+    function reload() {
+        // Force a fresh Markdown parse even when the source has not changed.
+        refreshTimer.stop();
+        renderedMarkdown = "";
+        Qt.callLater(refresh);
     }
     Component.onCompleted: refresh()
 
@@ -35,6 +49,7 @@ Rectangle {
         contentWidth: width
         contentHeight: Math.max(height, previewText.implicitHeight + 100)
         boundsBehavior: Flickable.StopAtBounds
+        onContentYChanged: root.scrollFractionChanged(contentY / Math.max(1, contentHeight - height))
         ScrollBar.vertical: ScrollBar {}
         TextEdit {
             id: previewText
@@ -53,7 +68,7 @@ Rectangle {
             font.pixelSize: root.textSize
             color: root.darkMode ? "#e6e8ec" : "#242831"
             selectionColor: "#c9d9f0"
-            onLinkActivated: function(link) { root.linkRequested(link) }
+            onLinkActivated: function(link) { if (String(link).charAt(0) === "#") root.jumpToAnchor(String(link).slice(1)); else root.linkRequested(link); }
             Accessible.name: "Rendered Markdown preview"
         }
         Label {

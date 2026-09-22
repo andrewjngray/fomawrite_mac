@@ -1,6 +1,9 @@
 <RCC>
     <qresource prefix="/">
         <file>LibraryPane.qml</file>
+        <file>WorkspaceCommands.qml</file>
+        <file>NativeCommandMenuItem.qml</file>
+        <file>RecentFilesMenu.qml</file>
         <file>ChromeButton.qml</file>
         <file>CompactMenu.qml</file>
         <file>CompactMenuItem.qml</file>

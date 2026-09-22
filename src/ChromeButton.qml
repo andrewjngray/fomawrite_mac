@@ -4,11 +4,12 @@ import QtQuick.Controls
 Button {
     id: control
     property bool darkMode: false
-    property color iconColor: "transparent"
+    property color iconColor: iconName === "folder" ? (darkMode ? "#63c9f1" : "#159dcc") : "transparent"
     font.pixelSize: 14
     property string iconName: ""
     property bool alignLeft: false
     property string hint: text
+    property int tooltipDelay: 700
     implicitHeight: 28
     implicitWidth: Math.max(28, label.implicitWidth + (iconName ? 18 + (text ? 6 : 0) : 0) + 16)
     padding: 0
@@ -22,7 +23,7 @@ Button {
     bottomInset: 0
     focusPolicy: Qt.StrongFocus
     Accessible.name: hint
-    ToolTip.delay: 700
+    ToolTip.delay: control.tooltipDelay
     ToolTip.visible: hovered && hint !== ""
     ToolTip.text: hint
     contentItem: Item {

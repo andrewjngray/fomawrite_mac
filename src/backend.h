@@ -8,7 +8,10 @@
 #include <QTimer>
 #include <QUrl>
 #include <QVariantList>
+#include <QPageLayout>
+#include <QJsonObject>
 #include <memory>
+#include <functional>
 #include "filelibrary.h"
 
 class MarkdownHighlighter;
@@ -32,6 +35,8 @@ class Backend : public QObject {
     Q_PROPERTY(QString themeAccent READ themeAccent NOTIFY themeColorsChanged)
     Q_PROPERTY(QString themeSelection READ themeSelection NOTIFY themeColorsChanged)
 
+    Q_PROPERTY(bool canGoBack READ canGoBack NOTIFY historyChanged)
+    Q_PROPERTY(bool canGoForward READ canGoForward NOTIFY historyChanged)
 public:
     explicit Backend(QObject *parent = nullptr);
     ~Backend() override;
@@ -40,6 +45,10 @@ public:
     QUrl documentBaseUrl() const;
 
     void setParentWindow(QWindow *window);
+    std::function<bool(const QUrl &)> focusExistingDocument;
+    Q_INVOKABLE void notifyWindowClosed() { emit windowClosed(); }
+    Q_INVOKABLE void requestQuit() { emit quitRequested(); }
+    Q_INVOKABLE void cancelQuit() { emit quitCanceled(); }
 
     QUrl fileUrl() const { return m_fileUrl; }
     QString fileName() const;
@@ -61,13 +70,27 @@ public:
 
     Q_INVOKABLE QVariantList documentOutline(const QString &markdown) const;
     Q_INVOKABLE QVariantMap documentStatistics(const QString &markdown) const;
+    Q_INVOKABLE QString previewMarkdown(const QString &source) const;
+    Q_INVOKABLE int previewAnchorPosition(QObject *textDocument, const QString &anchor) const;
+    Q_INVOKABLE QString tableOfContents(const QString &markdown) const;
     Q_INVOKABLE void stylePreview(QObject *textDocument);
-    Q_INVOKABLE void setFocusPosition(int position, bool enabled);
+    Q_INVOKABLE QVariantMap wrapSelection(int start, int end, const QString &before, const QString &after);
+    Q_INVOKABLE QVariantMap replaceText(int start, int end, const QString &replacement);
+    Q_INVOKABLE QVariantMap editMarkdown(const QString &action, int start, int end);
+    Q_INVOKABLE QVariantList searchPositions(const QString &query) const;
+    Q_INVOKABLE int replaceMatches(const QString &query, const QString &replacement, int position);
+    Q_INVOKABLE void setFocusPosition(int position, bool enabled, bool sentence = false);
+    static QPair<int, int> sentenceRange(const QString &text, int position);
     Q_INVOKABLE void setShowMarkup(bool show);
     Q_INVOKABLE QUrl resolveDocumentLink(const QString &link) const;
     Q_INVOKABLE void attachDocument(QObject *textDocument);
     Q_INVOKABLE void openDialog();
-    Q_INVOKABLE void open(const QUrl &url);
+    Q_INVOKABLE bool open(const QUrl &url);
+    Q_INVOKABLE void rememberCursor(int position);
+    Q_INVOKABLE int navigateHistory(int direction);
+    Q_INVOKABLE QUrl sourceLinkAt(int position) const;
+    bool canGoBack() const { return m_historyIndex > 0; }
+    bool canGoForward() const { return m_historyIndex + 1 < m_history.size(); }
     Q_INVOKABLE void save();
     Q_INVOKABLE void saveForClose();
     Q_INVOKABLE void saveAsDialog();
@@ -76,8 +99,30 @@ public:
     Q_INVOKABLE void discardRecovery();
     Q_INVOKABLE void reloadFromDisk();
     Q_INVOKABLE void keepExternalVersion();
-    Q_INVOKABLE void printDocument();
+    Q_INVOKABLE void printDocument(bool plain = false);
+    Q_INVOKABLE void pageSetup();
+    Q_INVOKABLE bool exportDocument(const QUrl &destination, const QString &format);
+    Q_INVOKABLE void setOutputStyle(int style);
+    Q_INVOKABLE bool loadOutputStyle(const QUrl &file);
     Q_INVOKABLE void newWindow();
+    Q_INVOKABLE void markAuthorship(int start, int end, const QString &category, const QString &author);
+    Q_INVOKABLE QVariantList authorshipRanges() const;
+    Q_INVOKABLE bool createVersion();
+    Q_INVOKABLE QVariantList versions() const;
+    Q_INVOKABLE bool restoreVersion(const QUrl &version);
+    Q_INVOKABLE void autosave();
+    Q_INVOKABLE int nativeTabInset() const;
+    Q_INVOKABLE void nativeWindowAction(const QString &action);
+    Q_INVOKABLE QVariantList writingAnalysis(const QString &text, const QString &customWords);
+    Q_INVOKABLE QStringList spellingIssues(const QString &text);
+    Q_INVOKABLE void newDocument();
+    Q_INVOKABLE bool duplicateDocument(const QString &name);
+    Q_INVOKABLE bool renameDocument(const QString &name);
+    Q_INVOKABLE bool moveDocument(const QUrl &folder);
+    Q_INVOKABLE bool openInNewWindow(const QUrl &url);
+    Q_INVOKABLE bool showInFinder();
+    Q_INVOKABLE bool copySelection(int start, int end, const QString &format);
+    Q_INVOKABLE QString clipboardMarkdown() const;
     Q_INVOKABLE QString clipboardUrl() const;
     Q_INVOKABLE QString clipboardText() const;
     Q_INVOKABLE bool editorTextChanged();
@@ -88,6 +133,12 @@ public:
     Q_INVOKABLE void saveWindowGeometry(int x, int y, int width, int height, bool maximized);
 
 signals:
+    void newWindowRequested(const QUrl &url);
+    void quitRequested();
+    void quitCanceled();
+    void windowClosed();
+    void saveFailed();
+    void historyChanged();
     void documentLoaded();
     void fileUrlChanged();
     void modifiedChanged();
@@ -103,10 +154,22 @@ signals:
     void externalChangeDetected(bool deleted, bool locallyModified);
 
 private:
+    QList<QPair<QUrl, int>> m_history;
+    int m_historyIndex = -1;
+    bool m_navigatingHistory = false;
     void loadDocumentText(const QString &text);
     void setFileUrl(const QUrl &url);
     void setModified(bool modified);
     void setStatus(const QString &status);
+    QJsonObject authorshipData() const;
+    void applyAuthorshipData(const QJsonObject &data);
+    bool saveAuthorship(const QUrl &url);
+    void loadAuthorship(const QUrl &url);
+    void prepareOutput(QTextDocument &document, bool plain = false) const;
+    int m_outputStyle = 0;
+    QString m_customOutputFont;
+    int m_customOutputSize = 12;
+    QPageLayout m_pageLayout;
     void saveTo(const QUrl &url);
     QUrl suggestedSaveUrl() const;
     QString currentDocumentText() const;

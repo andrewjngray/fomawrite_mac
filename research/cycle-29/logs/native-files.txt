@@ -1,0 +1,3 @@
+Safety copy.md: matching hash, Human / QA author, range 0–5
+moved/Safety-final.md: matching hash, Human / QA author, range 0–5
+Original Markdown and metadata paths removed after successful move.

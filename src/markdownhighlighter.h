@@ -13,6 +13,7 @@ public:
     void setDarkMode(bool darkMode);
     void setShowMarkup(bool show);
     void setFocusBlock(int block);
+    void setFocusRange(int start, int end);
     void setColors(const QString &background, const QString &foreground, const QString &accent);
     void setSearch(const QString &query, int currentMatchStart);
 
@@ -44,6 +45,8 @@ private:
     void highlightSearch(const QString &text);
 
     int m_focusBlock = -1;
+    int m_focusStart = -1;
+    int m_focusEnd = -1;
     bool m_showMarkup = false;
     bool m_darkMode = true;
     QString m_customBackground;

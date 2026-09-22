@@ -36,6 +36,9 @@ ApplicationWindow {
     readonly property int editorWidth: Math.min(
         Math.round(writerFontMetrics.averageCharacterWidth * 65),
         Math.max(180, editorPane.width - 64))
+    property int tabInset: 0
+    Timer { interval: 250; repeat: true; running: win.visible && win.isMac; onTriggered: win.tabInset = backend.nativeTabInset() }
+    property bool synchronizingScroll: false
     property bool closeConfirmed: false
     property bool searchOpen: false
     property bool searchUpdating: false
@@ -45,6 +48,8 @@ ApplicationWindow {
     property string pendingAction: ""
     property bool replaceOpen: false
     property bool awaitingPendingSave: false
+    property string pendingFileName: ""
+    property int pendingHistoryDirection: 0
 
     Settings {
         id: workspaceSettings
@@ -56,12 +61,32 @@ ApplicationWindow {
         property int writingSize: 16
         property int appearanceRevision: 0
         property bool showMarkup: true
+        property string reviewWords: ""
+        property bool autosaveEnabled: false
+        property bool synchronizedScroll: false
         property bool typewriter: false
+        property bool sentenceFocus: false
+        onSentenceFocusChanged: backend.setFocusPosition(editor.cursorPosition, paragraphFocus, sentenceFocus)
         property bool paragraphFocus: false
-        onParagraphFocusChanged: backend.setFocusPosition(editor.cursorPosition, paragraphFocus)
+        onParagraphFocusChanged: backend.setFocusPosition(editor.cursorPosition, paragraphFocus, sentenceFocus)
         property int previewStyle: 0
         onShowMarkupChanged: backend.setShowMarkup(showMarkup)
     }
+
+    WorkspaceCommands {
+        id: workspaceCommands
+        settings: workspaceSettings
+        library: backend.library
+        libraryPane: libraryPane
+        window: win
+        editor: editor
+        preview: previewPane
+        onOutlineRequested: { outlineDrawer.headings = backend.documentOutline(editor.text); outlineDrawer.open(); }
+        onStatisticsRequested: statisticsDialog.open()
+        onTypewriterChanged: editorFlick.ensureCursorVisible()
+    }
+
+    component NativeCommand: NativeCommandMenuItem { commands: workspaceCommands }
 
     ToolBar {
         id: topChrome
@@ -82,8 +107,8 @@ ApplicationWindow {
             anchors.leftMargin: win.isMac ? 84 : 8
             anchors.rightMargin: 10
             spacing: 5
-            ChromeButton { iconName: "library"; hint: "Show or hide library"; darkMode: win.darkMode; checkable: true; checked: workspaceSettings.libraryVisible; onClicked: workspaceSettings.libraryVisible = checked }
-            ChromeButton { iconName: "organizer"; hint: "Show or hide organizer"; darkMode: win.darkMode; visible: workspaceSettings.libraryVisible; onClicked: workspaceSettings.organizerVisible = !workspaceSettings.organizerVisible }
+            ChromeButton { iconName: "library"; hint: "Show or hide library"; darkMode: win.darkMode; checkable: true; checked: workspaceSettings.libraryVisible; onClicked: workspaceCommands.run("library") }
+            ChromeButton { iconName: "organizer"; hint: "Show or hide organizer"; darkMode: win.darkMode; visible: workspaceSettings.libraryVisible; enabled: workspaceCommands.isEnabled("organizer"); onClicked: workspaceCommands.run("organizer") }
             Item { visible: organizerPane.visible; Layout.preferredWidth: Math.max(0, organizerPane.width - (win.isMac ? 164 : 88)) }
             RowLayout {
                 visible: libraryPane.visible
@@ -95,10 +120,10 @@ ApplicationWindow {
                 ChromeButton { iconName: "down"; hint: "Library options"; darkMode: win.darkMode; onClicked: libraryPane.showOptions(this) }
             }
             Label { Accessible.description: backend.status; text: backend.fileName; color: win.darkMode ? "#d5d8dd" : "#54585f"; font.pixelSize: 15; font.weight: Font.Normal; elide: Text.ElideMiddle; horizontalAlignment: Text.AlignLeft; Layout.fillWidth: true }
-            ChromeButton { iconName: "outline"; hint: "Document outline"; darkMode: win.darkMode; onClicked: { outlineDrawer.headings = backend.documentOutline(editor.text); outlineDrawer.open(); } }
+            ChromeButton { iconName: "outline"; hint: "Document outline"; darkMode: win.darkMode; onClicked: workspaceCommands.run("outline") }
             ChromeButton { text: "Aa"; hint: "Writing options"; darkMode: win.darkMode; onClicked: writingOptions.open() }
-            ChromeButton { iconName: "search"; hint: "Find in document"; darkMode: win.darkMode; onClicked: { if (workspaceSettings.layoutMode === 2) workspaceSettings.layoutMode = 1; win.searchOpen = true; searchField.forceActiveFocus(); searchField.selectAll(); } }
-            ChromeButton { iconName: "preview"; hint: "Show or hide preview"; darkMode: win.darkMode; checked: workspaceSettings.layoutMode !== 0; onClicked: workspaceSettings.layoutMode = workspaceSettings.layoutMode === 0 ? 1 : 0 }
+            ChromeButton { iconName: "search"; hint: "Find in document"; darkMode: win.darkMode; onClicked: win.openSearch(false, false) }
+            ChromeButton { iconName: "preview"; hint: "Show or hide preview"; darkMode: win.darkMode; checked: workspaceSettings.layoutMode !== 0; onClicked: workspaceCommands.run("togglePreview") }
         }
     }
 
@@ -151,25 +176,25 @@ ApplicationWindow {
         MenuItem { objectName: "saveButton"; text: "Save"; onTriggered: backend.save() }
         MenuItem { objectName: "openButton"; text: "Open…"; onTriggered: backend.openDialog() }
         MenuSeparator {}
-        MenuItem { text: "Strikethrough"; onTriggered: editor.wrapSelection("~~", "~~") }
-        MenuItem { text: "Inline code"; onTriggered: editor.wrapSelection("`", "`") }
+        MenuItem { text: "Strikethrough"; onTriggered: workspaceCommands.run("strike") }
+        MenuItem { text: "Inline code"; onTriggered: workspaceCommands.run("inlineCode") }
     }
     Menu {
         id: writingOptions
         width: 250
         x: Math.max(0, win.width - width - 160)
         y: 44
-        MenuItem { text: "Show Markdown syntax"; checkable: true; checked: workspaceSettings.showMarkup; onTriggered: workspaceSettings.showMarkup = !workspaceSettings.showMarkup }
-        MenuItem { text: "Paragraph focus"; checkable: true; checked: workspaceSettings.paragraphFocus; onTriggered: workspaceSettings.paragraphFocus = !workspaceSettings.paragraphFocus }
-        MenuItem { text: "Typewriter scrolling"; checkable: true; checked: workspaceSettings.typewriter; onTriggered: { workspaceSettings.typewriter = !workspaceSettings.typewriter; editorFlick.ensureCursorVisible(); } }
+        MenuItem { text: "Show Markdown syntax"; checkable: true; checked: workspaceSettings.showMarkup; onTriggered: workspaceCommands.run("markup") }
+        MenuItem { text: "Paragraph focus"; checkable: true; checked: workspaceSettings.paragraphFocus; onTriggered: workspaceCommands.run("paragraph") }
+        MenuItem { text: "Typewriter scrolling"; checkable: true; checked: workspaceSettings.typewriter; onTriggered: workspaceCommands.run("typewriter") }
         MenuSeparator {}
-        MenuItem { text: "Larger text"; enabled: workspaceSettings.writingSize < 32; onTriggered: workspaceSettings.writingSize += 2 }
-        MenuItem { text: "Smaller text"; enabled: workspaceSettings.writingSize > 12; onTriggered: workspaceSettings.writingSize -= 2 }
-        MenuItem { text: "Reset text size"; onTriggered: workspaceSettings.writingSize = 16 }
+        MenuItem { text: "Larger text"; enabled: workspaceSettings.writingSize < 32; onTriggered: workspaceCommands.run("larger") }
+        MenuItem { text: "Smaller text"; enabled: workspaceSettings.writingSize > 12; onTriggered: workspaceCommands.run("smaller") }
+        MenuItem { text: "Reset text size"; onTriggered: workspaceCommands.run("resetSize") }
         MenuSeparator {}
-        MenuItem { text: "Preview: Sans"; checkable: true; checked: workspaceSettings.previewStyle === 0; onTriggered: workspaceSettings.previewStyle = 0 }
-        MenuItem { text: "Preview: Serif"; checkable: true; checked: workspaceSettings.previewStyle === 1; onTriggered: workspaceSettings.previewStyle = 1 }
-        MenuItem { text: "Preview: Mono"; checkable: true; checked: workspaceSettings.previewStyle === 2; onTriggered: workspaceSettings.previewStyle = 2 }
+        MenuItem { text: "Preview: Sans"; checkable: true; checked: workspaceSettings.previewStyle === 0; onTriggered: workspaceCommands.run("sans") }
+        MenuItem { text: "Preview: Serif"; checkable: true; checked: workspaceSettings.previewStyle === 1; onTriggered: workspaceCommands.run("serif") }
+        MenuItem { text: "Preview: Mono"; checkable: true; checked: workspaceSettings.previewStyle === 2; onTriggered: workspaceCommands.run("mono") }
     }
 
     Material.theme: darkMode ? Material.Dark : Material.Light
@@ -177,8 +202,10 @@ ApplicationWindow {
     color: pageColor
 
     onClosing: function(close) {
-        if (closeConfirmed || !backend.modified)
+        if (closeConfirmed || !backend.modified) {
+            backend.notifyWindowClosed();
             return;
+        }
 
         close.accepted = false;
         pendingAction = "close";
@@ -186,7 +213,28 @@ ApplicationWindow {
             unsavedChangesDialog.open();
     }
 
+    function editMarkdown(action) {
+        var result = backend.editMarkdown(action, editor.selectionStart, editor.selectionEnd);
+        editor.forceActiveFocus();
+        if (result.start !== undefined) editor.select(result.start, result.end);
+    }
+
+    function requestHistory(direction) {
+        backend.rememberCursor(editor.cursorPosition);
+        pendingHistoryDirection = direction;
+        pendingAction = "history";
+        if (backend.modified) unsavedChangesDialog.open();
+        else completePendingAction();
+    }
+
+    function openSourceLink() {
+        var link = backend.sourceLinkAt(editor.cursorPosition);
+        if (/^file:.*\.(md|markdown|mdown|txt|text)(#.*)?$/i.test(String(link))) requestOpen(link);
+        else backend.openExternalUrl(link);
+    }
+
     function requestOpen(url) {
+        backend.rememberCursor(editor.cursorPosition);
         if (!backend.modified) {
             backend.open(url);
             return;
@@ -194,6 +242,30 @@ ApplicationWindow {
         pendingOpenUrl = url;
         pendingAction = "open";
         unsavedChangesDialog.open();
+    }
+
+    function requestNewDocument() {
+        pendingAction = "new";
+        if (backend.modified) unsavedChangesDialog.open();
+        else completePendingAction();
+    }
+
+    function requestCreateDocument(name, inNewWindow) {
+        workspaceSettings.libraryVisible = true;
+        if (inNewWindow) {
+            var file = backend.library.createDocument(name);
+            if (file.toString() !== "") backend.openInNewWindow(file);
+            return;
+        }
+        pendingFileName = name;
+        pendingAction = "create";
+        if (backend.modified) unsavedChangesDialog.open();
+        else completePendingAction();
+    }
+
+    function showCurrentFileInLibrary() {
+        workspaceSettings.libraryVisible = true;
+        libraryPane.showCurrentFile();
     }
 
     function completePendingAction() {
@@ -204,6 +276,14 @@ ApplicationWindow {
             close();
         } else if (action === "open") {
             backend.open(pendingOpenUrl);
+        } else if (action === "history") {
+            var position = backend.navigateHistory(pendingHistoryDirection);
+            if (position >= 0) Qt.callLater(function() { editor.cursorPosition = position; editor.forceActiveFocus(); editorFlick.ensureCursorVisible(); });
+        } else if (action === "new") {
+            backend.newDocument();
+        } else if (action === "create") {
+            var file = backend.library.createDocument(pendingFileName);
+            if (file.toString() !== "") backend.open(file);
         }
     }
 
@@ -224,21 +304,33 @@ ApplicationWindow {
             : Window.FullScreen;
     }
 
+    readonly property var editTarget: activeFocusItem && typeof activeFocusItem.cut === "function" ? activeFocusItem : editor
+
+    function openSearch(withReplace, useSelection) {
+        var selected = editor.selectedText;
+        if (workspaceSettings.layoutMode === 2) workspaceSettings.layoutMode = 1;
+        searchOpen = true;
+        replaceOpen = withReplace;
+        if (useSelection && selected.length > 0) searchField.text = selected;
+        searchField.forceActiveFocus();
+        searchField.selectAll();
+        updateSearch();
+    }
+
     function updateSearch() {
-        var matches = [];
-        var query = searchField.text;
-        if (query.length > 0) {
-            var haystack = editor.text.toLocaleLowerCase();
-            var needle = query.toLocaleLowerCase();
-            var position = 0;
-            while ((position = haystack.indexOf(needle, position)) !== -1) {
-                matches.push(position);
-                position += Math.max(1, needle.length);
-            }
-        }
-        searchMatches = matches;
-        searchMatchIndex = matches.length > 0 ? 0 : -1;
+        searchMatches = backend.searchPositions(searchField.text);
+        searchMatchIndex = searchMatches.length > 0 ? 0 : -1;
         showSearchMatch();
+    }
+
+    function replaceSearch(all) {
+        if (searchMatchIndex < 0) return;
+        var start = searchMatches[searchMatchIndex];
+        searchUpdating = true;
+        backend.replaceMatches(searchField.text, replaceField.text, all ? -1 : start);
+        searchUpdating = false;
+        backend.editorTextChanged();
+        updateSearch();
     }
 
     function showSearchMatch() {
@@ -280,10 +372,7 @@ ApplicationWindow {
         sequence: win.isMac ? "Ctrl+Alt+F" : "Ctrl+H"
         context: Qt.ApplicationShortcut
         onActivated: {
-            searchOpen = true;
-            replaceOpen = true;
-            searchField.forceActiveFocus();
-            searchField.selectAll();
+            win.openSearch(true, false);
         }
     }
 
@@ -344,23 +433,27 @@ ApplicationWindow {
     Shortcut {
         sequence: "Ctrl+Z"
         context: Qt.WindowShortcut
-        onActivated: editor.undo()
+        onActivated: win.editTarget.undo()
     }
 
     Shortcut {
         sequences: ["Ctrl+Shift+Z", "Ctrl+Y"]
         context: Qt.WindowShortcut
-        onActivated: editor.redo()
+        onActivated: win.editTarget.redo()
     }
 
     Shortcut {
         sequence: "Ctrl+F"
         context: Qt.ApplicationShortcut
         onActivated: {
-            searchOpen = true;
-            searchField.forceActiveFocus();
-            searchField.selectAll();
+            win.openSearch(false, false);
         }
+    }
+
+    Shortcut {
+        sequence: "Ctrl+Shift+G"
+        enabled: win.searchOpen
+        onActivated: win.moveSearch(-1)
     }
 
     Shortcut {
@@ -381,44 +474,238 @@ ApplicationWindow {
     Platform.MenuBar {
         Platform.Menu {
             title: "File"
+            Platform.MenuItem { objectName: "fileNew"; text: "New"; onTriggered: win.requestNewDocument() }
             Platform.MenuItem { text: "New Window"; onTriggered: backend.newWindow() }
+            Platform.MenuItem { objectName: "fileNewLibrary"; text: "New in Library…"; enabled: backend.library.rootFolder.toString() !== ""; onTriggered: libraryPane.newDocument(false) }
+            Platform.MenuItem { objectName: "fileNewLibraryWindow"; text: "New in Library in Window…"; enabled: backend.library.rootFolder.toString() !== ""; onTriggered: libraryPane.newDocument(true) }
+            Platform.MenuItem { objectName: "fileNewFolder"; text: "New Folder…"; enabled: backend.library.rootFolder.toString() !== ""; onTriggered: libraryPane.newFolder() }
+            Platform.MenuSeparator {}
             Platform.MenuItem { text: "Open…"; onTriggered: backend.openDialog() }
+            RecentFilesMenu { title: "Open Recent"; library: backend.library; onOpenRequested: function(url) { win.requestOpen(url); } }
+            Platform.MenuSeparator {}
             Platform.MenuItem { text: "Save"; onTriggered: backend.save() }
+            Platform.MenuItem { text: "Autosave Saved Files Every Minute"; checkable: true; checked: workspaceSettings.autosaveEnabled; onTriggered: workspaceSettings.autosaveEnabled = !workspaceSettings.autosaveEnabled }
+            Platform.MenuItem { text: "Create Version of Saved File"; visible: win.isMac; enabled: backend.fileUrl.toString() !== ""; onTriggered: backend.createVersion() }
+            Platform.MenuItem { text: "Restore Version in Editor…"; visible: win.isMac; enabled: backend.fileUrl.toString() !== ""; onTriggered: { versionsDialog.items = backend.versions(); versionsDialog.open(); } }
             Platform.MenuItem { text: "Save As…"; onTriggered: backend.saveAsDialog() }
-            Platform.MenuItem { text: "Print…"; onTriggered: backend.printDocument() }
+            Platform.MenuItem { objectName: "fileDuplicate"; text: "Duplicate…"; enabled: backend.fileUrl.toString() !== ""; onTriggered: fileNameDialog.showFor(false) }
+            Platform.MenuItem { objectName: "fileRename"; text: "Rename…"; enabled: backend.fileUrl.toString() !== ""; onTriggered: fileNameDialog.showFor(true) }
+            Platform.MenuItem {
+                objectName: "fileMove"; text: "Move To…"; enabled: backend.fileUrl.toString() !== ""
+                onTriggered: { moveFolderDialog.currentFolder = backend.documentBaseUrl; moveFolderDialog.open(); }
+            }
+            Platform.MenuSeparator {}
+            Platform.MenuItem { objectName: "fileRevealFinder"; text: "Show in Finder"; enabled: backend.fileUrl.toString() !== ""; onTriggered: backend.showInFinder() }
+            Platform.MenuItem { objectName: "fileRevealLibrary"; text: "Show in Library"; enabled: backend.fileUrl.toString() !== ""; onTriggered: win.showCurrentFileInLibrary() }
+            Platform.MenuSeparator {}
+            Platform.MenuItem { text: "Export HTML…"; onTriggered: { exportDialog.outputFormat = "html"; exportDialog.nameFilters = ["HTML (*.html)"]; exportDialog.open(); } }
+            Platform.MenuItem { text: "Export PDF…"; onTriggered: { exportDialog.outputFormat = "pdf"; exportDialog.nameFilters = ["PDF (*.pdf)"]; exportDialog.open(); } }
+            Platform.MenuItem { text: "Page Setup…"; onTriggered: backend.pageSetup() }
+            Platform.MenuItem { text: "Print Markdown Source…"; onTriggered: backend.printDocument(true) }
+            Platform.MenuItem { text: "Print…"; onTriggered: backend.printDocument(false) }
+            Platform.MenuItem { text: "Share Markdown…"; visible: win.isMac; onTriggered: backend.nativeWindowAction("share") }
             Platform.MenuItem { text: "Close Window"; onTriggered: win.close() }
             Platform.MenuItem {
                 text: "Quit Omawrite"
                 role: Platform.MenuItem.QuitRole
-                onTriggered: win.close()
+                onTriggered: backend.requestQuit()
             }
         }
         Platform.Menu {
             title: "Edit"
-            Platform.MenuItem { text: "Undo"; onTriggered: editor.undo() }
-            Platform.MenuItem { text: "Redo"; onTriggered: editor.redo() }
-            Platform.MenuItem { text: "Cut"; onTriggered: editor.cut() }
-            Platform.MenuItem { text: "Copy"; onTriggered: editor.copy() }
-            Platform.MenuItem { text: "Paste"; onTriggered: editor.pasteClipboardAsPlainText() }
-            Platform.MenuItem { text: "Select All"; onTriggered: editor.selectAll() }
-            Platform.MenuItem {
-                text: "Find…"
-                onTriggered: {
-                    win.searchOpen = true;
-                    searchField.forceActiveFocus();
-                    searchField.selectAll();
-                }
+            Platform.MenuItem { text: "Authorship Annotations…"; onTriggered: { authorshipDialog.ranges = backend.authorshipRanges(); authorshipDialog.open(); } }
+            Platform.MenuItem { text: "Check Selection Spelling…"; visible: win.isMac; enabled: editor.selectedText.length > 0; onTriggered: { spellingDialog.issues = backend.spellingIssues(editor.selectedText); spellingDialog.open(); } }
+            Platform.MenuItem { text: "Emoji & Symbols"; visible: win.isMac; onTriggered: backend.nativeWindowAction("emoji") }
+            Platform.MenuItem { objectName: "editUndo"; text: "Undo"; enabled: win.editTarget.canUndo; onTriggered: win.editTarget.undo() }
+            Platform.MenuItem { objectName: "editRedo"; text: "Redo"; enabled: win.editTarget.canRedo; onTriggered: win.editTarget.redo() }
+            Platform.MenuItem { text: "Cut"; enabled: !win.editTarget.readOnly && win.editTarget.selectedText.length > 0; onTriggered: win.editTarget.cut() }
+            Platform.MenuItem { text: "Copy"; enabled: win.editTarget.selectedText.length > 0; onTriggered: win.editTarget.copy() }
+            Platform.MenuItem { text: "Paste"; enabled: !win.editTarget.readOnly && win.editTarget.canPaste; onTriggered: { if (win.editTarget === editor) editor.pasteClipboardAsPlainText(); else win.editTarget.paste(); } }
+            Platform.MenuItem { objectName: "editDelete"; text: "Delete"; enabled: !win.editTarget.readOnly && win.editTarget.selectedText.length > 0; onTriggered: win.editTarget.remove(win.editTarget.selectionStart, win.editTarget.selectionEnd) }
+            Platform.MenuItem { text: "Select All"; enabled: win.editTarget.length > 0; onTriggered: win.editTarget.selectAll() }
+            Platform.Menu {
+                title: "Copy As"
+                Platform.MenuItem { text: "Markdown"; enabled: editor.selectedText.length > 0; onTriggered: backend.copySelection(editor.selectionStart, editor.selectionEnd, "markdown") }
+                Platform.MenuItem { text: "HTML"; enabled: editor.selectedText.length > 0; onTriggered: backend.copySelection(editor.selectionStart, editor.selectionEnd, "html") }
+                Platform.MenuItem { text: "Formatted Text"; enabled: editor.selectedText.length > 0; onTriggered: backend.copySelection(editor.selectionStart, editor.selectionEnd, "formatted") }
+            }
+            Platform.Menu {
+                title: "Paste As"
+                Platform.MenuItem { text: "Plain Text"; enabled: editor.canPaste; onTriggered: { editor.forceActiveFocus(); editor.replaceAtomic(editor.selectionStart, editor.selectionEnd, backend.clipboardText()); } }
+                Platform.MenuItem { text: "Markdown from HTML"; enabled: editor.canPaste; onTriggered: { editor.forceActiveFocus(); editor.replaceAtomic(editor.selectionStart, editor.selectionEnd, backend.clipboardMarkdown()); } }
+            }
+            Platform.MenuSeparator {}
+            Platform.Menu {
+                title: "Find"
+                Platform.MenuItem { objectName: "editFind"; text: "Find…"; onTriggered: win.openSearch(false, false) }
+                Platform.MenuItem { objectName: "editReplace"; text: "Find and Replace…"; onTriggered: win.openSearch(true, false) }
+                Platform.MenuItem { objectName: "editFindNext"; text: "Find Next"; enabled: win.searchOpen && win.searchMatches.length > 0; onTriggered: win.moveSearch(1) }
+                Platform.MenuItem { objectName: "editFindPrevious"; text: "Find Previous"; enabled: win.searchOpen && win.searchMatches.length > 0; onTriggered: win.moveSearch(-1) }
+                Platform.MenuItem { objectName: "editFindSelection"; text: "Use Selection for Find"; enabled: editor.selectedText.length > 0; onTriggered: win.openSearch(false, true) }
             }
         }
         Platform.Menu {
             title: "Format"
+            Platform.MenuItem { text: "Highlight"; onTriggered: editor.wrapSelection("==", "==") }
+            Platform.MenuItem { text: "Wikilink"; onTriggered: editor.wrapSelection("[[", "]]") }
+            Platform.MenuItem { text: "Footnote"; onTriggered: editor.replaceAtomic(editor.selectionStart, editor.selectionEnd, "[^note]\n\n[^note]: Note text") }
+            Platform.MenuItem { text: "Content Block"; onTriggered: editor.replaceAtomic(editor.selectionStart, editor.selectionEnd, "\n/chapter.md\n") }
+            Platform.MenuItem { text: "Hashtag"; onTriggered: editor.replaceAtomic(editor.selectionStart, editor.selectionEnd, "#tag") }
+            Platform.MenuItem { text: "Insert Table of Contents"; onTriggered: editor.replaceAtomic(editor.selectionStart, editor.selectionEnd, backend.tableOfContents(editor.text)) }
+            Platform.Menu {
+                title: "Headings"
+                Platform.MenuItem { text: "Heading 1"; onTriggered: win.editMarkdown("heading1") }
+                Platform.MenuItem { text: "Heading 2"; onTriggered: win.editMarkdown("heading2") }
+                Platform.MenuItem { text: "Heading 3"; onTriggered: win.editMarkdown("heading3") }
+                Platform.MenuItem { text: "Heading 4"; onTriggered: win.editMarkdown("heading4") }
+                Platform.MenuItem { text: "Heading 5"; onTriggered: win.editMarkdown("heading5") }
+                Platform.MenuItem { text: "Heading 6"; onTriggered: win.editMarkdown("heading6") }
+                Platform.MenuItem { text: "Body"; onTriggered: win.editMarkdown("body") }
+            }
+            Platform.Menu {
+                title: "Lists"
+                Platform.MenuItem { text: "Bulleted List"; onTriggered: win.editMarkdown("bullet") }
+                Platform.MenuItem { text: "Numbered List"; onTriggered: win.editMarkdown("ordered") }
+                Platform.MenuItem { text: "Task List"; onTriggered: win.editMarkdown("task") }
+                Platform.MenuItem { text: "Toggle Task Completion"; onTriggered: win.editMarkdown("toggleTask") }
+            }
+            Platform.MenuItem { text: "Blockquote"; onTriggered: win.editMarkdown("quote") }
+            Platform.Menu {
+                title: "Structure"
+                Platform.MenuItem { text: "Indent"; onTriggered: win.editMarkdown("indent") }
+                Platform.MenuItem { text: "Outdent"; onTriggered: win.editMarkdown("outdent") }
+                Platform.MenuItem { text: "Move Lines Up"; onTriggered: win.editMarkdown("lineUp") }
+                Platform.MenuItem { text: "Move Lines Down"; onTriggered: win.editMarkdown("lineDown") }
+            }
+            Platform.MenuSeparator {}
             Platform.MenuItem { text: "Bold"; onTriggered: editor.wrapSelection("**", "**") }
             Platform.MenuItem { text: "Italic"; onTriggered: editor.wrapSelection("*", "*") }
             Platform.MenuItem { text: "Link…"; onTriggered: editor.insertLink() }
+            Platform.MenuSeparator {}
+            NativeCommand { commandId: "strike" }
+            NativeCommand { commandId: "inlineCode" }
+            Platform.MenuItem { text: "Code Block"; onTriggered: win.editMarkdown("codeBlock") }
+            Platform.MenuItem { text: "Horizontal Rule"; onTriggered: win.editMarkdown("rule") }
+            Platform.MenuItem { text: "Date"; onTriggered: win.editMarkdown("date") }
+            Platform.MenuItem { text: "Table"; onTriggered: win.editMarkdown("table") }
+            Platform.MenuItem { text: "Clear Surrounding Inline Styles"; enabled: editor.selectedText.length > 0; onTriggered: win.editMarkdown("clearInline") }
+            Platform.Menu {
+                title: "Change Case"
+                Platform.MenuItem { text: "UPPERCASE"; enabled: editor.selectedText.length > 0; onTriggered: win.editMarkdown("uppercase") }
+                Platform.MenuItem { text: "lowercase"; enabled: editor.selectedText.length > 0; onTriggered: win.editMarkdown("lowercase") }
+                Platform.MenuItem { text: "Title Case"; enabled: editor.selectedText.length > 0; onTriggered: win.editMarkdown("titlecase") }
+            }
         }
         Platform.Menu {
             title: "View"
-            Platform.MenuItem { text: "Toggle Full Screen"; onTriggered: win.toggleFullScreen() }
+            Platform.Menu {
+                title: "Output Style"
+                Platform.MenuItem { text: "Clean Sans"; onTriggered: backend.setOutputStyle(0) }
+                Platform.MenuItem { text: "Reading Serif"; onTriggered: backend.setOutputStyle(1) }
+                Platform.MenuItem { text: "Manuscript Mono"; onTriggered: backend.setOutputStyle(2) }
+                Platform.MenuItem { text: "Load Custom Style…"; onTriggered: outputStyleDialog.open() }
+            }
+            Platform.MenuItem { text: "Synchronized Scrolling"; checkable: true; checked: workspaceSettings.synchronizedScroll; onTriggered: workspaceSettings.synchronizedScroll = !workspaceSettings.synchronizedScroll }
+            NativeCommand { commandId: "library" }
+            NativeCommand { commandId: "organizer" }
+            Platform.MenuSeparator {}
+            NativeCommand { commandId: "sortBar" }
+            NativeCommand { commandId: "filterBar" }
+            Platform.Menu {
+                title: "Sort Files By"
+                NativeCommand { commandId: "sortName" }
+                NativeCommand { commandId: "sortModified" }
+                NativeCommand { commandId: "sortCreated" }
+                NativeCommand { commandId: "sortExtension" }
+                Platform.MenuSeparator {}
+                NativeCommand { commandId: "ascending" }
+                NativeCommand { commandId: "descending" }
+                Platform.MenuSeparator {}
+                NativeCommand { commandId: "foldersFirst" }
+            }
+            Platform.Menu {
+                title: "View Options"
+                NativeCommand { commandId: "dates" }
+                NativeCommand { commandId: "excerpts" }
+            }
+            Platform.MenuSeparator {}
+            Platform.Menu {
+                title: "Text Size"
+                NativeCommand { commandId: "larger" }
+                NativeCommand { commandId: "smaller" }
+                NativeCommand { commandId: "resetSize" }
+            }
+            NativeCommand { commandId: "markup" }
+            Platform.MenuSeparator {}
+            NativeCommand { commandId: "togglePreview" }
+            NativeCommand { commandId: "reloadPreview" }
+            Platform.Menu {
+                title: "Layout"
+                NativeCommand { commandId: "editor" }
+                NativeCommand { commandId: "split" }
+                NativeCommand { commandId: "preview" }
+            }
+            Platform.Menu {
+                title: "Preview Typeface"
+                NativeCommand { commandId: "sans" }
+                NativeCommand { commandId: "serif" }
+                NativeCommand { commandId: "mono" }
+            }
+            Platform.MenuSeparator {}
+            NativeCommand { commandId: "outline" }
+            NativeCommand { commandId: "statistics" }
+            Platform.MenuSeparator {}
+            // AppKit supplies the native Full Screen item automatically.
+        }
+        Platform.Menu {
+            title: "Window"
+            visible: win.isMac
+            Platform.MenuItem { text: "Minimize"; onTriggered: backend.nativeWindowAction("minimize") }
+            Platform.MenuItem { text: "Zoom"; onTriggered: backend.nativeWindowAction("zoom") }
+            Platform.MenuItem { text: "Bring All to Front"; onTriggered: backend.nativeWindowAction("front") }
+            Platform.MenuSeparator {}
+            Platform.MenuItem { text: "Merge All Windows"; onTriggered: backend.nativeWindowAction("merge") }
+            Platform.MenuItem { text: "Next Tab"; onTriggered: backend.nativeWindowAction("nextTab") }
+            Platform.MenuItem { text: "Previous Tab"; onTriggered: backend.nativeWindowAction("previousTab") }
+            Platform.MenuItem { text: "Move Tab to New Window"; onTriggered: backend.nativeWindowAction("detach") }
+            Platform.MenuItem { text: "Toggle Tab Bar"; onTriggered: backend.nativeWindowAction("tabBar") }
+            Platform.MenuItem { text: "Tab Overview"; onTriggered: backend.nativeWindowAction("overview") }
+        }
+        Platform.Menu {
+            title: "Focus"
+            Platform.MenuItem { text: "Analyze Selection…"; enabled: editor.selectedText.length > 0; onTriggered: { analysisDialog.sample = editor.selectedText; analysisDialog.open(); } }
+            NativeCommand { commandId: "paragraph" }
+            NativeCommand { commandId: "sentence" }
+            NativeCommand { commandId: "typewriter" }
+        }
+        Platform.Menu {
+            title: "Go"
+            Platform.MenuItem { text: "Command Palette…"; shortcut: "Ctrl+Shift+P"; onTriggered: commandPalette.open() }
+            Platform.MenuItem { objectName: "documentBack"; text: "Back in Documents"; enabled: backend.canGoBack; onTriggered: win.requestHistory(-1) }
+            Platform.MenuItem { objectName: "documentForward"; text: "Forward in Documents"; enabled: backend.canGoForward; onTriggered: win.requestHistory(1) }
+            Platform.MenuItem { text: "Back in Library"; enabled: backend.library.canGoBack; onTriggered: backend.library.navigateHistory(-1) }
+            Platform.MenuItem { text: "Forward in Library"; enabled: backend.library.canGoForward; onTriggered: backend.library.navigateHistory(1) }
+            Platform.MenuItem { text: "Enclosing Library Folder"; enabled: backend.library.rootFolder.toString() !== ""; onTriggered: backend.library.enclosingFolder() }
+            Platform.MenuItem { text: "Open Link at Cursor"; enabled: { var text = editor.text; return backend.sourceLinkAt(editor.cursorPosition).toString() !== ""; } onTriggered: win.openSourceLink() }
+            Platform.MenuItem { text: "Quick Open…"; enabled: backend.library.rootFolder.toString() !== ""; onTriggered: quickOpenDialog.open() }
+            Platform.MenuSeparator {}
+            Platform.Menu {
+                id: locationsMenu
+                title: "Locations"
+                Instantiator {
+                    model: backend.library.locations
+                    delegate: Platform.MenuItem {
+                        required property var modelData
+                        text: modelData.name + (modelData.available ? "" : " (Unavailable)")
+                        onTriggered: { backend.library.rootFolder = modelData.url; workspaceSettings.libraryVisible = true; }
+                    }
+                    onObjectAdded: function(index, object) { locationsMenu.insertItem(index, object); }
+                    onObjectRemoved: function(index, object) { locationsMenu.removeItem(object); }
+                }
+                Platform.MenuSeparator {}
+                Platform.MenuItem { text: "Add Location…"; onTriggered: libraryPane.chooseFolder() }
+            }
+            RecentFilesMenu { title: "Recent Files"; library: backend.library; onOpenRequested: function(url) { win.requestOpen(url); } }
         }
         Platform.Menu {
             title: "Help"
@@ -453,6 +740,8 @@ ApplicationWindow {
             win.close();
         }
 
+        function onSaveFailed() { win.awaitingPendingSave = false; win.pendingAction = ""; }
+
         function onSaveSucceeded() {
             win.awaitingPendingSave = false;
             if (win.pendingAction !== "")
@@ -464,6 +753,242 @@ ApplicationWindow {
             externalChangeDialog.locallyModified = locallyModified;
             externalChangeDialog.open();
         }
+    }
+
+    Timer { interval: 60000; repeat: true; running: workspaceSettings.autosaveEnabled; onTriggered: { if (!unsavedChangesDialog.opened && win.pendingAction === "") backend.autosave(); } }
+    Dialog {
+        id: versionsDialog
+        title: "Restore a saved version (one-step undo)"
+        property var items: []
+        modal: true
+        anchors.centerIn: parent
+        width: Math.min(540, win.width - 40)
+        height: Math.min(400, win.height - 60)
+        standardButtons: Dialog.Cancel
+        ColumnLayout {
+            anchors.fill: parent
+            Label { text: "Replaces editor text. Disk changes only when you Save."; wrapMode: Text.Wrap; Layout.fillWidth: true }
+            Label { visible: versionsDialog.items.length === 0; text: "No saved versions are available." }
+            ListView {
+                Layout.fillWidth: true; Layout.fillHeight: true
+                model: versionsDialog.items
+                delegate: ItemDelegate {
+                    required property var modelData
+                    width: ListView.view.width
+                    text: modelData.date
+                    onClicked: { backend.restoreVersion(modelData.url); versionsDialog.close(); }
+                }
+            }
+        }
+    }
+
+    Dialog {
+        id: authorshipDialog
+        property var ranges: []
+        title: "Authorship annotations"
+        modal: true
+        anchors.centerIn: parent
+        width: Math.min(620, win.width - 40)
+        height: Math.min(500, win.height - 60)
+        standardButtons: Dialog.Close
+        ColumnLayout {
+            anchors.fill: parent
+            Label { Layout.fillWidth: true; wrapMode: Text.Wrap; text: "Manual labels, not verified provenance. Edits can inherit nearby labels. Save writes a hidden .omawrite-authors.json sidecar; keep it with the Markdown file. External edits invalidate labels. Clipboard/export do not preserve them." }
+            TextField { id: authorName; Layout.fillWidth: true; placeholderText: "Author or source name (optional)" }
+            RowLayout {
+                Repeater {
+                    model: ["Human", "AI", "Reference", "Unknown"]
+                    Button { required property string modelData; text: modelData; enabled: editor.selectionStart !== editor.selectionEnd; onClicked: { backend.markAuthorship(editor.selectionStart, editor.selectionEnd, modelData, authorName.text); authorshipDialog.ranges = backend.authorshipRanges(); } }
+                }
+            }
+            ListView {
+                Layout.fillWidth: true; Layout.fillHeight: true; clip: true
+                model: authorshipDialog.ranges
+                delegate: Label { required property var modelData; width: ListView.view.width; height: 28; text: modelData.start + "–" + modelData.end + ": " + modelData.category + " " + modelData.author; elide: Text.ElideRight }
+                ScrollBar.vertical: ScrollBar {}
+            }
+        }
+    }
+
+    Dialog {
+        id: analysisDialog
+        property string sample: ""
+        property var results: []
+        title: "Writing review — suggestions, not corrections"
+        modal: true
+        anchors.centerIn: parent
+        width: Math.min(580, win.width - 40)
+        height: Math.min(460, win.height - 60)
+        standardButtons: Dialog.Close
+        onOpened: results = backend.writingAnalysis(sample, workspaceSettings.reviewWords)
+        ColumnLayout {
+            anchors.fill: parent
+            TextField { Layout.fillWidth: true; text: workspaceSettings.reviewWords; placeholderText: "Custom review words, separated by commas"; onEditingFinished: { workspaceSettings.reviewWords = text; analysisDialog.results = backend.writingAnalysis(analysisDialog.sample, text); } }
+            Label { Layout.fillWidth: true; wrapMode: Text.Wrap; text: "System word classes plus a small review-word list. Select prose only; code is not excluded automatically. First 50,000 characters / 1,000 results." }
+            ListView {
+                Layout.fillWidth: true; Layout.fillHeight: true; clip: true
+                model: analysisDialog.results
+                delegate: Label { required property var modelData; text: modelData.word + " — " + modelData.label; width: ListView.view.width; height: 28 }
+                ScrollBar.vertical: ScrollBar {}
+            }
+        }
+    }
+
+    Dialog {
+        id: spellingDialog
+        property var issues: []
+        title: "Selection spelling — system language"
+        modal: true
+        anchors.centerIn: parent
+        width: Math.min(500, win.width - 40)
+        standardButtons: Dialog.Ok
+        Label { width: parent.width; wrapMode: Text.Wrap; text: spellingDialog.issues.length ? spellingDialog.issues.join(", ") : "No spelling issues found in this selection." }
+    }
+
+    Dialog {
+        id: commandPalette
+        objectName: "commandPalette"
+        title: "Command Palette"
+        modal: true
+        anchors.centerIn: parent
+        width: Math.min(580, win.width - 40)
+        height: Math.min(460, win.height - 60)
+        standardButtons: Dialog.Cancel
+        property var results: []
+        function refresh() {
+            results = workspaceCommands.entries.filter(function(item) {
+                return workspaceCommands.label(item.id).toLowerCase().indexOf(commandQuery.text.toLowerCase()) >= 0;
+            });
+            commandList.currentIndex = results.length ? 0 : -1;
+        }
+        function choose(index) {
+            if (index < 0 || index >= results.length) return;
+            var id = results[index].id;
+            if (!workspaceCommands.isEnabled(id)) return;
+            close();
+            editor.forceActiveFocus();
+            workspaceCommands.run(id);
+        }
+        onOpened: { refresh(); commandQuery.forceActiveFocus(); commandQuery.selectAll(); }
+        ColumnLayout {
+            anchors.fill: parent
+            TextField {
+                id: commandQuery
+                objectName: "commandQuery"
+                Layout.fillWidth: true
+                placeholderText: "Search workspace commands…"
+                onTextChanged: commandPalette.refresh()
+                onAccepted: commandPalette.choose(commandList.currentIndex)
+                Keys.onDownPressed: commandList.currentIndex = Math.min(commandList.count - 1, commandList.currentIndex + 1)
+                Keys.onUpPressed: commandList.currentIndex = Math.max(0, commandList.currentIndex - 1)
+            }
+            ListView {
+                id: commandList
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                clip: true
+                model: commandPalette.results
+                delegate: ItemDelegate {
+                    required property var modelData
+                    required property int index
+                    width: commandList.width
+                    text: workspaceCommands.label(modelData.id) + (workspaceCommands.isChecked(modelData.id) ? " ✓" : "")
+                    enabled: workspaceCommands.isEnabled(modelData.id)
+                    highlighted: commandList.currentIndex === index
+                    onClicked: commandPalette.choose(index)
+                }
+                ScrollBar.vertical: ScrollBar {}
+            }
+            Label { visible: commandPalette.results.length === 0; text: "No matching commands" }
+        }
+    }
+
+    Dialog {
+        id: quickOpenDialog
+        objectName: "quickOpenDialog"
+        title: "Quick Open — current library"
+        modal: true
+        anchors.centerIn: parent
+        width: Math.min(620, win.width - 40)
+        height: Math.min(460, win.height - 60)
+        standardButtons: Dialog.Cancel
+        onOpened: { quickQuery.forceActiveFocus(); quickQuery.selectAll(); quickSearchTimer.restart(); }
+        onClosed: { quickSearchTimer.stop(); backend.library.cancelQuickSearch(); }
+        function choose(index) {
+            var results = backend.library.quickResults;
+            if (index < 0 || index >= results.length) return;
+            var url = results[index].url;
+            close();
+            win.requestOpen(url);
+        }
+        Timer { interval: 5000; repeat: true; running: quickOpenDialog.visible && quickContents.checked; onTriggered: quickSearchTimer.restart() }
+        Timer { id: quickSearchTimer; interval: 150; onTriggered: backend.library.quickSearch(quickQuery.text, quickContents.checked) }
+        ColumnLayout {
+            anchors.fill: parent
+            TextField {
+                id: quickQuery
+                objectName: "quickQuery"
+                Layout.fillWidth: true
+                placeholderText: "Filename, content, or #tag…"
+                onTextChanged: { backend.library.cancelQuickSearch(); quickSearchTimer.restart(); }
+                onAccepted: quickOpenDialog.choose(quickList.currentIndex)
+                Keys.onDownPressed: quickList.currentIndex = Math.min(quickList.count - 1, quickList.currentIndex + 1)
+                Keys.onUpPressed: quickList.currentIndex = Math.max(0, quickList.currentIndex - 1)
+            }
+            RowLayout {
+                Layout.fillWidth: true
+                ComboBox {
+                    id: savedSearchChoice
+                    Layout.fillWidth: true
+                    model: backend.library.savedSearches
+                    textRole: "query"
+                    displayText: currentIndex < 0 ? "Saved searches…" : currentText
+                    onActivated: {
+                        var item = backend.library.savedSearches[currentIndex];
+                        backend.library.rootFolder = item.root;
+                        quickContents.checked = item.contents;
+                        quickQuery.text = item.query;
+                        quickSearchTimer.restart();
+                    }
+                }
+                Button { text: "Save query"; enabled: quickQuery.text.trim().length > 0; onClicked: backend.library.saveSearch(quickQuery.text, quickContents.checked) }
+                Button { text: "Remove query"; enabled: savedSearchChoice.currentIndex >= 0; onClicked: backend.library.removeSearch(savedSearchChoice.currentIndex) }
+            }
+            CheckBox { id: quickContents; text: "Search saved file contents too"; onToggled: { backend.library.cancelQuickSearch(); quickSearchTimer.restart(); } }
+            Label { Layout.fillWidth: true; text: backend.library.quickStatus; wrapMode: Text.Wrap }
+            ListView {
+                id: quickList
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                clip: true
+                model: backend.library.quickResults
+                onCountChanged: currentIndex = count > 0 ? 0 : -1
+                delegate: ItemDelegate {
+                    required property var modelData
+                    required property int index
+                    width: quickList.width
+                    text: modelData.path
+                    highlighted: quickList.currentIndex === index
+                    onClicked: quickOpenDialog.choose(index)
+                }
+                ScrollBar.vertical: ScrollBar {}
+            }
+            Label { Layout.fillWidth: true; wrapMode: Text.Wrap; text: "Markdown/text files only. Hidden folders, symlinks and build/dependency folders are excluded. Content search reads saved files up to 256 KiB each; unsaved edits are excluded."; font.pixelSize: 12 }
+        }
+    }
+
+    Dialogs.FileDialog {
+        id: exportDialog
+        property string outputFormat: "html"
+        title: "Export Document"
+        fileMode: Dialogs.FileDialog.SaveFile
+        onAccepted: backend.exportDocument(selectedFile, outputFormat)
+    }
+    Dialogs.FileDialog {
+        id: outputStyleDialog
+        title: "Load Output Style"
+        nameFilters: ["Output style (*.json)"]
+        onAccepted: backend.loadOutputStyle(selectedFile)
     }
 
     Dialogs.FileDialog {
@@ -482,13 +1007,83 @@ ApplicationWindow {
         onAccepted: backend.saveAs(selectedFile)
         onRejected: {
             backend.fileDialogCanceled();
+            backend.cancelQuit();
             win.awaitingPendingSave = false;
             win.pendingAction = "";
         }
     }
 
+    Dialogs.FolderDialog {
+        id: moveFolderDialog
+        objectName: "moveFolderDialog"
+        // The macOS native picker currently leaves its accept button disabled.
+        options: win.isMac ? Dialogs.FolderDialog.DontUseNativeDialog : 0
+        title: "Move document — keep unsaved edits; relative links use the new folder"
+        onAccepted: {
+            if (!backend.moveDocument(selectedFolder)) {
+                moveError.text = backend.status;
+                moveError.open();
+            }
+        }
+    }
+
+    Dialog {
+        id: moveError
+        objectName: "moveError"
+        property string text: ""
+        title: "Could not finish moving"
+        modal: true
+        anchors.centerIn: parent
+        width: Math.min(440, win.width - 40)
+        standardButtons: Dialog.Ok
+        Label { width: parent.width; text: moveError.text; wrapMode: Text.Wrap }
+    }
+
+    Dialog {
+        id: fileNameDialog
+        objectName: "fileNameDialog"
+        property bool renaming: false
+        property string errorText: ""
+        title: renaming ? "Rename document" : "Duplicate document"
+        modal: true
+        anchors.centerIn: parent
+        width: Math.min(440, win.width - 48)
+        function showFor(rename) {
+            renaming = rename;
+            errorText = "";
+            var name = backend.fileName;
+            var dot = name.lastIndexOf(".");
+            fileNameInput.text = rename ? name : (dot > 0 ? name.slice(0, dot) + " copy" + name.slice(dot) : name + " copy.md");
+            open();
+            fileNameInput.forceActiveFocus();
+            fileNameInput.selectAll();
+        }
+        function submit() {
+            var success = renaming ? backend.renameDocument(fileNameInput.text) : backend.duplicateDocument(fileNameInput.text);
+            if (success) close();
+            else errorText = backend.status;
+        }
+        ColumnLayout {
+            width: parent.width
+            Label {
+                Layout.fillWidth: true
+                wrapMode: Text.Wrap
+                text: fileNameDialog.renaming ? "Rename in the current folder. Unsaved edits stay in this window."
+                    : "Create a copy in the current folder, including unsaved edits. Keep editing the original."
+            }
+            TextField { id: fileNameInput; objectName: "fileNameInput"; Layout.fillWidth: true; onAccepted: fileNameDialog.submit() }
+            Label { Layout.fillWidth: true; wrapMode: Text.Wrap; visible: text !== ""; text: fileNameDialog.errorText; color: win.darkMode ? "#fca5a5" : "#b42318" }
+        }
+        footer: DialogButtonBox {
+            Button { text: "Cancel"; DialogButtonBox.buttonRole: DialogButtonBox.RejectRole }
+            Button { text: fileNameDialog.renaming ? "Rename" : "Duplicate"; enabled: fileNameInput.text.length > 0; onClicked: fileNameDialog.submit() }
+            onRejected: fileNameDialog.reject()
+        }
+    }
+
     UnsavedChangesDialog {
         id: unsavedChangesDialog
+        objectName: "unsavedChangesPrompt"
         pendingAction: win.pendingAction
         fileName: backend.fileName
         darkMode: win.darkMode
@@ -500,7 +1095,8 @@ ApplicationWindow {
         containerHeight: win.height
 
         onDiscardRequested: {
-            backend.discardRecovery();
+            // A failed open/create must retain recovery for the unchanged buffer.
+            if (win.pendingAction === "close") backend.discardRecovery();
             win.completePendingAction();
         }
 
@@ -508,7 +1104,7 @@ ApplicationWindow {
             win.awaitingPendingSave = true;
             backend.save();
         }
-        onCancelRequested: win.pendingAction = ""
+        onCancelRequested: { win.pendingAction = ""; backend.cancelQuit(); }
     }
 
     ExternalChangeDialog {
@@ -539,6 +1135,7 @@ ApplicationWindow {
 
     SplitView {
         anchors.top: topChrome.bottom
+        anchors.topMargin: win.tabInset
         anchors.bottom: parent.bottom
         anchors.left: parent.left
         anchors.right: parent.right
@@ -560,6 +1157,8 @@ ApplicationWindow {
         }
         LibraryPane {
             id: libraryPane
+            commands: workspaceCommands
+            onCreateRequested: function(name, inNewWindow) { win.requestCreateDocument(name, inNewWindow); }
             library: backend.library
             currentFile: backend.fileUrl
             darkMode: win.darkMode
@@ -578,11 +1177,18 @@ ApplicationWindow {
 
         Flickable {
             id: editorFlick
+            onContentYChanged: {
+                if (!workspaceSettings.synchronizedScroll || win.synchronizingScroll || workspaceSettings.layoutMode !== 1) return;
+                win.synchronizingScroll = true;
+                previewPane.scrollToFraction(contentY / Math.max(1, contentHeight - height));
+                win.synchronizingScroll = false;
+            }
             objectName: "editorScroll"
             anchors.fill: parent
             anchors.leftMargin: 24
             anchors.rightMargin: 24
             anchors.bottomMargin: 34
+            anchors.topMargin: win.searchOpen ? searchPane.height + 24 : 0
             clip: true
             contentWidth: width
             contentHeight: Math.max(height, editor.y + editor.implicitHeight + (workspaceSettings.typewriter ? height / 2 : 220))
@@ -802,7 +1408,7 @@ ApplicationWindow {
                     color: win.strongTextColor
                 }
                 onCursorRectangleChanged: editorFlick.ensureCursorVisible()
-                onCursorPositionChanged: backend.setFocusPosition(cursorPosition, workspaceSettings.paragraphFocus)
+                onCursorPositionChanged: backend.setFocusPosition(cursorPosition, workspaceSettings.paragraphFocus, workspaceSettings.sentenceFocus)
 
                 function replaceSelectionWith(replacement) {
                     var start = Math.min(selectionStart, selectionEnd);
@@ -814,11 +1420,17 @@ ApplicationWindow {
                     forceActiveFocus();
                     var start = Math.min(selectionStart, selectionEnd);
                     var end = Math.max(selectionStart, selectionEnd);
-                    var selected = text.slice(start, end);
-                    EditorMutations.replaceRange(editor, start, end,
-                                                 before + selected + after,
-                                                 before.length,
-                                                 before.length + selected.length);
+                    var selection = backend.wrapSelection(start, end, before, after);
+                    if (selection.start !== undefined)
+                        select(selection.start, selection.end);
+                }
+
+                function replaceAtomic(start, end, text, selectionStartOffset, selectionEndOffset) {
+                    var result = backend.replaceText(start, end, text);
+                    if (result.start === undefined) return;
+                    if (selectionStartOffset !== undefined)
+                        select(result.start + selectionStartOffset, result.start + selectionEndOffset);
+                    else cursorPosition = result.end;
                 }
 
                 function insertLink() {
@@ -831,14 +1443,14 @@ ApplicationWindow {
                     var escapedLabel = escapeMarkdownLinkText(label);
                     var markdown = "[" + escapedLabel + "](" + escapeMarkdownLinkDestination(destination) + ")";
                     if (selected.length === 0) {
-                        EditorMutations.replaceRange(editor, start, end, markdown,
+                        replaceAtomic(start, end, markdown,
                                                      1, 1 + escapedLabel.length);
                     } else if (url.length === 0) {
-                        EditorMutations.replaceRange(editor, start, end, markdown,
+                        replaceAtomic(start, end, markdown,
                                                      escapedLabel.length + 3,
                                                      markdown.length - 1);
                     } else {
-                        EditorMutations.replaceRange(editor, start, end, markdown);
+                        replaceAtomic(start, end, markdown);
                     }
                 }
 
@@ -1036,7 +1648,7 @@ ApplicationWindow {
                 Component.onCompleted: {
                     backend.setShowMarkup(workspaceSettings.showMarkup);
                     backend.attachDocument(textDocument);
-                    backend.setFocusPosition(cursorPosition, workspaceSettings.paragraphFocus);
+                    backend.setFocusPosition(cursorPosition, workspaceSettings.paragraphFocus, workspaceSettings.sentenceFocus);
                     forceActiveFocus();
                 }
             }
@@ -1059,12 +1671,13 @@ ApplicationWindow {
                 ChromeButton { text: "Link"; hint: "Insert link"; darkMode: win.darkMode; onClicked: editor.insertLink() }
                 ChromeButton { text: "More"; hint: "More formatting"; darkMode: win.darkMode; onClicked: formatPopover.open() }
                 Item { Layout.fillWidth: true }
-                ChromeButton { text: backend.wordCount + " words"; hint: "Document statistics"; darkMode: win.darkMode; onClicked: statisticsDialog.open() }
+                ChromeButton { text: backend.wordCount + " words"; hint: "Document statistics"; darkMode: win.darkMode; onClicked: workspaceCommands.run("statistics") }
             }
         }
 
 
         Pane {
+            id: searchPane
             anchors.top: parent.top
             anchors.left: parent.left
             anchors.right: parent.right
@@ -1095,6 +1708,7 @@ ApplicationWindow {
 
                     TextInput {
                         id: searchField
+                        objectName: "searchField"
                         anchors.left: parent.left
                         anchors.right: parent.right
                         anchors.top: parent.top
@@ -1119,6 +1733,7 @@ ApplicationWindow {
 
                     TextInput {
                         id: replaceField
+                        objectName: "replaceField"
                         anchors.left: parent.left
                         anchors.right: parent.right
                         anchors.bottom: parent.bottom
@@ -1165,29 +1780,16 @@ ApplicationWindow {
                     id: replaceCurrentButton
                     visible: win.replaceOpen
                     text: "Replace"
-                    onClicked: {
-                        if (win.searchMatchIndex < 0) return;
-                        var start = win.searchMatches[win.searchMatchIndex];
-                        EditorMutations.replaceRange(editor, start,
-                                                     start + searchField.text.length,
-                                                     replaceField.text);
-                        win.updateSearch();
-                    }
+                    enabled: win.searchMatches.length > 0
+                    onClicked: win.replaceSearch(false)
                 }
 
                 Button {
+                    objectName: "replaceAllButton"
                     visible: win.replaceOpen
                     text: "All"
-                    onClicked: {
-                        if (searchField.text.length === 0) return;
-                        for (var i = win.searchMatches.length - 1; i >= 0; --i) {
-                            var start = win.searchMatches[i];
-                            EditorMutations.replaceRange(editor, start,
-                                                         start + searchField.text.length,
-                                                         replaceField.text);
-                        }
-                        win.updateSearch();
-                    }
+                    enabled: win.searchMatches.length > 0
+                    onClicked: win.replaceSearch(true)
                 }
 
                 Rectangle {
@@ -1218,7 +1820,14 @@ ApplicationWindow {
     }
 
         PreviewPane {
+            id: previewPane
             renderer: backend
+            onScrollFractionChanged: function(fraction) {
+                if (!workspaceSettings.synchronizedScroll || win.synchronizingScroll || workspaceSettings.layoutMode !== 1) return;
+                win.synchronizingScroll = true;
+                editorFlick.contentY = Math.max(0, editorFlick.contentHeight - editorFlick.height) * fraction;
+                win.synchronizingScroll = false;
+            }
             markdown: editor.text
             documentBaseUrl: backend.documentBaseUrl
             darkMode: win.darkMode
@@ -1229,7 +1838,7 @@ ApplicationWindow {
             typeface: ["Helvetica Neue", "Georgia", "iA Writer Mono S"][workspaceSettings.previewStyle]
             textSize: Math.max(12, workspaceSettings.writingSize - 2)
             layoutMode: workspaceSettings.layoutMode
-            onLayoutRequested: function(mode) { workspaceSettings.layoutMode = mode; }
+            onLayoutRequested: function(mode) { workspaceCommands.run(["editor", "split", "preview"][mode]); }
             onLinkRequested: function(link) {
                 var resolved = backend.resolveDocumentLink(link);
                 if (/^file:.*\.(md|markdown|mdown|txt|text)(#.*)?$/i.test(String(resolved)))

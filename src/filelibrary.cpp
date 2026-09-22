@@ -6,6 +6,8 @@
 #include <QSettings>
 #include <QRegularExpression>
 #include <algorithm>
+#include <QtConcurrent>
+#include <QFutureWatcher>
 
 FileLibrary::FileLibrary(QObject *parent) : QObject(parent) {
     QSettings settings;
@@ -73,6 +75,19 @@ void FileLibrary::recordRecentFile(const QUrl &url) {
     while (m_recentFiles.size() > 20) m_recentFiles.removeLast();
     saveOrganizer();
 }
+void FileLibrary::renamedFile(const QUrl &oldUrl, const QUrl &newUrl) {
+    const QString oldPath = QDir::cleanPath(oldUrl.toLocalFile());
+    const QString newPath = QFileInfo(newUrl.toLocalFile()).canonicalFilePath();
+    if (newPath.isEmpty()) return;
+    for (QStringList *paths : {&m_favorites, &m_recentFiles}) {
+        for (QString &path : *paths)
+            if (QDir::cleanPath(path) == oldPath) path = newPath;
+        paths->removeDuplicates();
+    }
+    saveOrganizer();
+    refresh();
+}
+
 void FileLibrary::clearRecentFiles() { m_recentFiles.clear(); saveOrganizer(); }
 void FileLibrary::saveSorting() {
     QSettings settings;
@@ -115,7 +130,14 @@ void FileLibrary::setRootFolder(const QUrl &folder) {
         saveOrganizer();
     }
     if (normalized == m_rootFolder) { refresh(); return; }
+    cancelQuickSearch();
     m_rootFolder = normalized;
+    if (!m_navigatingHistory) {
+        while (m_history.size() > m_historyIndex + 1) m_history.removeLast();
+        m_history.append(normalized);
+        m_historyIndex = m_history.size() - 1;
+        emit historyChanged();
+    }
     m_expanded.clear();
     m_filter.clear();
     QSettings().setValue(QStringLiteral("library/root"), m_rootFolder);
@@ -245,6 +267,24 @@ void FileLibrary::revealFile(const QUrl &url) {
     refresh();
 }
 
+int FileLibrary::showFile(const QUrl &url) {
+    const QFileInfo info(url.toLocalFile());
+    if (!url.isLocalFile() || !info.isFile() || !isTextFile(info.fileName())) {
+        setError(QStringLiteral("This document is no longer available in the library."));
+        return -1;
+    }
+    const QString path = info.canonicalFilePath();
+    if (!containsPath(path))
+        setRootFolder(QUrl::fromLocalFile(QFileInfo(path).absolutePath()));
+    setFilter(QString());
+    revealFile(QUrl::fromLocalFile(path));
+    for (int i = 0; i < m_entries.size(); ++i)
+        if (m_entries.at(i).toMap().value("url").toUrl() == QUrl::fromLocalFile(path))
+            return i;
+    setError(QStringLiteral("This document could not be shown within the library's scan limits."));
+    return -1;
+}
+
 QString FileLibrary::excerpt(const QUrl &url) const {
     if (!url.isLocalFile()) return {};
     const QFileInfo info(url.toLocalFile());
@@ -256,4 +296,138 @@ QString FileLibrary::excerpt(const QUrl &url) const {
     sample.remove(QRegularExpression(QStringLiteral("(?m)^ {0,3}#{1,6} +")));
     sample = sample.simplified();
     return sample.isEmpty() ? QStringLiteral("Empty document") : sample.left(160);
+}
+
+bool FileLibrary::navigateHistory(int direction) {
+    if (direction != -1 && direction != 1) return false;
+    const int target = m_historyIndex + direction;
+    if (target < 0 || target >= m_history.size() || !QFileInfo(m_history.at(target).toLocalFile()).isDir()) return false;
+    m_navigatingHistory = true;
+    setRootFolder(m_history.at(target));
+    m_navigatingHistory = false;
+    m_historyIndex = target;
+    emit historyChanged();
+    return true;
+}
+
+void FileLibrary::enclosingFolder() {
+    QDir directory(m_rootFolder.toLocalFile());
+    if (m_rootFolder.isLocalFile() && directory.cdUp()) setRootFolder(QUrl::fromLocalFile(directory.absolutePath()));
+}
+
+void FileLibrary::cancelQuickSearch() {
+    if (m_searchCanceled) m_searchCanceled->store(true);
+    ++m_searchGeneration;
+    m_quickResults.clear();
+    m_quickStatus.clear();
+    emit quickSearchChanged();
+}
+
+void FileLibrary::quickSearch(const QString &query, bool contents) {
+    cancelQuickSearch();
+    const QString root = m_rootFolder.toLocalFile();
+    if (root.isEmpty()) return;
+    m_quickStatus = contents ? QStringLiteral("Searching saved file contents…") : QStringLiteral("Searching filenames…");
+    emit quickSearchChanged();
+    const int generation = m_searchGeneration;
+    const auto canceled = std::make_shared<std::atomic_bool>(false);
+    m_searchCanceled = canceled;
+    auto *watcher = new QFutureWatcher<QVariantMap>(this);
+    connect(watcher, &QFutureWatcher<QVariantMap>::finished, this, [this, watcher, generation] {
+        const auto result = watcher->result();
+        watcher->deleteLater();
+        if (generation != m_searchGeneration) return;
+        m_quickResults = result.value("results").toList();
+        m_contentIndex = result.value("index").toMap();
+        m_quickStatus = result.value("limited").toBool() ? QStringLiteral("Search limit reached: narrow the folder/query (100 results / 20,000 entries / 32 MiB).")
+            : QStringLiteral("%1 matching files; %2 unreadable/oversized files skipped").arg(m_quickResults.size()).arg(result.value("skipped").toInt());
+        emit quickSearchChanged();
+    });
+    watcher->setFuture(QtConcurrent::run([root, query, contents, canceled] {
+        QVariantList results;
+        QStringList folders{root};
+        int visited = 0, skipped = 0;
+        qint64 indexedBytes = 0;
+        QVariantMap index;
+        bool limited = false;
+        while (!folders.isEmpty() && !canceled->load()) {
+            const QDir directory(folders.takeLast());
+            const auto entries = directory.entryInfoList(QDir::AllEntries | QDir::NoDotAndDotDot | QDir::NoSymLinks, QDir::Name);
+            for (const auto &entry : entries) {
+                if (canceled->load()) break;
+                if (++visited > 20000 || results.size() >= 100) { limited = true; break; }
+                if (entry.isDir()) {
+                    if (entry.fileName() != "node_modules" && entry.fileName() != "build" && entry.fileName() != "build-tests" && entry.fileName() != "dist") folders.append(entry.absoluteFilePath());
+                } else if (isTextFile(entry.fileName())) {
+                    bool matches = entry.fileName().contains(query, Qt::CaseInsensitive);
+                    if (contents) {
+                        if (entry.size() > 262144) { ++skipped; continue; }
+                        if (indexedBytes + entry.size() > 32 * 1024 * 1024) { limited = true; break; }
+                        indexedBytes += entry.size();
+                        const QString key = entry.absoluteFilePath();
+                        QVariantMap cached;
+                        // Revalidate every query; no stale filename or content results after edits.
+                        QFile file(key);
+                        if (!file.open(QIODevice::ReadOnly)) { ++skipped; continue; }
+                        const QByteArray bytes = file.read(262145);
+                        if (bytes.size() > 262144 || file.error() != QFile::NoError) { ++skipped; continue; }
+                        const QString text = QString::fromUtf8(bytes);
+                        cached = QVariantMap{{"text", text}, {"modified", entry.lastModified()}, {"size", entry.size()}};
+                        index.insert(key, cached);
+                        matches = query.startsWith("#") ? tagsIn(text).contains(query.mid(1).toCaseFolded())
+                            : matches || text.contains(query, Qt::CaseInsensitive);
+                    }
+                    if (!matches) continue;
+                    results.append(QVariantMap{{"name", entry.fileName()}, {"path", QDir(root).relativeFilePath(entry.absoluteFilePath())}, {"url", QUrl::fromLocalFile(entry.absoluteFilePath())}});
+                }
+            }
+            if (limited) break;
+        }
+        return QVariantMap{{"results", results}, {"limited", limited}, {"skipped", skipped}, {"index", index}};
+    }));
+}
+
+QVariantList FileLibrary::savedSearches() const {
+    return QSettings().value("library/savedSearches").toList();
+}
+void FileLibrary::saveSearch(const QString &query, bool contents) {
+    if (query.trimmed().isEmpty() || !m_rootFolder.isLocalFile()) return;
+    auto list = savedSearches();
+    const QVariantMap item{{"query", query.trimmed()}, {"contents", contents}, {"root", m_rootFolder}};
+    list.removeAll(item);
+    list.prepend(item);
+    while (list.size() > 30) list.removeLast();
+    QSettings().setValue("library/savedSearches", list);
+    emit savedSearchesChanged();
+}
+void FileLibrary::removeSearch(int index) {
+    auto list = savedSearches();
+    if (index < 0 || index >= list.size()) return;
+    list.removeAt(index);
+    QSettings().setValue("library/savedSearches", list);
+    emit savedSearchesChanged();
+}
+QStringList FileLibrary::tagsIn(const QString &markdown) {
+    QStringList tags;
+    QChar fence;
+    int fenceLength = 0;
+    const QRegularExpression fenceRe("^ {0,3}(`{3,}|~{3,})(.*)$");
+    const QRegularExpression tagRe(QStringLiteral("(?:^|\\s)#([\\p{L}\\p{N}_-]+)"));
+    const QRegularExpression inlineCode("(`+).*?\\1");
+    for (const QString &line : markdown.split('\n')) {
+        const auto match = fenceRe.match(line);
+        if (match.hasMatch()) {
+            const auto marker = match.captured(1);
+            if (fence.isNull()) { fence = marker.at(0); fenceLength = marker.size(); }
+            else if (marker.at(0) == fence && marker.size() >= fenceLength && match.captured(2).trimmed().isEmpty()) fence = QChar();
+            continue;
+        }
+        if (!fence.isNull() || line.startsWith("    ") || line.startsWith('\t')) continue;
+        QString prose = line;
+        prose.remove(inlineCode);
+        auto matches = tagRe.globalMatch(prose);
+        while (matches.hasNext()) tags.append(matches.next().captured(1).toCaseFolded());
+    }
+    tags.removeDuplicates();
+    return tags;
 }

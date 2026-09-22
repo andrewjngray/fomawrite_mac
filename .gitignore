@@ -13,3 +13,6 @@ qrc_*.cpp
 Makefile
 /dist/
 .DS_Store
+
+# Menu audit raw captures can contain private window content.
+/research/menu-audit-2026-09-12/raw/

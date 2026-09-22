@@ -1,5 +1,25 @@
 # iA Writer reference inventory
 
+## Closeout implementation overlay — 21 September 2026
+
+Cycles 20b–27 now have working subsets; final build and 48 tests pass. This does **not** close the baseline parity rows wholesale. See the [closeout audit](closeout-audit.md) for per-cycle implemented behavior, native evidence and unfinished acceptance criteria. In particular, basic output fonts are not full templates; manual annotations are not author-aware paste/provenance; saved queries are not full organizer smart folders; selection review is not complete live linguistic services. Older tables/overlays remain historical snapshots.
+
+
+## Cycles 18a–20a implementation overlay — 21 September 2026
+
+| IDs | Implemented local subset / remaining gap |
+|---|---|
+| M01–M04 | Heading/body, lists/tasks, blockquote, indentation and line moves with atomic undo. Nested Markdown/fence variants remain partial. |
+| M05–M10 / M18 | Inline toggles, backtick-safe code, atomic link insertion, fenced code block and horizontal rule. Highlight remains future work; not every iA delimiter rule is verified. |
+| M15–M16 / M20 / E13 | Date, basic table, Unicode case and surrounding inline style removal. Full Clear Styles is not implemented. |
+| E03–E06 | Ordinary Markdown/HTML/formatted copy and plain/HTML-to-Markdown paste. MIME and native round-trip pass; cross-app interoperability and authorship paste remain pending. |
+| G01–G05 | Separate session document/library histories, enclosing folder, basic source links and bounded recursive filename quick-open. Content indexing, persistent histories and advanced links remain future work. |
+
+Final 39 tests pass; representative native commands, clipboard undo, quick-open/link navigation, cursor restoration and dirty-navigation Cancel verified. Both bundles refreshed. [Per-cycle records and limits](build-cycles.md). Next 20b; 15 listed increments remain plus QA. Historical tables below are baseline observations; this overlay takes precedence for current implementation status.
+
+
+**Updated reference, 17 September 2026:** Andrew supplied seven menu screenshots. The [command-level parity log](ia-menu-parity-2026-09-17.md) records current implementation status and new Go-menu evidence. The [staged development plan](development-plan.md) supersedes speculative future cycle numbers below; historical inspection notes remain for context.
+
 Inspected in the running Mac app with computer use on 10 September 2026. All ten main menus were opened, including the nested items exposed by accessibility. All nine Settings categories and all three Markdown settings tabs were inspected. No writing, account, or preference changes were made. This records interface behavior, not proprietary implementation. Personal filenames, account details and document contents are intentionally excluded.
 
 Status: **Have** = implemented in Omawrite; **Partial** = some behavior exists; **Planned** = not implemented. Menu availability can depend on selection and document state. This is not a claim that every command was executed.
@@ -24,7 +44,7 @@ Status: **Have** = implemented in Omawrite; **Partial** = some behavior exists; 
 | Swipe to reveal panes | Planned | Later |
 | Synchronized editor/preview scrolling | Planned | 7 |
 | Auto-resize when showing library | Planned | Later |
-| Hide sort/filter bars | Planned | 5 |
+| Hide sort/filter bars | Have: persistent library dropdown actions; native View-menu exposure pending | 10; proposed 14 |
 | File extensions preference | Planned | 5 |
 
 ## Main menus observed
@@ -69,7 +89,7 @@ Omawrite has paragraph focus and typewriter scrolling. Sentence focus, linguisti
 
 ### Go
 
-The menu opened but its accessibility tree exposed no commands in the current state. Main toolbar visibly provides back/forward library navigation. Go-menu contents need another check with a suitable document/location state; no commands are inferred here.
+The 10 September accessibility inspection was inconclusive. Andrew’s 17 September screenshot now confirms Back/Forward, Back/Forward in Library, Enclosing Folder, Open Link, Quick Search, Command Palette, Locations/Add Location, Recents/New Smart Folder and Hashtags. Omawrite has local locations/recents in its organizer and preview link activation; history, command palette, recursive search, smart folders and hashtags remain unimplemented. See the dated parity log for exact limitations.
 
 ### Window
 
@@ -121,3 +141,35 @@ Favorites and Recents have persistent collapsible sections; favorite actions are
 ### Cycle 13 reference change
 
 Codex is now the visual reference for navigation icons, font treatment and spacing. This inventory remains the functional backlog; prior iA visual styling is no longer the target.
+
+### Cycle 14 menu implementation
+
+View now exposes existing pane/bar/sort/text-size/layout/preview-typeface controls plus reload, markup, outline and statistics. Focus exposes paragraph/typewriter; Format includes strike/inline code. A shared command registry keeps native and in-window controls aligned. Wrapping selected text now has single-step undo in C++. Build and 28 automated tests pass; native verification is pending safe Dev refresh. Templates, sentence/linguistic focus and hidden reference submenu details remain partial/future work.
+
+### Cycle 15 file-access update
+
+File now exposes New/current-window, New Window, library creation in current/new window, New Folder, shared Open Recent, Finder/library reveal. Go exposes locations and recents. New/create keep the unsaved guard; failed replacements retain recovery. Build/31 tests pass. Native current-window creation, recents, location switching, Cancel/Save and filtered reveal verified; Finder selection and new-window/folder/dialog completion remain unchecked. See [Cycle 15 records](../research/cycle-15/README.md).
+
+### Cycle 15b folder color feedback
+
+Andrew retains the current outline shapes but requests blue folders and gray documents. Locations, folder favorites, library rows and folder header now use blue folder outlines; neutral selections remain. Light native appearance verified with a sample; dark appearance still needs review. This is visual polish, not a functional parity change.
+
+
+## Cycle 16a update — 20 September 2026
+
+Local Duplicate and Rename are implemented through File. Duplicate copies the current buffer to a new sibling without changing the active document; Rename retains dirty text and undo while updating the path, recents/favorites, watcher and recovery. Collision errors and cancellation were checked natively; 32 tests pass, including Unicode, recovery metadata and external-change detection. [Evidence and limits](../research/cycle-16a/README.md). Move To remains future work (16b); untitled/symlink, case-only rename and cross-window/native lifecycle parity remain limited. Matching labels alone do not establish full iA behavior.
+
+
+## Cycle 16b update — 20 September 2026
+
+File → Move To is implemented for saved regular local files. It copies saved disk contents, verifies/rechecks before source removal, retains unsaved editor text/undo, and updates path, recovery, watcher, recents/favorites. Collision and cancellation were checked in the live app; successful picker acceptance, state preservation and removal-failure behavior pass in the 33-test suite. macOS uses Qt's folder picker after native Open remained disabled. Successful live move, separate-volume, crash/disconnection and cross-window coordination remain unverified; this is partial parity evidence. [Cycle 16b records](../research/cycle-16b/README.md).
+
+
+## Cycle 17 update — 21 September 2026
+
+E01/E02/E09/E10 local editing/search subset implemented: focused-field editing states/Delete, native Find/Replace/Next/Previous/selection search. Single/all replacements have atomic undo; literal case-insensitive search preserves original Unicode offsets. 34 tests pass and native sample replacement/undo/wrapping verified. Full hidden iA search submenu parity and advanced search options remain unclaimed. [Evidence](../research/cycle-17/README.md).
+
+
+### Cycle 29 implementation update
+
+Manual authorship annotations now follow Duplicate, Rename and Move, with collision guards and dirty-buffer/recovery preservation. 51 automated tests pass; native sample operations and resulting sidecar hashes were checked. This supersedes the earlier “no authorship tracking” baseline only for explicit manual annotations. It is not automatic provenance, author-aware paste/merge, or full iA Writer parity. See [Cycle 29 evidence](../research/cycle-29/README.md).

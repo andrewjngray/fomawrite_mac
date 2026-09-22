@@ -1,0 +1,114 @@
+/opt/homebrew/share/qt/libexec/moc -DQT_NO_DEBUG -DQT_QUICKCONTROLS2_LIB -DQT_QUICKDIALOGS2_LIB -DQT_QUICK_LIB -DQT_OPENGL_LIB -DQT_PRINTSUPPORT_LIB -DQT_WIDGETS_LIB -DQT_GUI_LIB -DQT_QML_LIB -DQT_QMLINTEGRATION_LIB -DQT_NETWORK_LIB -DQT_TESTLIB_LIB -DQT_CONCURRENT_LIB -DQT_CORE_LIB -DQT_TESTCASE_BUILDDIR='"/Users/andrewgray/repo/projects/omawrite_mac/build-tests"' --include /Users/andrewgray/repo/projects/omawrite_mac/build-tests/moc_predefs.h -I/opt/homebrew/share/qt/mkspecs/macx-clang -I/Users/andrewgray/repo/projects/omawrite_mac/tests -I/Users/andrewgray/repo/projects/omawrite_mac/src -I/opt/homebrew/lib/QtQuickControls2.framework/Headers -I/opt/homebrew/lib/QtQuickDialogs2.framework/Headers -I/opt/homebrew/lib/QtQuick.framework/Headers -I/opt/homebrew/lib/QtOpenGL.framework/Headers -I/opt/homebrew/lib/QtPrintSupport.framework/Headers -I/opt/homebrew/lib/QtWidgets.framework/Headers -I/opt/homebrew/lib/QtGui.framework/Headers -I/opt/homebrew/lib/QtQml.framework/Headers -I/opt/homebrew/include -I/opt/homebrew/include/QtQmlIntegration -I/opt/homebrew/lib/QtNetwork.framework/Headers -I/opt/homebrew/lib/QtTest.framework/Headers -I/opt/homebrew/lib/QtConcurrent.framework/Headers -I/opt/homebrew/lib/QtCore.framework/Headers -I. -I/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1 -I/Library/Developer/CommandLineTools/usr/lib/clang/17/include -I/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include -I/Library/Developer/CommandLineTools/usr/include -F/opt/homebrew/lib ../tests/tst_omawrite.cpp -o tst_omawrite.moc
+/Library/Developer/CommandLineTools/usr/bin/clang++ -c -pipe -stdlib=libc++ -O2 -std=gnu++1z  -arch arm64 -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk -mmacosx-version-min=14.0 -Wall -Wextra -DQT_NO_DEBUG -DQT_QUICKCONTROLS2_LIB -DQT_QUICKDIALOGS2_LIB -DQT_QUICK_LIB -DQT_OPENGL_LIB -DQT_PRINTSUPPORT_LIB -DQT_WIDGETS_LIB -DQT_GUI_LIB -DQT_QML_LIB -DQT_QMLINTEGRATION_LIB -DQT_NETWORK_LIB -DQT_TESTLIB_LIB -DQT_CONCURRENT_LIB -DQT_CORE_LIB -DQT_TESTCASE_BUILDDIR='"/Users/andrewgray/repo/projects/omawrite_mac/build-tests"' -I../tests -I. -I../src -I/opt/homebrew/lib/QtQuickControls2.framework/Headers -I/opt/homebrew/lib/QtQuickDialogs2.framework/Headers -I/opt/homebrew/lib/QtQuick.framework/Headers -I/opt/homebrew/lib/QtOpenGL.framework/Headers -I/opt/homebrew/lib/QtPrintSupport.framework/Headers -I/opt/homebrew/lib/QtWidgets.framework/Headers -I/opt/homebrew/lib/QtGui.framework/Headers -I/opt/homebrew/lib/QtQml.framework/Headers -I/opt/homebrew/include -I/opt/homebrew/include/QtQmlIntegration -I/opt/homebrew/lib/QtNetwork.framework/Headers -I/opt/homebrew/lib/QtTest.framework/Headers -I/opt/homebrew/lib/QtConcurrent.framework/Headers -I/opt/homebrew/lib/QtCore.framework/Headers -I. -I/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/System/Library/Frameworks/OpenGL.framework/Headers -I/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/System/Library/Frameworks/OpenGL.framework/Headers -I/opt/homebrew/share/qt/mkspecs/macx-clang -F/opt/homebrew/lib -o backend.o ../src/backend.cpp
+/Library/Developer/CommandLineTools/usr/bin/clang++ -c -pipe -stdlib=libc++ -O2 -std=gnu++1z  -arch arm64 -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk -mmacosx-version-min=14.0 -Wall -Wextra -DQT_NO_DEBUG -DQT_QUICKCONTROLS2_LIB -DQT_QUICKDIALOGS2_LIB -DQT_QUICK_LIB -DQT_OPENGL_LIB -DQT_PRINTSUPPORT_LIB -DQT_WIDGETS_LIB -DQT_GUI_LIB -DQT_QML_LIB -DQT_QMLINTEGRATION_LIB -DQT_NETWORK_LIB -DQT_TESTLIB_LIB -DQT_CONCURRENT_LIB -DQT_CORE_LIB -DQT_TESTCASE_BUILDDIR='"/Users/andrewgray/repo/projects/omawrite_mac/build-tests"' -I../tests -I. -I../src -I/opt/homebrew/lib/QtQuickControls2.framework/Headers -I/opt/homebrew/lib/QtQuickDialogs2.framework/Headers -I/opt/homebrew/lib/QtQuick.framework/Headers -I/opt/homebrew/lib/QtOpenGL.framework/Headers -I/opt/homebrew/lib/QtPrintSupport.framework/Headers -I/opt/homebrew/lib/QtWidgets.framework/Headers -I/opt/homebrew/lib/QtGui.framework/Headers -I/opt/homebrew/lib/QtQml.framework/Headers -I/opt/homebrew/include -I/opt/homebrew/include/QtQmlIntegration -I/opt/homebrew/lib/QtNetwork.framework/Headers -I/opt/homebrew/lib/QtTest.framework/Headers -I/opt/homebrew/lib/QtConcurrent.framework/Headers -I/opt/homebrew/lib/QtCore.framework/Headers -I. -I/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/System/Library/Frameworks/OpenGL.framework/Headers -I/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/System/Library/Frameworks/OpenGL.framework/Headers -I/opt/homebrew/share/qt/mkspecs/macx-clang -F/opt/homebrew/lib -o markdownhighlighter.o ../src/markdownhighlighter.cpp
+/opt/homebrew/share/qt/libexec/moc -DQT_NO_DEBUG -DQT_QUICKCONTROLS2_LIB -DQT_QUICKDIALOGS2_LIB -DQT_QUICK_LIB -DQT_OPENGL_LIB -DQT_PRINTSUPPORT_LIB -DQT_WIDGETS_LIB -DQT_GUI_LIB -DQT_QML_LIB -DQT_QMLINTEGRATION_LIB -DQT_NETWORK_LIB -DQT_TESTLIB_LIB -DQT_CONCURRENT_LIB -DQT_CORE_LIB -DQT_TESTCASE_BUILDDIR='"/Users/andrewgray/repo/projects/omawrite_mac/build-tests"' --include /Users/andrewgray/repo/projects/omawrite_mac/build-tests/moc_predefs.h -I/opt/homebrew/share/qt/mkspecs/macx-clang -I/Users/andrewgray/repo/projects/omawrite_mac/tests -I/Users/andrewgray/repo/projects/omawrite_mac/src -I/opt/homebrew/lib/QtQuickControls2.framework/Headers -I/opt/homebrew/lib/QtQuickDialogs2.framework/Headers -I/opt/homebrew/lib/QtQuick.framework/Headers -I/opt/homebrew/lib/QtOpenGL.framework/Headers -I/opt/homebrew/lib/QtPrintSupport.framework/Headers -I/opt/homebrew/lib/QtWidgets.framework/Headers -I/opt/homebrew/lib/QtGui.framework/Headers -I/opt/homebrew/lib/QtQml.framework/Headers -I/opt/homebrew/include -I/opt/homebrew/include/QtQmlIntegration -I/opt/homebrew/lib/QtNetwork.framework/Headers -I/opt/homebrew/lib/QtTest.framework/Headers -I/opt/homebrew/lib/QtConcurrent.framework/Headers -I/opt/homebrew/lib/QtCore.framework/Headers -I. -I/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1 -I/Library/Developer/CommandLineTools/usr/lib/clang/17/include -I/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include -I/Library/Developer/CommandLineTools/usr/include -F/opt/homebrew/lib ../src/backend.h -o moc_backend.cpp
+/opt/homebrew/share/qt/libexec/moc -DQT_NO_DEBUG -DQT_QUICKCONTROLS2_LIB -DQT_QUICKDIALOGS2_LIB -DQT_QUICK_LIB -DQT_OPENGL_LIB -DQT_PRINTSUPPORT_LIB -DQT_WIDGETS_LIB -DQT_GUI_LIB -DQT_QML_LIB -DQT_QMLINTEGRATION_LIB -DQT_NETWORK_LIB -DQT_TESTLIB_LIB -DQT_CONCURRENT_LIB -DQT_CORE_LIB -DQT_TESTCASE_BUILDDIR='"/Users/andrewgray/repo/projects/omawrite_mac/build-tests"' --include /Users/andrewgray/repo/projects/omawrite_mac/build-tests/moc_predefs.h -I/opt/homebrew/share/qt/mkspecs/macx-clang -I/Users/andrewgray/repo/projects/omawrite_mac/tests -I/Users/andrewgray/repo/projects/omawrite_mac/src -I/opt/homebrew/lib/QtQuickControls2.framework/Headers -I/opt/homebrew/lib/QtQuickDialogs2.framework/Headers -I/opt/homebrew/lib/QtQuick.framework/Headers -I/opt/homebrew/lib/QtOpenGL.framework/Headers -I/opt/homebrew/lib/QtPrintSupport.framework/Headers -I/opt/homebrew/lib/QtWidgets.framework/Headers -I/opt/homebrew/lib/QtGui.framework/Headers -I/opt/homebrew/lib/QtQml.framework/Headers -I/opt/homebrew/include -I/opt/homebrew/include/QtQmlIntegration -I/opt/homebrew/lib/QtNetwork.framework/Headers -I/opt/homebrew/lib/QtTest.framework/Headers -I/opt/homebrew/lib/QtConcurrent.framework/Headers -I/opt/homebrew/lib/QtCore.framework/Headers -I. -I/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1 -I/Library/Developer/CommandLineTools/usr/lib/clang/17/include -I/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include -I/Library/Developer/CommandLineTools/usr/include -F/opt/homebrew/lib ../src/markdownhighlighter.h -o moc_markdownhighlighter.cpp
+/Library/Developer/CommandLineTools/usr/bin/clang++ -c -pipe -stdlib=libc++ -O2 -std=gnu++1z  -arch arm64 -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk -mmacosx-version-min=14.0 -Wall -Wextra -DQT_NO_DEBUG -DQT_QUICKCONTROLS2_LIB -DQT_QUICKDIALOGS2_LIB -DQT_QUICK_LIB -DQT_OPENGL_LIB -DQT_PRINTSUPPORT_LIB -DQT_WIDGETS_LIB -DQT_GUI_LIB -DQT_QML_LIB -DQT_QMLINTEGRATION_LIB -DQT_NETWORK_LIB -DQT_TESTLIB_LIB -DQT_CONCURRENT_LIB -DQT_CORE_LIB -DQT_TESTCASE_BUILDDIR='"/Users/andrewgray/repo/projects/omawrite_mac/build-tests"' -I../tests -I. -I../src -I/opt/homebrew/lib/QtQuickControls2.framework/Headers -I/opt/homebrew/lib/QtQuickDialogs2.framework/Headers -I/opt/homebrew/lib/QtQuick.framework/Headers -I/opt/homebrew/lib/QtOpenGL.framework/Headers -I/opt/homebrew/lib/QtPrintSupport.framework/Headers -I/opt/homebrew/lib/QtWidgets.framework/Headers -I/opt/homebrew/lib/QtGui.framework/Headers -I/opt/homebrew/lib/QtQml.framework/Headers -I/opt/homebrew/include -I/opt/homebrew/include/QtQmlIntegration -I/opt/homebrew/lib/QtNetwork.framework/Headers -I/opt/homebrew/lib/QtTest.framework/Headers -I/opt/homebrew/lib/QtConcurrent.framework/Headers -I/opt/homebrew/lib/QtCore.framework/Headers -I. -I/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/System/Library/Frameworks/OpenGL.framework/Headers -I/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/System/Library/Frameworks/OpenGL.framework/Headers -I/opt/homebrew/share/qt/mkspecs/macx-clang -F/opt/homebrew/lib -o moc_backend.o moc_backend.cpp
+/Library/Developer/CommandLineTools/usr/bin/clang++ -c -pipe -stdlib=libc++ -O2 -std=gnu++1z  -arch arm64 -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk -mmacosx-version-min=14.0 -Wall -Wextra -DQT_NO_DEBUG -DQT_QUICKCONTROLS2_LIB -DQT_QUICKDIALOGS2_LIB -DQT_QUICK_LIB -DQT_OPENGL_LIB -DQT_PRINTSUPPORT_LIB -DQT_WIDGETS_LIB -DQT_GUI_LIB -DQT_QML_LIB -DQT_QMLINTEGRATION_LIB -DQT_NETWORK_LIB -DQT_TESTLIB_LIB -DQT_CONCURRENT_LIB -DQT_CORE_LIB -DQT_TESTCASE_BUILDDIR='"/Users/andrewgray/repo/projects/omawrite_mac/build-tests"' -I../tests -I. -I../src -I/opt/homebrew/lib/QtQuickControls2.framework/Headers -I/opt/homebrew/lib/QtQuickDialogs2.framework/Headers -I/opt/homebrew/lib/QtQuick.framework/Headers -I/opt/homebrew/lib/QtOpenGL.framework/Headers -I/opt/homebrew/lib/QtPrintSupport.framework/Headers -I/opt/homebrew/lib/QtWidgets.framework/Headers -I/opt/homebrew/lib/QtGui.framework/Headers -I/opt/homebrew/lib/QtQml.framework/Headers -I/opt/homebrew/include -I/opt/homebrew/include/QtQmlIntegration -I/opt/homebrew/lib/QtNetwork.framework/Headers -I/opt/homebrew/lib/QtTest.framework/Headers -I/opt/homebrew/lib/QtConcurrent.framework/Headers -I/opt/homebrew/lib/QtCore.framework/Headers -I. -I/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/System/Library/Frameworks/OpenGL.framework/Headers -I/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/System/Library/Frameworks/OpenGL.framework/Headers -I/opt/homebrew/share/qt/mkspecs/macx-clang -F/opt/homebrew/lib -o moc_markdownhighlighter.o moc_markdownhighlighter.cpp
+/Library/Developer/CommandLineTools/usr/bin/clang++ -c -pipe -stdlib=libc++ -O2 -std=gnu++1z  -arch arm64 -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk -mmacosx-version-min=14.0 -Wall -Wextra -DQT_NO_DEBUG -DQT_QUICKCONTROLS2_LIB -DQT_QUICKDIALOGS2_LIB -DQT_QUICK_LIB -DQT_OPENGL_LIB -DQT_PRINTSUPPORT_LIB -DQT_WIDGETS_LIB -DQT_GUI_LIB -DQT_QML_LIB -DQT_QMLINTEGRATION_LIB -DQT_NETWORK_LIB -DQT_TESTLIB_LIB -DQT_CONCURRENT_LIB -DQT_CORE_LIB -DQT_TESTCASE_BUILDDIR='"/Users/andrewgray/repo/projects/omawrite_mac/build-tests"' -I../tests -I. -I../src -I/opt/homebrew/lib/QtQuickControls2.framework/Headers -I/opt/homebrew/lib/QtQuickDialogs2.framework/Headers -I/opt/homebrew/lib/QtQuick.framework/Headers -I/opt/homebrew/lib/QtOpenGL.framework/Headers -I/opt/homebrew/lib/QtPrintSupport.framework/Headers -I/opt/homebrew/lib/QtWidgets.framework/Headers -I/opt/homebrew/lib/QtGui.framework/Headers -I/opt/homebrew/lib/QtQml.framework/Headers -I/opt/homebrew/include -I/opt/homebrew/include/QtQmlIntegration -I/opt/homebrew/lib/QtNetwork.framework/Headers -I/opt/homebrew/lib/QtTest.framework/Headers -I/opt/homebrew/lib/QtConcurrent.framework/Headers -I/opt/homebrew/lib/QtCore.framework/Headers -I. -I/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/System/Library/Frameworks/OpenGL.framework/Headers -I/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/System/Library/Frameworks/OpenGL.framework/Headers -I/opt/homebrew/share/qt/mkspecs/macx-clang -F/opt/homebrew/lib -o tst_omawrite.o ../tests/tst_omawrite.cpp
+/Library/Developer/CommandLineTools/usr/bin/clang++ -stdlib=libc++ -headerpad_max_install_names  -arch arm64 -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk -mmacosx-version-min=14.0 -Wl,-rpath,@executable_path/../Frameworks -Wl,-rpath,/opt/homebrew/lib -o tst_omawrite  tst_omawrite.o backend.o markdownhighlighter.o filelibrary.o moc_backend.o moc_markdownhighlighter.o moc_filelibrary.o   -F/opt/homebrew/lib -framework QtQuickControls2 -framework QtQuickDialogs2 -framework QtQuick -framework QtOpenGL -framework QtPrintSupport -framework QtWidgets -framework QtGui -framework ImageIO -framework Metal -framework QtQml -framework QtNetwork -framework QtTest -framework Security -framework AppKit -framework ApplicationServices -framework Foundation -framework QtConcurrent -framework QtCore -framework IOKit -framework DiskArbitration -framework UniformTypeIdentifiers -lcups -framework OpenGL   
+********* Start testing of OmawriteTest *********
+Config: Using QtTest library 6.11.2, Qt 6.11.2 (arm64-little_endian-lp64 shared (dynamic) release build; by Apple LLVM 21.0.0 (clang-2100.1.1.101)), macos 27.0.0
+PASS   : OmawriteTest::initTestCase()
+QWARN  : OmawriteTest::sentenceFocusBoundaries() qt.qpa.fonts: Populating font family aliases took 18 ms. Replace uses of missing font family "Sans Serif" with one that exists to avoid this cost. 
+PASS   : OmawriteTest::sentenceFocusBoundaries()
+QWARN  : OmawriteTest::navigationHistoryAndQuickOpenStayIndependent() QFSFileEngine::open: No file name specified
+QWARN  : OmawriteTest::navigationHistoryAndQuickOpenStayIndependent() QFile::remove: Empty or null file name
+QWARN  : OmawriteTest::navigationHistoryAndQuickOpenStayIndependent() QFile::remove: Empty or null file name
+QWARN  : OmawriteTest::navigationHistoryAndQuickOpenStayIndependent() QFile::remove: Empty or null file name
+QWARN  : OmawriteTest::navigationHistoryAndQuickOpenStayIndependent() QFile::remove: Empty or null file name
+QWARN  : OmawriteTest::navigationHistoryAndQuickOpenStayIndependent() QFile::remove: Empty or null file name
+PASS   : OmawriteTest::navigationHistoryAndQuickOpenStayIndependent()
+QWARN  : OmawriteTest::clipboardFormatsPreserveSelectionAndSource() QFSFileEngine::open: No file name specified
+QWARN  : OmawriteTest::clipboardFormatsPreserveSelectionAndSource() QFile::remove: Empty or null file name
+PASS   : OmawriteTest::clipboardFormatsPreserveSelectionAndSource()
+QWARN  : OmawriteTest::editingToolsPreserveProtectedTextAndUndo() QFSFileEngine::open: No file name specified
+QWARN  : OmawriteTest::editingToolsPreserveProtectedTextAndUndo() QFile::remove: Empty or null file name
+PASS   : OmawriteTest::editingToolsPreserveProtectedTextAndUndo()
+QWARN  : OmawriteTest::inlineFormattingAndStructuralInsertionUndo() QFSFileEngine::open: No file name specified
+QWARN  : OmawriteTest::inlineFormattingAndStructuralInsertionUndo() QFile::remove: Empty or null file name
+PASS   : OmawriteTest::inlineFormattingAndStructuralInsertionUndo()
+QWARN  : OmawriteTest::blockFormattingPreservesLinesAndUndo() QFSFileEngine::open: No file name specified
+QWARN  : OmawriteTest::blockFormattingPreservesLinesAndUndo() QFile::remove: Empty or null file name
+PASS   : OmawriteTest::blockFormattingPreservesLinesAndUndo()
+QWARN  : OmawriteTest::searchMenusWrapAndReplaceWithSingleUndo() QFSFileEngine::open: No file name specified
+QWARN  : OmawriteTest::searchMenusWrapAndReplaceWithSingleUndo() QFile::remove: Empty or null file name
+PASS   : OmawriteTest::searchMenusWrapAndReplaceWithSingleUndo()
+QWARN  : OmawriteTest::movePreservesStateAndRejectsUnsafeDestinations() QFSFileEngine::open: No file name specified
+QWARN  : OmawriteTest::movePreservesStateAndRejectsUnsafeDestinations() QFile::remove: Empty or null file name
+FAIL!  : OmawriteTest::movePreservesStateAndRejectsUnsafeDestinations() 'snapshotFound' returned FALSE. ()
+   Loc: [../tests/tst_omawrite.cpp(361)]
+QWARN  : OmawriteTest::duplicateAndRenamePreserveDocumentState() QFSFileEngine::open: No file name specified
+QWARN  : OmawriteTest::duplicateAndRenamePreserveDocumentState() QFile::remove: Empty or null file name
+FAIL!  : OmawriteTest::duplicateAndRenamePreserveDocumentState() 'recoveryUpdated' returned FALSE. ()
+   Loc: [../tests/tst_omawrite.cpp(421)]
+PASS   : OmawriteTest::explicitRevealClearsFilterAndFindsOutsideRoot()
+QWARN  : OmawriteTest::newAndCreateRespectUnsavedCancellation() QFSFileEngine::open: No file name specified
+QWARN  : OmawriteTest::newAndCreateRespectUnsavedCancellation() QFile::remove: Empty or null file name
+QWARN  : OmawriteTest::newAndCreateRespectUnsavedCancellation() QFile::remove: Empty or null file name
+QWARN  : OmawriteTest::newAndCreateRespectUnsavedCancellation() QFile::remove: Empty or null file name
+QWARN  : OmawriteTest::newAndCreateRespectUnsavedCancellation() QFile::remove: Empty or null file name
+PASS   : OmawriteTest::newAndCreateRespectUnsavedCancellation()
+QWARN  : OmawriteTest::recentMenuTracksLibraryAndGuardsOpen() QFSFileEngine::open: No file name specified
+QWARN  : OmawriteTest::recentMenuTracksLibraryAndGuardsOpen() QFile::remove: Empty or null file name
+PASS   : OmawriteTest::recentMenuTracksLibraryAndGuardsOpen()
+QWARN  : OmawriteTest::nativeWorkspaceMenusShareState() QFSFileEngine::open: No file name specified
+PASS   : OmawriteTest::nativeWorkspaceMenusShareState()
+QWARN  : OmawriteTest::workspacePresentationPreservesSourceAndUndo() QFSFileEngine::open: No file name specified
+QWARN  : OmawriteTest::workspacePresentationPreservesSourceAndUndo() QFile::remove: Empty or null file name
+PASS   : OmawriteTest::workspacePresentationPreservesSourceAndUndo()
+QWARN  : OmawriteTest::sharedFormattingCommandsPreserveUndo() QFSFileEngine::open: No file name specified
+QWARN  : OmawriteTest::sharedFormattingCommandsPreserveUndo() QFile::remove: Empty or null file name
+QWARN  : OmawriteTest::sharedFormattingCommandsPreserveUndo() QFile::remove: Empty or null file name
+PASS   : OmawriteTest::sharedFormattingCommandsPreserveUndo()
+QWARN  : OmawriteTest::sortMenuAppliesFieldAndDirection() QFSFileEngine::open: No file name specified
+PASS   : OmawriteTest::sortMenuAppliesFieldAndDirection()
+QWARN  : OmawriteTest::libraryBarsCanBeHiddenAndRestored() QFSFileEngine::open: No file name specified
+PASS   : OmawriteTest::libraryBarsCanBeHiddenAndRestored()
+QWARN  : OmawriteTest::organizerSectionsCollapseWithoutChangingShortcuts() QFSFileEngine::open: No file name specified
+PASS   : OmawriteTest::organizerSectionsCollapseWithoutChangingShortcuts()
+PASS   : OmawriteTest::boundsLibraryExcerptsAndPreservesFiles()
+PASS   : OmawriteTest::browsesAndCreatesLibraryFilesSafely()
+QWARN  : OmawriteTest::rendersPreviewWithoutChangingMarkdown() QFSFileEngine::open: No file name specified
+QWARN  : OmawriteTest::rendersPreviewWithoutChangingMarkdown() QFile::remove: Empty or null file name
+PASS   : OmawriteTest::rendersPreviewWithoutChangingMarkdown()
+QWARN  : OmawriteTest::typographyDoesNotDirtySavedDocument() QFSFileEngine::open: No file name specified
+QWARN  : OmawriteTest::typographyDoesNotDirtySavedDocument() QFile::remove: Empty or null file name
+PASS   : OmawriteTest::typographyDoesNotDirtySavedDocument()
+PASS   : OmawriteTest::presentationKeepsSourceAndUndoIntact()
+QWARN  : OmawriteTest::previewsRelativeImagesAndCentersTypewriter() QFSFileEngine::open: No file name specified
+QWARN  : OmawriteTest::previewsRelativeImagesAndCentersTypewriter() QFile::remove: Empty or null file name
+QWARN  : OmawriteTest::previewsRelativeImagesAndCentersTypewriter() QFile::remove: Empty or null file name
+PASS   : OmawriteTest::previewsRelativeImagesAndCentersTypewriter()
+PASS   : OmawriteTest::outlinesHeadingsOutsideCodeAndFrontMatter()
+PASS   : OmawriteTest::organizesShortcutsAndSortsWithoutMovingFiles()
+QWARN  : OmawriteTest::headingAndFencePreviewMatchesSource() QFSFileEngine::open: No file name specified
+QWARN  : OmawriteTest::headingAndFencePreviewMatchesSource() QFile::remove: Empty or null file name
+PASS   : OmawriteTest::headingAndFencePreviewMatchesSource()
+PASS   : OmawriteTest::countsWords()
+PASS   : OmawriteTest::normalizesLinks()
+PASS   : OmawriteTest::suggestsSafeNames()
+PASS   : OmawriteTest::findsInlineMarkdownRanges()
+PASS   : OmawriteTest::loadsCurrentOmarchyTheme()
+QWARN  : OmawriteTest::ignoresFileWatcherEventsForSavedContents() QFile::remove: Empty or null file name
+FAIL!  : OmawriteTest::ignoresFileWatcherEventsForSavedContents() Compared values are not the same
+   Actual   (externalChangeSpy.count()): 0
+   Expected (1)                        : 1
+   Loc: [../tests/tst_omawrite.cpp(1143)]
+PASS   : OmawriteTest::keepsCursorAndSelectionStableAcrossInsertions()
+QWARN  : OmawriteTest::savesAndOpensFromFooterMenu() QFSFileEngine::open: No file name specified
+QWARN  : OmawriteTest::savesAndOpensFromFooterMenu() qrc:/qt-project.org/imports/QtQuick/Controls/Material/SplitView.qml:29:13: TypeError: Cannot read property 'parent' of null
+QWARN  : OmawriteTest::savesAndOpensFromFooterMenu() qrc:/qt-project.org/imports/QtQuick/Controls/Material/SplitView.qml:29:13: TypeError: Cannot read property 'parent' of null
+PASS   : OmawriteTest::savesAndOpensFromFooterMenu()
+QWARN  : OmawriteTest::scalesTextWithDesktopTextSize() QFSFileEngine::open: No file name specified
+PASS   : OmawriteTest::scalesTextWithDesktopTextSize()
+QWARN  : OmawriteTest::preservesMarkdownAndProtectsUnsavedOpen() QFSFileEngine::open: No file name specified
+QWARN  : OmawriteTest::preservesMarkdownAndProtectsUnsavedOpen() QFile::remove: Empty or null file name
+QWARN  : OmawriteTest::preservesMarkdownAndProtectsUnsavedOpen() QFile::remove: Empty or null file name
+QWARN  : OmawriteTest::preservesMarkdownAndProtectsUnsavedOpen() QFile::remove: Empty or null file name
+PASS   : OmawriteTest::preservesMarkdownAndProtectsUnsavedOpen()
+QWARN  : OmawriteTest::remembersLastSaveDirectory() QFile::remove: Empty or null file name
+PASS   : OmawriteTest::remembersLastSaveDirectory()
+PASS   : OmawriteTest::cleanupTestCase()
+Totals: 37 passed, 3 failed, 0 skipped, 0 blacklisted, 17198ms
+********* Finished testing of OmawriteTest *********

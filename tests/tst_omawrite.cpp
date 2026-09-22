@@ -1,3 +1,4 @@
+#include "markdownextensions.h"
 #include <QtTest>
 #include <QFont>
 #include <QTextBlock>
@@ -5,6 +6,12 @@
 #include <QTextDocument>
 #include <QQuickTextDocument>
 #include <QImage>
+#include <QDate>
+#include <QClipboard>
+#include <QMimeData>
+#include <QJsonDocument>
+#include <QJsonObject>
+#include <QJsonArray>
 #include <QQmlComponent>
 #include <QQmlContext>
 #include <QQmlEngine>
@@ -27,6 +34,931 @@ private slots:
         QSettings::setDefaultFormat(QSettings::IniFormat);
         QSettings::setPath(QSettings::IniFormat, QSettings::UserScope,
                            m_settingsDirectory.path());
+    }
+
+    void autosaveRefusesExternalChanges() {
+        QTemporaryDir directory;
+        const auto url = QUrl::fromLocalFile(directory.filePath("sample.md"));
+        Backend backend;
+        QQmlEngine engine; engine.rootContext()->setContextProperty("backend", &backend);
+        QQmlComponent component(&engine, QUrl::fromLocalFile(QFINDTESTDATA("../src/Main.qml")));
+        QScopedPointer<QObject> window(component.create()); QVERIFY2(window, qPrintable(component.errorString()));
+        auto *editor = window->findChild<QObject *>("sourceEditor");
+        editor->setProperty("text", "initial"); backend.saveAs(url);
+        QVERIFY(QMetaObject::invokeMethod(editor, "insert", Q_ARG(int, 7), Q_ARG(QString, " draft")));
+        backend.autosave(); QVERIFY(!backend.modified());
+        QFile file(url.toLocalFile()); QVERIFY(file.open(QIODevice::ReadOnly)); QCOMPARE(file.readAll(), QByteArray("initial draft")); file.close();
+        QVERIFY(QMetaObject::invokeMethod(editor, "insert", Q_ARG(int, 13), Q_ARG(QString, " local")));
+        QVERIFY(file.open(QIODevice::WriteOnly | QIODevice::Truncate)); file.write("external"); file.close();
+        backend.autosave(); QVERIFY(backend.modified());
+        QVERIFY(file.open(QIODevice::ReadOnly)); QCOMPARE(file.readAll(), QByteArray("external"));
+        QVERIFY(backend.status().contains("paused"));
+        backend.discardRecovery();
+    }
+
+    void windowRequestsAndFailedSaveCancelQuit() {
+        Backend backend;
+        QSignalSpy requested(&backend, &Backend::newWindowRequested);
+        backend.newWindow(); QCOMPARE(requested.size(), 1);
+        QSignalSpy canceled(&backend, &Backend::quitCanceled);
+        QSignalSpy failed(&backend, &Backend::saveFailed);
+        backend.saveAs(QUrl("https://example.com/sample.md"));
+        QCOMPARE(failed.size(), 1); QCOMPARE(canceled.size(), 1);
+    }
+
+    void authorshipSidecarsMatchSourceAndUndo() {
+        QTemporaryDir directory;
+        Backend backend;
+        QQmlEngine engine; engine.rootContext()->setContextProperty("backend", &backend);
+        QQmlComponent component(&engine, QUrl::fromLocalFile(QFINDTESTDATA("../src/Main.qml")));
+        QScopedPointer<QObject> window(component.create()); QVERIFY2(window, qPrintable(component.errorString()));
+        auto *editor = window->findChild<QObject *>("sourceEditor");
+        editor->setProperty("text", "alpha beta");
+        backend.markAuthorship(0, 5, "Human", "Sample author");
+        QCOMPARE(backend.authorshipRanges().size(), 1);
+        QVERIFY(QMetaObject::invokeMethod(editor, "undo"));
+        QVERIFY(backend.authorshipRanges().isEmpty());
+        QVERIFY(QMetaObject::invokeMethod(editor, "redo"));
+        QCOMPARE(backend.authorshipRanges().size(), 1);
+        const auto url = QUrl::fromLocalFile(directory.filePath("sample.md"));
+        backend.saveAs(url); QVERIFY(!backend.modified());
+        backend.newDocument(); QVERIFY(backend.open(url));
+        QCOMPARE(backend.authorshipRanges().size(), 1);
+        QFile file(url.toLocalFile()); QVERIFY(file.open(QIODevice::WriteOnly | QIODevice::Truncate)); file.write("changed text"); file.close();
+        QVERIFY(backend.open(url)); QVERIFY(backend.authorshipRanges().isEmpty());
+        backend.discardRecovery();
+    }
+
+    void authorshipFollowsDuplicateRenameAndMove() {
+        QTemporaryDir directory;
+        QVERIFY(QDir(directory.path()).mkdir("moved"));
+        Backend backend;
+        QQmlEngine engine; engine.rootContext()->setContextProperty("backend", &backend);
+        QQmlComponent component(&engine, QUrl::fromLocalFile(QFINDTESTDATA("../src/Main.qml")));
+        QScopedPointer<QObject> window(component.create()); QVERIFY2(window, qPrintable(component.errorString()));
+        auto *editor = window->findChild<QObject *>("sourceEditor");
+        editor->setProperty("text", "alpha beta");
+        backend.markAuthorship(0, 5, "Human", "Saved author");
+        backend.saveAs(QUrl::fromLocalFile(directory.filePath("original.md")));
+        QVERIFY(!backend.modified());
+        backend.markAuthorship(6, 10, "Reference", "Unsaved source");
+        const auto draftRanges = backend.authorshipRanges();
+        QVERIFY(backend.duplicateDocument("copy.md"));
+        QVERIFY(backend.modified());
+        QCOMPARE(backend.authorshipRanges(), draftRanges);
+        QVERIFY(backend.renameDocument("renamed.md"));
+        QVERIFY(!QFileInfo::exists(directory.filePath(".original.md.omawrite-authors.json")));
+        QVERIFY(backend.moveDocument(QUrl::fromLocalFile(directory.filePath("moved"))));
+        QVERIFY(!QFileInfo::exists(directory.filePath(".renamed.md.omawrite-authors.json")));
+        QCOMPARE(backend.authorshipRanges(), draftRanges);
+        QVERIFY(backend.modified());
+        // Moving a dirty document carries saved metadata with saved bytes.
+        QFile sidecar(directory.filePath("moved/.renamed.md.omawrite-authors.json"));
+        QVERIFY(sidecar.open(QIODevice::ReadOnly));
+        QCOMPARE(QJsonDocument::fromJson(sidecar.readAll()).object()["ranges"].toArray().size(), 1);
+        sidecar.close();
+        backend.save(); QVERIFY(!backend.modified());
+        backend.newDocument();
+        QVERIFY(backend.open(QUrl::fromLocalFile(directory.filePath("moved/renamed.md"))));
+        QCOMPARE(backend.authorshipRanges(), draftRanges);
+        QVERIFY(backend.open(QUrl::fromLocalFile(directory.filePath("copy.md"))));
+        QCOMPARE(backend.authorshipRanges(), draftRanges);
+        backend.discardRecovery();
+    }
+
+    void renameDialogPreservesWindowAndDirtyAnnotations() {
+        QTemporaryDir directory;
+        Backend backend;
+        QQmlEngine engine; engine.rootContext()->setContextProperty("backend", &backend);
+        QQmlComponent component(&engine, QUrl::fromLocalFile(QFINDTESTDATA("../src/Main.qml")));
+        QScopedPointer<QObject> window(component.create()); QVERIFY2(window, qPrintable(component.errorString()));
+        auto *editor = window->findChild<QObject *>("sourceEditor");
+        editor->setProperty("text", "alpha beta");
+        backend.saveAs(QUrl::fromLocalFile(directory.filePath("original.md")));
+        backend.markAuthorship(0, 5, "Human", "Draft author");
+        const auto ranges = backend.authorshipRanges();
+        auto *dialog = window->findChild<QObject *>("fileNameDialog"); QVERIFY(dialog);
+        QSignalSpy closed(&backend, &Backend::windowClosed);
+        QVERIFY(QMetaObject::invokeMethod(dialog, "showFor", Q_ARG(QVariant, QVariant(true))));
+        window->findChild<QObject *>("fileNameInput")->setProperty("text", "renamed.md");
+        QVERIFY(QMetaObject::invokeMethod(dialog, "submit"));
+        QCoreApplication::processEvents();
+        QCOMPARE(closed.size(), 0);
+        QVERIFY(window->property("visible").toBool());
+        QTRY_VERIFY(!dialog->property("visible").toBool());
+        QVERIFY(backend.modified());
+        QCOMPARE(editor->property("text").toString(), QString("alpha beta"));
+        QCOMPARE(backend.authorshipRanges(), ranges);
+        QCOMPARE(backend.fileUrl(), QUrl::fromLocalFile(directory.filePath("renamed.md")));
+        // Path operations synchronously update recovery with dirty annotations.
+        bool recovered = false;
+        QDir recovery(QStandardPaths::writableLocation(QStandardPaths::AppDataLocation));
+        for (const auto &name : recovery.entryList({"recovery-*.json"}, QDir::Files)) {
+            QFile file(recovery.filePath(name)); QVERIFY(file.open(QIODevice::ReadOnly));
+            auto data = QJsonDocument::fromJson(file.readAll()).object();
+            if (QUrl(data["fileUrl"].toString()) == backend.fileUrl()) {
+                QCOMPARE(data["authorship"].toObject()["ranges"].toArray().size(), 1);
+                recovered = true;
+            }
+        }
+        QVERIFY(recovered);
+        QVERIFY(QMetaObject::invokeMethod(editor, "undo"));
+        QVERIFY(backend.authorshipRanges().isEmpty());
+        backend.discardRecovery();
+    }
+
+    void authorshipCollisionsLeaveOriginalIntact() {
+        QTemporaryDir directory;
+        Backend backend;
+        QQmlEngine engine; engine.rootContext()->setContextProperty("backend", &backend);
+        QQmlComponent component(&engine, QUrl::fromLocalFile(QFINDTESTDATA("../src/Main.qml")));
+        QScopedPointer<QObject> window(component.create()); QVERIFY2(window, qPrintable(component.errorString()));
+        window->findChild<QObject *>("sourceEditor")->setProperty("text", "sample");
+        backend.markAuthorship(0, 6, "Human", "Author");
+        const auto original = QUrl::fromLocalFile(directory.filePath("sample.md"));
+        backend.saveAs(original);
+        QFile occupied(directory.filePath(".target.md.omawrite-authors.json"));
+        QVERIFY(occupied.open(QIODevice::WriteOnly)); occupied.write("keep me"); occupied.close();
+        QFile existing(directory.filePath("existing.md"));
+        QVERIFY(existing.open(QIODevice::WriteOnly)); existing.write("untouched"); existing.close();
+        QVERIFY(!backend.duplicateDocument("existing.md"));
+        QVERIFY(!QFileInfo::exists(directory.filePath(".existing.md.omawrite-authors.json")));
+        QVERIFY(!backend.renameDocument("target.md"));
+        QVERIFY(!backend.duplicateDocument("target.md"));
+        QCOMPARE(backend.fileUrl(), original);
+        QVERIFY(!QFileInfo::exists(directory.filePath("target.md")));
+        QVERIFY(occupied.open(QIODevice::ReadOnly)); QCOMPARE(occupied.readAll(), QByteArray("keep me"));
+        QVERIFY(QDir(directory.path()).mkdir("destination"));
+        QVERIFY(QFile::copy(occupied.fileName(), directory.filePath("destination/.sample.md.omawrite-authors.json")));
+        QVERIFY(!backend.moveDocument(QUrl::fromLocalFile(directory.filePath("destination"))));
+        QVERIFY(QFileInfo::exists(original.toLocalFile()));
+        QVERIFY(!QFileInfo::exists(directory.filePath("destination/sample.md")));
+        backend.discardRecovery();
+    }
+
+    void exportsPreserveSourceAndWriteHtmlPdf() {
+        QTemporaryDir directory;
+        Backend backend;
+        QQmlEngine engine;
+        engine.rootContext()->setContextProperty("backend", &backend);
+        QQmlComponent component(&engine, QUrl::fromLocalFile(QFINDTESTDATA("../src/Main.qml")));
+        QScopedPointer<QObject> window(component.create());
+        QVERIFY2(window, qPrintable(component.errorString()));
+        auto *editor = window->findChild<QObject *>("sourceEditor");
+        editor->setProperty("text", "# Export café\n\n**Bold** sample");
+        const auto original = editor->property("text");
+        QVERIFY(backend.exportDocument(QUrl::fromLocalFile(directory.filePath("sample.html")), "html"));
+        QFile html(directory.filePath("sample.html")); QVERIFY(html.open(QIODevice::ReadOnly));
+        QVERIFY(html.readAll().contains("Export caf"));
+        QVERIFY(backend.exportDocument(QUrl::fromLocalFile(directory.filePath("sample.pdf")), "pdf"));
+        QFile pdf(directory.filePath("sample.pdf")); QVERIFY(pdf.open(QIODevice::ReadOnly));
+        QVERIFY(pdf.readAll().startsWith("%PDF"));
+        const QString evidence = qEnvironmentVariable("OMAWRITE_EXPORT_EVIDENCE");
+        if (!evidence.isEmpty()) {
+            QVERIFY(backend.exportDocument(QUrl::fromLocalFile(evidence + "/sample.pdf"), "pdf"));
+            QVERIFY(backend.exportDocument(QUrl::fromLocalFile(evidence + "/sample.html"), "html"));
+        }
+        QCOMPARE(editor->property("text"), original);
+        QVERIFY(backend.modified());
+        QVERIFY(!backend.exportDocument(QUrl("https://example.com/file.pdf"), "pdf"));
+        backend.discardRecovery();
+    }
+
+    void markdownExtensionsPreserveCodeAndBoundIncludes() {
+        QTemporaryDir directory;
+        const QUrl base = QUrl::fromLocalFile(directory.path() + '/');
+        const auto rendered = expandedMarkdown("[[note|Label]] ==bright== `==code==`\n[^n]\n[^n]: Footnote\n```\n[[literal]]\n```", base);
+        QVERIFY(rendered.contains("Label"));
+        QVERIFY(rendered.contains("note.md"));
+        QVERIFY(rendered.contains("background-color"));
+        QVERIFY(rendered.contains("`==code==`"));
+        QVERIFY(rendered.contains("[[literal]]"));
+        QVERIFY(rendered.contains("Footnote"));
+        QFile file(directory.filePath("loop.md"));
+        QVERIFY(file.open(QIODevice::WriteOnly)); file.write("/loop.md"); file.close();
+        QVERIFY(expandedMarkdown("/loop.md", base).contains("Content block unavailable"));
+        QVERIFY(expandedMarkdown("/../outside.md", base).contains("Content block unavailable"));
+    }
+
+    void tableOfContentsUsesUniqueAnchors() {
+        Backend backend;
+        const QString toc = backend.tableOfContents("# Hello **world**\n## Hello world\n```\n# hidden\n```\n# Café");
+        QVERIFY(toc.contains("(#hello-world)"));
+        QVERIFY(toc.contains("(#hello-world-1)"));
+        QVERIFY(toc.contains("(#café)"));
+        QVERIFY(!toc.contains("hidden"));
+        QQmlEngine engine; engine.rootContext()->setContextProperty("backend", &backend);
+        QQmlComponent component(&engine, QUrl::fromLocalFile(QFINDTESTDATA("../src/Main.qml")));
+        QScopedPointer<QObject> window(component.create()); QVERIFY2(window, qPrintable(component.errorString()));
+        auto *editor = window->findChild<QObject *>("sourceEditor");
+        auto *preview = window->findChild<QObject *>("renderedPreview");
+        editor->setProperty("text", "# Same\n\ntext\n\n# Same\n");
+        auto *document = qvariant_cast<QQuickTextDocument *>(preview->property("textDocument"));
+        QTRY_VERIFY(backend.previewAnchorPosition(document, "same-1") > 0);
+        QCOMPARE(backend.previewAnchorPosition(document, "missing"), -1);
+        backend.discardRecovery();
+    }
+
+    void tagsExcludeCodeAndSearchesPersist() {
+        QCOMPARE(FileLibrary::tagsIn("# Heading\n#work #CAFÉ\n`#inline`\n```\n#hidden\n```\n    #indented"), QStringList({"work", "café"}));
+        QTemporaryDir directory;
+        FileLibrary library;
+        library.setRootFolder(QUrl::fromLocalFile(directory.path()));
+        library.saveSearch("#work", true);
+        FileLibrary reopened;
+        QCOMPARE(reopened.savedSearches().first().toMap()["query"].toString(), QString("#work"));
+        reopened.removeSearch(0);
+        QVERIFY(reopened.savedSearches().isEmpty());
+    }
+
+    void contentSearchReflectsSavedChanges() {
+        QTemporaryDir directory;
+        QFile file(directory.filePath("sample.md"));
+        QVERIFY(file.open(QIODevice::WriteOnly)); file.write("unique phrase"); file.close();
+        FileLibrary library;
+        library.setRootFolder(QUrl::fromLocalFile(directory.path()));
+        library.quickSearch("unique", true);
+        QTRY_COMPARE(library.quickResults().size(), 1);
+        QVERIFY(file.open(QIODevice::WriteOnly | QIODevice::Truncate)); file.write("other text"); file.close();
+        library.quickSearch("unique", true);
+        QTRY_VERIFY(library.quickStatus().contains("matching files"));
+        QVERIFY(library.quickResults().isEmpty());
+        QVERIFY(file.rename(directory.filePath("renamed.md")));
+        library.quickSearch("other", true);
+        QTRY_COMPARE(library.quickResults().size(), 1);
+        QCOMPARE(library.quickResults().first().toMap()["name"].toString(), QString("renamed.md"));
+        QVERIFY(file.remove());
+        library.quickSearch("other", true);
+        QTRY_VERIFY(library.quickStatus().contains("matching files"));
+        QVERIFY(library.quickResults().isEmpty());
+    }
+
+    void sentenceFocusBoundaries() {
+        QCOMPARE(Backend::sentenceRange("First. Second!", 2), qMakePair(0, 7));
+        QCOMPARE(Backend::sentenceRange("First. Second!", 10), qMakePair(7, 14));
+        QCOMPARE(Backend::sentenceRange("First. Second!", 14), qMakePair(7, 14));
+        QCOMPARE(Backend::sentenceRange("", 0), qMakePair(0, 0));
+        QTextDocument document;
+        document.setPlainText("First. Second!");
+        MarkdownHighlighter highlighter(&document);
+        highlighter.setFocusRange(7, 14);
+        QVERIFY(!document.isUndoAvailable());
+        QCOMPARE(document.toPlainText(), QString("First. Second!"));
+    }
+
+    void navigationHistoryAndQuickOpenStayIndependent() {
+        QTemporaryDir directory;
+        QVERIFY(QDir(directory.path()).mkpath("nested/deep"));
+        QFile first(directory.filePath("First.md")), second(directory.filePath("nested/deep/Second.md"));
+        QVERIFY(first.open(QIODevice::WriteOnly)); first.write("first document"); first.close();
+        QVERIFY(second.open(QIODevice::WriteOnly)); second.write("second document"); second.close();
+        Backend backend;
+        QQmlEngine engine;
+        engine.rootContext()->setContextProperty("backend", &backend);
+        QQmlComponent component(&engine, QUrl::fromLocalFile(QFINDTESTDATA("../src/Main.qml")));
+        QScopedPointer<QObject> window(component.create());
+        QVERIFY2(window, qPrintable(component.errorString()));
+        auto *editor = window->findChild<QObject *>("sourceEditor");
+        QVERIFY(backend.open(QUrl::fromLocalFile(first.fileName())));
+        backend.rememberCursor(7);
+        QVERIFY(backend.open(QUrl::fromLocalFile(second.fileName())));
+        QVERIFY(backend.canGoBack());
+        QCOMPARE(backend.navigateHistory(-1), 7);
+        QCOMPARE(backend.fileUrl(), QUrl::fromLocalFile(first.fileName()));
+        QVERIFY(backend.canGoForward());
+        QCOMPARE(backend.navigateHistory(1), 0);
+        QVERIFY(QMetaObject::invokeMethod(editor, "insert", Q_ARG(int, 0), Q_ARG(QString, "dirty ")));
+        QVERIFY(QMetaObject::invokeMethod(window.data(), "requestHistory", Q_ARG(QVariant, -1)));
+        QCOMPARE(window->property("pendingAction").toString(), QString("history"));
+        QVERIFY(QMetaObject::invokeMethod(window->findChild<QObject *>("unsavedChangesPrompt"), "cancelRequested"));
+        QCOMPARE(backend.fileUrl(), QUrl::fromLocalFile(second.fileName()));
+        QVERIFY(backend.modified());
+        QVERIFY(first.remove());
+        QCOMPARE(backend.navigateHistory(-1), -1);
+        QCOMPARE(backend.fileUrl(), QUrl::fromLocalFile(second.fileName()));
+        QVERIFY(backend.modified());
+        auto *library = qobject_cast<FileLibrary *>(backend.library());
+        library->setRootFolder(QUrl::fromLocalFile(directory.path()));
+        library->setRootFolder(QUrl::fromLocalFile(directory.filePath("nested")));
+        QVERIFY(library->navigateHistory(-1));
+        QCOMPARE(library->rootFolder(), QUrl::fromLocalFile(QFileInfo(directory.path()).canonicalFilePath()));
+        QCOMPARE(backend.fileUrl(), QUrl::fromLocalFile(second.fileName()));
+        library->quickSearch("Second");
+        QTRY_COMPARE(library->quickResults().size(), 1);
+        QCOMPARE(library->quickResults().first().toMap()["name"].toString(), QString("Second.md"));
+        library->quickSearch("Second");
+        library->quickSearch("missing");
+        QTRY_VERIFY(library->quickStatus() != "Searching filenames…");
+        QVERIFY(library->quickResults().isEmpty());
+        editor->setProperty("text", "[local](First.md) [bad](javascript:alert)");
+        QCOMPARE(backend.sourceLinkAt(2), backend.resolveDocumentLink("First.md"));
+        QVERIFY(backend.sourceLinkAt(22).isEmpty());
+        backend.discardRecovery();
+    }
+
+    void clipboardFormatsPreserveSelectionAndSource() {
+        Backend backend;
+        QQmlEngine engine;
+        engine.rootContext()->setContextProperty("backend", &backend);
+        QQmlComponent component(&engine, QUrl::fromLocalFile(QFINDTESTDATA("../src/Main.qml")));
+        QScopedPointer<QObject> window(component.create());
+        QVERIFY2(window, qPrintable(component.errorString()));
+        auto *editor = window->findChild<QObject *>("sourceEditor");
+        editor->setProperty("text", "**bold** untouched");
+        QVERIFY(backend.copySelection(0, 8, "formatted"));
+        const auto *mime = QGuiApplication::clipboard()->mimeData();
+        QVERIFY(mime->hasHtml());
+        QCOMPARE(mime->text(), QString("bold"));
+        QVERIFY(mime->html().contains("bold"));
+        QVERIFY(backend.copySelection(0, 8, "markdown"));
+        QCOMPARE(QGuiApplication::clipboard()->mimeData()->data("text/markdown"), QByteArray("**bold**"));
+        QCOMPARE(backend.clipboardMarkdown(), QString("**bold**"));
+        QVERIFY(backend.copySelection(0, 8, "html"));
+        QVERIFY(QGuiApplication::clipboard()->text().contains("<html"));
+        QCOMPARE(editor->property("text").toString(), QString("**bold** untouched"));
+        auto *html = new QMimeData;
+        html->setHtml("<p><strong>Hello</strong> <a href='https://example.com'>link</a></p>");
+        QGuiApplication::clipboard()->setMimeData(html);
+        const QString converted = backend.clipboardMarkdown();
+        QVERIFY(converted.contains("**Hello**"));
+        QVERIFY(converted.contains("[link](https://example.com)"));
+        backend.replaceText(0, 8, converted);
+        QVERIFY(QMetaObject::invokeMethod(editor, "undo"));
+        QCOMPARE(editor->property("text").toString(), QString("**bold** untouched"));
+        QGuiApplication::clipboard()->setText("plain fallback");
+        QCOMPARE(backend.clipboardMarkdown(), QString("plain fallback"));
+        backend.discardRecovery();
+    }
+
+    void editingToolsPreserveProtectedTextAndUndo() {
+        Backend backend;
+        QQmlEngine engine;
+        engine.rootContext()->setContextProperty("backend", &backend);
+        QQmlComponent component(&engine, QUrl::fromLocalFile(QFINDTESTDATA("../src/Main.qml")));
+        QScopedPointer<QObject> window(component.create());
+        QVERIFY2(window, qPrintable(component.errorString()));
+        auto *editor = window->findChild<QObject *>("sourceEditor");
+        editor->setProperty("text", QStringLiteral("straße café"));
+        backend.editMarkdown("uppercase", 0, 11);
+        QCOMPARE(editor->property("text").toString(), QStringLiteral("STRASSE CAFÉ"));
+        QVERIFY(QMetaObject::invokeMethod(editor, "undo"));
+        QCOMPARE(editor->property("text").toString(), QStringLiteral("straße café"));
+        editor->setProperty("text", "**~~words~~**");
+        backend.editMarkdown("clearInline", 0, 13);
+        QCOMPARE(editor->property("text").toString(), QString("words"));
+        editor->setProperty("text", "[Label](https://example.com)");
+        QVERIFY(backend.editMarkdown("uppercase", 0, 27).isEmpty());
+        editor->setProperty("text", "");
+        backend.editMarkdown("date", 0, 0);
+        QCOMPARE(editor->property("text").toString(), QDate::currentDate().toString(Qt::ISODate));
+        QVERIFY(QMetaObject::invokeMethod(editor, "undo"));
+        QCOMPARE(editor->property("text").toString(), QString());
+        backend.editMarkdown("table", 0, 0);
+        QVERIFY(editor->property("text").toString().contains("| --- | --- |"));
+        QVERIFY(QMetaObject::invokeMethod(editor, "undo"));
+        QCOMPARE(editor->property("text").toString(), QString());
+        backend.discardRecovery();
+    }
+
+    void inlineFormattingAndStructuralInsertionUndo() {
+        Backend backend;
+        QQmlEngine engine;
+        engine.rootContext()->setContextProperty("backend", &backend);
+        QQmlComponent component(&engine, QUrl::fromLocalFile(QFINDTESTDATA("../src/Main.qml")));
+        QScopedPointer<QObject> window(component.create());
+        QVERIFY2(window, qPrintable(component.errorString()));
+        auto *editor = window->findChild<QObject *>("sourceEditor");
+        editor->setProperty("text", "alpha");
+        auto selection = backend.wrapSelection(0, 5, "**", "**");
+        QCOMPARE(editor->property("text").toString(), QString("**alpha**"));
+        backend.wrapSelection(selection["start"].toInt(), selection["end"].toInt(), "**", "**");
+        QCOMPARE(editor->property("text").toString(), QString("alpha"));
+        editor->setProperty("text", "a`b");
+        selection = backend.wrapSelection(0, 3, "`", "`");
+        QCOMPARE(editor->property("text").toString(), QString("``a`b``"));
+        backend.wrapSelection(selection["start"].toInt(), selection["end"].toInt(), "`", "`");
+        QCOMPARE(editor->property("text").toString(), QString("a`b"));
+        editor->setProperty("text", "before\n```\ninside");
+        backend.editMarkdown("codeBlock", 0, 17);
+        QVERIFY(editor->property("text").toString().startsWith("````\n"));
+        QVERIFY(QMetaObject::invokeMethod(editor, "undo"));
+        QCOMPARE(editor->property("text").toString(), QString("before\n```\ninside"));
+        backend.replaceText(0, 6, "[label](https://example.com)");
+        QVERIFY(QMetaObject::invokeMethod(editor, "undo"));
+        QCOMPARE(editor->property("text").toString(), QString("before\n```\ninside"));
+        backend.discardRecovery();
+    }
+
+    void blockFormattingPreservesLinesAndUndo() {
+        Backend backend;
+        QQmlEngine engine;
+        engine.rootContext()->setContextProperty("backend", &backend);
+        QQmlComponent component(&engine, QUrl::fromLocalFile(QFINDTESTDATA("../src/Main.qml")));
+        QScopedPointer<QObject> window(component.create());
+        QVERIFY2(window, qPrintable(component.errorString()));
+        auto *editor = window->findChild<QObject *>("sourceEditor");
+        editor->setProperty("text", "");
+        auto caret = backend.editMarkdown("heading2", 0, 0);
+        QCOMPARE(editor->property("text").toString(), QString("## "));
+        QCOMPARE(caret["start"].toInt(), 3);
+        QCOMPARE(caret["end"].toInt(), 3);
+        editor->setProperty("text", "alpha\nbeta\nlast");
+        backend.editMarkdown("ordered", 10, 0);
+        QCOMPARE(editor->property("text").toString(), QString("1. alpha\n2. beta\nlast"));
+        QVERIFY(QMetaObject::invokeMethod(editor, "undo"));
+        QCOMPARE(editor->property("text").toString(), QString("alpha\nbeta\nlast"));
+        backend.editMarkdown("heading2", 0, 0);
+        QCOMPARE(editor->property("text").toString(), QString("## alpha\nbeta\nlast"));
+        backend.editMarkdown("body", 0, 0);
+        QCOMPARE(editor->property("text").toString(), QString("alpha\nbeta\nlast"));
+        backend.editMarkdown("lineDown", 0, 0);
+        QCOMPARE(editor->property("text").toString(), QString("beta\nalpha\nlast"));
+        backend.editMarkdown("lineUp", 5, 5);
+        QCOMPARE(editor->property("text").toString(), QString("alpha\nbeta\nlast"));
+        editor->setProperty("text", "  - nested\n- [ ] task");
+        backend.editMarkdown("ordered", 0, 10);
+        QCOMPARE(editor->property("text").toString(), QString("  1. nested\n- [ ] task"));
+        backend.editMarkdown("toggleTask", 12, 12);
+        QCOMPARE(editor->property("text").toString(), QString("  1. nested\n- [x] task"));
+        editor->setProperty("text", "```\nalpha\n```\n");
+        QVERIFY(backend.editMarkdown("heading1", 4, 9).isEmpty());
+        QCOMPARE(editor->property("text").toString(), QString("```\nalpha\n```\n"));
+        backend.discardRecovery();
+    }
+
+    void searchMenusWrapAndReplaceWithSingleUndo() {
+        Backend backend;
+        QQmlEngine engine;
+        engine.rootContext()->setContextProperty("backend", &backend);
+        QQmlComponent component(&engine, QUrl::fromLocalFile(QFINDTESTDATA("../src/Main.qml")));
+        QScopedPointer<QObject> window(component.create());
+        QVERIFY2(window, qPrintable(component.errorString()));
+        auto *editor = window->findChild<QObject *>("sourceEditor");
+        auto *query = window->findChild<QObject *>("searchField");
+        auto *replacement = window->findChild<QObject *>("replaceField");
+        QVERIFY(editor && query && replacement);
+        const QString source = QStringLiteral("İ 😀 café CAFÉ café");
+        editor->setProperty("text", source);
+        const QVariantList matches = backend.searchPositions(QStringLiteral("café"));
+        QCOMPARE(matches.size(), 3);
+        QCOMPARE(matches.first().toInt(), source.indexOf(QStringLiteral("café")));
+        QVERIFY(backend.searchPositions("").isEmpty());
+        QVERIFY(backend.searchPositions("absent").isEmpty());
+        auto trigger = [&](const char *name) {
+            QObject *action = window->findChild<QObject *>(name);
+            return action && QMetaObject::invokeMethod(action, "triggered");
+        };
+        QVERIFY(trigger("editReplace"));
+        QVERIFY(window->property("searchOpen").toBool());
+        QVERIFY(window->property("replaceOpen").toBool());
+        query->setProperty("text", QStringLiteral("café"));
+        QVERIFY(trigger("editFindPrevious"));
+        QCOMPARE(editor->property("selectionStart").toInt(), matches.last().toInt());
+        QVERIFY(trigger("editFindNext"));
+        QCOMPARE(editor->property("selectionStart").toInt(), matches.first().toInt());
+        replacement->setProperty("text", QStringLiteral("茶"));
+        QVERIFY(QMetaObject::invokeMethod(window->findChild<QObject *>("replaceAllButton"), "clicked"));
+        QCOMPARE(editor->property("text").toString(), QStringLiteral("İ 😀 茶 茶 茶"));
+        QVERIFY(backend.modified());
+        QVERIFY(QMetaObject::invokeMethod(editor, "undo"));
+        QCOMPARE(editor->property("text").toString(), source);
+        QCOMPARE(backend.replaceMatches("absent", "x", -1), 0);
+        QCOMPARE(backend.replaceMatches(QStringLiteral("café"), "", matches.at(1).toInt()), 1);
+        QCOMPARE(editor->property("text").toString(), QStringLiteral("İ 😀 café  café"));
+        QVERIFY(QMetaObject::invokeMethod(editor, "undo"));
+        QCOMPARE(editor->property("text").toString(), source);
+        query->setProperty("text", "absent");
+        QVERIFY(!window->findChild<QObject *>("editFindNext")->property("enabled").toBool());
+        QVERIFY(QMetaObject::invokeMethod(query, "forceActiveFocus"));
+        QVERIFY(QMetaObject::invokeMethod(query, "selectAll"));
+        QVERIFY(trigger("editDelete"));
+        QCOMPARE(query->property("text").toString(), QString());
+        QCOMPARE(editor->property("text").toString(), source);
+        QVERIFY(QMetaObject::invokeMethod(editor, "forceActiveFocus"));
+        QVERIFY(QMetaObject::invokeMethod(editor, "select", Q_ARG(int, matches.first().toInt()), Q_ARG(int, matches.first().toInt() + 4)));
+        QVERIFY(trigger("editFindSelection"));
+        QCOMPARE(query->property("text").toString(), QStringLiteral("café"));
+        backend.discardRecovery();
+    }
+
+    void movePreservesStateAndRejectsUnsafeDestinations() {
+        QTemporaryDir root;
+        QVERIFY(QDir(root.path()).mkpath("destination"));
+        const QUrl folder = QUrl::fromLocalFile(root.filePath("destination"));
+        QFile original(root.filePath(QStringLiteral("Note 日本語.md")));
+        QVERIFY(original.open(QIODevice::WriteOnly)); original.write("saved text"); original.close();
+        Backend backend;
+        QQmlEngine engine;
+        engine.rootContext()->setContextProperty("backend", &backend);
+        QQmlComponent component(&engine, QUrl::fromLocalFile(QFINDTESTDATA("../src/Main.qml")));
+        QScopedPointer<QObject> window(component.create());
+        QVERIFY2(window, qPrintable(component.errorString()));
+        const QUrl oldUrl = QUrl::fromLocalFile(original.fileName());
+        backend.open(oldUrl);
+        auto *editor = window->findChild<QObject *>("sourceEditor");
+        auto *library = qobject_cast<FileLibrary *>(backend.library());
+        QVERIFY(editor && library);
+        library->toggleFavorite(oldUrl);
+        QVERIFY(QMetaObject::invokeMethod(editor, "insert", Q_ARG(int, 10), Q_ARG(QString, QStringLiteral(" café"))));
+        const QString dirty = editor->property("text").toString();
+        QVERIFY(!backend.moveDocument(QUrl("https://example.com/")));
+        QVERIFY(!backend.moveDocument(QUrl::fromLocalFile(root.filePath("missing"))));
+        QVERIFY(backend.moveDocument(QUrl::fromLocalFile(root.path()))); // Same folder is a no-op.
+        QCOMPARE(backend.fileUrl(), oldUrl);
+        QFile destination(root.filePath(QStringLiteral("destination/Note 日本語.md")));
+        QVERIFY(destination.open(QIODevice::WriteOnly)); destination.write("occupied"); destination.close();
+        QVERIFY(!backend.moveDocument(folder));
+        QVERIFY(destination.open(QIODevice::ReadOnly)); QCOMPARE(destination.readAll(), QByteArray("occupied")); destination.close();
+        QVERIFY(destination.remove());
+        // A dangling symlink is a collision, too.
+        QVERIFY(QFile::link(root.filePath("missing-target"), destination.fileName()));
+        QVERIFY(!backend.moveDocument(folder));
+        QVERIFY(destination.remove());
+        // Destination remains writable, but removing the original must fail.
+        const auto permissions = QFile::permissions(root.path());
+        QVERIFY(QFile::setPermissions(root.path(), QFileDevice::ReadOwner | QFileDevice::ExeOwner));
+        const bool movedFromReadOnlyDirectory = backend.moveDocument(folder);
+        QVERIFY(QFile::setPermissions(root.path(), permissions));
+        QVERIFY(!movedFromReadOnlyDirectory);
+        QVERIFY(original.exists());
+        QVERIFY(destination.exists());
+        QCOMPARE(backend.fileUrl(), oldUrl);
+        QVERIFY(backend.modified());
+        QVERIFY(backend.status().contains("both files remain"));
+        QVERIFY(destination.remove());
+        auto *moveDialog = window->findChild<QObject *>("moveFolderDialog");
+        QVERIFY(moveDialog);
+        QVERIFY(moveDialog->setProperty("currentFolder", QUrl::fromLocalFile(root.path())));
+        QVERIFY(QMetaObject::invokeMethod(moveDialog, "open"));
+        QTRY_VERIFY(moveDialog->property("visible").toBool());
+        QVERIFY(moveDialog->setProperty("selectedFolder", folder));
+        QTRY_COMPARE(moveDialog->property("selectedFolder").toUrl(), folder);
+        QVERIFY(QMetaObject::invokeMethod(moveDialog, "accept"));
+        QVERIFY2(!original.exists(), qPrintable(backend.status()));
+        const QUrl moved = backend.fileUrl();
+        QCOMPARE(moved, QUrl::fromLocalFile(QFileInfo(destination).canonicalFilePath()));
+        QVERIFY(backend.modified());
+        QCOMPARE(editor->property("text").toString(), dirty);
+        QVERIFY(destination.open(QIODevice::ReadOnly)); QCOMPARE(destination.readAll(), QByteArray("saved text")); destination.close();
+        QCOMPARE(library->favorites().last().toMap().value("url").toUrl(), moved);
+        bool recentFound = false;
+        for (const auto &entry : library->recentFiles()) {
+            const QUrl url = entry.toMap().value("url").toUrl();
+            QVERIFY(url != oldUrl);
+            if (url == moved) recentFound = true;
+        }
+        QVERIFY(recentFound);
+        bool snapshotFound = false;
+        const QDir recovery(QStandardPaths::writableLocation(QStandardPaths::AppDataLocation));
+        for (const QString &name : recovery.entryList({"recovery-*.json"}, QDir::Files)) {
+            QFile snapshot(recovery.filePath(name)); QVERIFY(snapshot.open(QIODevice::ReadOnly));
+            const auto data = QJsonDocument::fromJson(snapshot.readAll()).object();
+            if (QUrl(data.value("fileUrl").toString()) == moved) {
+                QCOMPARE(data.value("text").toString(), dirty); snapshotFound = true;
+            }
+        }
+        QVERIFY(snapshotFound);
+        QVERIFY(QMetaObject::invokeMethod(editor, "undo"));
+        QCOMPARE(editor->property("text").toString(), QStringLiteral("saved text"));
+        QVERIFY(QMetaObject::invokeMethod(editor, "redo"));
+        QCOMPARE(editor->property("text").toString(), dirty);
+        backend.save();
+        QVERIFY(!backend.modified());
+        QVERIFY(destination.open(QIODevice::ReadOnly)); QCOMPARE(destination.readAll(), dirty.toUtf8()); destination.close();
+        QSignalSpy changed(&backend, &Backend::externalChangeDetected);
+        QVERIFY(destination.open(QIODevice::WriteOnly | QIODevice::Truncate)); destination.write("external"); destination.close();
+        QVERIFY(!backend.moveDocument(QUrl::fromLocalFile(root.path())));
+        QCOMPARE(backend.fileUrl(), moved);
+        QVERIFY(!original.exists());
+        QTRY_COMPARE(changed.count(), 1);
+        backend.discardRecovery();
+    }
+
+    void duplicateAndRenamePreserveDocumentState() {
+        QTemporaryDir directory;
+        QFile original(directory.filePath("Original.md"));
+        QVERIFY(original.open(QIODevice::WriteOnly)); original.write("saved text"); original.close();
+        Backend backend;
+        QQmlEngine engine;
+        engine.rootContext()->setContextProperty("backend", &backend);
+        QQmlComponent component(&engine, QUrl::fromLocalFile(QFINDTESTDATA("../src/Main.qml")));
+        QScopedPointer<QObject> window(component.create());
+        QVERIFY2(window, qPrintable(component.errorString()));
+        backend.open(QUrl::fromLocalFile(original.fileName()));
+        auto *editor = window->findChild<QObject *>("sourceEditor");
+        auto *library = qobject_cast<FileLibrary *>(backend.library());
+        QVERIFY(editor && library);
+        library->toggleFavorite(backend.fileUrl());
+        QVERIFY(QMetaObject::invokeMethod(editor, "insert", Q_ARG(int, 10), Q_ARG(QString, QStringLiteral(" café 日本語"))));
+        const QString dirty = editor->property("text").toString();
+        QVERIFY(backend.modified());
+        QVERIFY(backend.duplicateDocument("Copy.md"));
+        QCOMPARE(backend.fileUrl(), QUrl::fromLocalFile(original.fileName()));
+        QVERIFY(backend.modified());
+        QFile copy(directory.filePath("Copy.md"));
+        QVERIFY(copy.open(QIODevice::ReadOnly)); QCOMPARE(copy.readAll(), dirty.toUtf8()); copy.close();
+        QVERIFY(!backend.duplicateDocument("Copy.md"));
+        QVERIFY(!backend.duplicateDocument("../escape.md"));
+        QVERIFY(!backend.renameDocument("Copy.md"));
+        QVERIFY(!backend.renameDocument("../escape.md"));
+        QVERIFY(backend.renameDocument("Renamed 日本語.md"));
+        QVERIFY(!QFileInfo::exists(original.fileName()));
+        QCOMPARE(editor->property("text").toString(), dirty);
+        QVERIFY(backend.modified());
+        const QUrl renamed = backend.fileUrl();
+        bool recoveryUpdated = false;
+        const QDir recoveryDirectory(QStandardPaths::writableLocation(QStandardPaths::AppDataLocation));
+        for (const QString &name : recoveryDirectory.entryList({"recovery-*.json"}, QDir::Files)) {
+            QFile snapshot(recoveryDirectory.filePath(name));
+            QVERIFY(snapshot.open(QIODevice::ReadOnly));
+            const auto data = QJsonDocument::fromJson(snapshot.readAll()).object();
+            if (QUrl(data.value("fileUrl").toString()) == renamed) {
+                QCOMPARE(data.value("text").toString(), dirty);
+                recoveryUpdated = true;
+            }
+        }
+        QVERIFY(recoveryUpdated);
+        QFile disk(renamed.toLocalFile());
+        QVERIFY(disk.open(QIODevice::ReadOnly)); QCOMPARE(disk.readAll(), QByteArray("saved text")); disk.close();
+        QCOMPARE(library->favorites().last().toMap().value("url").toUrl(), QUrl::fromLocalFile(QFileInfo(disk).canonicalFilePath()));
+        bool found = false;
+        for (const auto &entry : library->recentFiles())
+            if (entry.toMap().value("url").toUrl() == QUrl::fromLocalFile(QFileInfo(disk).canonicalFilePath())) found = true;
+        QVERIFY(found);
+        QVERIFY(QMetaObject::invokeMethod(editor, "undo"));
+        QCOMPARE(editor->property("text").toString(), QStringLiteral("saved text"));
+        QVERIFY(QMetaObject::invokeMethod(editor, "redo"));
+        QCOMPARE(editor->property("text").toString(), dirty);
+        backend.save();
+        QVERIFY(!backend.modified());
+        QVERIFY(disk.open(QIODevice::ReadOnly)); QCOMPARE(disk.readAll(), dirty.toUtf8()); disk.close();
+        QSignalSpy externalChangeSpy(&backend, &Backend::externalChangeDetected);
+        QVERIFY(disk.open(QIODevice::WriteOnly | QIODevice::Truncate)); disk.write("external edit"); disk.close();
+        QVERIFY(!backend.renameDocument("Must-not-rename.md"));
+        QCOMPARE(backend.fileUrl(), renamed);
+        QVERIFY(QFileInfo::exists(renamed.toLocalFile()));
+        QVERIFY(!QFileInfo::exists(directory.filePath("Must-not-rename.md")));
+        QTRY_COMPARE(externalChangeSpy.count(), 1);
+        backend.discardRecovery();
+    }
+
+    void explicitRevealClearsFilterAndFindsOutsideRoot() {
+        QTemporaryDir first, second;
+        QVERIFY(QDir(first.path()).mkpath("nested/deep"));
+        QFile inside(first.filePath("nested/deep/Note.md"));
+        QVERIFY(inside.open(QIODevice::WriteOnly)); inside.write("inside"); inside.close();
+        QFile outside(second.filePath("Other.md"));
+        QVERIFY(outside.open(QIODevice::WriteOnly)); outside.write("outside"); outside.close();
+        FileLibrary library;
+        library.setRootFolder(QUrl::fromLocalFile(first.path()));
+        library.setFilter("does-not-match");
+        int row = library.showFile(QUrl::fromLocalFile(inside.fileName()));
+        QVERIFY(row >= 0);
+        QVERIFY(library.filter().isEmpty());
+        QCOMPARE(library.entries().at(row).toMap().value("name").toString(), QStringLiteral("Note.md"));
+        row = library.showFile(QUrl::fromLocalFile(outside.fileName()));
+        QVERIFY(row >= 0);
+        QCOMPARE(library.rootFolder(), QUrl::fromLocalFile(QFileInfo(second.path()).canonicalFilePath()));
+        QCOMPARE(library.showFile(QUrl::fromLocalFile(second.filePath("missing.md"))), -1);
+        QVERIFY(!library.error().isEmpty());
+        QCOMPARE(library.showFile(QUrl("https://example.com/note.md")), -1);
+    }
+
+    void newAndCreateRespectUnsavedCancellation() {
+        QTemporaryDir directory;
+        QFile sample(directory.filePath("original.md"));
+        QVERIFY(sample.open(QIODevice::WriteOnly)); sample.write("original"); sample.close();
+        Backend backend;
+        QQmlEngine engine;
+        engine.rootContext()->setContextProperty("backend", &backend);
+        QQmlComponent component(&engine, QUrl::fromLocalFile(QFINDTESTDATA("../src/Main.qml")));
+        QScopedPointer<QObject> window(component.create());
+        QVERIFY2(window, qPrintable(component.errorString()));
+        backend.open(QUrl::fromLocalFile(sample.fileName()));
+        backend.library()->setProperty("rootFolder", QUrl::fromLocalFile(directory.path()));
+        auto *editor = window->findChild<QObject *>("sourceEditor");
+        QVERIFY(editor);
+        editor->setProperty("text", "unsaved text");
+        QVERIFY(backend.modified());
+        QVERIFY(QMetaObject::invokeMethod(window.data(), "requestCreateDocument",
+                Q_ARG(QVariant, QStringLiteral("created.md")), Q_ARG(QVariant, false)));
+        QCOMPARE(window->property("pendingAction").toString(), QStringLiteral("create"));
+        QVERIFY(!QFileInfo::exists(directory.filePath("created.md")));
+        // Cancel leaves the original buffer and filesystem intact.
+        auto *prompt = window->findChild<QObject *>("unsavedChangesPrompt");
+        QVERIFY(prompt);
+        QVERIFY(QMetaObject::invokeMethod(prompt, "reject"));
+        QVERIFY(window->property("pendingAction").toString().isEmpty());
+        QCOMPARE(editor->property("text").toString(), QStringLiteral("unsaved text"));
+        QVERIFY(!QFileInfo::exists(directory.filePath("created.md")));
+        // Save successfully, then resume the requested creation.
+        QVERIFY(QMetaObject::invokeMethod(window.data(), "requestCreateDocument",
+                Q_ARG(QVariant, QStringLiteral("created.md")), Q_ARG(QVariant, false)));
+        window->setProperty("awaitingPendingSave", true);
+        backend.save();
+        QVERIFY(QFileInfo::exists(directory.filePath("created.md")));
+        QCOMPARE(backend.fileUrl(), QUrl::fromLocalFile(QFileInfo(directory.filePath("created.md")).canonicalFilePath()));
+        QVERIFY(sample.open(QIODevice::ReadOnly));
+        QCOMPARE(sample.readAll(), QByteArray("unsaved text")); sample.close();
+        // A collision cannot replace either the file or the current dirty buffer.
+        editor->setProperty("text", "keep me");
+        QVERIFY(QMetaObject::invokeMethod(window.data(), "requestCreateDocument",
+                Q_ARG(QVariant, QStringLiteral("original.md")), Q_ARG(QVariant, false)));
+        QVERIFY(QMetaObject::invokeMethod(window.data(), "completePendingAction"));
+        QCOMPARE(editor->property("text").toString(), QStringLiteral("keep me"));
+        QVERIFY(backend.modified());
+        // New is guarded, and accepted New resets URL, contents and undo.
+        QVERIFY(QMetaObject::invokeMethod(window.data(), "requestNewDocument"));
+        QCOMPARE(window->property("pendingAction").toString(), QStringLiteral("new"));
+        QCOMPARE(editor->property("text").toString(), QStringLiteral("keep me"));
+        QVERIFY(QMetaObject::invokeMethod(window.data(), "completePendingAction"));
+        QVERIFY(backend.fileUrl().isEmpty());
+        QVERIFY(editor->property("text").toString().isEmpty());
+        QVERIFY(!backend.modified());
+        QVERIFY(!editor->property("canUndo").toBool());
+        QVERIFY(!backend.showInFinder());
+        QVERIFY(!backend.openInNewWindow(QUrl::fromLocalFile(directory.filePath("absent.md"))));
+    }
+
+    void recentMenuTracksLibraryAndGuardsOpen() {
+        QTemporaryDir directory;
+        QFile sample(directory.filePath("Recent.md"));
+        QVERIFY(sample.open(QIODevice::WriteOnly)); sample.write("recent"); sample.close();
+        Backend backend;
+        QQmlEngine engine;
+        engine.rootContext()->setContextProperty("backend", &backend);
+        QQmlComponent component(&engine, QUrl::fromLocalFile(QFINDTESTDATA("../src/Main.qml")));
+        QScopedPointer<QObject> window(component.create());
+        QVERIFY2(window, qPrintable(component.errorString()));
+        auto *library = qobject_cast<FileLibrary *>(backend.library());
+        QVERIFY(library);
+        library->clearRecentFiles();
+        library->recordRecentFile(QUrl::fromLocalFile(sample.fileName()));
+        QCoreApplication::processEvents();
+#ifdef Q_OS_MACOS
+        int count = 0;
+        for (auto *item : window->findChildren<QObject *>()) {
+            if (item->property("text").toString().startsWith("Recent.md — ")) {
+                ++count;
+                QVERIFY(QMetaObject::invokeMethod(item, "triggered"));
+                break; // Opening reorders/recreates the dynamic menu delegates.
+            }
+        }
+        QCOMPARE(count, 1);
+        QCOMPARE(backend.fileUrl(), QUrl::fromLocalFile(QFileInfo(sample.fileName()).canonicalFilePath()));
+#endif
+        auto *editor = window->findChild<QObject *>("sourceEditor");
+        QVERIFY(editor);
+        editor->setProperty("text", "preserve dirty buffer");
+        QVERIFY(sample.remove());
+        QVERIFY(QMetaObject::invokeMethod(window.data(), "requestOpen", Q_ARG(QVariant, QUrl::fromLocalFile(sample.fileName()))));
+        QCOMPARE(window->property("pendingAction").toString(), QStringLiteral("open"));
+        QVERIFY(QMetaObject::invokeMethod(window.data(), "completePendingAction"));
+        QCOMPARE(editor->property("text").toString(), QStringLiteral("preserve dirty buffer"));
+        QVERIFY(backend.modified());
+        QVERIFY(backend.status().startsWith("Could not open"));
+        library->clearRecentFiles();
+        QCoreApplication::processEvents();
+        QVERIFY(library->recentFiles().isEmpty());
+    }
+
+    void nativeWorkspaceMenusShareState() {
+        Backend backend;
+        QQmlEngine engine;
+        engine.rootContext()->setContextProperty("backend", &backend);
+        QQmlComponent component(&engine, QUrl::fromLocalFile(QFINDTESTDATA("../src/Main.qml")));
+        QVERIFY2(component.isReady(), qPrintable(component.errorString()));
+        QScopedPointer<QObject> window(component.create());
+        QVERIFY(window);
+        auto *settings = window->findChild<QObject *>("workspaceSettings");
+        auto *pane = window->findChild<QObject *>("libraryPane");
+        QVERIFY(settings && pane);
+        auto native = [&](const char *id) { return window->findChild<QObject *>(QStringLiteral("native_") + id); };
+        auto *libraryAction = native("library");
+#ifdef Q_OS_MACOS
+        QVERIFY(libraryAction);
+#else
+        QSKIP("Native menus are macOS-specific");
+#endif
+        settings->setProperty("libraryVisible", true);
+        settings->setProperty("organizerVisible", true);
+        QVERIFY(QMetaObject::invokeMethod(libraryAction, "triggered"));
+        QVERIFY(!settings->property("libraryVisible").toBool());
+        QCOMPARE(libraryAction->property("text").toString(), QStringLiteral("Show Library"));
+        QVERIFY(!native("organizer")->property("enabled").toBool());
+        settings->setProperty("libraryVisible", true);
+        QCOMPARE(libraryAction->property("text").toString(), QStringLiteral("Hide Library"));
+        window->setProperty("width", 800);
+        QTRY_VERIFY(!native("organizer")->property("enabled").toBool());
+        window->setProperty("width", 1280);
+        QTRY_VERIFY(native("organizer")->property("enabled").toBool());
+        for (const auto &pair : {qMakePair("sortBar", "showSortBar"), qMakePair("filterBar", "showFilterBar"),
+                                qMakePair("dates", "showDates"), qMakePair("excerpts", "showExcerpts")}) {
+            auto *action = native(pair.first);
+            QVERIFY(action);
+            pane->setProperty(pair.second, false);
+            QVERIFY(QMetaObject::invokeMethod(action, "triggered"));
+            QVERIFY(pane->property(pair.second).toBool());
+            QVERIFY(action->property("checked").toBool());
+            pane->setProperty(pair.second, false);
+            QVERIFY(!action->property("checked").toBool());
+            QVERIFY(QMetaObject::invokeMethod(action, "triggered"));
+            QVERIFY(action->property("checked").toBool());
+        }
+        QVERIFY(QMetaObject::invokeMethod(native("sortCreated"), "triggered"));
+        QCOMPARE(backend.library()->property("sortMode").toInt(), 2);
+        QVERIFY(native("sortCreated")->property("checked").toBool());
+        backend.library()->setProperty("sortMode", 0);
+        QVERIFY(!native("sortCreated")->property("checked").toBool());
+        QVERIFY(native("sortName")->property("checked").toBool());
+        QVERIFY(QMetaObject::invokeMethod(native("descending"), "triggered"));
+        QVERIFY(!backend.library()->property("ascending").toBool());
+        QVERIFY(!native("ascending")->property("checked").toBool());
+        // Restore the shared test preferences for following existing tests.
+        pane->setProperty("showDates", false);
+        pane->setProperty("showExcerpts", false);
+        backend.library()->setProperty("ascending", true);
+    }
+
+    void workspacePresentationPreservesSourceAndUndo() {
+        QTemporaryDir directory;
+        QFile sample(directory.filePath("menu.md"));
+        QVERIFY(sample.open(QIODevice::WriteOnly));
+        const QByteArray source("# Menu check\n\nPlain **Markdown**.\n");
+        QCOMPARE(sample.write(source), source.size());
+        sample.close();
+        Backend backend;
+        QQmlEngine engine;
+        engine.rootContext()->setContextProperty("backend", &backend);
+        QQmlComponent component(&engine, QUrl::fromLocalFile(QFINDTESTDATA("../src/Main.qml")));
+        QScopedPointer<QObject> window(component.create());
+        QVERIFY2(window, qPrintable(component.errorString()));
+        backend.open(QUrl::fromLocalFile(sample.fileName()));
+        auto *commands = window->findChild<QObject *>("workspaceCommands");
+        auto *settings = window->findChild<QObject *>("workspaceSettings");
+        auto *editor = window->findChild<QObject *>("sourceEditor");
+        QVERIFY(commands && settings && editor);
+        auto run = [&](const char *id) { return QMetaObject::invokeMethod(commands, "run", Q_ARG(QVariant, QString::fromLatin1(id))); };
+        for (const auto *id : {"editor", "split", "preview", "split", "paragraph", "typewriter", "serif", "mono", "sans", "markup", "reloadPreview"})
+            QVERIFY(run(id));
+        auto *preview = window->findChild<QObject *>("previewPane");
+        QVERIFY(preview);
+        QTRY_COMPARE(preview->property("renderedMarkdown").toString(), QString::fromUtf8(source));
+        QCOMPARE(editor->property("text").toString(), QString::fromUtf8(source));
+        QVERIFY(!backend.modified());
+        QVERIFY(!editor->property("canUndo").toBool());
+        settings->setProperty("writingSize", 32);
+        QVERIFY(run("larger"));
+        QCOMPARE(settings->property("writingSize").toInt(), 32);
+        settings->setProperty("writingSize", 12);
+        QVERIFY(run("smaller"));
+        QCOMPARE(settings->property("writingSize").toInt(), 12);
+        QVERIFY(run("resetSize"));
+        QCOMPARE(settings->property("writingSize").toInt(), 16);
+        settings->setProperty("paragraphFocus", false);
+        settings->setProperty("typewriter", false);
+        settings->setProperty("showMarkup", true);
+    }
+
+    void sharedFormattingCommandsPreserveUndo() {
+        QTemporaryDir directory;
+        QFile sample(directory.filePath("format.md"));
+        QVERIFY(sample.open(QIODevice::WriteOnly));
+        sample.write("sample");
+        sample.close();
+        Backend backend;
+        QQmlEngine engine;
+        engine.rootContext()->setContextProperty("backend", &backend);
+        QQmlComponent component(&engine, QUrl::fromLocalFile(QFINDTESTDATA("../src/Main.qml")));
+        QScopedPointer<QObject> window(component.create());
+        QVERIFY2(window, qPrintable(component.errorString()));
+        auto *commands = window->findChild<QObject *>("workspaceCommands");
+        auto *editor = window->findChild<QObject *>("sourceEditor");
+        QVERIFY(commands && editor);
+        for (const auto &pair : {qMakePair("strike", "~~sample~~"), qMakePair("inlineCode", "`sample`")}) {
+            backend.open(QUrl::fromLocalFile(sample.fileName()));
+            QVERIFY(QMetaObject::invokeMethod(editor, "select", Q_ARG(int, 0), Q_ARG(int, 6)));
+            QVERIFY(QMetaObject::invokeMethod(commands, "run", Q_ARG(QVariant, QString::fromLatin1(pair.first))));
+            QCOMPARE(editor->property("text").toString(), QString::fromLatin1(pair.second));
+            QCOMPARE(editor->property("selectedText").toString(), QStringLiteral("sample"));
+            QVERIFY(QMetaObject::invokeMethod(editor, "undo"));
+            QCOMPARE(editor->property("text").toString(), QStringLiteral("sample"));
+            QVERIFY(QMetaObject::invokeMethod(editor, "redo"));
+            QCOMPARE(editor->property("text").toString(), QString::fromLatin1(pair.second));
+            QVERIFY(QMetaObject::invokeMethod(editor, "undo"));
+        }
+        // The same C++ mutation handles reversed and empty selections.
+        auto selection = backend.wrapSelection(6, 0, "**", "**");
+        QCOMPARE(editor->property("text").toString(), QStringLiteral("**sample**"));
+        QCOMPARE(selection.value("start").toInt(), 2);
+        QCOMPARE(selection.value("end").toInt(), 8);
+        QVERIFY(QMetaObject::invokeMethod(editor, "undo"));
+        selection = backend.wrapSelection(6, 6, "`", "`");
+        QCOMPARE(editor->property("text").toString(), QStringLiteral("sample``"));
+        QCOMPARE(selection.value("start").toInt(), 7);
+        QCOMPARE(selection.value("end").toInt(), 7);
+        QVERIFY(QMetaObject::invokeMethod(editor, "undo"));
+        QCOMPARE(editor->property("text").toString(), QStringLiteral("sample"));
     }
 
     void sortMenuAppliesFieldAndDirection() {

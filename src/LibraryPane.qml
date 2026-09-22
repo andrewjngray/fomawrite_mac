@@ -7,6 +7,11 @@ import QtQuick.Dialogs as Dialogs
 Rectangle {
     id: root
     required property var library
+    required property var commands
+    property alias showSortBar: displaySettings.showSortBar
+    property alias showFilterBar: displaySettings.showFilterBar
+    property alias showDates: displaySettings.showDates
+    property alias showExcerpts: displaySettings.showExcerpts
     property url currentFile
     property bool darkMode: false
     Settings {
@@ -26,10 +31,20 @@ Rectangle {
         }
     }
     signal openRequested(url file)
+    signal createRequested(string name, bool inNewWindow)
     color: darkMode ? "#202124" : "#fafaf9"
     objectName: "libraryPane"
     function chooseFolder() { folderDialog.open(); }
-    function newDocument() { newFileDialog.open(); }
+    function newDocument(inNewWindow) { newFileDialog.inNewWindow = !!inNewWindow; newFileDialog.open(); }
+    function newFolder() { newFolderDialog.open(); }
+    function showCurrentFile() {
+        var index = library.showFile(currentFile);
+        if (index >= 0) Qt.callLater(function() {
+            fileList.currentIndex = index;
+            fileList.positionViewAtIndex(index, ListView.Contain);
+        });
+        return index >= 0;
+    }
     function showOptions(anchor) { folderMenu.parent = anchor; folderMenu.x = anchor.width - folderMenu.width; folderMenu.y = anchor.height + 3; folderMenu.open(); }
 
     ColumnLayout {
@@ -64,7 +79,7 @@ Rectangle {
                 darkMode: root.darkMode
                 checkable: true
                 checked: displaySettings.showExcerpts
-                onClicked: displaySettings.showExcerpts = checked
+                onClicked: root.commands.run("excerpts")
             }
         }
         Label {
@@ -106,7 +121,7 @@ Rectangle {
                     spacing: 7
                     LineIcon {
                         name: entry.modelData.directory ? "folder" : "editor"
-                        ink: root.darkMode ? "#b4b4b4" : "#666666"
+                        ink: entry.modelData.directory ? (root.darkMode ? "#63c9f1" : "#159dcc") : (root.darkMode ? "#b4b4b4" : "#666666")
                         Layout.preferredWidth: 18
                         Layout.preferredHeight: 18
                     }
@@ -122,7 +137,7 @@ Rectangle {
                     }
                     LineIcon { visible: entry.modelData.directory; name: entry.modelData.expanded ? "down" : "right"; ink: "#92969e"; Layout.preferredWidth: 14; Layout.preferredHeight: 14 }
                 }
-                ToolTip.delay: 700
+                ToolTip.delay: 2000
                 ToolTip.visible: hovered
                 ToolTip.text: modelData.url.toString()
             }
@@ -158,18 +173,18 @@ Rectangle {
         ButtonGroup { id: sortFieldGroup }
         ButtonGroup { id: sortDirectionGroup }
         darkMode: root.darkMode
-        CompactMenuItem { text: "Date Modified"; ButtonGroup.group: sortFieldGroup; checkable: true; checked: root.library.sortMode === 1; onTriggered: root.library.sortMode = 1 }
-        CompactMenuItem { text: "Date Created"; ButtonGroup.group: sortFieldGroup; checkable: true; checked: root.library.sortMode === 2; onTriggered: root.library.sortMode = 2 }
-        CompactMenuItem { text: "Name"; ButtonGroup.group: sortFieldGroup; checkable: true; checked: root.library.sortMode === 0; onTriggered: root.library.sortMode = 0 }
-        CompactMenuItem { text: "Extension"; ButtonGroup.group: sortFieldGroup; checkable: true; checked: root.library.sortMode === 3; onTriggered: root.library.sortMode = 3 }
+        CompactMenuItem { text: "Date Modified"; ButtonGroup.group: sortFieldGroup; checkable: true; checked: root.library.sortMode === 1; onTriggered: root.commands.run("sortModified") }
+        CompactMenuItem { text: "Date Created"; ButtonGroup.group: sortFieldGroup; checkable: true; checked: root.library.sortMode === 2; onTriggered: root.commands.run("sortCreated") }
+        CompactMenuItem { text: "Name"; ButtonGroup.group: sortFieldGroup; checkable: true; checked: root.library.sortMode === 0; onTriggered: root.commands.run("sortName") }
+        CompactMenuItem { text: "Extension"; ButtonGroup.group: sortFieldGroup; checkable: true; checked: root.library.sortMode === 3; onTriggered: root.commands.run("sortExtension") }
         MenuSeparator { padding: 4; implicitHeight: 9; contentItem: Rectangle { implicitHeight: 1; color: root.darkMode ? "#45484e" : "#dedfe2" } }
-        CompactMenuItem { text: "A to Z"; ButtonGroup.group: sortDirectionGroup; checkable: true; checked: root.library.ascending; onTriggered: root.library.ascending = true }
-        CompactMenuItem { text: "Z to A"; ButtonGroup.group: sortDirectionGroup; checkable: true; checked: !root.library.ascending; onTriggered: root.library.ascending = false }
+        CompactMenuItem { text: "A to Z"; ButtonGroup.group: sortDirectionGroup; checkable: true; checked: root.library.ascending; onTriggered: root.commands.run("ascending") }
+        CompactMenuItem { text: "Z to A"; ButtonGroup.group: sortDirectionGroup; checkable: true; checked: !root.library.ascending; onTriggered: root.commands.run("descending") }
         MenuSeparator { padding: 4; implicitHeight: 9; contentItem: Rectangle { implicitHeight: 1; color: root.darkMode ? "#45484e" : "#dedfe2" } }
-        CompactMenuItem { text: "Pin Folders to Top"; checkable: true; checked: root.library.foldersFirst; onTriggered: root.library.foldersFirst = !root.library.foldersFirst }
+        CompactMenuItem { text: "Pin Folders to Top"; checkable: true; checked: root.library.foldersFirst; onTriggered: root.commands.run("foldersFirst") }
         MenuSeparator { padding: 4; implicitHeight: 9; contentItem: Rectangle { implicitHeight: 1; color: root.darkMode ? "#45484e" : "#dedfe2" } }
-        CompactMenuItem { text: "Show Date"; checkable: true; checked: displaySettings.showDates; onTriggered: displaySettings.showDates = !displaySettings.showDates }
-        CompactMenuItem { text: "Show Text Excerpts"; checkable: true; checked: displaySettings.showExcerpts; onTriggered: displaySettings.showExcerpts = !displaySettings.showExcerpts }
+        CompactMenuItem { text: "Show Date"; checkable: true; checked: displaySettings.showDates; onTriggered: root.commands.run("dates") }
+        CompactMenuItem { text: "Show Text Excerpts"; checkable: true; checked: displaySettings.showExcerpts; onTriggered: root.commands.run("excerpts") }
     }
     LibrarySortMenu {
         id: sortMenu
@@ -181,19 +196,19 @@ Rectangle {
         id: folderMenu
         objectName: "libraryOptionsMenu"
         darkMode: root.darkMode
-        CompactMenuItem { text: "New File"; iconName: "plus"; enabled: root.library.rootFolder.toString() !== ""; onTriggered: newFileDialog.open() }
-        CompactMenuItem { text: "New Folder"; iconName: "folder"; enabled: root.library.rootFolder.toString() !== ""; onTriggered: newFolderDialog.open() }
+        CompactMenuItem { text: "New File"; iconName: "plus"; enabled: root.library.rootFolder.toString() !== ""; onTriggered: root.newDocument(false) }
+        CompactMenuItem { text: "New Folder"; iconName: "folder"; enabled: root.library.rootFolder.toString() !== ""; onTriggered: root.newFolder() }
         MenuSeparator {}
         LibrarySortMenu { title: "Sort By"; objectName: "libraryOptionsSortMenu" }
         CompactMenu {
             title: "View Options"
             darkMode: root.darkMode
-            CompactMenuItem { text: "Show Date"; checkable: true; checked: displaySettings.showDates; onTriggered: displaySettings.showDates = !displaySettings.showDates }
-            CompactMenuItem { text: "Show Text Excerpts"; checkable: true; checked: displaySettings.showExcerpts; onTriggered: displaySettings.showExcerpts = !displaySettings.showExcerpts }
+            CompactMenuItem { text: "Show Date"; checkable: true; checked: displaySettings.showDates; onTriggered: root.commands.run("dates") }
+            CompactMenuItem { text: "Show Text Excerpts"; checkable: true; checked: displaySettings.showExcerpts; onTriggered: root.commands.run("excerpts") }
         }
         MenuSeparator {}
-        CompactMenuItem { objectName: "toggleSortBar"; iconName: "sort"; text: displaySettings.showSortBar ? "Hide Sort Bar" : "Show Sort Bar"; onTriggered: displaySettings.showSortBar = !displaySettings.showSortBar }
-        CompactMenuItem { objectName: "toggleFilterBar"; iconName: "filter"; text: displaySettings.showFilterBar ? "Hide Filter Bar" : "Show Filter Bar"; onTriggered: displaySettings.showFilterBar = !displaySettings.showFilterBar }
+        CompactMenuItem { objectName: "toggleSortBar"; iconName: "sort"; text: displaySettings.showSortBar ? "Hide Sort Bar" : "Show Sort Bar"; onTriggered: root.commands.run("sortBar") }
+        CompactMenuItem { objectName: "toggleFilterBar"; iconName: "filter"; text: displaySettings.showFilterBar ? "Hide Filter Bar" : "Show Filter Bar"; onTriggered: root.commands.run("filterBar") }
         MenuSeparator {}
         CompactMenuItem { text: "Choose Folder…"; onTriggered: folderDialog.open() }
         CompactMenuItem { text: "Refresh"; onTriggered: root.library.refresh() }
@@ -205,16 +220,15 @@ Rectangle {
     }
     Dialog {
         id: newFileDialog
+        objectName: "newLibraryFileDialog"
+        property bool inNewWindow: false
         title: "New document"
         anchors.centerIn: parent
         modal: true
         width: 290
         standardButtons: Dialog.Ok | Dialog.Cancel
         onOpened: { newFileName.text = "Untitled.md"; newFileName.forceActiveFocus(); newFileName.selectAll(); }
-        onAccepted: {
-            var file = root.library.createDocument(newFileName.text)
-            if (file.toString() !== "") root.openRequested(file)
-        }
+        onAccepted: root.createRequested(newFileName.text, inNewWindow)
         TextField { id: newFileName; width: parent.width; placeholderText: "Document.md"; onAccepted: newFileDialog.accept() }
     }
     Dialog {

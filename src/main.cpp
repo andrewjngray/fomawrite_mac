@@ -11,6 +11,9 @@
 #include <QFile>
 #include <QFileOpenEvent>
 #include <functional>
+#include <QPointer>
+#include <QTimer>
+#include <QFileInfo>
 
 #include "backend.h"
 #include "systemtheme.h"
@@ -55,11 +58,7 @@ int main(int argc, char *argv[]) {
 
     QQuickStyle::setStyle(QStringLiteral("Material"));
 
-    Backend backend(&app);
     SystemTheme systemTheme(&app);
-    backend.setDarkMode(systemTheme.darkMode());
-    QObject::connect(&systemTheme, &SystemTheme::darkModeChanged, &backend,
-                     &Backend::setDarkMode);
 
     // Carry the desktop's text scale into the default font, so the chrome that
     // inherits it (dialog titles, buttons) grows along with the writing area.
@@ -78,45 +77,80 @@ int main(int argc, char *argv[]) {
     };
     applyInterfaceFont(systemTheme.textScale());
 
-    backend.setTextScale(systemTheme.textScale());
-    QObject::connect(&systemTheme, &SystemTheme::textScaleChanged, &backend,
-                     [&backend, applyInterfaceFont](qreal textScale) {
-        applyInterfaceFont(textScale);
-        backend.setTextScale(textScale);
-    });
-
-    QQmlApplicationEngine engine;
-    QObject::connect(&engine, &QQmlApplicationEngine::warnings, &app,
-                     [](const QList<QQmlError> &warnings) {
-        for (const QQmlError &warning : warnings)
-            qWarning().noquote() << warning.toString();
-    });
-    engine.rootContext()->setContextProperty(QStringLiteral("backend"), &backend);
-
-    engine.load(QUrl(QStringLiteral("qrc:/Main.qml")));
-    if (engine.rootObjects().isEmpty()) {
-        qCritical() << "Could not load the Omawrite interface; resource available:"
-                    << QFile::exists(QStringLiteral(":/Main.qml"));
-        return -1;
-    }
-
-#ifdef Q_OS_MACOS
-    configureMacWindowChrome(qobject_cast<QWindow *>(engine.rootObjects().constFirst()));
-#endif
-
-    backend.setParentWindow(qobject_cast<QWindow *>(engine.rootObjects().constFirst()));
-
-    app.openDocument = [&engine](const QUrl &url) {
-        QMetaObject::invokeMethod(engine.rootObjects().constFirst(), "requestOpen",
-                                  Q_ARG(QVariant, QVariant::fromValue(url)));
+    struct Session {
+        QPointer<Backend> backend;
+        QPointer<QQmlApplicationEngine> engine;
+        QPointer<QWindow> window;
     };
-    for (const QUrl &url : app.pendingDocuments)
-        app.openDocument(url);
-    app.pendingDocuments.clear();
-
+    QList<std::shared_ptr<Session>> sessions;
+    bool quitting = false;
+    std::function<void()> closeNext;
+    closeNext = [&] {
+        if (!quitting) return;
+        for (const auto &session : sessions) {
+            if (session->window) {
+                session->window->show();
+                session->window->raise();
+                session->window->requestActivate();
+                session->window->close();
+                return;
+            }
+        }
+        app.quit();
+    };
+    const auto focusExisting = [&](const QUrl &url, Backend *except) {
+        const auto path = QFileInfo(url.toLocalFile()).canonicalFilePath();
+        if (path.isEmpty()) return false;
+        for (const auto &session : sessions) {
+            if (session->backend && session->backend != except && session->window
+                && QFileInfo(session->backend->fileUrl().toLocalFile()).canonicalFilePath() == path) {
+                session->window->raise(); session->window->requestActivate(); return true;
+            }
+        }
+        return false;
+    };
+    std::function<void(const QUrl &)> createWindow;
+    createWindow = [&](const QUrl &url) {
+        if (!url.isEmpty() && focusExisting(url, nullptr)) return;
+        auto session = std::make_shared<Session>();
+        session->backend = new Backend(&app);
+        auto *backend = session->backend.data();
+        backend->setDarkMode(systemTheme.darkMode());
+        backend->setTextScale(systemTheme.textScale());
+        backend->focusExistingDocument = [&, backend](const QUrl &target) { return focusExisting(target, backend); };
+        QObject::connect(&systemTheme, &SystemTheme::darkModeChanged, backend, &Backend::setDarkMode);
+        QObject::connect(&systemTheme, &SystemTheme::textScaleChanged, backend, &Backend::setTextScale);
+        QObject::connect(backend, &Backend::newWindowRequested, &app, createWindow);
+        QObject::connect(backend, &Backend::quitRequested, &app, [&] { quitting = true; closeNext(); });
+        QObject::connect(backend, &Backend::quitCanceled, &app, [&] { quitting = false; });
+        session->engine = new QQmlApplicationEngine(&app);
+        session->engine->rootContext()->setContextProperty(QStringLiteral("backend"), backend);
+        session->engine->load(QUrl(QStringLiteral("qrc:/Main.qml")));
+        if (session->engine->rootObjects().isEmpty()) {
+            session->engine->deleteLater(); backend->deleteLater(); return;
+        }
+        session->window = qobject_cast<QWindow *>(session->engine->rootObjects().constFirst());
+        backend->setParentWindow(session->window);
+#ifdef Q_OS_MACOS
+        configureMacWindowChrome(session->window);
+#endif
+        sessions.append(session);
+        QObject::connect(backend, &Backend::windowClosed, &app, [&, session] {
+            QTimer::singleShot(0, &app, [&, session] {
+                sessions.removeAll(session);
+                if (session->engine) session->engine->deleteLater();
+                if (session->backend) session->backend->deleteLater();
+                if (quitting) closeNext();
+            });
+        });
+        if (!url.isEmpty() && !backend->modified()) backend->open(url);
+    };
+    QObject::connect(&systemTheme, &SystemTheme::textScaleChanged, &app, applyInterfaceFont);
+    app.openDocument = createWindow;
     const QStringList args = app.arguments();
-    if (args.size() > 1 && !backend.modified())
-        backend.open(QUrl::fromLocalFile(args.at(1)));
+    createWindow(args.size() > 1 ? QUrl::fromLocalFile(args.at(1)) : QUrl());
+    for (const QUrl &url : app.pendingDocuments) createWindow(url);
+    app.pendingDocuments.clear();
 
     return app.exec();
 }

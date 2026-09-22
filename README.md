@@ -44,9 +44,11 @@ On macOS use **Command-S/O/N/P/F/B/I/K**, **Shift-Command-S** for Save As, **Opt
 
 Try `./bin/run examples/Workspace-tour.md`. Use the sidebar toggles to show/hide the library and organizer, the outline icon to jump to headings, and **Aa** for writing options, and the word count for statistics. Files remain ordinary UTF-8 Markdown. The library filter currently covers files in expanded folders. Preview uses Qt Markdown; it does not yet offer iA Writer's complete extensions, web/PDF template system or publishing integrations.
 
-## Latest review: Cycle 8
+## Latest build: closeout implementation pass, Cycles 20b–28
 
-The Sort by control now uses a rounded compact menu with sort-field/order choices and date/excerpt visibility toggles. The interface has a unified macOS title/toolbar area, balanced writing and preview panes, smaller default text, navy accents, and file dates/excerpts. Use the preview triangle to show/hide preview and its bottom Split/Full controls to change layout. The preview check fixture is `examples/Preview-check.md`: `# title` is a heading; `#title` remains literal text. Fenced Markdown stays literal in both panes. See [screenshots and verification records](research/cycle-08/README.md) and [the short usability checklist](research/usability/cycle-08.md).
+Command palette and sentence focus; bounded saved-content/tag searches and saved queries; preview extensions/TOC/scroll synchronization; HTML/PDF export and basic output styles; shared-process windows/native tabs; opt-in autosave and saved-file versions; selection spelling/analysis and manual authorship annotations.
+
+Build and all 48 tests pass. Both bundles refreshed. Representative native workflows and a basic PDF export were checked. **Full parity/release closeout is still pending**: the [closeout audit](docs/closeout-audit.md) distinguishes working subsets from unfinished templates, services, authorship workflows and QA. Read the [new-feature guide](docs/new-feature-guide.md) before using the optional autosave/annotation features on important writing.
 
 ## Build cycles and feedback
 
@@ -66,3 +68,8 @@ See [the cycle log and short usability exercises](docs/build-cycles.md) for each
 ## Attribution
 
 Omawrite is copyright David Heinemeier Hansson, under the [MIT license](LICENSE), retained here. Bundled iA Writer Mono fonts are copyright Information Architects Inc., based on IBM Plex, and distributed under the [SIL Open Font License](fonts/OFL.txt).
+
+
+### Cycle 29 source checkpoint
+
+Authorship metadata now follows Duplicate, Rename and Move; current verification is 51 passing tests. See [Cycle 29](research/cycle-29/README.md), the [remaining closeout work](docs/closeout-audit.md), and [GitHub snapshot scope](docs/github-snapshot.md). The project remains an early personal editor, with the original parity plan still open.

@@ -29,3 +29,8 @@ RESOURCES += src/resources.qrc
 
 SOURCES += src/filelibrary.cpp
 HEADERS += src/filelibrary.h
+
+QT += concurrent
+
+SOURCES += src/markdownextensions.cpp
+HEADERS += src/markdownextensions.h
