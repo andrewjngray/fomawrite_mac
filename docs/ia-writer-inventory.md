@@ -177,3 +177,7 @@ Manual authorship annotations now follow Duplicate, Rename and Move, with collis
 ### Cycle 30 user-requested addition
 
 Open by Path accepts a local Markdown/text file or folder path. Native menu/keyboard and unsaved-change checks pass; 53 tests total. This is an Omawrite workflow addition, not a claim of complete reference-app parity.
+
+### Cycle 31 polish
+
+Library filter now uses a fixed placeholder and bounded rounded field at narrow widths. 54 tests pass; native focused appearance checked. No change to filter matching semantics.

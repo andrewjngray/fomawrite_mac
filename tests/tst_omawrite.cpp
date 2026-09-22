@@ -36,6 +36,34 @@ private slots:
                            m_settingsDirectory.path());
     }
 
+    void libraryFilterStaysInsideNarrowPane() {
+        Backend backend;
+        QQmlEngine engine; engine.rootContext()->setContextProperty("backend", &backend);
+        QQmlComponent component(&engine, QUrl::fromLocalFile(QFINDTESTDATA("../src/Main.qml")));
+        QScopedPointer<QObject> window(component.create()); QVERIFY2(window, qPrintable(component.errorString()));
+        auto *settings = window->findChild<QObject *>("workspaceSettings");
+        settings->setProperty("libraryVisible", true);
+        settings->setProperty("organizerVisible", false);
+        auto *pane = window->findChild<QQuickItem *>("libraryPane");
+        auto *field = window->findChild<QQuickItem *>("libraryFilter");
+        QVERIFY(pane); QVERIFY(field);
+        pane->setProperty("showFilterBar", true);
+        for (int width : {1100, 900, 720}) {
+            window->setProperty("width", width);
+            QTest::qWait(50);
+            field->forceActiveFocus();
+            const QPointF position = field->mapToItem(pane, QPointF());
+            QVERIFY(position.x() >= 0);
+            QVERIFY2(position.x() + field->width() <= pane->width(), "Filter extends past library edge");
+            QVERIFY(field->width() > 0);
+        }
+        // Long filter text must scroll within the input, not enlarge the pill.
+        field->setProperty("text", QString(300, 'x'));
+        QTest::qWait(50);
+        QVERIFY(field->mapToItem(pane, QPointF()).x() + field->width() <= pane->width());
+        backend.discardRecovery();
+    }
+
     void resolvesLocalFileAndFolderPaths() {
         QTemporaryDir directory;
         const QString path = directory.filePath("a # café.md");

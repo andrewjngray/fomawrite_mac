@@ -569,3 +569,14 @@ Planned scope: searchable existing workspace commands with keyboard navigation a
 **Known gaps:** No relative paths, shell expansion, environment variables, path completion or remote URLs. File types match the library's Markdown/text extensions. Dark/narrow and permission-revocation races not independently exercised.
 
 **Artifacts / exercise:** Stable `dist/Omawrite Dev.app` and packaged `dist/Omawrite.app`; [evidence](../research/cycle-30/README.md). Press Shift–Command–O and paste `~/Documents`, then try a Markdown file path containing spaces.
+
+
+## Cycle 31 — Filter field label and rounded edges
+
+**Scope / changes:** Andrew reported the filter placeholder floating above its outline on focus, and the right curve disappearing when narrowing. Use a Basic TextField with explicit colors/padding/insets, a fixed placeholder, a content-independent implicit width, zero minimum layout width and a maximum constrained to the library's inner width. Rounded background follows control height.
+
+**Verification:** Build and 54 tests pass. QML geometry checks cover 1100/900/720-pixel windows and long input while focused. Native focus/typing checked on a sample-only library; fixed label and both rounded ends visually inspected. Screenshot in research/cycle-31. Native resize gestures did not resize the window, so minimum-width verification is automated rather than a claimed native drag pass.
+
+**Known gaps:** Independent native minimum-width drag and dark-mode visual checks remain. Existing broader closeout gaps unchanged.
+
+**Artifact / exercise:** Stable Dev and packaged app updated. Focus Filter files, type a query, and narrow the library; both ends should remain inside its bounds. See [evidence](../research/cycle-31/README.md).

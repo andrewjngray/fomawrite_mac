@@ -1,6 +1,7 @@
 import QtQuick
 import QtCore
 import QtQuick.Controls
+import QtQuick.Controls.Basic as Basic
 import QtQuick.Layouts
 import QtQuick.Dialogs as Dialogs
 
@@ -152,19 +153,32 @@ Rectangle {
                 font.pixelSize: 13
             }
         }
-        TextField {
+        Basic.TextField {
             id: filterField
             objectName: "libraryFilter"
             visible: displaySettings.showFilterBar
             Layout.fillWidth: true
+            Layout.minimumWidth: 0
+            Layout.maximumWidth: Math.max(0, root.width - 16)
+            implicitWidth: 1
             implicitHeight: 26
             placeholderText: "Filter files"
-            leftPadding: 8
+            padding: 4
+            leftPadding: 10
+            rightPadding: 10
+            leftInset: 0
+            rightInset: 0
+            topInset: 0
+            bottomInset: 0
+            color: root.darkMode ? "#d5d8dd" : "#45484e"
+            placeholderTextColor: root.darkMode ? "#929aa6" : "#78808c"
+            selectionColor: "#426da7"
+            selectedTextColor: "white"
             font.pixelSize: 12
             text: root.library.filter
             onTextEdited: root.library.filter = text
             Accessible.name: "Filter visible library files"
-            background: Rectangle { radius: 13; color: root.darkMode ? "#292c31" : "#f0f1f3"; border.width: filterField.activeFocus ? 1 : 0; border.color: "#426da7" }
+            background: Rectangle { radius: height / 2; color: root.darkMode ? "#292c31" : "#f0f1f3"; border.width: filterField.activeFocus ? 1 : 0; border.color: "#426da7" }
             Keys.onEscapePressed: { text = ""; root.library.filter = ""; }
         }
     }
