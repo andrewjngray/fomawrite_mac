@@ -13,3 +13,5 @@ Start with `examples/Cycle28-QA.md` and disposable copies of your own documents.
 - **Authorship Annotations** assigns explicit Human/AI/Reference labels to a selection. They are manual assertions, not automatic source detection. Edits may inherit nearby labels. Save creates a hidden `.NAME.md.omawrite-authors.json` sidecar. Keep it alongside the Markdown; external text edits invalidate it. Duplicate includes current annotations; Rename and Move carry saved metadata and retain unsaved annotations in the editor. Clipboard/export do not yet transport metadata automatically.
 
 The [closeout audit](closeout-audit.md) lists unfinished scope and verification. This build is locally ad-hoc signed, not a public/notarized release.
+
+- **File → Open by Path… (Shift–Command–O):** paste a full local file/folder path, `~/` path or `file:///` URL. Files open with unsaved-change protection; folders open in the library and keep your document. Markdown/text extensions only; relative paths and shell expansions are not supported.

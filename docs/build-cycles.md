@@ -558,3 +558,14 @@ Planned scope: searchable existing workspace commands with keyboard navigation a
 **Known gaps:** Two-file operations are not crash-atomic transactions. Cross-volume/device-removal and concurrent external-writer stress remain unverified. Clipboard/export provenance, native version sidecars and full recovery-relaunch matrix remain future work. Session/tab restore and cross-launch ownership are separate closeout items. Cycle 28 release/parity audit remains open.
 
 **Artifact / exercise:** `dist/Omawrite Dev.app` and `dist/Omawrite.app`; [evidence](../research/cycle-29/README.md). On a disposable annotated document, Duplicate, Rename and Move, then reopen and check authorship. Report any repeat of an unexpected focus change.
+
+
+## Cycle 30 — Open a file or folder by path
+
+**Planned scope / changes:** User-requested File → Open by Path command (Shift–Command–O on macOS), also available in the editor file menu. Accepts absolute local paths, `~/`, paired outer quotes and local `file:///` URLs. C++ validates and canonicalizes existing readable folders or Markdown/text files; QML routes files through the existing unsaved-change guard and folders to the library without replacing the current document. Inline errors keep the dialog open.
+
+**Verification:** Build passed; **53 tests passed**. New tests cover spaces/Unicode/hash characters, encoded URLs, quotes, home expansion, symlinks, missing/unsupported/nonlocal paths, folder opening with a dirty document, and file-open Cancel/Discard. Native Shift–Command–O, home-relative file path, folder path, invalid-path message and dirty-open Cancel passed. Sample-only error screenshot reviewed.
+
+**Known gaps:** No relative paths, shell expansion, environment variables, path completion or remote URLs. File types match the library's Markdown/text extensions. Dark/narrow and permission-revocation races not independently exercised.
+
+**Artifacts / exercise:** Stable `dist/Omawrite Dev.app` and packaged `dist/Omawrite.app`; [evidence](../research/cycle-30/README.md). Press Shift–Command–O and paste `~/Documents`, then try a Markdown file path containing spaces.

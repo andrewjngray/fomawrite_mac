@@ -91,6 +91,34 @@ private:
     bool created = false;
 };
 
+QVariantMap Backend::resolveOpenPath(const QString &input) const {
+    const auto error = [](const QString &message) { return QVariantMap{{"error", message}}; };
+    QString path = input.trimmed();
+    if (path.size() >= 2 && ((path.startsWith('"') && path.endsWith('"'))
+            || (path.startsWith('\'') && path.endsWith('\''))))
+        path = path.mid(1, path.size() - 2);
+    if (path.isEmpty()) return error(QStringLiteral("Enter a file or folder path."));
+    if (path.contains(QChar::Null) || path.contains('\n') || path.contains('\r'))
+        return error(QStringLiteral("Enter one path on a single line."));
+    if (path.startsWith(QStringLiteral("file:"), Qt::CaseInsensitive)) {
+        const QUrl url(path, QUrl::StrictMode);
+        if (!url.isValid() || !url.isLocalFile() || !url.host().isEmpty()
+                || url.hasQuery() || url.hasFragment())
+            return error(QStringLiteral("Use a local file URL without a hostname, query or fragment."));
+        path = url.toLocalFile();
+    }
+    if (path == "~") path = QDir::homePath();
+    else if (path.startsWith("~/")) path = QDir::homePath() + path.mid(1);
+    if (!QDir::isAbsolutePath(path))
+        return error(QStringLiteral("Use an absolute path, ~/path, or a file:/// URL."));
+    const QFileInfo info(path);
+    if (!info.exists()) return error(QStringLiteral("That file or folder does not exist."));
+    if (!info.isReadable()) return error(QStringLiteral("That file or folder is not readable."));
+    if (!info.isDir() && (!info.isFile() || !FileLibrary::isTextFile(path)))
+        return error(QStringLiteral("Choose a folder or a Markdown/text file (.md, .markdown, .mdown, .txt, .text)."));
+    return {{"url", QUrl::fromLocalFile(info.canonicalFilePath())}, {"folder", info.isDir()}};
+}
+
 QString Backend::normalizedLinkUrl(const QString &clipboardText) {
     QString candidate = clipboardText.trimmed();
     static const QRegularExpression lineBreakRe(QStringLiteral("[\\r\\n]"));

@@ -175,6 +175,7 @@ ApplicationWindow {
         y: Math.max(0, win.contentItem.height - height - 38)
         MenuItem { objectName: "saveButton"; text: "Save"; onTriggered: backend.save() }
         MenuItem { objectName: "openButton"; text: "Open…"; onTriggered: backend.openDialog() }
+        MenuItem { text: "Open by Path…"; onTriggered: openPathDialog.open() }
         MenuSeparator {}
         MenuItem { text: "Strikethrough"; onTriggered: workspaceCommands.run("strike") }
         MenuItem { text: "Inline code"; onTriggered: workspaceCommands.run("inlineCode") }
@@ -481,6 +482,7 @@ ApplicationWindow {
             Platform.MenuItem { objectName: "fileNewFolder"; text: "New Folder…"; enabled: backend.library.rootFolder.toString() !== ""; onTriggered: libraryPane.newFolder() }
             Platform.MenuSeparator {}
             Platform.MenuItem { text: "Open…"; onTriggered: backend.openDialog() }
+            Platform.MenuItem { text: "Open by Path…"; shortcut: "Ctrl+Shift+O"; onTriggered: openPathDialog.open() }
             RecentFilesMenu { title: "Open Recent"; library: backend.library; onOpenRequested: function(url) { win.requestOpen(url); } }
             Platform.MenuSeparator {}
             Platform.MenuItem { text: "Save"; onTriggered: backend.save() }
@@ -989,6 +991,53 @@ ApplicationWindow {
         title: "Load Output Style"
         nameFilters: ["Output style (*.json)"]
         onAccepted: backend.loadOutputStyle(selectedFile)
+    }
+
+    Dialog {
+        id: openPathDialog
+        objectName: "openPathDialog"
+        title: "Open by Path"
+        modal: true
+        anchors.centerIn: parent
+        width: Math.min(560, win.width - 48)
+        property string errorText: ""
+        onOpened: { errorText = ""; openPathInput.forceActiveFocus(); openPathInput.selectAll(); }
+        function submit() {
+            var result = backend.resolveOpenPath(openPathInput.text);
+            if (result.error) { errorText = result.error; return; }
+            if (result.folder) {
+                backend.library.rootFolder = result.url;
+                if (String(backend.library.rootFolder) !== String(result.url)) {
+                    errorText = backend.library.error;
+                    return;
+                }
+                workspaceSettings.libraryVisible = true;
+                openPathDialog.close();
+            } else {
+                openPathDialog.close();
+                win.requestOpen(result.url);
+            }
+        }
+        ColumnLayout {
+            width: parent.width
+            Label { text: "Open a Markdown/text file, or show a folder in the library."; wrapMode: Text.Wrap; Layout.fillWidth: true }
+            TextField {
+                id: openPathInput
+                objectName: "openPathInput"
+                Layout.fillWidth: true
+                placeholderText: "~/Documents or /full/path/note.md"
+                Accessible.name: "File or folder path"
+                onTextChanged: openPathDialog.errorText = ""
+                onAccepted: openPathDialog.submit()
+            }
+            Label { text: "Accepts absolute paths, ~/ paths and file:/// URLs. Folder opening keeps your current document."; wrapMode: Text.Wrap; Layout.fillWidth: true }
+            Label { text: openPathDialog.errorText; visible: text !== ""; wrapMode: Text.Wrap; Layout.fillWidth: true; color: win.darkMode ? "#fca5a5" : "#b42318" }
+        }
+        footer: DialogButtonBox {
+            Button { text: "Cancel"; DialogButtonBox.buttonRole: DialogButtonBox.RejectRole }
+            Button { text: "Open"; enabled: openPathInput.text.trim().length > 0; onClicked: openPathDialog.submit() }
+            onRejected: openPathDialog.reject()
+        }
     }
 
     Dialogs.FileDialog {

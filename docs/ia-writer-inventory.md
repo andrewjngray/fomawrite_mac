@@ -173,3 +173,7 @@ E01/E02/E09/E10 local editing/search subset implemented: focused-field editing s
 ### Cycle 29 implementation update
 
 Manual authorship annotations now follow Duplicate, Rename and Move, with collision guards and dirty-buffer/recovery preservation. 51 automated tests pass; native sample operations and resulting sidecar hashes were checked. This supersedes the earlier “no authorship tracking” baseline only for explicit manual annotations. It is not automatic provenance, author-aware paste/merge, or full iA Writer parity. See [Cycle 29 evidence](../research/cycle-29/README.md).
+
+### Cycle 30 user-requested addition
+
+Open by Path accepts a local Markdown/text file or folder path. Native menu/keyboard and unsaved-change checks pass; 53 tests total. This is an Omawrite workflow addition, not a claim of complete reference-app parity.

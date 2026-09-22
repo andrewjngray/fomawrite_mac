@@ -67,6 +67,7 @@ public:
     static int countWords(const QString &text);
     static QString normalizedLinkUrl(const QString &clipboardText);
     static QString suggestedFileName(const QString &text);
+    Q_INVOKABLE QVariantMap resolveOpenPath(const QString &input) const;
 
     Q_INVOKABLE QVariantList documentOutline(const QString &markdown) const;
     Q_INVOKABLE QVariantMap documentStatistics(const QString &markdown) const;

@@ -36,6 +36,61 @@ private slots:
                            m_settingsDirectory.path());
     }
 
+    void resolvesLocalFileAndFolderPaths() {
+        QTemporaryDir directory;
+        const QString path = directory.filePath("a # café.md");
+        QFile file(path); QVERIFY(file.open(QIODevice::WriteOnly)); file.write("sample"); file.close();
+        Backend backend;
+        const auto expected = QUrl::fromLocalFile(QFileInfo(path).canonicalFilePath());
+        for (const QString &input : QStringList{path, "  "+path+"  ", "\""+path+"\"", "'"+path+"'", expected.toString(QUrl::FullyEncoded)}) {
+            const auto result = backend.resolveOpenPath(input);
+            QVERIFY2(!result.contains("error"), qPrintable(result["error"].toString()));
+            QCOMPARE(result["url"].toUrl(), expected);
+            QVERIFY(!result["folder"].toBool());
+        }
+        QVERIFY(backend.resolveOpenPath(directory.path())["folder"].toBool());
+        QCOMPARE(backend.resolveOpenPath("~")["url"].toUrl(), QUrl::fromLocalFile(QFileInfo(QDir::homePath()).canonicalFilePath()));
+        for (const QString &input : QStringList{"", "relative.md", "https://example.com/a.md", "file://server/a.md", "file:///tmp/a.md#fragment", directory.filePath("missing.md"), path+"\nother"})
+            QVERIFY2(backend.resolveOpenPath(input).contains("error"), qPrintable(input));
+        QFile binary(directory.filePath("sample.png")); QVERIFY(binary.open(QIODevice::WriteOnly)); binary.write("binary"); binary.close();
+        QVERIFY(backend.resolveOpenPath(binary.fileName()).contains("error"));
+        const QString link = directory.filePath("alias.md"); QVERIFY(QFile::link(path, link));
+        QCOMPARE(backend.resolveOpenPath(link)["url"].toUrl(), expected);
+    }
+
+    void openByPathProtectsDirtyDocumentAndOpensFolder() {
+        QTemporaryDir directory;
+        QFile file(directory.filePath("sample.md")); QVERIFY(file.open(QIODevice::WriteOnly)); file.write("file contents"); file.close();
+        Backend backend;
+        QQmlEngine engine; engine.rootContext()->setContextProperty("backend", &backend);
+        QQmlComponent component(&engine, QUrl::fromLocalFile(QFINDTESTDATA("../src/Main.qml")));
+        QScopedPointer<QObject> window(component.create()); QVERIFY2(window, qPrintable(component.errorString()));
+        auto *editor = window->findChild<QObject *>("sourceEditor");
+        auto *dialog = window->findChild<QObject *>("openPathDialog");
+        auto *input = window->findChild<QObject *>("openPathInput");
+        QVERIFY(dialog); QVERIFY(input);
+        editor->setProperty("text", "unsaved draft");
+        input->setProperty("text", directory.path());
+        QVERIFY(QMetaObject::invokeMethod(dialog, "submit"));
+        QCOMPARE(backend.library()->property("rootFolder").toUrl(), QUrl::fromLocalFile(QFileInfo(directory.path()).canonicalFilePath()));
+        QCOMPARE(editor->property("text").toString(), QString("unsaved draft")); QVERIFY(backend.modified());
+        input->setProperty("text", directory.filePath("missing.md"));
+        QVERIFY(QMetaObject::invokeMethod(dialog, "submit"));
+        QVERIFY(!dialog->property("errorText").toString().isEmpty());
+        input->setProperty("text", file.fileName());
+        QVERIFY(QMetaObject::invokeMethod(dialog, "submit"));
+        QCOMPARE(window->property("pendingAction").toString(), QString("open"));
+        QCOMPARE(editor->property("text").toString(), QString("unsaved draft"));
+        auto *prompt = window->findChild<QObject *>("unsavedChangesPrompt"); QVERIFY(prompt);
+        QVERIFY(QMetaObject::invokeMethod(prompt, "cancelRequested"));
+        QCOMPARE(editor->property("text").toString(), QString("unsaved draft"));
+        QVERIFY(window->property("pendingAction").toString().isEmpty());
+        QVERIFY(QMetaObject::invokeMethod(dialog, "submit"));
+        QVERIFY(QMetaObject::invokeMethod(prompt, "discardRequested"));
+        QCOMPARE(editor->property("text").toString(), QString("file contents"));
+        QVERIFY(!backend.modified()); backend.discardRecovery();
+    }
+
     void autosaveRefusesExternalChanges() {
         QTemporaryDir directory;
         const auto url = QUrl::fromLocalFile(directory.filePath("sample.md"));
