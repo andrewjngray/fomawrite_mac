@@ -580,3 +580,15 @@ Planned scope: searchable existing workspace commands with keyboard navigation a
 **Known gaps:** Independent native minimum-width drag and dark-mode visual checks remain. Existing broader closeout gaps unchanged.
 
 **Artifact / exercise:** Stable Dev and packaged app updated. Focus Filter files, type a query, and narrow the library; both ends should remain inside its bounds. See [evidence](../research/cycle-31/README.md).
+
+## Cycle 32 — Workspace restart and launch coordination
+
+**Scope / changes:** One owner per installed executable, with local-socket forwarding for repeated launches and canonical-path duplicate focus. Saved-file windows retain bounds, library root and cursor; macOS tab grouping/order and last active document survive Quit/relaunch. Workspace metadata uses atomic owner-readable files. Existing orphan recovery snapshots are opened before saved-session files so dirty recovered buffers are not overwritten by restoration. Save As during a Quit prompt updates the saved session URL. OS Quit events use the guarded close sequence.
+
+**Verification:** Build and **56 tests passed**. Added workspace round-trip/corrupt-input/rejected-write checks and concurrent secondary-launch forwarding, including Unicode/spaces and activation-only requests. Native sample checks: second executable opened another file and exited; repeated launch selected the existing tab; Merge All Windows, Quit/relaunch restored two tabs in order; cursor position 2 survived; dirty Quit → Cancel retained text, Undo restored the sample, and Save completed Quit. Final active-document state stays recorded while another app has focus. Reviewed sample-only screenshot retained.
+
+**Known gaps:** Dev and ordinary app installations are deliberately separate owners. Missing saved files and clean untitled windows are skipped. Normal bounds are restored; minimized/fullscreen state and external-display placement are not reproduced. Existing sequential quit can close earlier windows before a later Cancel; it does not reopen those windows. Crash/recovery/disk-full and multiple dirty-window/OS-shutdown stress remain in Cycle 34. Session metadata has a one-second checkpoint interval; existing dirty-text recovery remains separate. Native Save As during Quit not independently exercised.
+
+**Artifacts / exercise:** Stable `dist/Omawrite Dev.app` and `dist/Omawrite.app`; [evidence](../research/cycle-32/README.md). Open two disposable documents, merge them as tabs, place the cursor partway through one, Quit and reopen. Verify order and cursor; explicitly closing a document removes it from the next restored session.
+
+**Next:** Cycle 33 themes. [Ten cycles remain in the updated plan](remaining-cycles.md), including themes; full iA parity remains unclaimed.

@@ -1,3 +1,4 @@
+#include <QVariantMap>
 #include <QWindow>
 #import <AppKit/AppKit.h>
 
@@ -121,4 +122,25 @@ int macTabInset(QWindow *window) {
     NSWindow *native = view.window;
     if (!native.tabGroup.isTabBarVisible) return 0;
     return qMax(0, qRound(native.frame.size.height - native.contentLayoutRect.size.height) - 44);
+}
+
+// Keep AppKit tab inspection and restoration out of the portable session store.
+QVariantMap macWorkspaceState(QWindow *window) {
+    NSView *view = reinterpret_cast<NSView *>(window->winId());
+    NSWindow *native = view.window;
+    NSArray<NSWindow *> *tabs = native.tabbedWindows;
+    if (tabs.count < 2) return {};
+    return {{"group", QString::number(tabs.firstObject.windowNumber)},
+            {"order", int([tabs indexOfObject:native])}};
+}
+void restoreMacWorkspaceTabs(const QList<QWindow *> &windows) {
+    if (windows.size() < 2) return;
+    NSWindow *previous = nil;
+    for (auto *window : windows) {
+        NSView *view = reinterpret_cast<NSView *>(window->winId());
+        NSWindow *native = view.window;
+        native.tabbingMode = NSWindowTabbingModePreferred;
+        if (previous) [previous addTabbedWindow:native ordered:NSWindowAbove];
+        previous = native;
+    }
 }

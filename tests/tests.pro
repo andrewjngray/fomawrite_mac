@@ -27,3 +27,7 @@ macx {
     OBJECTIVE_SOURCES += ../src/windowchrome_mac.mm
     LIBS += -framework AppKit
 }
+
+QT += network
+SOURCES += ../src/workspace.cpp
+HEADERS += ../src/workspace.h

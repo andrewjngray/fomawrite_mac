@@ -38,6 +38,10 @@ ApplicationWindow {
         Math.max(180, editorPane.width - 64))
     property int tabInset: 0
     Timer { interval: 250; repeat: true; running: win.visible && win.isMac; onTriggered: win.tabInset = backend.nativeTabInset() }
+    readonly property int workspaceCursor: editor.cursorPosition
+    function restoreWorkspaceCursor(position) {
+        Qt.callLater(function() { editor.cursorPosition = Math.max(0, Math.min(position, editor.length)); editorFlick.ensureCursorVisible(); });
+    }
     property bool synchronizingScroll: false
     property bool closeConfirmed: false
     property bool searchOpen: false

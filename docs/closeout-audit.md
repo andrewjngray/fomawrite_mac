@@ -41,3 +41,7 @@ Extension implementation consulted iA's published [content-block syntax](https:/
 ## Cycle 29 follow-up
 
 Authorship migration for Duplicate/Rename/Move is implemented and verified with 51 passing tests and native sample operations. Dirty annotations stay in the current buffer and recovery snapshot; Duplicate includes them, while Rename/Move transport saved sidecars with saved bytes. See [Cycle 29](../research/cycle-29/README.md) for verification and remaining failure-mode limits. This closes that path-operation subset only; the broader audit above remains open.
+
+## Cycle 32 follow-up
+
+Same-installation cross-launch ownership and saved-file window/cursor/native-tab restoration are now implemented. Native two-tab restart and duplicate-launch focus passed; 56 regression tests pass. The Cycle 25a/25b rows above describe the original audit and are superseded for these specific items. Their exhaustive lifecycle, multi-dirty cancellation, fullscreen/minimized and display checks remain open. [Ten planned cycles remain](remaining-cycles.md), including Andrew's new themes concept as Cycle 33.

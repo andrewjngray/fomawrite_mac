@@ -1,4 +1,6 @@
 #include "markdownextensions.h"
+#include "workspace.h"
+#include <QtConcurrent>
 #include <QtTest>
 #include <QFont>
 #include <QTextBlock>
@@ -34,6 +36,43 @@ private slots:
         QSettings::setDefaultFormat(QSettings::IniFormat);
         QSettings::setPath(QSettings::IniFormat, QSettings::UserScope,
                            m_settingsDirectory.path());
+    }
+
+    void workspacePersistsAndRejectsCorruption() {
+        QTemporaryDir directory; QVERIFY(directory.isValid());
+        const auto path = directory.filePath("workspace.json");
+        const QJsonArray windows{QJsonObject{{"url", "file:///tmp/one.md"}, {"cursor", 17}, {"group", "1"}, {"order", 0}},
+                                 QJsonObject{{"url", "file:///tmp/two.md"}, {"cursor", 8}, {"group", "1"}, {"order", 1}}};
+        QVERIFY(WorkspaceStore::write(path, windows));
+        QCOMPARE(WorkspaceStore::read(path), windows);
+        QFile file(path); QVERIFY(file.open(QIODevice::WriteOnly)); file.write("{broken"); file.close();
+        QVERIFY(WorkspaceStore::read(path).isEmpty());
+        QVERIFY(WorkspaceStore::write(path, windows));
+        QJsonArray excessive; for (int i=0; i<101; ++i) excessive.append(QJsonObject{});
+        QVERIFY(!WorkspaceStore::write(path, excessive));
+        QCOMPARE(WorkspaceStore::read(path), windows); // rejected writes preserve prior state
+    }
+
+    void secondInstanceForwardsWithoutTakingOwnership() {
+        QTemporaryDir directory("/tmp/ow-XXXXXX"); QVERIFY(directory.isValid());
+        InstanceBroker owner;
+        QCOMPARE(owner.start(directory.path(), "test", {}), InstanceBroker::Owner);
+        QSignalSpy requests(&owner, &InstanceBroker::requested);
+        auto future = QtConcurrent::run([path=directory.path()] {
+            InstanceBroker client;
+            return client.start(path, "test", {"/tmp/a file.md", "/tmp/東京.md"});
+        });
+        QTRY_VERIFY_WITH_TIMEOUT(future.isFinished(), 15000);
+        QCOMPARE(future.result(), InstanceBroker::Forwarded);
+        QCOMPARE(requests.size(), 1);
+        QCOMPARE(requests[0][0].toStringList(), QStringList({"/tmp/a file.md", "/tmp/東京.md"}));
+        auto activate = QtConcurrent::run([path=directory.path()] {
+            InstanceBroker client; return client.start(path, "test", {});
+        });
+        QTRY_VERIFY_WITH_TIMEOUT(activate.isFinished(), 15000);
+        QCOMPARE(activate.result(), InstanceBroker::Forwarded);
+        QCOMPARE(requests.size(), 2);
+        QVERIFY(requests[1][0].toStringList().isEmpty());
     }
 
     void libraryFilterStaysInsideNarrowPane() {

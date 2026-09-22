@@ -73,3 +73,7 @@ Omawrite is copyright David Heinemeier Hansson, under the [MIT license](LICENSE)
 ### Cycle 29 source checkpoint
 
 Authorship metadata now follows Duplicate, Rename and Move; current verification is 51 passing tests. See [Cycle 29](research/cycle-29/README.md), the [remaining closeout work](docs/closeout-audit.md), and [GitHub snapshot scope](docs/github-snapshot.md). The project remains an early personal editor, with the original parity plan still open.
+
+### Cycle 32 checkpoint
+
+Saved documents now restore their windows, native tab order, cursor and library root after Quit/relaunch. Repeated launches of the same installed app forward requests to its existing process. Build and 56 tests pass; native sample restart/duplicate-open checks passed. See [Cycle 32 evidence](research/cycle-32/README.md) and [the ten remaining cycles](docs/remaining-cycles.md), with whole-workspace themes next.

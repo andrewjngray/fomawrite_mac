@@ -181,3 +181,9 @@ Open by Path accepts a local Markdown/text file or folder path. Native menu/keyb
 ### Cycle 31 polish
 
 Library filter now uses a fixed placeholder and bounded rounded field at narrow widths. 54 tests pass; native focused appearance checked. No change to filter matching semantics.
+
+## Cycle 32 / themes follow-through
+
+Saved-file windows now restore bounds, library roots and cursor positions; macOS tab groups/order and active document are restored. Repeated launches of the same installed executable forward paths and focus an already-open canonical path. Dev and ordinary bundles remain separate owners. Full lifecycle stress remains partial: fullscreen/minimized/display states, exhaustive multi-dirty quit cancellation and crash/disk failure cases still need coverage.
+
+Themes are a new Andrew-requested product concept, planned for Cycle 33: shared workspace/preview presets and persisted selection. They are not implemented yet and are not evidence of iA theme parity. See [remaining cycle plan](remaining-cycles.md).

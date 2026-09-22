@@ -34,3 +34,7 @@ QT += concurrent
 
 SOURCES += src/markdownextensions.cpp
 HEADERS += src/markdownextensions.h
+
+QT += network
+SOURCES += src/workspace.cpp
+HEADERS += src/workspace.h
