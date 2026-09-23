@@ -2261,6 +2261,212 @@ private slots:
         QCOMPARE(backend.documentStatistics("").value("readingMinutes").toInt(), 0);
     }
 
+    void statisticsCountRenderedUnicodeTasksAndAuthorship() {
+        Backend backend;
+        QQmlEngine engine;
+        engine.rootContext()->setContextProperty("backend", &backend);
+        QQmlComponent component(&engine, QUrl::fromLocalFile(QFINDTESTDATA("../src/Main.qml")));
+        QVERIFY2(component.isReady(), qPrintable(component.errorString()));
+        QScopedPointer<QObject> window(component.create());
+        QVERIFY(window);
+        auto *editor = window->findChild<QObject *>("sourceEditor");
+        auto *commands = window->findChild<QObject *>("workspaceCommands");
+        auto *settings = window->findChild<QObject *>("workspaceSettings");
+        auto *toolbarStatistic = window->findChild<QObject *>("toolbarStatistic");
+        auto *statisticsDialog = window->findChild<QObject *>("statisticsDialog");
+        QVERIFY(editor && commands && settings && toolbarStatistic && statisticsDialog);
+
+        const int originalMode = settings->property("toolbarMode").toInt();
+        QObject *restoreSettings = settings;
+        QVariantMap originalMetrics;
+        const QStringList metricProperties = {
+            QStringLiteral("toolbarCharacters"), QStringLiteral("toolbarCharactersNoSpaces"),
+            QStringLiteral("toolbarWords"), QStringLiteral("toolbarSentences"),
+            QStringLiteral("toolbarReadingTime"), QStringLiteral("toolbarSpeakingTime"),
+            QStringLiteral("toolbarTasks"), QStringLiteral("toolbarHuman"),
+            QStringLiteral("toolbarAI"), QStringLiteral("toolbarReference")};
+        for (const QString &property : metricProperties)
+            originalMetrics.insert(property, settings->property(property.toUtf8().constData()));
+        auto restore = qScopeGuard([&] {
+            if (!restoreSettings) return;
+            restoreSettings->setProperty("toolbarMode", originalMode);
+            for (auto it = originalMetrics.cbegin(); it != originalMetrics.cend(); ++it)
+                restoreSettings->setProperty(it.key().toUtf8().constData(), it.value());
+        });
+
+        const QString markdown = QString::fromUtf8(
+            "**Alpha café.** Beta gamma!\n\n- [ ] Task one\n1. [x] Done two\n\n"
+            "~~~md\n- [ ] hidden task\n~~~\n\n最後 sentence?");
+        editor->setProperty("text", markdown);
+        QTRY_COMPARE(backend.documentStatistics(markdown).value("words").toInt(), 12);
+        QCOMPARE(backend.documentStatistics(markdown).value("sentences").toInt(), 3);
+        QCOMPARE(backend.documentStatistics(markdown).value("tasks").toInt(), 2);
+        QCOMPARE(backend.documentStatistics(markdown).value("readingMinutes").toInt(), 1);
+        QCOMPARE(backend.documentStatistics(markdown).value("speakingMinutes").toInt(), 1);
+        const auto unicode = backend.documentStatistics(QString::fromUtf8("**Hi** 😀"));
+        QCOMPARE(unicode.value("characters").toInt(), 4);
+        QCOMPARE(unicode.value("charactersWithoutSpaces").toInt(), 3);
+        QCOMPARE(backend.documentStatistics(QString()).value("speakingMinutes").toInt(), 0);
+
+        const int alpha = markdown.indexOf(QStringLiteral("Alpha"));
+        const int cafeEnd = markdown.indexOf(QString::fromUtf8("café")) + QString::fromUtf8("café").size();
+        const int beta = markdown.indexOf(QStringLiteral("Beta"));
+        const int gammaEnd = markdown.indexOf(QStringLiteral("gamma")) + 5;
+        const int task = markdown.indexOf(QStringLiteral("Task one"));
+        backend.markAuthorship(alpha, cafeEnd, QStringLiteral("Human"), QStringLiteral("Writer"));
+        backend.markAuthorship(beta, gammaEnd, QStringLiteral("AI"), QStringLiteral("Assistant"));
+        backend.markAuthorship(task, task + 8, QStringLiteral("Reference"), QStringLiteral("Source"));
+        const int done = markdown.indexOf(QStringLiteral("Done"));
+        backend.markAuthorship(done, done + 2, QStringLiteral("Reference"), QStringLiteral("Partial source"));
+        const auto annotated = backend.documentStatistics(markdown);
+        QCOMPARE(annotated.value("humanWords").toInt(), 2);
+        QCOMPARE(annotated.value("aiWords").toInt(), 2);
+        QCOMPARE(annotated.value("referenceWords").toInt(), 2);
+        QCOMPARE(backend.documentStatistics(markdown + QStringLiteral(" ")).value("humanWords").toInt(), 0);
+
+        QVERIFY(QMetaObject::invokeMethod(commands, "run", Q_ARG(QVariant, QStringLiteral("statistics"))));
+        QTRY_VERIFY(statisticsDialog->property("opened").toBool());
+        const int before = statisticsDialog->property("statistics").toMap().value("words").toInt();
+        editor->setProperty("text", markdown + QStringLiteral(" Extra."));
+        QTRY_COMPARE(statisticsDialog->property("statistics").toMap().value("words").toInt(), before + 1);
+        const int aiBefore = statisticsDialog->property("statistics").toMap().value("aiWords").toInt();
+        const int extra = editor->property("text").toString().indexOf(QStringLiteral("Extra"));
+        backend.markAuthorship(extra, extra + 5, QStringLiteral("AI"), QStringLiteral("Assistant"));
+        QTRY_COMPARE(statisticsDialog->property("statistics").toMap().value("aiWords").toInt(), aiBefore + 1);
+        QVERIFY(QMetaObject::invokeMethod(editor, "undo"));
+        QTRY_COMPARE(statisticsDialog->property("statistics").toMap().value("aiWords").toInt(), aiBefore);
+
+        settings->setProperty("toolbarMode", 0);
+        for (const QString &property : metricProperties) settings->setProperty(property.toUtf8().constData(), true);
+        QVERIFY(QMetaObject::invokeMethod(commands, "run", Q_ARG(QVariant, QStringLiteral("toolbarTasks"))));
+        QCOMPARE(settings->property("toolbarMode").toInt(), 1);
+        QVERIFY(!settings->property("toolbarTasks").toBool());
+        QVERIFY(toolbarStatistic->property("text").toString().contains(QStringLiteral("words")));
+        QVERIFY(!toolbarStatistic->property("text").toString().contains(QStringLiteral("tasks")));
+#ifdef Q_OS_MACOS
+        auto *tasksAction = window->findChild<QObject *>("native_toolbarTasks");
+        auto *defaultAction = window->findChild<QObject *>("native_toolbarDefault");
+        auto *statsOnlyAction = window->findChild<QObject *>("native_toolbarStatsOnly");
+        QVERIFY(tasksAction && defaultAction && statsOnlyAction);
+        QVERIFY(!tasksAction->property("checked").toBool());
+        QVERIFY(QMetaObject::invokeMethod(tasksAction, "triggered"));
+        QVERIFY(tasksAction->property("checked").toBool());
+        QCOMPARE(settings->property("toolbarMode").toInt(), 1);
+        QVERIFY(statsOnlyAction->property("checked").toBool());
+        QVERIFY(QMetaObject::invokeMethod(defaultAction, "triggered"));
+        QCOMPARE(settings->property("toolbarMode").toInt(), 0);
+        QVERIFY(defaultAction->property("checked").toBool());
+        QVERIFY(!statsOnlyAction->property("checked").toBool());
+#endif
+
+        settings->setProperty("toolbarMode", 1);
+        const bool expectedTasks = settings->property("toolbarTasks").toBool();
+        restoreSettings = nullptr;
+        window.reset();
+        QCoreApplication::processEvents();
+        Backend reopenedBackend;
+        QQmlEngine reopenedEngine;
+        reopenedEngine.rootContext()->setContextProperty("backend", &reopenedBackend);
+        QQmlComponent reopenedComponent(&reopenedEngine, QUrl::fromLocalFile(QFINDTESTDATA("../src/Main.qml")));
+        QScopedPointer<QObject> reopened(reopenedComponent.create());
+        QVERIFY(reopened);
+        auto *reopenedSettings = reopened->findChild<QObject *>("workspaceSettings");
+        QVERIFY(reopenedSettings);
+        restoreSettings = reopenedSettings;
+        QCOMPARE(reopenedSettings->property("toolbarMode").toInt(), 1);
+        QCOMPARE(reopenedSettings->property("toolbarTasks").toBool(), expectedTasks);
+        reopenedSettings->setProperty("toolbarMode", originalMode);
+        for (auto it = originalMetrics.cbegin(); it != originalMetrics.cend(); ++it)
+            reopenedSettings->setProperty(it.key().toUtf8().constData(), it.value());
+        QVERIFY(QMetaObject::invokeMethod(reopenedSettings, "sync"));
+        restoreSettings = nullptr;
+        restore.dismiss();
+    }
+
+    void chromePresentationModesPersistAndKeepCommandsReachable() {
+        Backend backend;
+        QQmlEngine engine;
+        engine.rootContext()->setContextProperty("backend", &backend);
+        QQmlComponent component(&engine, QUrl::fromLocalFile(QFINDTESTDATA("../src/Main.qml")));
+        QVERIFY2(component.isReady(), qPrintable(component.errorString()));
+        QScopedPointer<QObject> window(component.create());
+        QVERIFY(window);
+        auto *settings = window->findChild<QObject *>("workspaceSettings");
+        auto *commands = window->findChild<QObject *>("workspaceCommands");
+        auto *chrome = window->findChild<QObject *>("topChrome");
+        auto *title = window->findChild<QObject *>("topChromeTitle");
+        auto *leading = window->findChild<QObject *>("topChromeToolbarLeading");
+        auto *trailing = window->findChild<QObject *>("topChromeToolbarTrailing");
+        auto *libraryButton = window->findChild<QObject *>("topChromeLibraryButton");
+        auto *editor = window->findChild<QObject *>("sourceEditor");
+        QVERIFY(settings && commands && chrome && title && leading && trailing && libraryButton && editor);
+
+        const int originalTitleMode = settings->property("titleBarMode").toInt();
+        const int originalToolbarVisibility = settings->property("toolbarVisibilityMode").toInt();
+        QObject *restoreSettings = settings;
+        auto restore = qScopeGuard([&] {
+            if (!restoreSettings) return;
+            restoreSettings->setProperty("titleBarMode", originalTitleMode);
+            restoreSettings->setProperty("toolbarVisibilityMode", originalToolbarVisibility);
+        });
+
+        QVERIFY(QMetaObject::invokeMethod(commands, "run", Q_ARG(QVariant, QStringLiteral("titleBarFade"))));
+        QVERIFY(QMetaObject::invokeMethod(commands, "run", Q_ARG(QVariant, QStringLiteral("toolbarFade"))));
+        QCOMPARE(settings->property("titleBarMode").toInt(), 0);
+        QCOMPARE(settings->property("toolbarVisibilityMode").toInt(), 0);
+        QVERIFY(leading->property("visible").toBool());
+        QVERIFY(QMetaObject::invokeMethod(libraryButton, "forceActiveFocus"));
+        QTRY_VERIFY(chrome->property("keyboardReveal").toBool());
+        QTRY_COMPARE(title->property("opacity").toReal(), 1.0);
+        QTRY_COMPARE(leading->property("opacity").toReal(), 1.0);
+        QVERIFY(QMetaObject::invokeMethod(editor, "forceActiveFocus"));
+        QTRY_VERIFY(!chrome->property("keyboardReveal").toBool());
+
+        QVERIFY(QMetaObject::invokeMethod(commands, "run", Q_ARG(QVariant, QStringLiteral("titleBarAlways"))));
+        QTRY_COMPARE(title->property("opacity").toReal(), 1.0);
+        QVERIFY(QMetaObject::invokeMethod(commands, "run", Q_ARG(QVariant, QStringLiteral("toolbarHide"))));
+        QVERIFY(!leading->property("visible").toBool());
+        QVERIFY(!trailing->property("visible").toBool());
+        QCOMPARE(chrome->property("height").toInt(), 44);
+        QVERIFY(title->property("visible").toBool());
+
+#ifdef Q_OS_MACOS
+        auto native = [&](const char *id) { return window->findChild<QObject *>(QStringLiteral("native_") + id); };
+        QVERIFY(native("titleBarAlways") && native("titleBarAlways")->property("checked").toBool());
+        QVERIFY(native("toolbarHide") && native("toolbarHide")->property("checked").toBool());
+        QVERIFY(native("outline") && native("outline")->property("enabled").toBool());
+        QVERIFY(QMetaObject::invokeMethod(native("toolbarAlways"), "triggered"));
+        QCOMPARE(settings->property("toolbarVisibilityMode").toInt(), 1);
+        QVERIFY(native("toolbarAlways")->property("checked").toBool());
+#else
+        QVERIFY(QMetaObject::invokeMethod(commands, "run", Q_ARG(QVariant, QStringLiteral("toolbarAlways"))));
+#endif
+        QVERIFY(leading->property("visible").toBool());
+        QTRY_COMPARE(leading->property("opacity").toReal(), 1.0);
+
+        settings->setProperty("titleBarMode", 0);
+        settings->setProperty("toolbarVisibilityMode", 2);
+        restoreSettings = nullptr;
+        window.reset();
+        QCoreApplication::processEvents();
+        Backend reopenedBackend;
+        QQmlEngine reopenedEngine;
+        reopenedEngine.rootContext()->setContextProperty("backend", &reopenedBackend);
+        QQmlComponent reopenedComponent(&reopenedEngine, QUrl::fromLocalFile(QFINDTESTDATA("../src/Main.qml")));
+        QScopedPointer<QObject> reopened(reopenedComponent.create());
+        QVERIFY(reopened);
+        auto *reopenedSettings = reopened->findChild<QObject *>("workspaceSettings");
+        QVERIFY(reopenedSettings);
+        restoreSettings = reopenedSettings;
+        QCOMPARE(reopenedSettings->property("titleBarMode").toInt(), 0);
+        QCOMPARE(reopenedSettings->property("toolbarVisibilityMode").toInt(), 2);
+        reopenedSettings->setProperty("titleBarMode", originalTitleMode);
+        reopenedSettings->setProperty("toolbarVisibilityMode", originalToolbarVisibility);
+        QVERIFY(QMetaObject::invokeMethod(reopenedSettings, "sync"));
+        restoreSettings = nullptr;
+        restore.dismiss();
+    }
+
     void organizesShortcutsAndSortsWithoutMovingFiles() {
         QTemporaryDir directory;
         FileLibrary library;

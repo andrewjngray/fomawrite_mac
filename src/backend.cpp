@@ -477,6 +477,12 @@ QVariantList Backend::documentOutline(const QString &markdown) const {
     return headings;
 }
 
+static const QRegularExpression &statisticsWordPattern() {
+    static const QRegularExpression pattern(
+        QStringLiteral("[\\p{L}\\p{N}]+(?:['-][\\p{L}\\p{N}]+)*"));
+    return pattern;
+}
+
 QVariantMap Backend::documentStatistics(const QString &markdown) const {
     QTextDocument rendered;
     rendered.setMarkdown(markdown);
@@ -484,9 +490,90 @@ QVariantMap Backend::documentStatistics(const QString &markdown) const {
     const int words = countWords(plain);
     QString compact = plain;
     compact.remove(QRegularExpression("\\s"));
+
+    // This is deliberately a visible punctuation heuristic, not a language
+    // grammar: a sentence ends at .?! or their CJK forms when followed by
+    // whitespace/end (optionally after closing quotes/brackets). Any remaining
+    // run containing a letter or number counts as one sentence.
+    int sentences = 0;
+    bool sentenceHasText = false;
+    const QString terminators = QStringLiteral(".?!。！？");
+    const QString closers = QStringLiteral("\"')]}»”’");
+    for (int i = 0; i < plain.size(); ++i) {
+        if (plain.at(i).isLetterOrNumber()) sentenceHasText = true;
+        if (!sentenceHasText || !terminators.contains(plain.at(i))) continue;
+        int next = i + 1;
+        while (next < plain.size() && closers.contains(plain.at(next))) ++next;
+        if (next == plain.size() || plain.at(next).isSpace()) {
+            ++sentences;
+            sentenceHasText = false;
+            i = next - 1;
+        }
+    }
+    if (sentenceHasText) ++sentences;
+
+    // Tasks are source constructs. Count bullet and numbered task markers only
+    // outside backtick/tilde fences; task completion does not change the count.
+    int tasks = 0;
+    QChar fence;
+    int fenceLength = 0;
+    const QRegularExpression fenceMarker(QStringLiteral("^ {0,3}(`{3,}|~{3,})(.*)$"));
+    const QRegularExpression taskMarker(QStringLiteral("^ {0,3}(?:[-+*]|\\d+[.)])[ \\t]+\\[[ xX]\\](?:[ \\t]|$)"));
+    for (const QString &line : markdown.split('\n')) {
+        const auto marker = fenceMarker.match(line);
+        if (marker.hasMatch()) {
+            const QString sequence = marker.captured(1);
+            if (fence.isNull()) { fence = sequence.at(0); fenceLength = sequence.size(); }
+            else if (sequence.at(0) == fence && sequence.size() >= fenceLength
+                     && marker.captured(2).trimmed().isEmpty()) fence = QChar();
+        } else if (fence.isNull() && taskMarker.match(line).hasMatch()) {
+            ++tasks;
+        }
+    }
+
+    QVariantMap categoryWords{{QStringLiteral("Human"), 0}, {QStringLiteral("AI"), 0},
+                              {QStringLiteral("Reference"), 0}};
+    // Authorship metadata is a manual assertion over UTF-16 source offsets.
+    // Count a source word only when every code unit is covered by one category;
+    // partially labelled and unlabelled words are excluded. Never apply the
+    // live document's offsets to a different Markdown string.
+    if (m_document && markdown == currentDocumentText()) {
+        const QVariantList ranges = authorshipRanges();
+        auto matches = statisticsWordPattern().globalMatch(markdown);
+        while (matches.hasNext()) {
+            const auto match = matches.next();
+            int covered = match.capturedStart();
+            const int end = match.capturedEnd();
+            QString category;
+            for (const QVariant &value : ranges) {
+                const QVariantMap range = value.toMap();
+                const int rangeStart = range.value(QStringLiteral("start")).toInt();
+                const int rangeEnd = range.value(QStringLiteral("end")).toInt();
+                if (rangeEnd <= covered) continue;
+                if (rangeStart > covered) break;
+                const QString nextCategory = range.value(QStringLiteral("category")).toString();
+                if (!categoryWords.contains(nextCategory)
+                    || (!category.isEmpty() && category != nextCategory)) break;
+                category = nextCategory;
+                covered = qMin(end, rangeEnd);
+                if (covered == end) break;
+            }
+            if (covered == end && !category.isEmpty())
+                categoryWords[category] = categoryWords.value(category).toInt() + 1;
+        }
+    }
+    // Words and Unicode-scalar character counts retain the existing rendered
+    // plain-text basis. Reading stays at 200 WPM; speaking uses a fixed 130 WPM.
+    // Empty documents report zero minutes and non-empty estimates round up.
     return {{"words", words}, {"characters", plain.toUcs4().size()},
             {"charactersWithoutSpaces", compact.toUcs4().size()},
-            {"readingMinutes", words == 0 ? 0 : qMax(1, (words + 199) / 200)}};
+            {"sentences", sentences},
+            {"readingMinutes", words == 0 ? 0 : qMax(1, (words + 199) / 200)},
+            {"speakingMinutes", words == 0 ? 0 : qMax(1, (words + 129) / 130)},
+            {"tasks", tasks},
+            {"humanWords", categoryWords.value(QStringLiteral("Human"))},
+            {"aiWords", categoryWords.value(QStringLiteral("AI"))},
+            {"referenceWords", categoryWords.value(QStringLiteral("Reference"))}};
 }
 
 QVariantMap Backend::replaceText(int start, int end, const QString &replacement) {
@@ -983,6 +1070,10 @@ void Backend::attachDocument(QObject *textDocument) {
                 m_lastChangePos = position;
                 m_lastChangeAdded = charsAdded;
             });
+    // Includes format-only authorship edits and their Undo/Redo paths. The QML
+    // consumer debounces this signal before recomputing the displayed metrics.
+    connect(m_document, &QTextDocument::contentsChanged,
+            this, &Backend::documentStatisticsChanged);
 
     applyDocumentTypography();
     restoreRecovery();
@@ -1440,6 +1531,7 @@ bool Backend::editorTextChanged() {
     }
 
     scheduleWordCount();
+    emit documentStatisticsChanged();
     setModified(true);
     setStatus(QStringLiteral("Unsaved"));
     scheduleRecovery();
@@ -1838,10 +1930,8 @@ QString Backend::currentDocumentText() const {
 }
 
 int Backend::countWords(const QString &text) {
-    static const QRegularExpression wordRe(
-        QStringLiteral("[\\p{L}\\p{N}]+(?:['-][\\p{L}\\p{N}]+)*"));
     int count = 0;
-    QRegularExpressionMatchIterator it = wordRe.globalMatch(text);
+    QRegularExpressionMatchIterator it = statisticsWordPattern().globalMatch(text);
     while (it.hasNext()) {
         it.next();
         ++count;
@@ -2277,6 +2367,7 @@ void Backend::markAuthorship(int start, int end, const QString &category, const 
     QTextCharFormat format;
     format.setProperty(authorProperty, category == "Unknown" ? QString() : category + "\n" + author.left(200));
     cursor.beginEditBlock(); cursor.mergeCharFormat(format); cursor.endEditBlock();
+    emit documentStatisticsChanged();
     setModified(true); scheduleRecovery();
     setStatus("Authorship annotation applied; Save writes a separate metadata file.");
 }
@@ -2303,9 +2394,12 @@ void Backend::applyAuthorshipData(const QJsonObject &data) {
     const auto undoGuard = qScopeGuard([this] { m_document->setUndoRedoEnabled(true); });
     QTextCursor clear(m_document); clear.select(QTextCursor::Document);
     QTextCharFormat blank; blank.setProperty(authorProperty, QString()); clear.mergeCharFormat(blank);
-    if (data["version"].toInt() != 1 || data["sha256"].toString() != authorshipData()["sha256"].toString()) return;
+    if (data["version"].toInt() != 1 || data["sha256"].toString() != authorshipData()["sha256"].toString()) {
+        emit documentStatisticsChanged();
+        return;
+    }
     const auto ranges = data["ranges"].toArray();
-    if (ranges.size() > 100000) return;
+    if (ranges.size() > 100000) { emit documentStatisticsChanged(); return; }
     for (const auto &item : ranges) {
         const auto range = item.toObject();
         const int start = range["start"].toInt(-1), end = range["end"].toInt(-1);
@@ -2317,6 +2411,7 @@ void Backend::applyAuthorshipData(const QJsonObject &data) {
         cursor.mergeCharFormat(format);
     }
     m_document->clearUndoRedoStacks();
+    emit documentStatisticsChanged();
 }
 bool Backend::saveAuthorship(const QUrl &url) {
     const QString path = authorshipPath(url);

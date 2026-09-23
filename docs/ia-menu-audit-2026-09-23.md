@@ -1,6 +1,6 @@
 # iA Writer menu map and Omawrite gap audit — 23 September 2026
 
-This is the planning baseline after Omawrite Cycle 47 (76 tests), with completed Cycle 48–49 rows updated. It transcribes the menu screenshots in `screenshots/` and compares them with the source. It is an interface and behavior audit, not a claim that similarly named commands behave identically.
+This is the planning baseline after Omawrite Cycle 47 (76 tests), with completed Cycle 48–51 rows and the unverified Cycle 52 source checkpoint updated. It transcribes the menu screenshots in `screenshots/` and compares them with the source. It is an interface and behavior audit, not a claim that similarly named commands behave identically.
 
 The screenshots contain personal filenames, locations and tags. This document records commands only. The images remain untracked reference material and should not be committed. Two files are empty duplicate captures: `3.48.34 PM(2)` and `3.49.37 PM(2)`. The duplicate `1.57.39 PM(2)` and `3.50.00 PM(2)` images add no distinct menu evidence.
 
@@ -203,9 +203,9 @@ These menus were not opened in this folder. The older inspection recorded the st
 | Preview Full/Split/Web | **Partial (Cycle 51)** | View → Preview now routes Full/Split/Web to existing continuous preview layouts. Web is not a separate renderer; exact iA behavior remains unverified. |
 | PDF preview / fit controls | **Partial (Cycle 51)** | View → Preview → PDF → Paginated Preview opens the existing page/fit controls. iA's PDF submenu children were not captured, so exact structure and shortcut parity remain open. |
 | Templates | **Partial** | Shared preview/export presets: Modern Sans, Classic Serif, Manuscript Mono, GitHub, Helvetica, Palatino and MLA Draft, plus JSON Custom. Duo/Quattro are missing; MLA Draft is not complete MLA Style; iA template-package import is unsupported. |
-| Title bar modes | **Gap** | No Fade In/Out versus Always Show option. |
-| Toolbar modes and stats-only display | **Partial** | Omawrite has a fixed toolbar and statistics dialog. It lacks fade/show/hide modes and persistent Stats Only toolbar. |
-| Statistics set | **Partial** | Words, characters, characters excluding whitespace and reading time exist. Sentences, speaking time, tasks and Human/AI/Reference counts are missing from the statistics UI. |
+| Title bar modes | **Partial (Cycle 52 source; native pending)** | Persisted Fade In/Out and Always Show affect the QML filename in the 44 px top strip; exact iA fade feel and native accessibility remain unverified. |
+| Toolbar modes and stats-only display | **Partial (Cycle 52 source; native pending)** | Fade/Always/Hide affect QML top controls; Default/Stats Only and ten independent metric toggles persist. Stats Only appears in Omawrite's footer, unlike iA's top toolbar. Native visual and keyboard acceptance remain open. |
+| Statistics set | **Partial (Cycle 52 source; native pending)** | Sentence, speaking, task and manual Human/AI/Reference counts join the earlier metrics. Deterministic heuristic/annotation rules have tests, but placement and native live updates remain unverified. |
 | Tab bar / all tabs / full screen | **Partial** | Native tab controls, tab overview and fullscreen lifecycle exist, but placement/labels differ and some platform action enabled states remain imperfect. |
 
 ### Go

@@ -44,9 +44,9 @@ On macOS use **Command-S/O/N/P/F/B/I/K**, **Shift-Command-S** for Save As, **Opt
 
 Try `./bin/run examples/Workspace-tour.md`. Use the sidebar toggles to show/hide the library and organizer, the outline icon to jump to headings, and **Aa** for writing options, and the word count for statistics. Files remain ordinary UTF-8 Markdown. The library filter currently covers files in expanded folders. Preview uses Qt Markdown; it does not yet offer iA Writer's complete extensions, web/PDF template system or publishing integrations.
 
-## Latest local build: Cycle 51 (after Mac 0.2.0 RC1)
+## Latest native-verified build: Cycle 51; Cycle 52 source in progress
 
-File and folder right-click menus include open/tab/window, info, favorites, duplicate/rename/Trash, Finder/sharing, output/clipboard, creation, sorting and view options. View → Template shares named presets across preview and export; Show Date offers Date Modified, Date Created and None. Format adds ordered tasks plus conservative Clear Styles. File/Edit follow the captured menu groups, and View now offers Tree or current-folder List navigation and continuous/paginated preview routes. **82 tests pass**; both local app bundles are refreshed. See Cycle 51 in the [build records](docs/build-cycles.md) and the [menu closeout plan](docs/menu-closeout-plan.md). The GitHub RC1 download remains the earlier Cycle 42 binary.
+File and folder right-click menus include open/tab/window, info, favorites, duplicate/rename/Trash, Finder/sharing, output/clipboard, creation, sorting and view options. View → Template shares named presets across preview and export; Show Date offers Date Modified, Date Created and None. Format adds ordered tasks plus conservative Clear Styles. File/Edit follow the captured menu groups, and View offers Tree or current-folder List navigation and continuous/paginated preview routes. Cycle 52 source adds statistics and View chrome modes with **84 passing tests**; `dist/Omawrite.app` is packaged from that source, while the running `dist/Omawrite Dev.app` remains at native-verified Cycle 51 until it can be closed normally and refreshed. See the [build records](docs/build-cycles.md) and [menu closeout plan](docs/menu-closeout-plan.md). The GitHub RC1 download remains the earlier Cycle 42 binary.
 
 ## Archived release: Mac 0.2.0 RC1, Cycle 42
 

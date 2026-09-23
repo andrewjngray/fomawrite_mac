@@ -54,6 +54,62 @@ ApplicationWindow {
     property bool awaitingPendingSave: false
     property string pendingFileName: ""
     property int pendingHistoryDirection: 0
+    property var documentStatistics: ({ words: 0, characters: 0, charactersWithoutSpaces: 0,
+                                        sentences: 0, readingMinutes: 0, speakingMinutes: 0,
+                                        tasks: 0, humanWords: 0, aiWords: 0, referenceWords: 0 })
+
+    function refreshDocumentStatistics() {
+        documentStatistics = backend.documentStatistics(editor.text);
+    }
+    function compactStatistic(metric) {
+        var value = documentStatistics[metric] || 0;
+        switch (metric) {
+        case "characters": return value + " chars";
+        case "charactersWithoutSpaces": return value + " chars no spaces";
+        case "sentences": return value + " sentences";
+        case "readingMinutes": return value + " min read";
+        case "speakingMinutes": return value + " min speak";
+        case "tasks": return value + " tasks";
+        case "humanWords": return value + " human";
+        case "aiWords": return value + " AI";
+        case "referenceWords": return value + " reference";
+        default: return value + " words";
+        }
+    }
+    function compactToolbarStatistics() {
+        var values = [];
+        if (workspaceSettings.toolbarCharacters) values.push(compactStatistic("characters"));
+        if (workspaceSettings.toolbarCharactersNoSpaces) values.push(compactStatistic("charactersWithoutSpaces"));
+        if (workspaceSettings.toolbarWords) values.push(compactStatistic("words"));
+        if (workspaceSettings.toolbarSentences) values.push(compactStatistic("sentences"));
+        if (workspaceSettings.toolbarReadingTime) values.push(compactStatistic("readingMinutes"));
+        if (workspaceSettings.toolbarSpeakingTime) values.push(compactStatistic("speakingMinutes"));
+        if (workspaceSettings.toolbarTasks) values.push(compactStatistic("tasks"));
+        if (workspaceSettings.toolbarHuman) values.push(compactStatistic("humanWords"));
+        if (workspaceSettings.toolbarAI) values.push(compactStatistic("aiWords"));
+        if (workspaceSettings.toolbarReference) values.push(compactStatistic("referenceWords"));
+        return values.length > 0 ? values.join("  ·  ") : "No statistics selected";
+    }
+
+    Timer {
+        id: statisticsRefreshTimer
+        interval: 120
+        onTriggered: win.refreshDocumentStatistics()
+    }
+    Connections {
+        target: backend
+        function onDocumentStatisticsChanged() { statisticsRefreshTimer.restart(); }
+        function onDocumentLoaded() { statisticsRefreshTimer.restart(); }
+    }
+
+    function isInside(item, ancestor) {
+        while (item) {
+            if (item === ancestor) return true;
+            item = item.parent;
+        }
+        return false;
+    }
+    onActiveFocusItemChanged: topChrome.keyboardReveal = isInside(activeFocusItem, topChrome)
 
     Settings {
         id: workspaceSettings
@@ -73,6 +129,19 @@ ApplicationWindow {
         onSentenceFocusChanged: backend.setFocusPosition(editor.cursorPosition, paragraphFocus, sentenceFocus)
         property bool paragraphFocus: false
         onParagraphFocusChanged: backend.setFocusPosition(editor.cursorPosition, paragraphFocus, sentenceFocus)
+        property int titleBarMode: 1
+        property int toolbarVisibilityMode: 1
+        property int toolbarMode: 0
+        property bool toolbarCharacters: true
+        property bool toolbarCharactersNoSpaces: true
+        property bool toolbarWords: true
+        property bool toolbarSentences: true
+        property bool toolbarReadingTime: true
+        property bool toolbarSpeakingTime: true
+        property bool toolbarTasks: true
+        property bool toolbarHuman: true
+        property bool toolbarAI: true
+        property bool toolbarReference: true
         property bool automaticVersions: false
         onShowMarkupChanged: backend.setShowMarkup(showMarkup)
     }
@@ -121,6 +190,12 @@ ApplicationWindow {
 
     ToolBar {
         id: topChrome
+        objectName: "topChrome"
+        property bool keyboardReveal: false
+        readonly property bool revealRequested: chromeHover.hovered || keyboardReveal
+        readonly property real titleContentOpacity: workspaceSettings.titleBarMode === 1 || revealRequested ? 1 : 0
+        readonly property real toolbarContentOpacity: workspaceSettings.toolbarVisibilityMode === 1 || revealRequested ? 1 : 0
+        readonly property bool toolbarContentVisible: workspaceSettings.toolbarVisibilityMode !== 2
         padding: 0
         topPadding: 0
         bottomPadding: 0
@@ -132,29 +207,58 @@ ApplicationWindow {
             color: backend.palette.panel
             MouseArea { anchors.fill: parent; onPressed: win.startSystemMove(); onDoubleClicked: win.visibility === Window.Maximized ? win.showNormal() : win.showMaximized() }
         }
+        HoverHandler { id: chromeHover }
         // Align the toolbar groups with the panes below, including native window controls.
         RowLayout {
             anchors.fill: parent
             anchors.leftMargin: win.isMac ? 84 : 8
             anchors.rightMargin: 10
             spacing: 5
-            ChromeButton { iconName: "library"; hint: "Show or hide library"; darkMode: win.darkMode; checkable: true; checked: workspaceSettings.libraryVisible; onClicked: workspaceCommands.run("library") }
-            ChromeButton { iconName: "organizer"; hint: "Show or hide organizer"; darkMode: win.darkMode; visible: workspaceSettings.libraryVisible; enabled: workspaceCommands.isEnabled("organizer"); onClicked: workspaceCommands.run("organizer") }
-            Item { visible: organizerPane.visible; Layout.preferredWidth: Math.max(0, organizerPane.width - (win.isMac ? 164 : 88)) }
             RowLayout {
-                visible: libraryPane.visible
-                Layout.preferredWidth: libraryPane.width - 10
-                Layout.minimumWidth: libraryPane.width - 10
-                Layout.maximumWidth: libraryPane.width - 10
-                ChromeButton { iconName: "folder"; font.pixelSize: 15; font.bold: false; text: backend.library.rootName || "Choose folder"; hint: "Choose library folder"; darkMode: win.darkMode; Layout.fillWidth: true; onClicked: libraryPane.chooseFolder() }
-                ChromeButton { iconName: "plus"; hint: "New document"; darkMode: win.darkMode; onClicked: libraryPane.newDocument() }
-                ChromeButton { iconName: "down"; hint: "Library options"; darkMode: win.darkMode; onClicked: libraryPane.showOptions(this) }
+                id: toolbarLeading
+                objectName: "topChromeToolbarLeading"
+                visible: topChrome.toolbarContentVisible
+                opacity: topChrome.toolbarContentOpacity
+                spacing: 5
+                Behavior on opacity { NumberAnimation { duration: 160 } }
+                ChromeButton { objectName: "topChromeLibraryButton"; iconName: "library"; hint: "Show or hide library"; darkMode: win.darkMode; checkable: true; checked: workspaceSettings.libraryVisible; onClicked: workspaceCommands.run("library") }
+                ChromeButton { iconName: "organizer"; hint: "Show or hide organizer"; darkMode: win.darkMode; visible: workspaceSettings.libraryVisible; enabled: workspaceCommands.isEnabled("organizer"); onClicked: workspaceCommands.run("organizer") }
+                Item { visible: organizerPane.visible; Layout.preferredWidth: Math.max(0, organizerPane.width - (win.isMac ? 164 : 88)) }
+                RowLayout {
+                    visible: libraryPane.visible
+                    Layout.preferredWidth: libraryPane.width - 10
+                    Layout.minimumWidth: libraryPane.width - 10
+                    Layout.maximumWidth: libraryPane.width - 10
+                    ChromeButton { iconName: "folder"; font.pixelSize: 15; font.bold: false; text: backend.library.rootName || "Choose folder"; hint: "Choose library folder"; darkMode: win.darkMode; Layout.fillWidth: true; onClicked: libraryPane.chooseFolder() }
+                    ChromeButton { iconName: "plus"; hint: "New document"; darkMode: win.darkMode; onClicked: libraryPane.newDocument() }
+                    ChromeButton { iconName: "down"; hint: "Library options"; darkMode: win.darkMode; onClicked: libraryPane.showOptions(this) }
+                }
             }
-            Label { Accessible.description: backend.status; text: backend.fileName; color: backend.palette.muted; font.pixelSize: 15; font.weight: Font.Normal; elide: Text.ElideMiddle; horizontalAlignment: Text.AlignLeft; Layout.fillWidth: true }
-            ChromeButton { iconName: "outline"; hint: "Document outline"; darkMode: win.darkMode; onClicked: workspaceCommands.run("outline") }
-            ChromeButton { text: "Aa"; hint: "Writing options"; darkMode: win.darkMode; onClicked: writingOptions.open() }
-            ChromeButton { iconName: "search"; hint: "Find in document"; darkMode: win.darkMode; onClicked: win.openSearch(false, false) }
-            ChromeButton { iconName: "preview"; hint: "Show or hide preview"; darkMode: win.darkMode; checked: workspaceSettings.layoutMode !== 0; onClicked: workspaceCommands.run("togglePreview") }
+            Label {
+                objectName: "topChromeTitle"
+                Accessible.description: backend.status
+                text: backend.fileName
+                color: backend.palette.muted
+                font.pixelSize: 15
+                font.weight: Font.Normal
+                elide: Text.ElideMiddle
+                horizontalAlignment: Text.AlignLeft
+                Layout.fillWidth: true
+                opacity: topChrome.titleContentOpacity
+                Behavior on opacity { NumberAnimation { duration: 160 } }
+            }
+            RowLayout {
+                id: toolbarTrailing
+                objectName: "topChromeToolbarTrailing"
+                visible: topChrome.toolbarContentVisible
+                opacity: topChrome.toolbarContentOpacity
+                spacing: 5
+                Behavior on opacity { NumberAnimation { duration: 160 } }
+                ChromeButton { iconName: "outline"; hint: "Document outline"; darkMode: win.darkMode; onClicked: workspaceCommands.run("outline") }
+                ChromeButton { text: "Aa"; hint: "Writing options"; darkMode: win.darkMode; onClicked: writingOptions.open() }
+                ChromeButton { iconName: "search"; hint: "Find in document"; darkMode: win.darkMode; onClicked: win.openSearch(false, false) }
+                ChromeButton { iconName: "preview"; hint: "Show or hide preview"; darkMode: win.darkMode; checked: workspaceSettings.layoutMode !== 0; onClicked: workspaceCommands.run("togglePreview") }
+            }
         }
     }
 
@@ -184,18 +288,26 @@ ApplicationWindow {
 
     Dialog {
         id: statisticsDialog
-        property var statistics: ({})
+        objectName: "statisticsDialog"
+        property var statistics: win.documentStatistics
         title: "Document statistics"
         anchors.centerIn: parent
         width: 300
         modal: true
         standardButtons: Dialog.Close
-        onOpened: statistics = backend.documentStatistics(editor.text)
+        onOpened: win.refreshDocumentStatistics()
         Label {
             text: (statisticsDialog.statistics.words || 0) + " words\n"
                 + (statisticsDialog.statistics.characters || 0) + " characters\n"
-                + (statisticsDialog.statistics.charactersWithoutSpaces || 0) + " excluding whitespace\n\n"
-                + (statisticsDialog.statistics.readingMinutes || 0) + " min estimated reading time"
+                + (statisticsDialog.statistics.charactersWithoutSpaces || 0) + " excluding whitespace\n"
+                + (statisticsDialog.statistics.sentences || 0) + " sentences\n"
+                + (statisticsDialog.statistics.tasks || 0) + " tasks\n\n"
+                + (statisticsDialog.statistics.readingMinutes || 0) + " min estimated reading time\n"
+                + (statisticsDialog.statistics.speakingMinutes || 0) + " min estimated speaking time\n\n"
+                + (statisticsDialog.statistics.humanWords || 0) + " Human words\n"
+                + (statisticsDialog.statistics.aiWords || 0) + " AI words\n"
+                + (statisticsDialog.statistics.referenceWords || 0) + " Reference words\n"
+                + "Authorship counts are manual assertions."
             lineHeight: 1.6
         }
     }
@@ -758,6 +870,36 @@ ApplicationWindow {
             Platform.MenuSeparator {}
             NativeCommand { commandId: "outline" }
             NativeCommand { commandId: "statistics" }
+            Platform.Menu {
+                title: "Title Bar"
+                NativeCommand { commandId: "titleBarFade" }
+                NativeCommand { commandId: "titleBarAlways" }
+            }
+            Platform.Menu {
+                title: "Toolbar"
+                NativeCommand { commandId: "toolbarFade" }
+                NativeCommand { commandId: "toolbarAlways" }
+                NativeCommand { commandId: "toolbarHide" }
+                Platform.MenuSeparator {}
+                NativeCommand { commandId: "toolbarDefault" }
+                Platform.Menu {
+                    id: toolbarStatsOnlyMenu
+                    title: "Stats Only"
+                    Binding { target: toolbarStatsOnlyMenu.menuItem; property: "objectName"; value: "native_toolbarStatsOnly" }
+                    Binding { target: toolbarStatsOnlyMenu.menuItem; property: "checkable"; value: true }
+                    Binding { target: toolbarStatsOnlyMenu.menuItem; property: "checked"; value: workspaceCommands.isChecked("toolbarStatsOnly") }
+                    NativeCommand { commandId: "toolbarCharacters" }
+                    NativeCommand { commandId: "toolbarCharactersNoSpaces" }
+                    NativeCommand { commandId: "toolbarWords" }
+                    NativeCommand { commandId: "toolbarSentences" }
+                    NativeCommand { commandId: "toolbarReadingTime" }
+                    NativeCommand { commandId: "toolbarSpeakingTime" }
+                    NativeCommand { commandId: "toolbarTasks" }
+                    NativeCommand { commandId: "toolbarHuman" }
+                    NativeCommand { commandId: "toolbarAI" }
+                    NativeCommand { commandId: "toolbarReference" }
+                }
+            }
             Platform.MenuSeparator {}
             // AppKit supplies the native Full Screen item automatically.
         }
@@ -1866,12 +2008,20 @@ ApplicationWindow {
                 anchors.leftMargin: 6
                 anchors.rightMargin: 10
                 spacing: 2
-                ChromeButton { text: "Bold"; hint: "Bold selection"; darkMode: win.darkMode; onClicked: editor.wrapSelection("**", "**") }
-                ChromeButton { text: "Italic"; hint: "Italic selection"; darkMode: win.darkMode; onClicked: editor.wrapSelection("*", "*") }
-                ChromeButton { text: "Link"; hint: "Insert link"; darkMode: win.darkMode; onClicked: editor.insertLink() }
-                ChromeButton { text: "More"; hint: "More formatting"; darkMode: win.darkMode; onClicked: formatPopover.open() }
-                Item { Layout.fillWidth: true }
-                ChromeButton { text: backend.wordCount + " words"; hint: "Document statistics"; darkMode: win.darkMode; onClicked: workspaceCommands.run("statistics") }
+                ChromeButton { visible: workspaceSettings.toolbarMode !== 1; text: "Bold"; hint: "Bold selection"; darkMode: win.darkMode; onClicked: editor.wrapSelection("**", "**") }
+                ChromeButton { visible: workspaceSettings.toolbarMode !== 1; text: "Italic"; hint: "Italic selection"; darkMode: win.darkMode; onClicked: editor.wrapSelection("*", "*") }
+                ChromeButton { visible: workspaceSettings.toolbarMode !== 1; text: "Link"; hint: "Insert link"; darkMode: win.darkMode; onClicked: editor.insertLink() }
+                ChromeButton { visible: workspaceSettings.toolbarMode !== 1; text: "More"; hint: "More formatting"; darkMode: win.darkMode; onClicked: formatPopover.open() }
+                Item { visible: workspaceSettings.toolbarMode !== 1; Layout.fillWidth: true }
+                ChromeButton {
+                    objectName: "toolbarStatistic"
+                    text: workspaceSettings.toolbarMode === 1 ? win.compactToolbarStatistics() : win.compactStatistic("words")
+                    hint: workspaceSettings.toolbarMode === 1 ? win.compactToolbarStatistics() : "Document statistics"
+                    darkMode: win.darkMode
+                    Layout.fillWidth: workspaceSettings.toolbarMode === 1
+                    Layout.maximumWidth: workspaceSettings.toolbarMode === 1 ? editorPane.width - 20 : implicitWidth
+                    onClicked: workspaceCommands.run("statistics")
+                }
             }
         }
 
@@ -2054,6 +2204,13 @@ ApplicationWindow {
             if (workspaceSettings.writingSize === 20) workspaceSettings.writingSize = 16;
             workspaceSettings.appearanceRevision = 1;
         }
+        if (workspaceSettings.toolbarMode !== 0 && workspaceSettings.toolbarMode !== 1)
+            workspaceSettings.toolbarMode = 0;
+        if (workspaceSettings.titleBarMode !== 0 && workspaceSettings.titleBarMode !== 1)
+            workspaceSettings.titleBarMode = 1;
+        if (workspaceSettings.toolbarVisibilityMode < 0 || workspaceSettings.toolbarVisibilityMode > 2)
+            workspaceSettings.toolbarVisibilityMode = 1;
+        Qt.callLater(win.refreshDocumentStatistics);
         var geometry = backend.windowGeometry();
         if (geometry.x >= 0) x = geometry.x;
         if (geometry.y >= 0) y = geometry.y;

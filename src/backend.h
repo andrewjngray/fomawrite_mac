@@ -176,6 +176,7 @@ signals:
     void modifiedChanged();
     void statusChanged();
     void wordCountChanged();
+    void documentStatisticsChanged();
     void outputStyleChanged();
     void themePresetChanged();
     void darkModeChanged();

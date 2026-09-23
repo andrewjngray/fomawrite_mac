@@ -73,6 +73,23 @@ QtObject {
         { id: "markup", title: "Show Markdown Syntax", toggle: true },
         { id: "outline", title: "Document Outline" },
         { id: "statistics", title: "Document Statistics" },
+        { id: "titleBarFade", title: "Fade In/Out", toggle: true },
+        { id: "titleBarAlways", title: "Always Show", toggle: true },
+        { id: "toolbarFade", title: "Fade In/Out", toggle: true },
+        { id: "toolbarAlways", title: "Always Show", toggle: true },
+        { id: "toolbarHide", title: "Hide", toggle: true },
+        { id: "toolbarDefault", title: "Default", toggle: true },
+        { id: "toolbarStatsOnly", title: "Stats Only", toggle: true },
+        { id: "toolbarCharacters", title: "Characters", toggle: true },
+        { id: "toolbarCharactersNoSpaces", title: "Characters Without Spaces", toggle: true },
+        { id: "toolbarWords", title: "Words", toggle: true },
+        { id: "toolbarSentences", title: "Sentences", toggle: true },
+        { id: "toolbarReadingTime", title: "Reading Time", toggle: true },
+        { id: "toolbarSpeakingTime", title: "Speaking Time", toggle: true },
+        { id: "toolbarTasks", title: "Tasks", toggle: true },
+        { id: "toolbarHuman", title: "Human", toggle: true },
+        { id: "toolbarAI", title: "AI", toggle: true },
+        { id: "toolbarReference", title: "Reference", toggle: true },
         { id: "fullscreen", title: "Full Screen" },
         { id: "sentence", title: "Sentence Focus", toggle: true },
         { id: "paragraph", title: "Paragraph Focus", toggle: true },
@@ -127,6 +144,23 @@ QtObject {
         case "preview": return settings.layoutMode === 2;
         case "togglePreview": return settings.layoutMode !== 0;
         case "webPreview": return true;
+        case "titleBarFade": return settings.titleBarMode === 0;
+        case "titleBarAlways": return settings.titleBarMode === 1;
+        case "toolbarFade": return settings.toolbarVisibilityMode === 0;
+        case "toolbarAlways": return settings.toolbarVisibilityMode === 1;
+        case "toolbarHide": return settings.toolbarVisibilityMode === 2;
+        case "toolbarDefault": return settings.toolbarMode === 0;
+        case "toolbarStatsOnly": return settings.toolbarMode === 1;
+        case "toolbarCharacters": return settings.toolbarCharacters;
+        case "toolbarCharactersNoSpaces": return settings.toolbarCharactersNoSpaces;
+        case "toolbarWords": return settings.toolbarWords;
+        case "toolbarSentences": return settings.toolbarSentences;
+        case "toolbarReadingTime": return settings.toolbarReadingTime;
+        case "toolbarSpeakingTime": return settings.toolbarSpeakingTime;
+        case "toolbarTasks": return settings.toolbarTasks;
+        case "toolbarHuman": return settings.toolbarHuman;
+        case "toolbarAI": return settings.toolbarAI;
+        case "toolbarReference": return settings.toolbarReference;
         case "sans": return backend.outputStyle === 0;
         case "serif": return backend.outputStyle === 1;
         case "mono": return backend.outputStyle === 2;
@@ -167,6 +201,23 @@ QtObject {
         case "togglePreview": settings.layoutMode = settings.layoutMode === 0 ? 1 : 0; break;
         case "reloadPreview": preview.reload(); break;
         case "webPreview": if (settings.layoutMode === 0) settings.layoutMode = 1; break;
+        case "titleBarFade": settings.titleBarMode = 0; break;
+        case "titleBarAlways": settings.titleBarMode = 1; break;
+        case "toolbarFade": settings.toolbarVisibilityMode = 0; break;
+        case "toolbarAlways": settings.toolbarVisibilityMode = 1; break;
+        case "toolbarHide": settings.toolbarVisibilityMode = 2; break;
+        case "toolbarDefault": settings.toolbarMode = 0; break;
+        case "toolbarStatsOnly": settings.toolbarMode = 1; break;
+        case "toolbarCharacters": settings.toolbarCharacters = !settings.toolbarCharacters; settings.toolbarMode = 1; break;
+        case "toolbarCharactersNoSpaces": settings.toolbarCharactersNoSpaces = !settings.toolbarCharactersNoSpaces; settings.toolbarMode = 1; break;
+        case "toolbarWords": settings.toolbarWords = !settings.toolbarWords; settings.toolbarMode = 1; break;
+        case "toolbarSentences": settings.toolbarSentences = !settings.toolbarSentences; settings.toolbarMode = 1; break;
+        case "toolbarReadingTime": settings.toolbarReadingTime = !settings.toolbarReadingTime; settings.toolbarMode = 1; break;
+        case "toolbarSpeakingTime": settings.toolbarSpeakingTime = !settings.toolbarSpeakingTime; settings.toolbarMode = 1; break;
+        case "toolbarTasks": settings.toolbarTasks = !settings.toolbarTasks; settings.toolbarMode = 1; break;
+        case "toolbarHuman": settings.toolbarHuman = !settings.toolbarHuman; settings.toolbarMode = 1; break;
+        case "toolbarAI": settings.toolbarAI = !settings.toolbarAI; settings.toolbarMode = 1; break;
+        case "toolbarReference": settings.toolbarReference = !settings.toolbarReference; settings.toolbarMode = 1; break;
         case "sans": backend.setOutputStyle(0); break;
         case "serif": backend.setOutputStyle(1); break;
         case "mono": backend.setOutputStyle(2); break;

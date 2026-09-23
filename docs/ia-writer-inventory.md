@@ -10,7 +10,9 @@
 
 **Cycle 51 overlay:** Tree and persisted current-folder List navigation now share folder history, Show in Library and sorting/filter settings. View → Preview contains Full, Split, Web and PDF → Paginated Preview using existing renderers. Web is an action for continuous preview, not a new renderer; iA's PDF children remain uncaptured. [Build and native evidence](../research/cycle-51/README.md).
 
-**Current status — 23 September 2026:** Cycle 51 is the latest local build, with 82 tests passing. Mac 0.2.0 RC1 remains the older Cycle 42 downloadable release. The [release acceptance ledger](release-acceptance.md) and [menu closeout plan](menu-closeout-plan.md) track unresolved parity and hardware checks; dated counts below are historical.
+**Cycle 52 source checkpoint:** deterministic additional statistics, independent Stats Only metrics and persisted Title Bar/Toolbar modes pass 84 tests. Native Dev verification is pending; placement, fade feel and accessibility remain partial. [Rules and pending evidence](../research/cycle-52/README.md).
+
+**Current status — 23 September 2026:** Cycle 51 is the latest native-verified build; Cycle 52 source passes 84 tests but is not closed. Mac 0.2.0 RC1 remains the older Cycle 42 downloadable release. The [release acceptance ledger](release-acceptance.md) and [menu closeout plan](menu-closeout-plan.md) track unresolved parity and hardware checks; dated counts below are historical.
 
 
 ## Current overlay — Cycles 34c–38, 23 September 2026

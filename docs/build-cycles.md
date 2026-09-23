@@ -867,3 +867,15 @@ Known gaps: Tree expansion resets when changing the library root and is not rest
 Runnable artifacts: `dist/Omawrite Dev.app` and `dist/Omawrite.app` from Cycle 51. GitHub RC1 binary remains the earlier Cycle 42 checkpoint.
 
 Optional exercise: open `research/cycle-51/sample` by path, use View → View Options → Navigation to switch Tree/List, open Child and use Go → Back in Library. Open `Child/Grandchild/Deep-note.md`, then use File → Show in Library. Compare View → Preview → Full/Split and PDF → Paginated Preview; report any confusing behavior.
+
+## Cycle 52 — View chrome and statistics (in progress)
+
+Planned scope: reproduce the captured Title Bar and Toolbar menu groups, add Default/Stats Only with independently selectable metrics, and define counts explicitly without claiming linguistic or authorship provenance accuracy. Keep macOS traffic lights and native-menu access available when QML chrome fades or hides.
+
+Source changes: the statistics dialog and compact footer now include sentences, speaking time, task count and fully labelled manual Human/AI/Reference source-word counts. Stats Only preserves ten independent metric choices as shown in the iA screenshot. Title Bar offers Fade In/Out and Always Show; Toolbar offers Fade In/Out, Always Show and Hide. The top strip stays 44 px for native controls and dragging. [Counting and fade rules](../research/cycle-52/counting-rules.md) describe Omawrite's chosen semantics.
+
+Validation so far: `./bin/build` and `./bin/test` pass with **84 tests, zero failures**, including the final tooltip/accessibility adjustment. Focused tests cover counting, UTF-16 manual labels, live updates/Undo, independent menu checks, persistence and keyboard-focus reveal. Stable Dev refresh and native visual/accessibility checks are pending. The Mac locked before the running Dev app could be closed normally; it remains untouched at Cycle 51 while the ordinary app is packaged from the passing Cycle 52 source.
+
+Known gaps: the Stats Only display is in Omawrite's footer rather than iA's top toolbar, and long selections elide visually while retaining a full hover/accessibility value. Sentence/task rules are conservative heuristics; authorship labels are manual assertions. iA fade timing was not captured. Fullscreen, narrow/dark, high-contrast, VoiceOver and traffic-light visual acceptance remain pending native QA.
+
+Optional exercise once Dev is refreshed: open `research/cycle-52/sample/Statistics.md`, compare View → Toolbar → Stats Only metric checks with the footer, edit a sentence and a task, then try Title Bar and Toolbar Fade/Hide. Confirm window controls and native View menu remain reachable.
