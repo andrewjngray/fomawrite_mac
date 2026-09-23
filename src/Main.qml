@@ -528,6 +528,7 @@ ApplicationWindow {
             Platform.MenuItem { objectName: "fileRevealFinder"; text: "Show in Finder"; enabled: backend.fileUrl.toString() !== ""; onTriggered: backend.showInFinder() }
             Platform.MenuItem { objectName: "fileRevealLibrary"; text: "Show in Library"; enabled: backend.fileUrl.toString() !== ""; onTriggered: win.showCurrentFileInLibrary() }
             Platform.MenuSeparator {}
+            Platform.MenuItem { text: "Insert Page Break"; onTriggered: editor.replaceSelectionWith("\n\n<!-- pagebreak -->\n\n") }
             Platform.MenuItem { text: "Export HTML…"; onTriggered: { exportDialog.outputFormat = "html"; exportDialog.nameFilters = ["HTML (*.html)"]; exportDialog.open(); } }
             Platform.MenuItem { text: "Export PDF…"; onTriggered: { exportDialog.outputFormat = "pdf"; exportDialog.nameFilters = ["PDF (*.pdf)"]; exportDialog.open(); } }
             Platform.MenuItem { text: "Page Setup…"; onTriggered: backend.pageSetup() }
@@ -632,8 +633,8 @@ ApplicationWindow {
             Platform.Menu {
                 title: "Output Style"
                 Platform.MenuItem { text: "Clean Sans"; onTriggered: backend.setOutputStyle(0) }
-                Platform.MenuItem { text: "Reading Serif"; onTriggered: backend.setOutputStyle(1) }
-                Platform.MenuItem { text: "Manuscript Mono"; onTriggered: backend.setOutputStyle(2) }
+                Platform.MenuItem { text: "Reading Serif"; checkable: true; checked: backend.outputStyle === 1; onTriggered: backend.setOutputStyle(1) }
+                Platform.MenuItem { text: "Manuscript Mono"; checkable: true; checked: backend.outputStyle === 2; onTriggered: backend.setOutputStyle(2) }
                 Platform.MenuItem { text: "Load Custom Style…"; onTriggered: outputStyleDialog.open() }
             }
             Platform.MenuItem { text: "Synchronized Scrolling"; checkable: true; checked: workspaceSettings.synchronizedScroll; onTriggered: workspaceSettings.synchronizedScroll = !workspaceSettings.synchronizedScroll }

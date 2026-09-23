@@ -652,3 +652,13 @@ Planned scope: searchable existing workspace commands with keyboard navigation a
 **Limits:** Not a complete Markdown parser. Nearest-match wiki lookup, complex nested inline links, semantic scroll synchronization and the full long-document/fragment matrix remain open.
 
 **Artifact / exercise:** Combined bundles. Preview an included chapter with a local image, a quoted CSV and a multiline footnote; follow its return link. Source files remain unchanged.
+
+## Cycle 37 — Persisted output templates and portable raster images
+
+**Changes:** Persisted output styles/custom font, size, header/footer and optional title page. PDF/print share paginated output with page counters. Page-break insertion uses a Markdown comment. HTML embeds bounded local raster images; unavailable assets reject export and retain prior output.
+
+**Tests:** Build and 65 tests pass. Persisted style, embedded image, page break and export rollback covered. Rendered two-page PDF visually reviewed; corrected a boundary defect that moved the preceding image to page 2. Corrected images/text/headers/footers inspected in output-final evidence. Native picker checks follow in combined QA.
+
+**Limits:** No in-app paginated/fit-page preview; document hyperlinks may remain external. Full title-page/custom template and physical printer matrix remains open.
+
+**Artifact / exercise:** Combined stable bundles. Select Reading Serif, insert a page break, export a two-page PDF and HTML with a local PNG. Move the HTML and confirm the image remains embedded.

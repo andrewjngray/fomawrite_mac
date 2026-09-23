@@ -17,10 +17,12 @@
 class MarkdownHighlighter;
 class QTextDocument;
 class QWindow;
+class QPagedPaintDevice;
 class QLockFile;
 
 class Backend : public QObject {
     Q_OBJECT
+    Q_PROPERTY(int outputStyle READ outputStyle NOTIFY outputStyleChanged)
     Q_PROPERTY(QObject *library READ library CONSTANT)
     Q_PROPERTY(QUrl documentBaseUrl READ documentBaseUrl NOTIFY fileUrlChanged)
     Q_PROPERTY(QUrl fileUrl READ fileUrl NOTIFY fileUrlChanged)
@@ -110,6 +112,7 @@ public:
     Q_INVOKABLE void printDocument(bool plain = false);
     Q_INVOKABLE void pageSetup();
     Q_INVOKABLE bool exportDocument(const QUrl &destination, const QString &format);
+    int outputStyle() const { return m_outputStyle; }
     Q_INVOKABLE void setOutputStyle(int style);
     Q_INVOKABLE bool loadOutputStyle(const QUrl &file);
     Q_INVOKABLE void newWindow();
@@ -156,6 +159,7 @@ signals:
     void modifiedChanged();
     void statusChanged();
     void wordCountChanged();
+    void outputStyleChanged();
     void themePresetChanged();
     void darkModeChanged();
     void textScaleChanged();
@@ -178,10 +182,13 @@ private:
     void applyAuthorshipData(const QJsonObject &data);
     bool saveAuthorship(const QUrl &url);
     void loadAuthorship(const QUrl &url);
+    void paintOutput(QPagedPaintDevice &device, QTextDocument &document) const;
     void prepareOutput(QTextDocument &document, bool plain = false) const;
     int m_outputStyle = 0;
     QString m_customOutputFont;
     int m_customOutputSize = 12;
+    QString m_outputHeader, m_outputFooter;
+    bool m_outputTitlePage = false;
     QPageLayout m_pageLayout;
     void saveTo(const QUrl &url, bool protectExternalChanges = false);
     QUrl suggestedSaveUrl() const;

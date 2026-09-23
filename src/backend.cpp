@@ -1,3 +1,8 @@
+#include <QPainter>
+#include <QAbstractTextDocumentLayout>
+#include <QPagedPaintDevice>
+#include <QImageReader>
+#include <QMimeDatabase>
 #include <QScopeGuard>
 #include <QCryptographicHash>
 #include <QTextFragment>
@@ -201,6 +206,12 @@ Backend::Backend(QObject *parent) : QObject(parent), m_library(this) {
                 emit externalChangeDetected(deleted, m_modified);
             });
 
+    m_outputStyle=qBound(0,QSettings().value("output/style",0).toInt(),3);
+    m_customOutputFont=QSettings().value("output/font","Georgia").toString();
+    m_customOutputSize=qBound(8,QSettings().value("output/size",12).toInt(),32);
+    m_outputHeader=QSettings().value("output/header").toString().left(200);
+    m_outputFooter=QSettings().value("output/footer","{page} / {pages}").toString().left(200);
+    m_outputTitlePage=QSettings().value("output/titlePage",false).toBool();
     const auto preset = QSettings().value("appearance/theme", "system").toString();
     if (QStringList{"system", "light", "dark", "paper"}.contains(preset)) m_themePreset = preset;
     loadOmarchyTheme();
@@ -882,7 +893,7 @@ void Backend::printDocument(bool plain) {
     if (dialog.exec() == QDialog::Accepted) {
         QTextDocument rendered;
         prepareOutput(rendered, plain);
-        rendered.print(&printer);
+        paintOutput(printer, rendered);
     }
 }
 
@@ -1667,7 +1678,7 @@ void Backend::reapplyTypographyToChange() {
 
 QString Backend::previewMarkdown(const QString &source) const { return expandedMarkdown(source, documentBaseUrl()); }
 
-void Backend::setOutputStyle(int style) { m_outputStyle = qBound(0, style, 3); }
+void Backend::setOutputStyle(int style) { m_outputStyle = qBound(0, style, 3); QSettings().setValue("output/style",m_outputStyle); emit outputStyleChanged(); }
 
 bool Backend::loadOutputStyle(const QUrl &url) {
     QFile file(url.toLocalFile());
@@ -1676,7 +1687,13 @@ bool Backend::loadOutputStyle(const QUrl &url) {
     const QString family = object.value("fontFamily").toString();
     const int size = object.value("pointSize").toInt();
     if (family.isEmpty() || size < 8 || size > 32) { setStatus("Style needs fontFamily and pointSize between 8 and 32."); return false; }
-    m_customOutputFont = family; m_customOutputSize = size; m_outputStyle = 3;
+    m_customOutputFont = family; m_customOutputSize = size;
+    m_outputHeader=object.value("header").toString().left(200);
+    m_outputFooter=object.value("footer").toString("{page} / {pages}").left(200);
+    m_outputTitlePage=object.value("titlePage").toBool(false);
+    QSettings settings; settings.setValue("output/font",family); settings.setValue("output/size",size);
+    settings.setValue("output/header",m_outputHeader); settings.setValue("output/footer",m_outputFooter); settings.setValue("output/titlePage",m_outputTitlePage);
+    setOutputStyle(3);
     setStatus("Custom output style loaded."); return true;
 }
 
@@ -1685,7 +1702,15 @@ void Backend::prepareOutput(QTextDocument &document, bool plain) const {
     document.setDefaultFont(QFont(families.value(m_outputStyle), m_outputStyle == 3 ? m_customOutputSize : 12));
     document.setBaseUrl(documentBaseUrl());
     if (plain) document.setPlainText(currentDocumentText());
-    else document.setMarkdown(previewMarkdown(currentDocumentText()));
+    else {
+        QString markdown=previewMarkdown(currentDocumentText());
+        markdown.replace(QRegularExpression("(?m)^\\s*<!-- pagebreak -->\\s*$"), "\n\nOMAWRITE_PAGE_BREAK_SENTINEL\n\n");
+        document.setMarkdown(markdown);
+        for(auto block=document.begin();block.isValid();block=block.next()) if(block.text()=="OMAWRITE_PAGE_BREAK_SENTINEL") {
+            QTextCursor cursor(&document); cursor.setPosition(block.position()); cursor.setPosition(block.position()+block.length()-1,QTextCursor::KeepAnchor); cursor.removeSelectedText();
+            QTextBlockFormat format=cursor.blockFormat(); format.setPageBreakPolicy(QTextFormat::PageBreak_AlwaysBefore); cursor.setBlockFormat(format);
+        }
+    }
 }
 
 void Backend::pageSetup() {
@@ -1708,15 +1733,27 @@ bool Backend::exportDocument(const QUrl &destination, const QString &format) {
     if (!output.open(QIODevice::WriteOnly)) { setStatus(output.errorString()); return false; }
     if (format == "html") {
         QString html = rendered.toHtml();
-        html.replace("<head>", "<head><base href=\"" + documentBaseUrl().toString(QUrl::FullyEncoded).toHtmlEscaped() + "\" />");
+        const QRegularExpression images("<img\\b[^>]*\\bsrc=\"([^\"]+)\"",QRegularExpression::CaseInsensitiveOption);
+        auto matches=images.globalMatch(html); QList<QPair<QPair<int,int>,QString>> substitutions; qint64 total=0;
+        while(matches.hasNext()) {
+            const auto match=matches.next(); const QUrl asset=documentBaseUrl().resolved(QUrl(match.captured(1).replace("&amp;","&")));
+            if(asset.scheme()=="data") continue;
+            QFile image(asset.toLocalFile()); const auto format=QImageReader::imageFormat(asset.toLocalFile());
+            if(!asset.isLocalFile() || !QList<QByteArray>{"png","jpeg","gif","webp"}.contains(format) || !image.open(QIODevice::ReadOnly)
+                || image.size()>5*1024*1024 || total+image.size()>20*1024*1024) { setStatus("Portable HTML needs readable local PNG/JPEG/GIF/WebP images (5 MiB each, 20 MiB total)."); return false; }
+            const auto data=image.read(5*1024*1024+1); if(image.error()!=QFile::NoError || data.size()>5*1024*1024 || total+data.size()>20*1024*1024) { setStatus("Could not read export image."); return false; } total+=data.size();
+            const QString uri="data:image/"+QString::fromLatin1(format)+";base64,"+QString::fromLatin1(data.toBase64());
+            substitutions.append({{match.capturedStart(1),match.capturedLength(1)},uri});
+        }
+        for(auto it=substitutions.crbegin();it!=substitutions.crend();++it) html.replace(it->first.first,it->first.second,it->second);
         const QByteArray bytes = html.toUtf8();
         if (output.write(bytes) != bytes.size()) { setStatus(output.errorString()); return false; }
     } else {
         QPdfWriter writer(&output);
         if (m_pageLayout.isValid()) writer.setPageLayout(m_pageLayout);
-        else writer.setPageSize(QPageSize(QPageSize::A4));
+        else { writer.setPageSize(QPageSize(QPageSize::A4)); writer.setPageMargins(QMarginsF(18,18,18,18)); }
         writer.setTitle(fileName());
-        rendered.print(&writer);
+        paintOutput(writer, rendered);
     }
     if (!output.commit()) { setStatus(output.errorString()); return false; }
     setStatus("Exported " + info.fileName()); return true;
@@ -1932,4 +1969,30 @@ bool Backend::exportAuthorship(const QUrl &destination) {
     const auto bytes=QJsonDocument(data).toJson();
     if (file.write(bytes)!=bytes.size() || !file.commit()) { setStatus("Could not write authorship export."); return false; }
     setStatus("Authorship metadata exported; keep it with the exact Markdown text."); return true;
+}
+
+void Backend::paintOutput(QPagedPaintDevice &device, QTextDocument &document) const {
+    const int dpi=device.logicalDpiX(); const QRect page=device.pageLayout().paintRectPixels(dpi);
+    const qreal scale=dpi/72.0, margin=24*scale;
+    document.documentLayout()->setPaintDevice(&device);
+    const bool decorated=m_outputStyle!=0;
+    const qreal inset=decorated?margin:0;
+    const QSizeF content(page.width(),qMax(100.0,page.height()-2*inset));
+    document.setPageSize(content);
+    const int count=document.pageCount(), titlePages=(m_outputStyle==3 && m_outputTitlePage)?1:0;
+    QPainter painter(&device);
+    if(titlePages) { painter.setFont(QFont(m_customOutputFont,24)); painter.drawText(QRectF(0,0,page.width(),page.height()),Qt::AlignCenter|Qt::TextWordWrap,fileName()); device.newPage(); }
+    for(int index=0;index<count;++index) {
+        if(index) device.newPage();
+        if(decorated) {
+            auto expand=[&](QString text) { return text.replace("{title}",fileName()).replace("{page}",QString::number(index+1+titlePages)).replace("{pages}",QString::number(count+titlePages)); };
+            painter.setFont(QFont("Helvetica Neue",9)); painter.setPen(Qt::black);
+            painter.drawText(QRectF(0,0,page.width(),inset),Qt::AlignLeft|Qt::AlignVCenter,expand(m_outputStyle==3?m_outputHeader:"{title}"));
+            painter.drawText(QRectF(0,page.height()-inset,page.width(),inset),Qt::AlignHCenter|Qt::AlignVCenter,expand(m_outputStyle==3?m_outputFooter:"{page} / {pages}"));
+        }
+        painter.save(); painter.translate(0,inset-index*content.height());
+        const QRectF clip(0,index*content.height(),content.width(),content.height()); painter.setClipRect(clip);
+        QAbstractTextDocumentLayout::PaintContext context; context.clip=clip; context.palette.setColor(QPalette::Text,Qt::black);
+        document.documentLayout()->draw(&painter,context); painter.restore();
+    }
 }

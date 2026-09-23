@@ -261,6 +261,29 @@ private slots:
         backend.discardRecovery();
     }
 
+    void outputStylesPersistAndHtmlEmbedsLocalImages() {
+        QTemporaryDir directory; Backend backend;
+        const auto reset=qScopeGuard([&] { backend.setOutputStyle(0); });
+        QQmlEngine engine; engine.rootContext()->setContextProperty("backend",&backend);
+        QQmlComponent component(&engine,QUrl::fromLocalFile(QFINDTESTDATA("../src/Main.qml")));
+        QScopedPointer<QObject> window(component.create()); QVERIFY2(window,qPrintable(component.errorString()));
+        auto *editor=window->findChild<QObject *>("sourceEditor");
+        QImage image(24,24,QImage::Format_RGB32); image.fill(Qt::blue); QVERIFY(image.save(directory.filePath("sample.png")));
+        editor->setProperty("text","# First page\n\n![sample](sample.png)\n\n<!-- pagebreak -->\n\n# Second page\n\nFinal paragraph.");
+        backend.saveAs(QUrl::fromLocalFile(directory.filePath("source.md")));
+        backend.setOutputStyle(1); Backend reopened; QCOMPARE(reopened.outputStyle(),1);
+        const auto html=QUrl::fromLocalFile(directory.filePath("output.html")); QVERIFY(backend.exportDocument(html,"html"));
+        QFile file(html.toLocalFile()); QVERIFY(file.open(QIODevice::ReadOnly)); const auto bytes=file.readAll(); file.close();
+        QVERIFY(bytes.contains("data:image/png;base64,")); QVERIFY(!bytes.contains("SENTINEL"));
+        const auto pdf=QUrl::fromLocalFile(directory.filePath("output.pdf")); QVERIFY(backend.exportDocument(pdf,"pdf"));
+        QFile pdfFile(pdf.toLocalFile()); QVERIFY(pdfFile.open(QIODevice::ReadOnly)); QVERIFY(pdfFile.readAll().contains("/Type /Page"));
+        // Optional synthetic evidence location is explicitly set by the test runner.
+        const auto evidence=qEnvironmentVariable("OMAWRITE_OUTPUT_EVIDENCE");
+        if(!evidence.isEmpty()) { QDir().mkpath(evidence); QVERIFY(QFile::copy(pdf.toLocalFile(),evidence+"/pages.pdf")); QVERIFY(QFile::copy(html.toLocalFile(),evidence+"/portable.html")); }
+        editor->setProperty("text","![missing](missing.png)"); QVERIFY(!backend.exportDocument(html,"html"));
+        QVERIFY(file.open(QIODevice::ReadOnly)); QCOMPARE(file.readAll(),bytes); backend.discardRecovery();
+    }
+
     void extendedContentBlocksRebaseLinksAndFootnotes() {
         QTemporaryDir directory; QDir(directory.path()).mkdir("nested");
         QFile included(directory.filePath("nested/chapter.md")); QVERIFY(included.open(QIODevice::WriteOnly)); included.write("[next](next.md#part) ![image](picture.png) `link [x](literal.md)`"); included.close();
