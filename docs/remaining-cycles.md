@@ -24,3 +24,7 @@ Start with bundled presets using shared color tokens, not scattered per-control 
 ## Counting rule
 
 Close a cycle only when its agreed behavior, automated checks, native verification and known limits are recorded. A working subset is described as partial; an implemented menu item alone does not close the corresponding feature. Re-estimate after Cycle 37, when output complexity is clearer.
+
+## Cycle 34b progress
+
+Safe version restoration is implemented: unlabelled historical text, one-step Undo of text/authorship, explicit Save before autosave resumes, and persisted recovery pause. Failed Save As preservation is regression-tested. 61 tests pass. Cycle 34 remains open for automatic history, disk/device failures and native display/OS-shutdown acceptance; the remaining count stays nine.

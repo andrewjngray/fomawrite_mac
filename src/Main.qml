@@ -786,6 +786,7 @@ ApplicationWindow {
     Timer { interval: 60000; repeat: true; running: workspaceSettings.autosaveEnabled; onTriggered: { if (!unsavedChangesDialog.opened && win.pendingAction === "") backend.autosave(); } }
     Dialog {
         id: versionsDialog
+        objectName: "versionsDialog"
         title: "Restore a saved version (one-step undo)"
         property var items: []
         modal: true
@@ -795,7 +796,7 @@ ApplicationWindow {
         standardButtons: Dialog.Cancel
         ColumnLayout {
             anchors.fill: parent
-            Label { text: "Replaces editor text. Disk changes only when you Save."; wrapMode: Text.Wrap; Layout.fillWidth: true }
+            Label { text: "Replaces editor text without authorship labels. Autosave pauses until you Save. One Undo restores your previous text and labels."; wrapMode: Text.Wrap; Layout.fillWidth: true }
             Label { visible: versionsDialog.items.length === 0; text: "No saved versions are available." }
             ListView {
                 Layout.fillWidth: true; Layout.fillHeight: true

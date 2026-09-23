@@ -221,6 +221,7 @@ private:
     QPointer<MarkdownHighlighter> m_highlighter;
     QString m_lastDocumentText;
     QByteArray m_lastKnownFileContents;
+    bool m_requiresExplicitSave = false;
     bool m_hasKnownFileContents = false;
     QString m_recoveryPath;
     std::unique_ptr<QLockFile> m_recoveryLock;

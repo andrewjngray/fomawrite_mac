@@ -1244,6 +1244,7 @@ void Backend::loadDocumentText(const QString &text) {
     }
 
     m_loading = true;
+    m_requiresExplicitSave = false;
     m_document->setPlainText(text);
     applyAuthorshipData({});
     m_lastDocumentText = text;
@@ -1352,6 +1353,7 @@ void Backend::saveTo(const QUrl &url, bool protectExternalChanges) {
         emit saveFailed(); emit quitCanceled(); return;
     }
     setModified(false);
+    m_requiresExplicitSave = false;
     setStatus(QStringLiteral("Saved %1").arg(fileName()));
     clearRecovery();
     emit saveSucceeded();
@@ -1380,6 +1382,7 @@ void Backend::writeRecovery() {
         return;
     const QJsonObject recovery{{QStringLiteral("fileUrl"), m_fileUrl.toString()},
                                {QStringLiteral("text"), currentDocumentText()}, {QStringLiteral("authorship"), authorshipData()},
+                               {"requiresExplicitSave", m_requiresExplicitSave},
                                {"knownDiskContents", m_hasKnownFileContents},
                                {"diskContents", QString::fromLatin1(m_lastKnownFileContents.toBase64())}};
     file.setPermissions(QFileDevice::ReadOwner | QFileDevice::WriteOwner);
@@ -1404,6 +1407,7 @@ void Backend::restoreRecovery() {
         && recovery.value("diskContents").isString();
     m_lastKnownFileContents = m_hasKnownFileContents
         ? QByteArray::fromBase64(recovery.value("diskContents").toString().toLatin1()) : QByteArray();
+    m_requiresExplicitSave = recovery.value("requiresExplicitSave").toBool(false);
     setFileUrl(recoveredUrl);
     setModified(true);
     setStatus(QStringLiteral("Recovered unsaved changes"));
@@ -1731,11 +1735,22 @@ bool Backend::restoreVersion(const QUrl &url) {
     if (!file.open(QIODevice::ReadOnly)) { setStatus("Version no longer available."); return false; }
     const auto bytes = file.readAll();
     if (file.error() != QFile::NoError) return false;
-    replaceText(0, currentDocumentText().size(), QString::fromUtf8(bytes));
-    setStatus("Version restored in editor; undo or Save to keep it.");
+    // Native versions contain Markdown only. Never inherit current authorship
+    // labels into historical text that has no corresponding metadata snapshot.
+    QTextCursor cursor(m_document);
+    cursor.beginEditBlock();
+    cursor.select(QTextCursor::Document);
+    QTextCharFormat unlabelled;
+    cursor.insertText(QString::fromUtf8(bytes), unlabelled);
+    cursor.endEditBlock();
+    m_requiresExplicitSave = true;
+    setModified(true);
+    writeRecovery();
+    setStatus("Version restored without authorship labels. Autosave paused; Undo or Save to keep it.");
     return true;
 }
 void Backend::autosave() {
+    if (m_requiresExplicitSave) { setStatus("Autosave paused: review the restored version and Save explicitly."); return; }
     if (!m_modified || !m_fileUrl.isLocalFile() || !m_hasKnownFileContents) return;
     QFile current(m_fileUrl.toLocalFile());
     if (!current.open(QIODevice::ReadOnly) || current.readAll() != m_lastKnownFileContents || current.error() != QFile::NoError) {

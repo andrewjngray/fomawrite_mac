@@ -81,3 +81,7 @@ Saved documents now restore their windows, native tab order, cursor and library 
 ### Cycles 33 / 34a checkpoint
 
 Aa → Theme now offers Follow system, Light, Dark and Warm paper across the workspace and preview. Recovery preserves the pre-crash disk baseline for safe autosave checks. Quit waits for every document's approval before closing windows, so a later Cancel retains earlier drafts. Build and 59 tests pass; native themes/restart and two-draft Quit/Cancel verified. [Nine planned cycles remain](docs/remaining-cycles.md), including the unfinished safety/version checks in Cycle 34.
+
+### Cycle 34b checkpoint
+
+Restoring a saved version now pauses autosave until explicit Save and clears unverified historical authorship; one Undo restores the previous text and labels. Build and 61 tests pass, including native file-version and failed-save checks. Native Restore/Undo verified. Cycle 34 remains open for its remaining safety/history and display checks.

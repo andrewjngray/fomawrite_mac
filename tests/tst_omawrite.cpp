@@ -261,6 +261,64 @@ private slots:
         backend.discardRecovery();
     }
 
+    void unavailableSaveDestinationPreservesDraftAndOriginal() {
+        QTemporaryDir directory; QVERIFY(directory.isValid());
+        Backend backend;
+        QQmlEngine engine; engine.rootContext()->setContextProperty("backend", &backend);
+        QQmlComponent component(&engine, QUrl::fromLocalFile(QFINDTESTDATA("../src/Main.qml")));
+        QScopedPointer<QObject> window(component.create()); QVERIFY2(window, qPrintable(component.errorString()));
+        auto *editor=window->findChild<QObject *>("sourceEditor");
+        const auto original=QUrl::fromLocalFile(directory.filePath("original.md"));
+        editor->setProperty("text", "saved original"); backend.saveAs(original);
+        QVERIFY(QMetaObject::invokeMethod(editor, "insert", Q_ARG(int, 14), Q_ARG(QString, " draft")));
+        QSignalSpy failed(&backend, &Backend::saveFailed);
+        backend.saveAs(QUrl::fromLocalFile(directory.filePath("unavailable/new.md")));
+        QCOMPARE(failed.size(), 1); QVERIFY(backend.modified()); QCOMPARE(backend.fileUrl(), original);
+        QCOMPARE(editor->property("text").toString(), QString("saved original draft"));
+        QFile file(original.toLocalFile()); QVERIFY(file.open(QIODevice::ReadOnly)); QCOMPARE(file.readAll(), QByteArray("saved original"));
+        QVERIFY(QMetaObject::invokeMethod(editor, "undo")); QCOMPARE(editor->property("text").toString(), QString("saved original"));
+        backend.discardRecovery();
+    }
+
+    void restoredVersionsRequireSaveAndDoNotInheritAuthorship() {
+#ifdef Q_OS_MACOS
+        QTemporaryDir directory; QVERIFY(directory.isValid());
+        const auto url=QUrl::fromLocalFile(directory.filePath("versioned.md"));
+        Backend backend;
+        QQmlEngine engine; engine.rootContext()->setContextProperty("backend", &backend);
+        QQmlComponent component(&engine, QUrl::fromLocalFile(QFINDTESTDATA("../src/Main.qml")));
+        QScopedPointer<QObject> window(component.create()); QVERIFY2(window, qPrintable(component.errorString()));
+        auto *editor=window->findChild<QObject *>("sourceEditor");
+        editor->setProperty("text", "historical text"); backend.saveAs(url); QVERIFY(!backend.modified());
+        QVERIFY2(backend.createVersion(), qPrintable(backend.status()));
+        const auto versions=backend.versions(); QVERIFY(!versions.isEmpty());
+        editor->setProperty("text", "current labelled text");
+        backend.markAuthorship(0, 7, "Human", "Synthetic author"); backend.save();
+        const auto annotations=backend.authorshipRanges(); QVERIFY(!annotations.isEmpty());
+        QVERIFY(backend.restoreVersion(versions.first().toMap()["url"].toUrl()));
+        QCOMPARE(editor->property("text").toString(), QString("historical text"));
+        QVERIFY(backend.authorshipRanges().isEmpty()); QVERIFY(backend.modified());
+        backend.autosave(); QVERIFY(backend.modified());
+        bool persistedPause=false;
+        QDir recovery(QStandardPaths::writableLocation(QStandardPaths::AppDataLocation));
+        for (const auto &name : recovery.entryList({"recovery-*.json"}, QDir::Files)) {
+            QFile snapshot(recovery.filePath(name)); if (!snapshot.open(QIODevice::ReadOnly)) continue;
+            const auto object=QJsonDocument::fromJson(snapshot.readAll()).object();
+            if (object["fileUrl"].toString() == url.toString()) persistedPause=object["requiresExplicitSave"].toBool();
+        }
+        QVERIFY(persistedPause);
+        QFile file(url.toLocalFile()); QVERIFY(file.open(QIODevice::ReadOnly)); QCOMPARE(file.readAll(), QByteArray("current labelled text")); file.close();
+        QVERIFY(QMetaObject::invokeMethod(editor, "undo"));
+        QCOMPARE(editor->property("text").toString(), QString("current labelled text"));
+        QCOMPARE(backend.authorshipRanges(), annotations);
+        QVERIFY(QMetaObject::invokeMethod(editor, "redo"));
+        QVERIFY(backend.authorshipRanges().isEmpty());
+        backend.save(); QVERIFY(!backend.modified());
+        QVERIFY(backend.open(url)); QVERIFY(backend.authorshipRanges().isEmpty());
+        backend.discardRecovery();
+#endif
+    }
+
     void autosaveRefusesExternalChanges() {
         QTemporaryDir directory;
         const auto url = QUrl::fromLocalFile(directory.filePath("sample.md"));

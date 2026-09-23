@@ -49,3 +49,7 @@ Same-installation cross-launch ownership and saved-file window/cursor/native-tab
 ## Cycles 33 / 34a follow-up — 23 September 2026
 
 Workspace themes are implemented as a separate product addition. Cycle 34a fixes recovery baseline handling and makes multi-document Quit cancellation retain earlier windows/drafts. A real synthetic subprocess-exit test recovers two annotated drafts and protects intervening external edits; native two-tab Discard/Cancel passed. 59 tests pass. The old sequential-quit limitation is superseded; remaining safety/version/display stress is still open. Nine cycles remain, counting the unfinished part of 34.
+
+## Cycle 34b follow-up
+
+Version restoration no longer inherits current authorship or allows autosave to write historical text before explicit Save. Native versions remain Markdown-only; Undo restores prior text and labels. Build and 61 tests pass, including real NSFileVersion creation/restore and unavailable Save As preservation. Native Restore/Undo passed. Remaining safety/display/device and automatic-version-history items keep Cycle 34 open.
