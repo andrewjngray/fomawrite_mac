@@ -1,0 +1,2 @@
+codesign --verify --deep --strict dist/Omawrite.app: PASS
+codesign --verify --deep --strict dist/Omawrite Dev.app: PASS

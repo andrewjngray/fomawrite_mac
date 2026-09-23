@@ -1,6 +1,6 @@
 # Remaining build plan — 23 September 2026
 
-Five additional build checkpoints are delivered: 34c automatic previous versions, 35 authorship clipboard, 36 richer Markdown, 37 output templates/portability and 38 organizer queries/tags. Build and 66 tests pass, with representative native sample checks. **Four untouched planned cycles remain (39–42), plus acceptance gaps in 34–38.** Under the strict counting rule below, nine cycle areas still contain open work; it would be misleading to say only four fully verified cycles remain. The next feature area is Cycle 39. Full iA Writer parity is not claimed.
+The implementation has reached **Cycle 42 / Mac 0.2.0 RC1**: native writing review, expanded command access, paginated preview, fullscreen/display restoration and QA fixes are added. Final build and 70 tests pass. All numbered areas now have a checkpoint; **the full plan is not signed off**. The [current acceptance ledger](release-acceptance.md) lists unresolved software parity and hardware checks. Earlier nine-area/four-untouched counts below are historical, not a new promise of zero remaining work. The next work should close named acceptance items rather than invent another run of numbered cycles.
 
 | Cycle | Deliverable | Completion criteria |
 |---|---|---|

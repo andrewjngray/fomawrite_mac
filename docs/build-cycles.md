@@ -681,3 +681,44 @@ Native Dev opened the synthetic workbench without changing existing writing. Pre
 Outstanding: full cross-app clipboard matrix, annotation-row focus timing, footnote click/long-scroll matrix, title-page/custom-template/printer checks, external-display and OS-shutdown/device-failure tests. These five checkpoints advance the plan; they do not close every acceptance criterion in Cycles 34–38.
 
 Final native check: after rebuilding, Command-S saved the active Workbench.md with two tabs restored. The persisted #writing smart folder returned both sample documents after restart. QA app quit normally with saved documents.
+
+## Cycle 39 — Native writing review
+
+**Scope / changes:** macOS spelling suggestions, explicit language choice and opt-in grammar review with individual Replace; replacement verifies expected text and is one Undo. Review masks fenced/indented/inline code, URL destinations and raw tags while preserving UTF-16 offsets. Writing Review refreshes while its non-modal panel is open. Speak Selection and Stop Speaking use the system voice. Annotation row selection waits for its dialog to close.
+
+**Tests:** Build and 67 tests pass, including real macOS dictionary suggestions, code exclusions and stale replacement/Undo. Native dialogs and speech checked during final combined QA.
+
+**Limits:** First 50,000 characters, 100 spelling/grammar issues, 1,000 analysis results. Dictionaries/language grammar quality depend on macOS; no automatic correction while typing, full Markdown grammar or iA-equivalent linguistic model. Speech uses AppKit's supported but deprecated synthesizer. Hardware/audio perception and all languages need user acceptance.
+
+**Artifact / exercise:** Combined stable Dev/everyday bundles. On a sample containing `mispellled` and fenced code, use Edit → Spelling and Grammar, replace a suggestion and Undo. Try Writing Review and Speak Selection. Evidence: research/cycle-39/logs.
+
+
+## Cycle 40 — Command access and interaction
+
+**Scope / changes:** Palette now covers file/path, save/save-as, duplicate/rename/move, reveal, quick-open/tags, export, themes and writing/annotation tools. Disabled state checks match required file/library context. Palette execution waits for closure. Path tooltips use independent two-second hover timers; annotation range selection waits until its dialog is closed. Paginated Preview shares PDF/print painting and offers fit/page/orientation controls.
+
+**Verification:** Final combined build and 70 tests pass; palette routing/disabled rename/pagebreak Undo tested. Native palette → Spelling and Grammar and Paginated Preview passed. Both preview pages visually inspected.
+
+**Limits:** Remaining reference submenu/context-menu and rapid-hover timing matrix is open, as are native tab-action enabled states and title/toolbar fading. See release-acceptance.md.
+
+**Artifact / exercise:** Stable Dev and ordinary RC1. Command-Shift-P → Paginated Preview; try fit controls and Cancel. Hover a library path and report any premature tooltip.
+
+## Cycle 41 — Integrated QA and fixes
+
+**Scope / changes:** Dark preview links now use readable theme colors and underlines; editor accessibility name added. Session capture retains normal bounds, display name and minimized/fullscreen/maximized state; restoration clamps to the available display. Native long-document QA found Qt drops empty named anchors; rendered-link fallback now resolves footnote destinations and repeated references. Synthetic tag limits and custom title-page output validated.
+
+**Verification:** Build and 70 tests pass, including off-screen geometry, tag caps/oversized skip, actual Qt footnote anchors and command behavior. Native spelling Replace/Undo, grammar request, paginated preview, fullscreen two-tab restart and long-note forward jump passed. Speech commands invoked; audible quality not independently verified. Custom three-page PDF rendered and all pages reviewed. Synthetic screenshots only.
+
+**Limits:** Hardware shutdown/disks/displays, minimized matrix, VoiceOver/cross-app clipboard, native return-link click, exact hover timing and language breadth are not certified. A failed native resize attempt is excluded; automated width checks pass. No blanket accessibility/parity sign-off.
+
+**Artifact / exercise:** Both RC1 bundles; research/cycle-41 contains samples, screenshots and PDF evidence. Open Long-notes.md and follow/return from the note; try the spelling panel on Closeout.md.
+
+## Cycle 42 — Versioned Mac release candidate
+
+**Scope / changes:** App version 0.2.0-rc1, bundle 0.2.0/build 42. Updated user guide and current acceptance ledger. Ordinary packaging now refuses to overwrite a running app, matching Dev. Archive script verifies committed compiled inputs and produces a packaged ZIP, source/build manifest and SHA-256 checksums; MIT/font licenses retained. GitHub prerelease archives the binary separately from source Git history.
+
+**Verification:** Final build, 70 tests, shell syntax checks and deep/strict bundle-signature verification. Package and archive evidence under research/cycle-42/logs. Both stable bundles refreshed. Release metadata identifies the source commit.
+
+**Limits / status:** RC1 is for personal use, Apple Silicon/macOS 14+, ad-hoc signed. Developer ID/notarization and other-machine install are not complete. All numbered areas now have implementation checkpoints, but outstanding software parity and hardware acceptance in release-acceptance.md remain open; this does not reset the strict remaining-work count to zero.
+
+**Artifact / exercise:** dist/Omawrite.app, dist/Omawrite Dev.app and GitHub mac-v0.2.0-rc1 prerelease archive. Use a copy of a document for a final personal acceptance session; report any issue against the candidate tag.

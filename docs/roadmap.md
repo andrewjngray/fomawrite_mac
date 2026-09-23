@@ -1,5 +1,8 @@
 # Omawrite Mac: personal Markdown workspace
 
+**Current status — 23 September 2026:** Cycle 42 / Mac 0.2.0 RC1, 70 tests passing. The [release acceptance ledger](release-acceptance.md) supersedes historical status/counts below. Numbered implementation checkpoints have reached the archive stage; unresolved software parity and hardware acceptance remain open.
+
+
 Owner: Andrew Gray. Working name: Omawrite Mac. Starting point: the MIT-licensed omacom/omawrite project; preserve its history and attribution.
 
 ## Product direction

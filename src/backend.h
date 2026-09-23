@@ -111,6 +111,7 @@ public:
     Q_INVOKABLE void keepExternalVersion();
     Q_INVOKABLE void printDocument(bool plain = false);
     Q_INVOKABLE void pageSetup();
+    Q_INVOKABLE void printPreview();
     Q_INVOKABLE bool exportDocument(const QUrl &destination, const QString &format);
     int outputStyle() const { return m_outputStyle; }
     Q_INVOKABLE void setOutputStyle(int style);
@@ -126,6 +127,12 @@ public:
     Q_INVOKABLE int nativeTabInset() const;
     Q_INVOKABLE void nativeWindowAction(const QString &action);
     Q_INVOKABLE QVariantList writingAnalysis(const QString &text, const QString &customWords);
+    Q_INVOKABLE QStringList writingLanguages() const;
+    Q_INVOKABLE QVariantList writingIssues(const QString &text, const QString &language, bool grammar);
+    Q_INVOKABLE bool correctWriting(int start, int end, const QString &expected, const QString &replacement);
+    Q_INVOKABLE void speakText(const QString &text);
+    Q_INVOKABLE void stopSpeaking();
+    static QString proseForReview(const QString &markdown);
     Q_INVOKABLE QStringList spellingIssues(const QString &text);
     Q_INVOKABLE void newDocument();
     Q_INVOKABLE bool duplicateDocument(const QString &name);

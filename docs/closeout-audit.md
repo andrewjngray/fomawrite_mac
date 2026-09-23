@@ -1,5 +1,8 @@
 # Closeout implementation audit — 21 September 2026
 
+**Current status — 23 September 2026:** Cycle 42 / Mac 0.2.0 RC1, 70 tests passing. The [release acceptance ledger](release-acceptance.md) supersedes historical status/counts below. Numbered implementation checkpoints have reached the archive stage; unresolved software parity and hardware acceptance remain open.
+
+
 Andrew asked to close the remaining cycles. This pass implements working slices across 20b–27 and starts the Cycle 28 audit. **The original plan is not fully closed:** several slices remain narrower than the planned acceptance criteria. Touching all cycle areas is not the same as verified iA parity. Keep the gaps below open; do not reset the remaining work count to zero.
 
 Final verification: `./bin/build`; `./bin/test` **48 passed, 0 failed** with normal macOS filesystem access. An initial sandboxed 20b run could not access recovery files; its normal-access rerun passed. Subsequent feature subsets were integrated and revalidated in combined builds, not fifteen separate native installations. Final logs: [Cycle 28](../research/cycle-28/logs/). Existing Qt teardown warnings remain. Code/document whitespace checks pass; pre-existing user example whitespace was not changed.

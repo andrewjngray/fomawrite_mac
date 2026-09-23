@@ -27,6 +27,7 @@ Rectangle {
     onMarkdownChanged: refreshTimer.restart()
     onTextSizeChanged: refreshTimer.restart()
     onTypefaceChanged: refreshTimer.restart()
+    onDarkModeChanged: refreshTimer.restart()
     function refresh() {
         renderedMarkdown = renderer.previewMarkdown(markdown);
         Qt.callLater(function() { root.renderer.stylePreview(previewText.textDocument); });

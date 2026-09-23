@@ -44,11 +44,11 @@ On macOS use **Command-S/O/N/P/F/B/I/K**, **Shift-Command-S** for Save As, **Opt
 
 Try `./bin/run examples/Workspace-tour.md`. Use the sidebar toggles to show/hide the library and organizer, the outline icon to jump to headings, and **Aa** for writing options, and the word count for statistics. Files remain ordinary UTF-8 Markdown. The library filter currently covers files in expanded folders. Preview uses Qt Markdown; it does not yet offer iA Writer's complete extensions, web/PDF template system or publishing integrations.
 
-## Latest build: closeout implementation pass, Cycles 20b–28
+## Latest build: Mac 0.2.0 RC1, Cycle 42
 
-Command palette and sentence focus; bounded saved-content/tag searches and saved queries; preview extensions/TOC/scroll synchronization; HTML/PDF export and basic output styles; shared-process windows/native tabs; opt-in autosave and saved-file versions; selection spelling/analysis and manual authorship annotations.
+Native spelling suggestions/grammar review and speech; code-aware writing analysis; expanded command palette; paginated preview with fit controls; improved dark links; fullscreen/display restoration and long-footnote navigation fixes. Earlier checkpoints include themes, safe history/recovery, authorship clipboard, portable output and organizer queries/tags.
 
-Build and all 48 tests pass. Both bundles refreshed. Representative native workflows and a basic PDF export were checked. **Full parity/release closeout is still pending**: the [closeout audit](docs/closeout-audit.md) distinguishes working subsets from unfinished templates, services, authorship workflows and QA. Read the [new-feature guide](docs/new-feature-guide.md) before using the optional autosave/annotation features on important writing.
+**Build and 70 tests pass**, with representative native QA and inspected PDF output. Both stable bundles are refreshed. The versioned GitHub prerelease includes the Apple Silicon app ZIP, source/build manifest and SHA-256 checksums; binaries remain excluded from Git history. This is a personal-use release candidate, not full iA parity or a notarized public release. See the [current acceptance ledger](docs/release-acceptance.md), [user guide](docs/new-feature-guide.md) and [build records](docs/build-cycles.md).
 
 ## Build cycles and feedback
 

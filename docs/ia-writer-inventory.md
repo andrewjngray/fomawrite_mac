@@ -1,5 +1,8 @@
 # iA Writer reference inventory
 
+**Current status — 23 September 2026:** Cycle 42 / Mac 0.2.0 RC1, 70 tests passing. The [release acceptance ledger](release-acceptance.md) supersedes historical status/counts below. Numbered implementation checkpoints have reached the archive stage; unresolved software parity and hardware acceptance remain open.
+
+
 ## Current overlay — Cycles 34c–38, 23 September 2026
 
 This overlay supersedes historical Planned labels below. 66 tests pass. Implemented subsets: optional previous-save history; validated annotation clipboard and separate metadata export; multiline/repeated footnotes and bounded local CSV/code/image inclusions; persisted output templates, page breaks, headers/footers and embedded raster HTML assets; organizer saved queries and refreshable tag counts. Representative native workflows and rendered PDF pages checked. Full provenance, complete parser/link semantics, native Versions browser, paginated preview, incremental indexing and hardware/performance acceptance remain partial. See [remaining work](remaining-cycles.md) and [build records](build-cycles.md).

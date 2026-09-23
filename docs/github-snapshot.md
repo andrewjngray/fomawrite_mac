@@ -12,3 +12,8 @@ The app bundles are generated outputs, not part of Git history. Historical binar
 ## Cycles 34c–38 source checkpoints
 
 Five separate feature checkpoints include source, tests, cycle notes, reviewed synthetic screenshots and final rendered PDF/HTML evidence. Both local app bundles are refreshed; generated binaries remain excluded. This push is a source/evidence archive, not a GitHub binary Release. Historical private/example changes remain unstaged. Current verification: 66 tests plus representative native QA.
+
+
+## Mac 0.2.0 RC1
+
+Cycle 42 introduces a separate GitHub prerelease binary archive: Apple Silicon app ZIP, build/source manifest and SHA-256 checksums. Source remains ordinary Git history and GitHub tag archives. Generated build/dist directories and private writing stay excluded. The acceptance ledger lists unfinished parity/hardware work; no historical binary archive is fabricated.

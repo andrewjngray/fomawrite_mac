@@ -90,3 +90,11 @@ bool WorkspaceStore::write(const QString &path, const QJsonArray &windows) {
     const auto bytes = QJsonDocument(QJsonObject{{"version", 1}, {"windows", windows}}).toJson(QJsonDocument::Compact);
     return file.write(bytes) == bytes.size() && file.commit();
 }
+
+
+QRect WorkspaceStore::visibleGeometry(const QRect &saved,const QRect &available,const QSize &minimum) {
+    const int width=qBound(minimum.width(),saved.width(),qMax(minimum.width(),available.width()));
+    const int height=qBound(minimum.height(),saved.height(),qMax(minimum.height(),available.height()));
+    return QRect(qBound(available.left(),saved.x(),qMax(available.left(),available.right()-width+1)),
+                 qBound(available.top(),saved.y(),qMax(available.top(),available.bottom()-height+1)),width,height);
+}

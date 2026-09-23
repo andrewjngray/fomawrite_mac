@@ -67,7 +67,7 @@ int main(int argc, char *argv[]) {
     app.setOrganizationName(QStringLiteral("AndrewGray"));
     app.setOrganizationDomain(QStringLiteral("andrewjngray.github.io"));
     app.setApplicationDisplayName(QStringLiteral("Omawrite Mac"));
-    app.setApplicationVersion(QStringLiteral("0.1.0"));
+    app.setApplicationVersion(QStringLiteral("0.2.0-rc1"));
 
     QQuickStyle::setStyle(QStringLiteral("Material"));
 
@@ -122,9 +122,13 @@ int main(int argc, char *argv[]) {
         for (const auto &session : sessions) {
             if (!session->window || !session->backend) continue;
             auto *w = session->window.data();
+            QRect normal=w->geometry();
+            if (w->windowState()!=Qt::WindowNoState && session->checkpoint.contains("width"))
+                normal=QRect(session->checkpoint["x"].toInt(),session->checkpoint["y"].toInt(),session->checkpoint["width"].toInt(),session->checkpoint["height"].toInt());
             QJsonObject entry{{"url", session->backend->fileUrl().toString()},
                 {"cursor", w->property("workspaceCursor").toInt()},
-                {"x", w->x()}, {"y", w->y()}, {"width", w->width()}, {"height", w->height()},
+                {"x", normal.x()}, {"y", normal.y()}, {"width", normal.width()}, {"height", normal.height()},
+                {"screen", w->screen() ? w->screen()->name() : QString()}, {"state", int(w->windowState())},
                 {"active", lastActiveWindow == w},
                 {"root", session->backend->library()->property("rootFolder").toUrl().toString()}};
 #ifdef Q_OS_MACOS
@@ -273,11 +277,17 @@ int main(int argc, char *argv[]) {
         const QUrl root(entry["root"].toString());
         if (root.isLocalFile() && QFileInfo(root.toLocalFile()).isDir()) restored->backend->library()->setProperty("rootFolder", root);
         auto *w = restored->window.data();
-        const QRect available = w->screen()->availableGeometry();
-        const int width = qBound(w->minimumWidth(), entry["width"].toInt(1100), qMax(w->minimumWidth(), available.width()));
-        const int height = qBound(w->minimumHeight(), entry["height"].toInt(720), qMax(w->minimumHeight(), available.height()));
-        w->setGeometry(qBound(available.left(), entry["x"].toInt(), qMax(available.left(), available.right()-width+1)),
-                       qBound(available.top(), entry["y"].toInt(), qMax(available.top(), available.bottom()-height+1)), width, height);
+        QScreen *target=w->screen();
+        for (auto *screen : app.screens()) if (screen->name()==entry["screen"].toString()) { target=screen; break; }
+        w->setScreen(target);
+        const QRect saved(entry["x"].toInt(),entry["y"].toInt(),entry["width"].toInt(1100),entry["height"].toInt(720));
+        w->setGeometry(WorkspaceStore::visibleGeometry(saved,target->availableGeometry(),QSize(w->minimumWidth(),w->minimumHeight())));
+        restored->checkpoint=entry;
+        const int state=entry["state"].toInt();
+        if (state==Qt::WindowMinimized || state==Qt::WindowFullScreen || state==Qt::WindowMaximized) {
+            QPointer<QWindow> guarded=w;
+            QTimer::singleShot(0,w,[guarded,state] { if(guarded) guarded->setWindowState(Qt::WindowState(state)); });
+        }
         QMetaObject::invokeMethod(w, "restoreWorkspaceCursor", Q_ARG(QVariant, entry["cursor"].toInt()));
         if (entry["active"].toBool()) activeWindow = w;
         const QString group = entry["group"].toString();

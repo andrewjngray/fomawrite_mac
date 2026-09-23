@@ -25,6 +25,7 @@
 #include <QMimeData>
 #include <QProcess>
 #include <QPrintDialog>
+#include <QPrintPreviewDialog>
 #include <QPrinter>
 #include <QQuickTextDocument>
 #include <QRegularExpression>
@@ -641,6 +642,18 @@ QString Backend::tableOfContents(const QString &markdown) const {
 int Backend::previewAnchorPosition(QObject *textDocument, const QString &anchor) const {
     auto *quick = qobject_cast<QQuickTextDocument *>(textDocument);
     if (!quick) return -1;
+    // Qt Markdown may discard empty HTML named anchors. The generated links
+    // remain, so resolve a note through its backlink and a reference by occurrence.
+    const auto reference=QRegularExpression("^(ow-note-[0-9]+-.+)-ref-([1-9][0-9]*)$").match(anchor);
+    int occurrence=0;
+    if(anchor.startsWith("ow-note-")) {
+        for(auto block=quick->textDocument()->begin();block.isValid();block=block.next())
+            for(auto it=block.begin();!it.atEnd();++it) {
+                const auto fragment=it.fragment(); const auto href=fragment.charFormat().anchorHref();
+                if(reference.hasMatch() && href=="#"+reference.captured(1) && ++occurrence==reference.captured(2).toInt()) return fragment.position();
+                if(!reference.hasMatch() && href=="#"+anchor+"-ref-1") return block.position();
+            }
+    }
     QHash<QString, int> occurrences;
     for (auto block = quick->textDocument()->begin(); block.isValid(); block = block.next()) {
         for (auto fragment=block.begin(); !fragment.atEnd(); ++fragment)
@@ -666,6 +679,12 @@ void Backend::stylePreview(QObject *textDocument) {
         format.setBottomMargin(block.textList() ? 4 : 12);
         QTextCursor cursor(block);
         cursor.setBlockFormat(format);
+        for (auto it=block.begin(); !it.atEnd(); ++it) {
+            const auto fragment=it.fragment();
+            if (!fragment.isValid() || !fragment.charFormat().isAnchor()) continue;
+            QTextCursor link(preview); link.setPosition(fragment.position()); link.setPosition(fragment.position()+fragment.length(),QTextCursor::KeepAnchor);
+            QTextCharFormat ink; ink.setForeground(QColor(palette().value("focus").toString())); ink.setFontUnderline(true); link.mergeCharFormat(ink);
+        }
         if (format.headingLevel() > 0) {
             QTextCharFormat heading;
             // Qt Quick applies its pixel font separately from the document default.
@@ -1713,6 +1732,18 @@ void Backend::prepareOutput(QTextDocument &document, bool plain) const {
     }
 }
 
+void Backend::printPreview() {
+    if (!m_document) return;
+    QPrinter printer(QPrinter::HighResolution);
+    if (m_pageLayout.isValid()) printer.setPageLayout(m_pageLayout);
+    QPrintPreviewDialog dialog(&printer);
+    dialog.setWindowTitle("Omawrite — Paginated Preview");
+    connect(&dialog,&QPrintPreviewDialog::paintRequested,this,[this](QPrinter *output) {
+        QTextDocument rendered; prepareOutput(rendered,false); paintOutput(*output,rendered);
+    });
+    dialog.resize(900,700); dialog.exec();
+}
+
 void Backend::pageSetup() {
     QPrinter printer;
     if (m_pageLayout.isValid()) printer.setPageLayout(m_pageLayout);
@@ -1830,7 +1861,72 @@ void Backend::autosave() {
     saveTo(m_fileUrl, true);
 }
 
-QVariantList Backend::writingAnalysis(const QString &text, const QString &customWords) {
+// Replace code/markup with spaces, retaining UTF-16 offsets for safe corrections.
+QString Backend::proseForReview(const QString &markdown) {
+    QString result = markdown.left(50000);
+    int offset = 0; QChar fence; int fenceLength = 0;
+    const QRegularExpression fencePattern("^ {0,3}(`{3,}|~{3,})(.*)$");
+    auto blank = [&result](int start, int length) {
+        for (int i=start; i<start+length && i<result.size(); ++i)
+            if (result[i] != '\n') result[i] = ' ';
+    };
+    for (const QString &line : result.split('\n')) {
+        QString candidate = line;
+        candidate.remove(QRegularExpression("^ {0,3}(?:> ?)+"));
+        candidate.remove(QRegularExpression("^ {0,3}(?:[-+*]|[0-9]+[.)]) +"));
+        const auto match = fencePattern.match(candidate);
+        if (match.hasMatch()) {
+            const auto marker=match.captured(1);
+            if (fence.isNull()) { fence=marker[0]; fenceLength=marker.size(); }
+            else if (marker[0]==fence && marker.size()>=fenceLength && match.captured(2).trimmed().isEmpty()) fence=QChar();
+            blank(offset,line.size());
+        } else if (!fence.isNull() || line.startsWith("    ") || line.startsWith('\t') || line.trimmed().startsWith("/")) blank(offset,line.size());
+        offset += line.size()+1;
+    }
+    const QRegularExpression inlineCode("(`+)([^`]|(?!\\1)`)*?\\1");
+    auto matches=inlineCode.globalMatch(result);
+    while(matches.hasNext()) { const auto match=matches.next(); blank(match.capturedStart(),match.capturedLength()); }
+    // URL destinations and raw tags are syntax, not prose.
+    const QRegularExpression syntax("\\]\\([^\\n]*?\\)|<[^>]*>|https?://[^\\s]+");
+    matches=syntax.globalMatch(result);
+    while(matches.hasNext()) { const auto match=matches.next(); blank(match.capturedStart(),match.capturedLength()); }
+    return result;
+}
+QStringList Backend::writingLanguages() const {
+#ifdef Q_OS_MACOS
+    extern QStringList macWritingLanguages(); return macWritingLanguages();
+#else
+    return {};
+#endif
+}
+QVariantList Backend::writingIssues(const QString &text, const QString &language, bool grammar) {
+#ifdef Q_OS_MACOS
+    extern QVariantList macWritingIssues(const QString &, const QString &, bool);
+    return macWritingIssues(proseForReview(text),language,grammar);
+#else
+    Q_UNUSED(text); Q_UNUSED(language); Q_UNUSED(grammar); return {};
+#endif
+}
+bool Backend::correctWriting(int start,int end,const QString &expected,const QString &replacement) {
+    if(!m_document || start<0 || end<=start || end>currentDocumentText().size() ||
+       currentDocumentText().mid(start,end-start)!=expected || replacement.size()>1000) return false;
+    QTextCursor cursor(m_document); cursor.setPosition(start); cursor.setPosition(end,QTextCursor::KeepAnchor);
+    cursor.beginEditBlock(); cursor.insertText(replacement); cursor.endEditBlock(); return true;
+}
+void Backend::speakText(const QString &text) {
+#ifdef Q_OS_MACOS
+    extern void macSpeakText(const QString &); macSpeakText(proseForReview(text));
+#else
+    Q_UNUSED(text);
+#endif
+}
+void Backend::stopSpeaking() {
+#ifdef Q_OS_MACOS
+    extern void macStopSpeaking(); macStopSpeaking();
+#endif
+}
+QVariantList Backend::writingAnalysis(const QString &markdown, const QString &customWords) {
+    const QString text=proseForReview(markdown);
     QVariantList result;
 #ifdef Q_OS_MACOS
     extern QVariantList macWordClasses(const QString &);

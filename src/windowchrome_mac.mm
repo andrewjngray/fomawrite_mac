@@ -149,3 +149,56 @@ void applyMacWindowTheme(QWindow *window, bool followSystem, bool dark) {
     NSView *view = reinterpret_cast<NSView *>(window->winId());
     view.window.appearance = followSystem ? nil : [NSAppearance appearanceNamed:dark ? NSAppearanceNameDarkAqua : NSAppearanceNameAqua];
 }
+
+
+QStringList macWritingLanguages() {
+    QStringList languages;
+    for(NSString *language in [[NSSpellChecker sharedSpellChecker] availableLanguages]) languages.append(QString::fromUtf8(language.UTF8String));
+    languages.sort(); return languages;
+}
+QVariantList macWritingIssues(const QString &text,const QString &language,bool grammar) {
+    NSString *input=[NSString stringWithUTF8String:text.toUtf8().constData()];
+    NSSpellChecker *checker=[NSSpellChecker sharedSpellChecker];
+    NSString *chosen=[NSString stringWithUTF8String:language.toUtf8().constData()];
+    if(![[[NSSpellChecker sharedSpellChecker] availableLanguages] containsObject:chosen]) chosen=checker.language;
+    const NSInteger tag=[NSSpellChecker uniqueSpellDocumentTag];
+    QVariantList issues; NSUInteger position=0;
+    while(position<input.length && issues.size()<100) {
+        NSRange range=[checker checkSpellingOfString:input startingAt:position language:chosen wrap:NO inSpellDocumentWithTag:tag wordCount:nil];
+        if(range.location==NSNotFound || range.location<position || !range.length) break;
+        QStringList suggestions;
+        for(NSString *guess in [checker guessesForWordRange:range inString:input language:chosen inSpellDocumentWithTag:tag]) {
+            if(suggestions.size()>=8) break; suggestions.append(QString::fromUtf8(guess.UTF8String));
+        }
+        issues.append(QVariantMap{{"start",int(range.location)},{"end",int(NSMaxRange(range))},{"word",QString::fromUtf8([input substringWithRange:range].UTF8String)},
+            {"label","Spelling"},{"suggestions",suggestions}});
+        position=NSMaxRange(range);
+    }
+    if(grammar) {
+        position=0;
+        while(position<input.length && issues.size()<100) {
+            NSArray *details=nil;
+            NSRange sentence=[checker checkGrammarOfString:input startingAt:position language:chosen wrap:NO inSpellDocumentWithTag:tag details:&details];
+            if(sentence.location==NSNotFound || sentence.location<position || !sentence.length) break;
+            for(NSDictionary *detail in details) {
+                NSRange local=[detail[NSGrammarRange] rangeValue];
+                NSRange range=NSMakeRange(sentence.location+local.location,local.length);
+                if(NSMaxRange(range)>input.length || !range.length || issues.size()>=100) continue;
+                QStringList suggestions;
+                for(NSString *guess in detail[NSGrammarCorrections]) { if(suggestions.size()>=8) break; suggestions.append(QString::fromUtf8(guess.UTF8String)); }
+                NSString *description=detail[NSGrammarUserDescription];
+                issues.append(QVariantMap{{"start",int(range.location)},{"end",int(NSMaxRange(range))},{"word",QString::fromUtf8([input substringWithRange:range].UTF8String)},
+                    {"label",description ? QString::fromUtf8(description.UTF8String) : QString("Grammar")},{"suggestions",suggestions}});
+            }
+            position=NSMaxRange(sentence);
+        }
+    }
+    [checker closeSpellDocumentWithTag:tag]; return issues;
+}
+static NSSpeechSynthesizer *writingSpeaker=nil;
+void macSpeakText(const QString &text) {
+    if(!writingSpeaker) writingSpeaker=[[NSSpeechSynthesizer alloc] initWithVoice:nil];
+    [writingSpeaker stopSpeaking];
+    [writingSpeaker startSpeakingString:[NSString stringWithUTF8String:text.toUtf8().constData()]];
+}
+void macStopSpeaking() { [writingSpeaker stopSpeaking]; }

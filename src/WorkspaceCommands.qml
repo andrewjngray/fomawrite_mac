@@ -15,8 +15,32 @@ QtObject {
     signal outlineRequested()
     signal statisticsRequested()
     signal typewriterChanged()
+    signal commandRequested(string commandId)
 
     readonly property var entries: [
+        { id: "new", title: "New Document" },
+        { id: "newWindow", title: "New Window" },
+        { id: "open", title: "Open File…" },
+        { id: "openPath", title: "Open by Path…" },
+        { id: "save", title: "Save" },
+        { id: "saveAs", title: "Save As…" },
+        { id: "duplicate", title: "Duplicate…" },
+        { id: "rename", title: "Rename…" },
+        { id: "move", title: "Move To…" },
+        { id: "reveal", title: "Show in Library" },
+        { id: "quickOpen", title: "Quick Open…" },
+        { id: "refreshTags", title: "Refresh Tags" },
+        { id: "exportHtml", title: "Export HTML…" },
+        { id: "printPreview", title: "Paginated Preview…" },
+        { id: "exportPdf", title: "Export PDF…" },
+        { id: "pageBreak", title: "Insert Page Break" },
+        { id: "writingReview", title: "Writing Review…" },
+        { id: "spelling", title: "Spelling and Grammar…" },
+        { id: "authorship", title: "Authorship Annotations…" },
+        { id: "themeSystem", title: "Theme: Follow System" },
+        { id: "themeLight", title: "Theme: Light" },
+        { id: "themeDark", title: "Theme: Dark" },
+        { id: "themePaper", title: "Theme: Warm Paper" },
         { id: "library", title: "Library", toggle: true },
         { id: "organizer", title: "Organizer", toggle: true },
         { id: "sortBar", title: "Sort Bar", toggle: true },
@@ -66,6 +90,9 @@ QtObject {
         return item.title;
     }
     function isEnabled(id) {
+        if (["duplicate", "rename", "move", "reveal"].indexOf(id) >= 0) return backend.fileUrl.toString() !== "";
+        if (["quickOpen", "refreshTags"].indexOf(id) >= 0) return library.rootFolder.toString() !== "";
+        if (id === "spelling") return window.isMac && editor.length > 0;
         if (id === "organizer") return settings.libraryVisible && window.width >= 1000;
         if (id === "larger") return settings.writingSize < 32;
         if (id === "smaller") return settings.writingSize > 12;
@@ -103,6 +130,7 @@ QtObject {
     function run(id) {
         if (!isEnabled(id)) return;
         switch (id) {
+        default: commandRequested(id); break;
         case "library": settings.libraryVisible = !settings.libraryVisible; break;
         case "organizer": settings.organizerVisible = !settings.organizerVisible; break;
         case "sortBar": libraryPane.showSortBar = !libraryPane.showSortBar; break;

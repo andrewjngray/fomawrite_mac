@@ -89,6 +89,33 @@ ApplicationWindow {
         onOutlineRequested: { outlineDrawer.headings = backend.documentOutline(editor.text); outlineDrawer.open(); }
         onStatisticsRequested: statisticsDialog.open()
         onTypewriterChanged: editorFlick.ensureCursorVisible()
+        onCommandRequested: function(id) {
+            switch (id) {
+            case "new": win.requestNewDocument(); break;
+            case "newWindow": backend.newWindow(); break;
+            case "open": backend.openDialog(); break;
+            case "openPath": openPathDialog.open(); break;
+            case "save": backend.save(); break;
+            case "saveAs": backend.saveAsDialog(); break;
+            case "duplicate": fileNameDialog.showFor(false); break;
+            case "rename": fileNameDialog.showFor(true); break;
+            case "move": moveFolderDialog.currentFolder=backend.documentBaseUrl; moveFolderDialog.open(); break;
+            case "reveal": win.showCurrentFileInLibrary(); break;
+            case "quickOpen": quickOpenDialog.open(); break;
+            case "refreshTags": backend.library.refreshTags(); break;
+            case "exportHtml": exportDialog.outputFormat="html"; exportDialog.nameFilters=["HTML (*.html)"]; exportDialog.open(); break;
+            case "printPreview": backend.printPreview(); break;
+            case "exportPdf": exportDialog.outputFormat="pdf"; exportDialog.nameFilters=["PDF (*.pdf)"]; exportDialog.open(); break;
+            case "pageBreak": editor.replaceSelectionWith("\n\n<!-- pagebreak -->\n\n"); break;
+            case "writingReview": analysisDialog.open(); break;
+            case "spelling": spellingDialog.open(); break;
+            case "authorship": authorshipDialog.ranges=backend.authorshipRanges(); authorshipDialog.open(); break;
+            case "themeSystem": backend.themePreset="system"; break;
+            case "themeLight": backend.themePreset="light"; break;
+            case "themeDark": backend.themePreset="dark"; break;
+            case "themePaper": backend.themePreset="paper"; break;
+            }
+        }
     }
 
     component NativeCommand: NativeCommandMenuItem { commands: workspaceCommands }
@@ -531,6 +558,7 @@ ApplicationWindow {
             Platform.MenuItem { text: "Insert Page Break"; onTriggered: editor.replaceSelectionWith("\n\n<!-- pagebreak -->\n\n") }
             Platform.MenuItem { text: "Export HTML…"; onTriggered: { exportDialog.outputFormat = "html"; exportDialog.nameFilters = ["HTML (*.html)"]; exportDialog.open(); } }
             Platform.MenuItem { text: "Export PDF…"; onTriggered: { exportDialog.outputFormat = "pdf"; exportDialog.nameFilters = ["PDF (*.pdf)"]; exportDialog.open(); } }
+            Platform.MenuItem { text: "Paginated Preview…"; onTriggered: backend.printPreview() }
             Platform.MenuItem { text: "Page Setup…"; onTriggered: backend.pageSetup() }
             Platform.MenuItem { text: "Print Markdown Source…"; onTriggered: backend.printDocument(true) }
             Platform.MenuItem { text: "Print…"; onTriggered: backend.printDocument(false) }
@@ -546,7 +574,9 @@ ApplicationWindow {
             title: "Edit"
             Platform.MenuItem { text: "Export Authorship Metadata…"; onTriggered: authorshipExportDialog.open() }
             Platform.MenuItem { text: "Authorship Annotations…"; onTriggered: { authorshipDialog.ranges = backend.authorshipRanges(); authorshipDialog.open(); } }
-            Platform.MenuItem { text: "Check Selection Spelling…"; visible: win.isMac; enabled: editor.selectedText.length > 0; onTriggered: { spellingDialog.issues = backend.spellingIssues(editor.selectedText); spellingDialog.open(); } }
+            Platform.MenuItem { text: "Spelling and Grammar…"; visible: win.isMac; enabled: editor.length > 0; onTriggered: { spellingDialog.open(); } }
+            Platform.MenuItem { text: "Speak Selection"; visible: win.isMac; enabled: editor.selectedText.length > 0; onTriggered: backend.speakText(editor.selectedText) }
+            Platform.MenuItem { text: "Stop Speaking"; visible: win.isMac; onTriggered: backend.stopSpeaking() }
             Platform.MenuItem { text: "Emoji & Symbols"; visible: win.isMac; onTriggered: backend.nativeWindowAction("emoji") }
             Platform.MenuItem { objectName: "editUndo"; text: "Undo"; enabled: win.editTarget.canUndo; onTriggered: win.editTarget.undo() }
             Platform.MenuItem { objectName: "editRedo"; text: "Redo"; enabled: win.editTarget.canRedo; onTriggered: win.editTarget.redo() }
@@ -705,7 +735,7 @@ ApplicationWindow {
         }
         Platform.Menu {
             title: "Focus"
-            Platform.MenuItem { text: "Analyze Selection…"; enabled: editor.selectedText.length > 0; onTriggered: { analysisDialog.sample = editor.selectedText; analysisDialog.open(); } }
+            Platform.MenuItem { text: "Writing Review…"; onTriggered: analysisDialog.open() }
             NativeCommand { commandId: "paragraph" }
             NativeCommand { commandId: "sentence" }
             NativeCommand { commandId: "typewriter" }
@@ -818,6 +848,9 @@ ApplicationWindow {
     Dialog {
         id: authorshipDialog
         property var ranges: []
+        property int pendingStart: -1
+        property int pendingEnd: -1
+        onClosed: if (pendingStart >= 0) { editor.forceActiveFocus(); editor.select(pendingStart, pendingEnd); pendingStart = -1; }
         title: "Authorship annotations"
         modal: true
         anchors.centerIn: parent
@@ -837,7 +870,7 @@ ApplicationWindow {
             ListView {
                 Layout.fillWidth: true; Layout.fillHeight: true; clip: true
                 model: authorshipDialog.ranges
-                delegate: ItemDelegate { required property var modelData; width: ListView.view.width; text: modelData.start + "–" + modelData.end + ": " + modelData.category + " " + modelData.author; onClicked: { authorshipDialog.close(); editor.select(modelData.start, modelData.end); editor.forceActiveFocus(); } }
+                delegate: ItemDelegate { required property var modelData; width: ListView.view.width; text: modelData.start + "–" + modelData.end + ": " + modelData.category + " " + modelData.author; onClicked: { authorshipDialog.pendingStart=modelData.start; authorshipDialog.pendingEnd=modelData.end; authorshipDialog.close(); } }
                 ScrollBar.vertical: ScrollBar {}
             }
         }
@@ -845,19 +878,21 @@ ApplicationWindow {
 
     Dialog {
         id: analysisDialog
-        property string sample: ""
         property var results: []
         title: "Writing review — suggestions, not corrections"
-        modal: true
+        modal: false
+        dim: false
         anchors.centerIn: parent
         width: Math.min(580, win.width - 40)
         height: Math.min(460, win.height - 60)
         standardButtons: Dialog.Close
-        onOpened: results = backend.writingAnalysis(sample, workspaceSettings.reviewWords)
+        onOpened: refresh()
+        function refresh() { results = backend.writingAnalysis(editor.text, workspaceSettings.reviewWords); }
+        Timer { interval: 1000; repeat: true; running: analysisDialog.visible; onTriggered: analysisDialog.refresh() }
         ColumnLayout {
             anchors.fill: parent
-            TextField { Layout.fillWidth: true; text: workspaceSettings.reviewWords; placeholderText: "Custom review words, separated by commas"; onEditingFinished: { workspaceSettings.reviewWords = text; analysisDialog.results = backend.writingAnalysis(analysisDialog.sample, text); } }
-            Label { Layout.fillWidth: true; wrapMode: Text.Wrap; text: "System word classes plus a small review-word list. Select prose only; code is not excluded automatically. First 50,000 characters / 1,000 results." }
+            TextField { Layout.fillWidth: true; text: workspaceSettings.reviewWords; placeholderText: "Custom review words, separated by commas"; onEditingFinished: { workspaceSettings.reviewWords = text; analysisDialog.refresh(); } }
+            Label { Layout.fillWidth: true; wrapMode: Text.Wrap; text: "System word classes and review words; code and URL destinations excluded. Refreshes while open. First 50,000 characters / 1,000 results. Language support depends on macOS." }
             ListView {
                 Layout.fillWidth: true; Layout.fillHeight: true; clip: true
                 model: analysisDialog.results
@@ -869,13 +904,42 @@ ApplicationWindow {
 
     Dialog {
         id: spellingDialog
+        objectName: "spellingDialog"
         property var issues: []
-        title: "Selection spelling — system language"
+        property string snapshot: ""
+        title: "Spelling and Grammar"
         modal: true
         anchors.centerIn: parent
-        width: Math.min(500, win.width - 40)
-        standardButtons: Dialog.Ok
-        Label { width: parent.width; wrapMode: Text.Wrap; text: spellingDialog.issues.length ? spellingDialog.issues.join(", ") : "No spelling issues found in this selection." }
+        width: Math.min(640, win.width - 40)
+        height: Math.min(540, win.height - 60)
+        standardButtons: Dialog.Close
+        function refresh() { snapshot=editor.text; issues=backend.writingIssues(snapshot, writingLanguage.currentText, grammarReview.checked); }
+        onOpened: refresh()
+        ColumnLayout {
+            anchors.fill: parent
+            RowLayout {
+                ComboBox { id: writingLanguage; Accessible.name: "Review language"; model: ["System language"].concat(backend.writingLanguages()); onActivated: spellingDialog.refresh() }
+                CheckBox { id: grammarReview; text: "Grammar"; onToggled: spellingDialog.refresh() }
+                Button { text: "Refresh"; onClicked: spellingDialog.refresh() }
+            }
+            Label { Layout.fillWidth: true; wrapMode: Text.Wrap; text: "Suggestions use macOS dictionaries. Review before replacing. Code and URL destinations are excluded. First 50,000 characters / 100 issues; grammar support varies by language." }
+            Label { text: spellingDialog.issues.length ? spellingDialog.issues.length + " issues" : "No issues found in the checked text." }
+            ListView {
+                Layout.fillWidth: true; Layout.fillHeight: true; clip: true
+                model: spellingDialog.issues
+                delegate: ColumnLayout {
+                    required property var modelData
+                    width: ListView.view.width
+                    Label { Layout.fillWidth: true; wrapMode: Text.Wrap; text: modelData.word + " — " + modelData.label }
+                    RowLayout {
+                        ComboBox { id: correction; Layout.fillWidth: true; model: modelData.suggestions; Accessible.name: "Replacement for " + modelData.word }
+                        Button { text: "Replace"; enabled: correction.count > 0 && spellingDialog.snapshot === editor.text
+                            onClicked: { backend.correctWriting(modelData.start,modelData.end,modelData.word,correction.currentText); spellingDialog.refresh(); } }
+                    }
+                }
+                ScrollBar.vertical: ScrollBar {}
+            }
+        }
     }
 
     Dialog {
@@ -887,6 +951,8 @@ ApplicationWindow {
         width: Math.min(580, win.width - 40)
         height: Math.min(460, win.height - 60)
         standardButtons: Dialog.Cancel
+        property string pendingCommand: ""
+        onClosed: if (pendingCommand !== "") { var command=pendingCommand; pendingCommand=""; editor.forceActiveFocus(); workspaceCommands.run(command); }
         property var results: []
         function refresh() {
             results = workspaceCommands.entries.filter(function(item) {
@@ -898,9 +964,8 @@ ApplicationWindow {
             if (index < 0 || index >= results.length) return;
             var id = results[index].id;
             if (!workspaceCommands.isEnabled(id)) return;
+            pendingCommand=id;
             close();
-            editor.forceActiveFocus();
-            workspaceCommands.run(id);
         }
         onOpened: { refresh(); commandQuery.forceActiveFocus(); commandQuery.selectAll(); }
         ColumnLayout {
@@ -1466,6 +1531,7 @@ ApplicationWindow {
             TextEdit {
                 id: editor
                 objectName: "sourceEditor"
+            Accessible.name: "Markdown editor"
                 x: Math.round((editorFlick.width - width) / 2)
                 y: workspaceSettings.typewriter ? editorFlick.height / 2 : 10
                 width: win.editorWidth

@@ -2,6 +2,8 @@
 #include <QObject>
 #include <QStringList>
 #include <QJsonArray>
+#include <QRect>
+#include <QSize>
 #include <QLocalServer>
 #include <QLockFile>
 #include <memory>
@@ -25,6 +27,7 @@ private:
 
 class WorkspaceStore {
 public:
+    static QRect visibleGeometry(const QRect &saved, const QRect &available, const QSize &minimum);
     static QJsonArray read(const QString &path);
     static bool write(const QString &path, const QJsonArray &windows);
 };

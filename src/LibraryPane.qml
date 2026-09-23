@@ -138,8 +138,11 @@ Rectangle {
                     }
                     LineIcon { visible: entry.modelData.directory; name: entry.modelData.expanded ? "down" : "right"; ink: "#92969e"; Layout.preferredWidth: 14; Layout.preferredHeight: 14 }
                 }
-                ToolTip.delay: 2000
-                ToolTip.visible: hovered
+                property bool tooltipReady: false
+                onHoveredChanged: { tooltipReady=false; if (hovered) pathHoverDelay.restart(); else pathHoverDelay.stop(); }
+                Timer { id: pathHoverDelay; interval: 2000; onTriggered: entry.tooltipReady=entry.hovered }
+                ToolTip.delay: 0
+                ToolTip.visible: hovered && tooltipReady
                 ToolTip.text: modelData.url.toString()
             }
             Label {

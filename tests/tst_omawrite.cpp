@@ -43,6 +43,67 @@ private slots:
                            m_settingsDirectory.path());
     }
 
+    void restoredWindowGeometryStaysOnAvailableScreen() {
+        const QRect screen(1440,0,1920,1080);
+        QCOMPARE(WorkspaceStore::visibleGeometry(QRect(-8000,-4000,1100,720),screen,QSize(720,520)),QRect(1440,0,1100,720));
+        QCOMPARE(WorkspaceStore::visibleGeometry(QRect(4000,3000,4000,2000),screen,QSize(720,520)),screen);
+        QCOMPARE(WorkspaceStore::visibleGeometry(QRect(1500,100,800,600),screen,QSize(720,520)),QRect(1500,100,800,600));
+    }
+
+    void tagIndexReportsBoundsAndSkipsOversizedFiles() {
+        QTemporaryDir dir;
+        QFile tags(dir.filePath("tags.md")); QVERIFY(tags.open(QIODevice::WriteOnly));
+        for(int i=0;i<2001;++i) tags.write(("#tag"+QString::number(i)+" ").toUtf8()); tags.close();
+        FileLibrary library; library.setRootFolder(QUrl::fromLocalFile(dir.path()));
+        QElapsedTimer elapsed; elapsed.start(); library.refreshTags();
+        QTRY_VERIFY_WITH_TIMEOUT(!library.tagStatus().startsWith("Scanning"),10000);
+        QCOMPARE(library.tagIndex().size(),2000); QVERIFY(library.tagStatus().contains("limit reached"));
+        qInfo() << "Bounded 2001-tag scan milliseconds:" << elapsed.elapsed();
+        QVERIFY(tags.remove()); QFile large(dir.filePath("large.md")); QVERIFY(large.open(QIODevice::WriteOnly)); large.write(QByteArray(262145,'x')); large.close();
+        library.refreshTags(); QTRY_VERIFY_WITH_TIMEOUT(!library.tagStatus().startsWith("Scanning"),10000);
+        QVERIFY(library.tagIndex().isEmpty()); QVERIFY(library.tagStatus().contains("1 skipped"));
+    }
+
+    void extendedPaletteRoutesCommandsAndProtectsDisabledActions() {
+        Backend backend; QQmlEngine engine; engine.rootContext()->setContextProperty("backend",&backend);
+        QQmlComponent component(&engine,QUrl::fromLocalFile(QFINDTESTDATA("../src/Main.qml")));
+        QScopedPointer<QObject> window(component.create()); QVERIFY2(window,qPrintable(component.errorString()));
+        auto *commands=window->findChild<QObject *>("workspaceCommands"); auto *editor=window->findChild<QObject *>("sourceEditor"); QVERIFY(commands && editor);
+        QSignalSpy requested(commands,SIGNAL(commandRequested(QString)));
+        QVERIFY(QMetaObject::invokeMethod(commands,"run",Q_ARG(QVariant,"rename"))); QCOMPARE(requested.count(),0);
+        editor->setProperty("text","sample");
+        QVERIFY(QMetaObject::invokeMethod(commands,"run",Q_ARG(QVariant,"themePaper"))); QCOMPARE(backend.themePreset(),QString("paper"));
+        QVERIFY(QMetaObject::invokeMethod(commands,"run",Q_ARG(QVariant,"pageBreak"))); QVERIFY(editor->property("text").toString().contains("<!-- pagebreak -->"));
+        QVERIFY(QMetaObject::invokeMethod(editor,"undo")); QCOMPARE(editor->property("text").toString(),QString("sample"));
+        backend.setThemePreset("system"); backend.discardRecovery();
+    }
+
+    void writingReviewExcludesCodeAndCorrectsSafely() {
+        const QString source="Very readable. `really`\n> ```\n> quite\n> ```\n    just\n[visible](https://example.com/very)\n";
+        const auto prose=Backend::proseForReview(source);
+        QCOMPARE(prose.size(),source.size()); QVERIFY(prose.startsWith("Very readable."));
+        QVERIFY(!prose.contains("really")); QVERIFY(!prose.contains("quite")); QVERIFY(!prose.contains("just")); QVERIFY(!prose.contains("https"));
+        Backend backend;
+        const auto analysis=backend.writingAnalysis(source, "");
+        int reviewCount=0; for(const auto &entry:analysis) if(entry.toMap()["label"]=="Review word") ++reviewCount;
+        QCOMPARE(reviewCount,1);
+        QQmlEngine engine; engine.rootContext()->setContextProperty("backend", &backend);
+        QQmlComponent component(&engine,QUrl::fromLocalFile(QFINDTESTDATA("../src/Main.qml")));
+        QScopedPointer<QObject> window(component.create()); QVERIFY2(window,qPrintable(component.errorString()));
+        auto *editor=window->findChild<QObject *>("sourceEditor"); QVERIFY(editor); editor->setProperty("text","A mispellled word.");
+        QVERIFY(!backend.correctWriting(2,12,"stale","misspelled"));
+        QVERIFY(backend.correctWriting(2,12,"mispellled","misspelled"));
+        QCOMPARE(editor->property("text").toString(),QString("A misspelled word."));
+        QVERIFY(QMetaObject::invokeMethod(editor,"undo")); QCOMPARE(editor->property("text").toString(),QString("A mispellled word."));
+#ifdef Q_OS_MACOS
+        QVERIFY(!backend.writingLanguages().isEmpty());
+        const auto issues=backend.writingIssues("A mispellled word. `mispellled`", "en_US",false);
+        bool found=false; for(const auto &entry:issues) { const auto issue=entry.toMap(); if(issue["word"]=="mispellled") { found=true; QCOMPARE(issue["start"].toInt(),2); QVERIFY(!issue["suggestions"].toStringList().isEmpty()); } }
+        QVERIFY(found);
+#endif
+        backend.discardRecovery();
+    }
+
     void themesPersistWithoutEditingDocuments() {
         Backend backend;
         QQmlEngine engine; engine.rootContext()->setContextProperty("backend", &backend);
@@ -291,6 +352,12 @@ private slots:
         // Optional synthetic evidence location is explicitly set by the test runner.
         const auto evidence=qEnvironmentVariable("OMAWRITE_OUTPUT_EVIDENCE");
         if(!evidence.isEmpty()) { QDir().mkpath(evidence); QVERIFY(QFile::copy(pdf.toLocalFile(),evidence+"/pages.pdf")); QVERIFY(QFile::copy(html.toLocalFile(),evidence+"/portable.html")); }
+        QFile style(directory.filePath("style.json")); QVERIFY(style.open(QIODevice::WriteOnly));
+        style.write(R"({"fontFamily":"Georgia","pointSize":12,"header":"Sample header: {title}","footer":"Page {page} of {pages}","titlePage":true})"); style.close();
+        QVERIFY(backend.loadOutputStyle(QUrl::fromLocalFile(style.fileName())));
+        Backend customReopened; QCOMPARE(customReopened.outputStyle(),3);
+        const auto customPdf=QUrl::fromLocalFile(directory.filePath("custom.pdf")); QVERIFY(backend.exportDocument(customPdf,"pdf"));
+        if(!evidence.isEmpty()) QVERIFY(QFile::copy(customPdf.toLocalFile(),evidence+"/custom.pdf"));
         editor->setProperty("text","![missing](missing.png)"); QVERIFY(!backend.exportDocument(html,"html"));
         QVERIFY(file.open(QIODevice::ReadOnly)); QCOMPARE(file.readAll(),bytes); backend.discardRecovery();
     }
@@ -624,6 +691,11 @@ private slots:
         auto *document = qvariant_cast<QQuickTextDocument *>(preview->property("textDocument"));
         QTRY_VERIFY(backend.previewAnchorPosition(document, "same-1") > 0);
         QCOMPARE(backend.previewAnchorPosition(document, "missing"), -1);
+        editor->setProperty("text","Note.[^end] Again.[^end]\n\n"+QString("Filler paragraph.\n\n").repeated(100)+"[^end]: Destination.");
+        QTRY_VERIFY(backend.previewAnchorPosition(document,"ow-note-0-end")>1000);
+        const int first=backend.previewAnchorPosition(document,"ow-note-0-end-ref-1");
+        const int second=backend.previewAnchorPosition(document,"ow-note-0-end-ref-2");
+        QVERIFY(first>=0 && first<100); QVERIFY(second>first && second<100);
         backend.discardRecovery();
     }
 

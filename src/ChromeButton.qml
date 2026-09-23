@@ -23,8 +23,12 @@ Button {
     bottomInset: 0
     focusPolicy: Qt.StrongFocus
     Accessible.name: hint
-    ToolTip.delay: control.tooltipDelay
-    ToolTip.visible: hovered && hint !== ""
+    property bool tooltipReady: false
+    onHoveredChanged: { tooltipReady=false; if (hovered) hoverDelay.restart(); else hoverDelay.stop(); }
+    onHintChanged: { tooltipReady=false; if (hovered) hoverDelay.restart(); }
+    Timer { id: hoverDelay; interval: control.tooltipDelay; onTriggered: control.tooltipReady=control.hovered }
+    ToolTip.delay: 0
+    ToolTip.visible: hovered && tooltipReady && hint !== ""
     ToolTip.text: hint
     contentItem: Item {
         readonly property color ink: !control.enabled ? "#96999e" : control.checked ? (backend.palette.text) : backend.palette.muted
