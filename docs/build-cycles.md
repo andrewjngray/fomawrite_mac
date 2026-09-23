@@ -724,3 +724,15 @@ Final native check: after rebuilding, Command-S saved the active Workbench.md wi
 **Artifact / exercise:** dist/Omawrite.app, dist/Omawrite Dev.app and GitHub mac-v0.2.0-rc1 prerelease archive. Use a copy of a document for a final personal acceptance session; report any issue against the candidate tag.
 
 Final RC1 native follow-up: modeless Writing Review stayed visible during input and updated its word classes. Long-note forward and return clicks both passed (preview scroll 100% → approximately 2% on return). Sample edit undone and saved normally.
+
+## Cycle 43 — Location and file context menus
+
+Scope: Andrew's iA Writer screenshot: Rename in Locations, Remove from Locations, Copy Library Path, Show in Finder; applicable path/Finder actions on library folders/files, favorites and recents.
+
+Implemented a shared QML context menu with right-click and Menu-key invocation. Location labels persist separately from disk names. Removing a location removes only the shortcut; missing locations remain available for shortcut maintenance. Copy Path writes a decoded local filesystem path. Show in Finder targets the clicked entry, without opening it in the editor. No file deletion or arbitrary on-disk rename added to this menu.
+
+Validation: ./bin/build and ./bin/test: 71 passed, zero failures. New coverage checks label persistence, invalid labels/targets, clipboard paths with spaces, and file preservation after shortcut removal. Initial sandbox run could not access native spelling/recovery services; rerun with required access passed. Native Dev: location menu, rename/apply/restore label, file menu without document switch, and Finder selection of Workbench.md verified. Sample screenshots/logs: research/cycle-43/. Keyboard Menu-key, dark appearance, unavailable-volume menu and VoiceOver not verified natively.
+
+Runnable artifacts: dist/Omawrite Dev.app and dist/Omawrite.app (same current source; GitHub RC1 archive remains the previous checkpoint).
+
+Optional exercise: right-click a location and give it a shorter label; right-click a file, copy its path, and reveal it in Finder. Confirm the folder's real name has stayed unchanged.

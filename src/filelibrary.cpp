@@ -1,5 +1,9 @@
 #include <QDirIterator>
 #include <QMap>
+#include <QGuiApplication>
+#include <QClipboard>
+#include <QProcess>
+#include <QDesktopServices>
 #include "filelibrary.h"
 #include <QDir>
 #include <QDateTime>
@@ -13,6 +17,7 @@
 
 FileLibrary::FileLibrary(QObject *parent) : QObject(parent) {
     QSettings settings;
+    m_locationNames = settings.value("library/locationNames").toMap();
     m_locations = settings.value("library/locations").toStringList();
     m_favorites = settings.value("library/favorites").toStringList();
     m_recentFiles = settings.value("library/recents").toStringList();
@@ -38,11 +43,43 @@ static QVariantList organizerEntries(const QStringList &paths) {
     }
     return entries;
 }
-QVariantList FileLibrary::locations() const { return organizerEntries(m_locations); }
+QVariantList FileLibrary::locations() const {
+    auto entries = organizerEntries(m_locations);
+    for (auto &entry : entries) {
+        auto map = entry.toMap();
+        const QString label = m_locationNames.value(map.value("url").toUrl().toLocalFile()).toString();
+        if (!label.isEmpty()) map["name"] = label;
+        map["directory"] = true;
+        entry = map;
+    }
+    return entries;
+}
+bool FileLibrary::renameLocation(const QUrl &url, const QString &name) {
+    const QString label = name.trimmed();
+    if (!url.isLocalFile() || !m_locations.contains(url.toLocalFile()) || label.isEmpty()
+        || label.size() > 200 || label.contains(QRegularExpression("[\\x00-\\x1f]"))) return false;
+    m_locationNames[url.toLocalFile()] = label;
+    saveOrganizer();
+    return true;
+}
+bool FileLibrary::copyPath(const QUrl &url) {
+    if (!url.isLocalFile() || !QDir::isAbsolutePath(url.toLocalFile())) return false;
+    QGuiApplication::clipboard()->setText(url.toLocalFile());
+    return true;
+}
+bool FileLibrary::showInFileManager(const QUrl &url) {
+    if (!url.isLocalFile() || !QFileInfo::exists(url.toLocalFile())) return false;
+#ifdef Q_OS_MACOS
+    return QProcess::startDetached(QStringLiteral("/usr/bin/open"), {QStringLiteral("-R"), url.toLocalFile()});
+#else
+    return QDesktopServices::openUrl(QUrl::fromLocalFile(QFileInfo(url.toLocalFile()).absolutePath()));
+#endif
+}
 QVariantList FileLibrary::favorites() const { return organizerEntries(m_favorites); }
 QVariantList FileLibrary::recentFiles() const { return organizerEntries(m_recentFiles); }
 void FileLibrary::saveOrganizer() {
     QSettings settings;
+    settings.setValue("library/locationNames", m_locationNames);
     settings.setValue("library/locations", m_locations);
     settings.setValue("library/favorites", m_favorites);
     settings.setValue("library/recents", m_recentFiles);
@@ -50,6 +87,7 @@ void FileLibrary::saveOrganizer() {
 }
 void FileLibrary::removeLocation(const QUrl &url) {
     m_locations.removeAll(url.toLocalFile());
+    m_locationNames.remove(url.toLocalFile());
     if (url == m_rootFolder) {
         m_rootFolder = QUrl();
         QSettings().remove("library/root");

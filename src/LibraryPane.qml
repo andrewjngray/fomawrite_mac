@@ -48,6 +48,7 @@ Rectangle {
     }
     function showOptions(anchor) { folderMenu.parent = anchor; folderMenu.x = anchor.width - folderMenu.width; folderMenu.y = anchor.height + 3; folderMenu.open(); }
 
+    LibraryContextMenu { id: contextMenu; library: root.library; darkMode: root.darkMode }
     ColumnLayout {
         anchors.fill: parent
         anchors.margins: 8
@@ -138,6 +139,11 @@ Rectangle {
                     }
                     LineIcon { visible: entry.modelData.directory; name: entry.modelData.expanded ? "down" : "right"; ink: "#92969e"; Layout.preferredWidth: 14; Layout.preferredHeight: 14 }
                 }
+                TapHandler {
+                    acceptedButtons: Qt.RightButton
+                    onTapped: (eventPoint) => contextMenu.showFor(entry, {url: entry.modelData.url, name: entry.modelData.name, available: true}, false, eventPoint.position)
+                }
+                Keys.onMenuPressed: contextMenu.showFor(entry, {url: modelData.url, name: modelData.name, available: true}, false, Qt.point(0, height))
                 property bool tooltipReady: false
                 onHoveredChanged: { tooltipReady=false; if (hovered) pathHoverDelay.restart(); else pathHoverDelay.stop(); }
                 Timer { id: pathHoverDelay; interval: 2000; onTriggered: entry.tooltipReady=entry.hovered }

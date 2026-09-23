@@ -1,6 +1,7 @@
 <RCC>
     <qresource prefix="/">
         <file>LibraryPane.qml</file>
+        <file>LibraryContextMenu.qml</file>
         <file>WorkspaceCommands.qml</file>
         <file>NativeCommandMenuItem.qml</file>
         <file>RecentFilesMenu.qml</file>

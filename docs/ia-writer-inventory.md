@@ -201,3 +201,7 @@ Cycle 33 implements Andrew's themes addition (not an iA parity claim): Follow sy
 Cycle 34a supersedes the earlier sequential-Quit cancellation limitation: approval is collected for all document revisions before any windows close. Recovery snapshots preserve the original disk baseline, preventing autosave from trusting intervening external edits after a crash. Verified with isolated subprocess-exit recovery and native two-dirty-tab cancellation. Versions/sidecars, physical disk/display failures and exhaustive lifecycle acceptance remain partial.
 
 Cycle 34b defines native-version authorship behavior: snapshots are Markdown-only; restoration clears labels instead of inheriting them from current text. Undo restores previous text/labels together. Autosave pauses until manual Save, with the pause retained in recovery metadata. Verified with NSFileVersion regression coverage and native sample Restore/Undo. Automatic per-save versions and the native Versions browser remain unimplemented.
+
+### Cycle 43 — Screenshot-backed context actions
+
+Locations now support Rename in Locations (persistent sidebar alias), Remove from Locations (shortcut only), Copy Library Path and Show in Finder. File/folder rows plus favorites/recents support Copy Path and Show in Finder. iA's protected built-in iCloud location has no equivalent here: our locations are user-added local folders. This implements the supplied screenshot's relevant actions; it does not claim the full iA file context menu or cloud integration.

@@ -45,6 +45,9 @@ public:
     void setSortMode(int mode);
     void setAscending(bool ascending);
     void setFoldersFirst(bool enabled);
+    Q_INVOKABLE bool renameLocation(const QUrl &url, const QString &name);
+    Q_INVOKABLE bool copyPath(const QUrl &url);
+    Q_INVOKABLE bool showInFileManager(const QUrl &url);
     Q_INVOKABLE void removeLocation(const QUrl &url);
     Q_INVOKABLE void toggleFavorite(const QUrl &url);
     Q_INVOKABLE void clearRecentFiles();
@@ -108,6 +111,7 @@ private:
     bool containsPath(const QString &path) const;
     void saveOrganizer();
     void saveSorting();
+    QVariantMap m_locationNames;
     QStringList m_locations, m_favorites, m_recentFiles;
     int m_sortMode = 0;
     bool m_ascending = true;

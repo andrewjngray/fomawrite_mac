@@ -23,6 +23,7 @@ Rectangle {
         if (entry.directory) library.rootFolder = entry.url;
         else openRequested(entry.url);
     }
+    LibraryContextMenu { id: contextMenu; library: root.library; darkMode: root.darkMode }
     ScrollView {
         anchors.fill: parent
         id: organizerScroll
@@ -45,13 +46,18 @@ Rectangle {
                         iconName: modelData.directory ? "folder" : "editor"
                         alignLeft: true
                         darkMode: root.darkMode
-                        enabled: modelData.available
+                        enabled: true
                         checked: modelData.url.toString() === root.library.rootFolder.toString()
                         Layout.fillWidth: true
-                        onClicked: root.library.rootFolder = modelData.url
+                        onClicked: if (modelData.available) root.library.rootFolder = modelData.url
                         hint: modelData.url.toString()
                         Accessible.name: text
                         tooltipDelay: 2000
+                        TapHandler {
+                            acceptedButtons: Qt.RightButton
+                            onTapped: (eventPoint) => contextMenu.showFor(parent, modelData, true, eventPoint.position)
+                        }
+                        Keys.onMenuPressed: contextMenu.showFor(this, modelData, true, Qt.point(0, height))
                     }
                     ChromeButton { darkMode: root.darkMode; iconName: "close"; Accessible.name: "Remove location shortcut " + modelData.name; onClicked: root.library.removeLocation(modelData.url) }
                 }
@@ -84,11 +90,16 @@ Rectangle {
                             alignLeft: true
                             darkMode: root.darkMode
                             Layout.fillWidth: true
-                            enabled: modelData.available
-                            onClicked: root.activate(modelData)
+                            enabled: true
+                            onClicked: if (modelData.available) root.activate(modelData)
                             hint: modelData.url.toString()
                             Accessible.name: text
                             tooltipDelay: 2000
+                        TapHandler {
+                            acceptedButtons: Qt.RightButton
+                            onTapped: (eventPoint) => contextMenu.showFor(parent, modelData, false, eventPoint.position)
+                        }
+                        Keys.onMenuPressed: contextMenu.showFor(this, modelData, false, Qt.point(0, height))
                         }
                         ChromeButton { darkMode: root.darkMode; iconName: "close"; Accessible.name: "Remove favorite " + modelData.name; onClicked: root.library.toggleFavorite(modelData.url) }
                     }
@@ -153,11 +164,16 @@ Rectangle {
                         text: modelData.name
                         iconName: modelData.directory ? "folder" : "editor"
                         alignLeft: true
-                        enabled: modelData.available
-                        onClicked: root.openRequested(modelData.url)
+                        enabled: true
+                        onClicked: if (modelData.available) root.openRequested(modelData.url)
                         hint: modelData.url.toString()
                         Accessible.name: text
                         tooltipDelay: 2000
+                        TapHandler {
+                            acceptedButtons: Qt.RightButton
+                            onTapped: (eventPoint) => contextMenu.showFor(parent, modelData, false, eventPoint.position)
+                        }
+                        Keys.onMenuPressed: contextMenu.showFor(this, modelData, false, Qt.point(0, height))
                     }
                 }
             }

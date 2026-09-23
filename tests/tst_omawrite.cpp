@@ -43,6 +43,32 @@ private slots:
                            m_settingsDirectory.path());
     }
 
+    void locationContextActionsPreserveFiles() {
+        QTemporaryDir dir;
+        FileLibrary library;
+        library.setRootFolder(QUrl::fromLocalFile(dir.path()));
+        const QUrl url = library.rootFolder();
+        const QUrl document = library.createDocument("Keep me.md");
+        QVERIFY(library.renameLocation(url, "  Writing desk  "));
+        auto labelFor = [&](FileLibrary &value) {
+            for (const auto &item : value.locations())
+                if (item.toMap().value("url").toUrl() == url) return item.toMap().value("name").toString();
+            return QString();
+        };
+        QCOMPARE(labelFor(library), QString("Writing desk"));
+        FileLibrary reopened;
+        QCOMPARE(labelFor(reopened), QString("Writing desk"));
+        QVERIFY(!library.renameLocation(url, "   "));
+        QVERIFY(!library.renameLocation(document, "Wrong target"));
+        QVERIFY(library.copyPath(document));
+        QCOMPARE(QGuiApplication::clipboard()->text(), document.toLocalFile());
+        QVERIFY(!library.copyPath(QUrl("https://example.com")));
+        library.removeLocation(url);
+        QVERIFY(QFileInfo::exists(document.toLocalFile()));
+        library.setRootFolder(url);
+        QVERIFY(labelFor(library) != "Writing desk");
+    }
+
     void restoredWindowGeometryStaysOnAvailableScreen() {
         const QRect screen(1440,0,1920,1080);
         QCOMPARE(WorkspaceStore::visibleGeometry(QRect(-8000,-4000,1100,720),screen,QSize(720,520)),QRect(1440,0,1100,720));
