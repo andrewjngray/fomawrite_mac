@@ -261,6 +261,18 @@ private slots:
         backend.discardRecovery();
     }
 
+    void extendedContentBlocksRebaseLinksAndFootnotes() {
+        QTemporaryDir directory; QDir(directory.path()).mkdir("nested");
+        QFile included(directory.filePath("nested/chapter.md")); QVERIFY(included.open(QIODevice::WriteOnly)); included.write("[next](next.md#part) ![image](picture.png) `link [x](literal.md)`"); included.close();
+        QFile csv(directory.filePath("table.csv")); QVERIFY(csv.open(QIODevice::WriteOnly)); csv.write("name,value\n\"a,b\",<tag>\n"); csv.close();
+        QFile code(directory.filePath("sample.py")); QVERIFY(code.open(QIODevice::WriteOnly)); code.write("# literal [[wiki]]"); code.close();
+        const auto output=expandedMarkdown("/nested/chapter.md\n/table.csv\n/sample.py\n\nText[^n] again[^n]\n[^n]: First\n    continued\n\n    next paragraph",QUrl::fromLocalFile(directory.path()+"/"));
+        QVERIFY(output.contains("nested/next.md#part")); QVERIFY(output.contains("nested/picture.png")); QVERIFY(output.contains("`link [x](literal.md)`"));
+        QVERIFY(output.contains("<td>a,b</td>")); QVERIFY(output.contains("&lt;tag&gt;")); QVERIFY(output.contains("```py\n# literal [[wiki]]"));
+        QVERIFY(output.contains("continued\n\nnext paragraph")); QVERIFY(output.contains("-ref-2")); QVERIFY(output.contains("[↩2]"));
+        const auto wiki=expandedMarkdown("[[next#part]]",QUrl::fromLocalFile(directory.path()+"/")); QVERIFY(wiki.contains("next.md#part"));
+    }
+
     void clipboardAuthorshipRoundTripsAndRejectsStaleMetadata() {
         QTemporaryDir directory; Backend backend;
         QQmlEngine engine; engine.rootContext()->setContextProperty("backend", &backend);

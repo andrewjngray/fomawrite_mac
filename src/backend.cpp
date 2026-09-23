@@ -632,6 +632,8 @@ int Backend::previewAnchorPosition(QObject *textDocument, const QString &anchor)
     if (!quick) return -1;
     QHash<QString, int> occurrences;
     for (auto block = quick->textDocument()->begin(); block.isValid(); block = block.next()) {
+        for (auto fragment=block.begin(); !fragment.atEnd(); ++fragment)
+            if (fragment.fragment().charFormat().anchorNames().contains(anchor)) return fragment.fragment().position();
         if (!block.blockFormat().headingLevel()) continue;
         QString slug = headingSlug(block.text());
         int count = occurrences[slug]++;

@@ -642,3 +642,13 @@ Planned scope: searchable existing workspace commands with keyboard navigation a
 **Limits:** Assertions are not verified authorship. Other apps may strip custom MIME data. Exported HTML/PDF does not embed assertions; matching Markdown and metadata are separate artifacts. Collaborative merging/full live attribution visualization remain future work.
 
 **Artifact / exercise:** Combined stable bundles. Mark a sample Reference, copy/paste it within Omawrite, inspect its range, then Undo. Paste plain text from another app and confirm it is unlabelled.
+
+## Cycle 36 — Footnotes and richer content blocks
+
+**Changes:** Multiline footnotes with repeated-reference backlinks; named-anchor lookup in preview; rebased links/images in nested Markdown includes; wiki fragments; local image, escaped CSV and literal code content blocks. Existing bounds retained.
+
+**Tests:** Build and 64 tests pass. New cases cover multiline notes, repeat backlinks, nested relative assets, CSV quoting/escaping, inline code and wiki fragments. Native combined preview check follows.
+
+**Limits:** Not a complete Markdown parser. Nearest-match wiki lookup, complex nested inline links, semantic scroll synchronization and the full long-document/fragment matrix remain open.
+
+**Artifact / exercise:** Combined bundles. Preview an included chapter with a local image, a quoted CSV and a multiline footnote; follow its return link. Source files remain unchanged.
