@@ -1,6 +1,6 @@
 # Cycle 59 integrated acceptance ledger
 
-**24 September follow-up — Cycle 54b:** A later opt-in Smart Quotes increment passes `./bin/build` and **100 native-access tests, zero failures and zero skips**. Refreshed ordinary and Dev bundles pass strict signature verification. Native Dev typing produced curly quotes, Command-Z restored the final straight quote, disabling the option left new input straight, and the disposable draft was discarded. This narrows the Cycle 54 gap below; it does not change the Cycle 59 implemented-subset classification. See [Cycle 54](../research/cycle-54/README.md).
+**24 September follow-up — Cycles 54b–54c:** Independent opt-in Smart Quotes and Smart Dashes subsets pass `./bin/build` and **101 native-access tests, zero failures and zero skips**. Refreshed ordinary and Dev bundles pass strict signature verification. Native Dev direct typing and first Undo verified both transformations. The ordinary app reopened a clean saved document. A UI bridge timeout left the final Dev disposable-draft close state unverified. This narrows the Cycle 54 gap below; it does not change the Cycle 59 implemented-subset classification. See [Cycle 54](../research/cycle-54/README.md).
 
 24 September 2026. This is an **implemented-subset integrated checkpoint**, not a declaration of complete iA Writer parity or a final menu closeout. The tested product code is commit `5f8d64b` on macOS 27.0.
 
@@ -23,7 +23,7 @@ A scoped dirty-close check used disposable `/private/tmp/omawrite-cycle59-native
 
 | Cycle / area | Explicit remaining behavior |
 |---|---|
-| 54 — writing input | Smart Quotes has a bounded opt-in implementation. Smart Dashes, Text Replacement, Smart Copy/Paste, automatic correction and the remaining Substitutions behavior remain unimplemented. Completion popup arrow/Escape/IME and broader accessibility acceptance remain open. |
+| 54 — writing input | Smart Quotes and the observed spaced-prose Smart Dashes rule have bounded opt-in implementations. Text Replacement, Smart Copy/Paste, automatic correction and the remaining Substitutions behavior remain unimplemented. Completion popup arrow/Escape/IME and broader accessibility acceptance remain open. |
 | 55 — Focus/style | Clichés, Redundancies and parts-of-speech Show Syntax are absent. Hide Authors, full Custom visual/overlap acceptance and focus/typewriter feel remain open. |
 | 56 — Authors | Post-setup iA semantics remain unknown. There is no iA-style Mark As or Paste Edits From workflow, reusable author registry, automatic assignment or verified provenance. |
 | 57 — platform menus | Window Zoom All, Fill, Move & Resize, Full Screen Tile, explicit move-to-display, window sets and verified dynamic window list remain open. Application menu destinations/enabled states, OS Help search and Online Support remain incomplete or unverified. Center geometry is automated offscreen only. |

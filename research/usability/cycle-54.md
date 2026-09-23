@@ -1,4 +1,4 @@
-# Cycle 54 usability (phases 54a–54b)
+# Cycle 54 usability (phases 54a–54c)
 
 - [ ] View → Show Completions opens suggestions only on explicit request; ordinary typing and restart do not turn on automatic insertion.
 - [ ] Type `lan` in the synthetic sample and accept a suggestion explicitly; verify one Undo restores the prefix.
@@ -10,3 +10,6 @@
 - [ ] Paste the same text and type a quote during IME composition; pasted/composing input should not be transformed by Omawrite.
 - [ ] Type straight quotes in inline/fenced/indented code, a bare URL, a link destination and a raw HTML tag; they should remain straight.
 - [ ] Try a non-US keyboard layout and report any quote key that bypasses or unexpectedly triggers the substitution.
+- [ ] Confirm Edit → Substitutions → Smart Dashes starts off, persists after relaunch once enabled, and remains independent of Smart Quotes.
+- [ ] With Smart Dashes enabled, type `one -- two`; confirm the pair becomes an em dash and one Undo restores the literal `--`.
+- [ ] Disable Smart Dashes and type another `--`; it should remain literal. Paste a pair and try code, a URL, a link destination and a raw tag; none should transform.

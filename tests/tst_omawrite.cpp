@@ -1764,6 +1764,78 @@ private slots:
         backend.discardRecovery();
     }
 
+    void smartDashesAreOptInAtomicAndMarkdownAware() {
+        QSettings settings;
+        const QString key = QStringLiteral("workspace/smartDashes");
+        const bool hadSetting = settings.contains(key);
+        const QVariant previousSetting = settings.value(key);
+        settings.setValue(key, true);
+        settings.sync();
+        const auto restore = qScopeGuard([&] {
+            if (hadSetting) settings.setValue(key, previousSetting);
+            else settings.remove(key);
+            settings.sync();
+        });
+
+        Backend backend;
+        QQmlEngine engine;
+        engine.rootContext()->setContextProperty(QStringLiteral("backend"), &backend);
+        QQmlComponent component(&engine, QUrl::fromLocalFile(QFINDTESTDATA("../src/Main.qml")));
+        QScopedPointer<QObject> window(component.create());
+        QVERIFY2(window, qPrintable(component.errorString()));
+        auto *editor = window->findChild<QObject *>(QStringLiteral("sourceEditor"));
+        auto *menuItem = window->findChild<QObject *>(QStringLiteral("editSmartDashes"));
+        auto *workspaceSettings = window->findChild<QObject *>(QStringLiteral("workspaceSettings"));
+        QVERIFY(editor && menuItem && workspaceSettings);
+        QVERIFY(menuItem->property("checked").toBool());
+
+        editor->setProperty("text", QStringLiteral("one -"));
+        editor->setProperty("cursorPosition", 5);
+        QVariant inserted;
+        QVERIFY(QMetaObject::invokeMethod(window.data(), "insertSmartDash",
+                                          Q_RETURN_ARG(QVariant, inserted)));
+        QVERIFY(inserted.toBool());
+        QCOMPARE(editor->property("text").toString(), QString::fromUtf8("one \u2014"));
+        QVERIFY(QMetaObject::invokeMethod(editor, "undo"));
+        QCOMPARE(editor->property("text").toString(), QStringLiteral("one --"));
+        QVERIFY(QMetaObject::invokeMethod(editor, "undo"));
+        QCOMPARE(editor->property("text").toString(), QStringLiteral("one -"));
+
+        workspaceSettings->setProperty("smartDashes", false);
+        QVERIFY(!menuItem->property("checked").toBool());
+        QVERIFY(QMetaObject::invokeMethod(window.data(), "insertSmartDash",
+                                          Q_RETURN_ARG(QVariant, inserted)));
+        QVERIFY(!inserted.toBool());
+
+        workspaceSettings->setProperty("smartDashes", true);
+        const QStringList protectedSources = {
+            QStringLiteral("-"),
+            QStringLiteral("---\ntitle: value\n---\n-"),
+            QStringLiteral("one--"),
+            QStringLiteral("`code -"),
+            QStringLiteral("    code -"),
+            QStringLiteral("```\ncode -"),
+            QStringLiteral("https://example.test/-"),
+            QStringLiteral("[site](destination-"),
+            QStringLiteral("<span data-value=-")
+        };
+        for (const QString &source : protectedSources) {
+            editor->setProperty("text", source);
+            editor->setProperty("cursorPosition", source.size());
+            QVERIFY(QMetaObject::invokeMethod(window.data(), "insertSmartDash",
+                                              Q_RETURN_ARG(QVariant, inserted)));
+            QVERIFY2(!inserted.toBool(), qPrintable(source));
+            QCOMPARE(editor->property("text").toString(), source);
+        }
+        editor->setProperty("text", QStringLiteral("one --"));
+        editor->setProperty("cursorPosition", 5);
+        QVERIFY(QMetaObject::invokeMethod(window.data(), "insertSmartDash",
+                                          Q_RETURN_ARG(QVariant, inserted)));
+        QVERIFY(!inserted.toBool());
+        QCOMPARE(editor->property("text").toString(), QStringLiteral("one --"));
+        backend.discardRecovery();
+    }
+
     void inlineFormattingAndStructuralInsertionUndo() {
         Backend backend;
         QQmlEngine engine;

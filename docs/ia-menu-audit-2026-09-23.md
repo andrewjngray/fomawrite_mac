@@ -154,7 +154,7 @@ These menus were not opened in the screenshot folder. The 24 September native in
 | Mark As | **Partial** | Manual Human/AI/Reference/Unknown range annotations exist in a dialog, with a sidecar and metadata export. They are assertions, not verified provenance, and are not exposed as iA-style menu commands. |
 | Find | **Partial** | Find, replace, next/previous and use selection exist. iA also has Filter Library… in Find; Omawrite routes library filtering/search elsewhere. |
 | Spelling and Grammar | **Partial** | Explicit macOS dictionary/grammar review with suggestions, Replace and Undo exists. iA's menu also exposes while-typing spelling/grammar and automatic correction; Omawrite has no equivalent inline controls. |
-| Substitutions | **Partial (Cycle 54b)** | iA exposes Show Substitutions, Smart Copy/Paste, Smart Quotes, Smart Dashes and Text Replacement. Omawrite now has a persisted, opt-in Smart Quotes toggle for directly typed double quotes in prose. Native typing and first-Undo restoration were checked on an unsaved sample. Other children, full input-method coverage and exact iA heuristics remain open. |
+| Substitutions | **Partial (Cycles 54b–54c)** | iA exposes Show Substitutions, Smart Copy/Paste, Smart Quotes, Smart Dashes and Text Replacement. Omawrite has independent persisted opt-in Smart Quotes and a bounded spaced-prose Smart Dashes rule. Native typing and first-Undo restoration were checked on disposable samples. Other children, full input-method coverage and exact iA heuristics remain open. |
 | Transformations | **Partial (Cycle 50)** | Uppercase, lowercase and title case appear under Edit → Transformations. iA's Make Upper Case/Lower Case/Capitalize/Make Title Case hierarchy is now captured; Capitalize remains missing. |
 | Speech | **Match** | Speak Selection and Stop Speaking use macOS speech; audible quality is not acceptance-tested. |
 | AutoFill / Dictation | **Partial (Cycle 50)** | iA's AutoFill shows Contact/Passwords/Credit Card and AppKit exposes Dictation. Omawrite relies on platform injection; availability depends on macOS and focused control. |
@@ -256,7 +256,7 @@ These are real differentiators or useful local-workflow additions, though some m
 
 Cycle 59 integrates the implemented subset at code commit `5f8d64b`: 99 tests pass, both local bundles are refreshed/signed, and accumulated native evidence has inspected every top-level menu family. It is not a full closeout. The largest remaining clusters are:
 
-1. **Cycle 54 writing input:** Smart Quotes is a verified bounded subset; Smart Dashes, Text Replacement, automatic correction and the remaining completion popup/IME/accessibility matrix remain.
+1. **Cycle 54 writing input:** Smart Quotes and the observed Smart Dashes rule are verified bounded subsets; Text Replacement, Smart Copy/Paste, automatic correction and the remaining completion popup/IME/accessibility matrix remain.
 2. **Cycle 55 writing intelligence:** Clichés, Redundancies, live parts-of-speech Show Syntax, Hide Authors and the remaining Custom/focus visual matrix.
 3. **Cycle 56 authorship semantics:** post-setup iA behavior, reusable authors, Mark As/Paste Edits From, category display and a truthful provenance model.
 4. **Cycle 57 platform integration:** Zoom All, Fill, Move & Resize, tiling, move-to-display, window sets/dynamic list, application destinations, OS Help search and Online Support. Center geometry still needs real screen/multi-display acceptance.

@@ -1,0 +1,5 @@
+iA Writer Smart Dashes reference check — 24 September 2026
+
+An isolated new draft typed `one -- two` with the existing Smart Dashes setting and displayed literal `--`. The Edit → Substitutions → Smart Dashes item was toggled once. Typing `three -- four` in the same draft then displayed `Three — four`. One Command-Z restored the two hyphens and selected them. The menu item was toggled again to restore the original setting.
+
+The test draft was closed, then only its automatically saved library file was moved to Trash through iA Writer's recoverable context-menu action. The previously open saved document was reopened without edits. This establishes a prose typing example and first-Undo result, not iA's complete dash rules, composition behavior or Markdown syntax exclusions.

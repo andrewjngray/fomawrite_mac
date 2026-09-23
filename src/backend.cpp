@@ -573,6 +573,22 @@ QString Backend::smartQuoteAt(int position) const {
     return QString(opening ? QChar(0x201c) : QChar(0x201d));
 }
 
+bool Backend::smartDashAt(int position) const {
+    if (!m_document) return false;
+    const QString text = currentDocumentText();
+    if (position < 3 || position > text.size() || text.at(position - 1) != '-'
+        || !text.at(position - 2).isSpace()
+        || (position < text.size() && text.at(position) == '-')
+        || !completionContextAllowed(text, position))
+        return false;
+
+    // The observed behavior was a spaced prose pair ("word -- word"). Keep
+    // line-leading rules/front matter and unobserved unspaced dash forms literal.
+    const int lineStart = text.lastIndexOf('\n', position - 2) + 1;
+    const QString prose = text.mid(lineStart, position - lineStart - 2).trimmed();
+    return !prose.isEmpty() && prose.back() != '-';
+}
+
 QVariantMap Backend::wordCompletions(int position) const {
     if (!m_document) return {};
     const QString text = currentDocumentText();

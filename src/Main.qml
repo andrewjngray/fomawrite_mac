@@ -155,6 +155,7 @@ ApplicationWindow {
         property string authorshipProfileName: ""
         property string authorshipProfileIdentifier: ""
         property bool smartQuotes: false
+        property bool smartDashes: false
         property bool autosaveEnabled: false
         property bool synchronizedScroll: false
         property bool typewriter: false
@@ -507,6 +508,20 @@ ApplicationWindow {
         // straight quote, and a second Undo removes the typed character.
         editor.replaceAtomic(position, position, "\"");
         editor.replaceAtomic(position, position + 1, replacement);
+        editor.forceActiveFocus();
+        return true;
+    }
+
+    function insertSmartDash() {
+        if (!workspaceSettings.smartDashes || editor.inputMethodComposing
+            || editor.selectionStart !== editor.selectionEnd)
+            return false;
+        var position = editor.cursorPosition;
+        if (!backend.smartDashAt(position)) return false;
+        // Preserve the literal pair as the first Undo state. Only the second
+        // directly typed hyphen enters this path; paste and existing text do not.
+        editor.replaceAtomic(position, position, "-");
+        editor.replaceAtomic(position - 1, position + 1, "\u2014");
         editor.forceActiveFocus();
         return true;
     }
@@ -925,6 +940,13 @@ ApplicationWindow {
                     checkable: true
                     checked: workspaceSettings.smartQuotes
                     onTriggered: workspaceSettings.smartQuotes = !workspaceSettings.smartQuotes
+                }
+                Platform.MenuItem {
+                    objectName: "editSmartDashes"
+                    text: "Smart Dashes"
+                    checkable: true
+                    checked: workspaceSettings.smartDashes
+                    onTriggered: workspaceSettings.smartDashes = !workspaceSettings.smartDashes
                 }
             }
             Platform.Menu {
@@ -2345,6 +2367,11 @@ ApplicationWindow {
 
                     if (!(event.modifiers & (Qt.ControlModifier | Qt.AltModifier | Qt.MetaModifier))
                         && event.text === "\"" && win.insertSmartQuote()) {
+                        event.accepted = true;
+                        return;
+                    }
+                    if (!(event.modifiers & (Qt.ControlModifier | Qt.AltModifier | Qt.MetaModifier))
+                        && event.text === "-" && win.insertSmartDash()) {
                         event.accepted = true;
                         return;
                     }

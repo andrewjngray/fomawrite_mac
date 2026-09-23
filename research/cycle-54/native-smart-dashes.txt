@@ -1,0 +1,9 @@
+Omawrite Cycle 54c native check — 24 September 2026
+
+The current Dev bundle was prepared after a successful build and 101/0/0 native-access test run. It reopened the prior clean synthetic Second.md. In a disposable Untitled draft, Edit → Substitutions displayed independent Smart Quotes and Smart Dashes commands.
+
+With Smart Dashes off, direct typing `one -- two` stayed literal. After enabling Smart Dashes, direct typing `three -- four` displayed `three — four`. Typing `five --` and invoking Command-Z restored `five --`. After disabling Smart Dashes, typing `six --` again stayed literal. These checks establish only the direct-key, spaced-prose rule and first Undo, not paste, IME, keyboard-layout or all Markdown contexts in native UI.
+
+Command-W raised the unsaved-change prompt with Cancel, Discard and Save. Discard was clicked, but the computer-use bridge timed out and subsequent Dev attachment also timed out. The final discard and return to Second.md could not be observed, so the Dev window's closing state is unverified. Do not refresh or force-quit it without recovering UI access and checking for unsaved work.
+
+The ordinary Omawrite bundle was quit normally from a clean saved README, packaged from current source, strict-signature verified and reopened the same clean saved document. Both ordinary and Dev bundles passed `codesign --verify --deep --strict` after refresh. No private writing was used in this check.
