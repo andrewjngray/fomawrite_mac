@@ -123,8 +123,19 @@ void FileLibrary::relocatedPath(const QUrl &oldUrl, const QUrl &newUrl) {
     for (auto *paths : {&m_locations, &m_favorites, &m_recentFiles})
         for (auto &path : *paths) path = relocate(path);
     QVariantMap labels;
-    for (auto it = m_locationNames.cbegin(); it != m_locationNames.cend(); ++it) labels[relocate(it.key())] = it.value();
+    // A physical rename supersedes the legacy sidebar-only alias for this folder.
+    for (auto it = m_locationNames.cbegin(); it != m_locationNames.cend(); ++it)
+        if (it.key() != oldPath) labels[relocate(it.key())] = it.value();
     m_locationNames = labels;
+    auto searches = savedSearches();
+    for (auto &entry : searches) {
+        auto search = entry.toMap();
+        const QUrl root = search.value("root").toUrl();
+        if (root.isLocalFile()) search["root"] = QUrl::fromLocalFile(relocate(root.toLocalFile()));
+        entry = search;
+    }
+    QSettings().setValue("library/savedSearches", searches);
+    emit savedSearchesChanged();
     for (auto &entry : m_history) entry = QUrl::fromLocalFile(relocate(entry.toLocalFile()));
     QSet<QString> expanded;
     for (const auto &path : m_expanded) expanded.insert(relocate(path));

@@ -757,3 +757,19 @@ Known gaps: no physical print job or actual sharing transmission; dark/VoiceOver
 Artifacts: dist/Omawrite Dev.app and dist/Omawrite.app. Versioned RC1 GitHub release remains the older checkpoint; this cycle is recorded in source history and local bundles.
 
 Optional exercise: right-click an unopened note, duplicate it, rename the copy, export/preview it and move the copy to Trash. Right-click a folder and create a file inside it; try the sorting and date/excerpt controls. Report whether the menu order feels natural.
+
+## Cycle 45 — Locations rename the real folder
+
+Scope: Andrew found that renaming a Location changed only its sidebar label while Finder retained the original disk name. Replace the alias-only menu action with a physical folder rename.
+
+Changes: Locations now offer **Rename Folder…**, using the same validated filesystem operation as library folders. The dialog starts with the actual disk name. Successful rename clears that folder's legacy sidebar alias and updates location URLs, root, favorites, recents, navigation and saved-search roots. Old aliases are not automatically applied to disk; run Rename Folder to perform the intended rename. Remove from Locations remains shortcut-only.
+
+Validation: ./bin/build and ./bin/test pass (74 tests, zero failures). Regression checks cover a legacy alias followed by physical rename, name collision rejection, preserved child file, persisted new root/location name, recents, saved-search root and copied path. Existing tests cover open-descendant refusal and unsaved-buffer preservation. The first test run exposed test settings leaking into a later search test; scoped restoration fixed test isolation.
+
+Native Dev: normal quit/restart retained the three existing sample tabs. Opened cycle-45/sample/Before through Open by Path, right-clicked its Location, chose Rename Folder, and renamed to After. Sidebar and header changed; Show in Finder selected the actual cycle-45/sample/After folder. Filesystem check confirmed Before absent and Note.md unchanged. Sample screenshot and verification logs are in research/cycle-45/. Everyday app closed normally before packaging.
+
+Known limits: documents inside a folder must be closed before rename; cross-process editing in another app is not coordinated. Unavailable volumes, permissions failures, case-only renames and VoiceOver were not exercised natively. Rename uses a dialog, not iA's inline text field.
+
+Artifacts: dist/Omawrite Dev.app and dist/Omawrite.app. GitHub RC1 downloadable binary remains Cycle 42; source history records this fix.
+
+Optional exercise: close documents inside the location, right-click it → Rename Folder, then Show in Finder. Confirm the new name and contents in both places. An old alias such as sample_b needs this real rename once.

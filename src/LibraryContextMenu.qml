@@ -19,7 +19,6 @@ CompactMenu {
     function showFor(item, entry, isLocation, point) {
         target = backend.libraryItemInfo(entry.url);
         if (target.error) target = entry;
-        if (isLocation) target.name = entry.name;
         location = isLocation;
         popup(item, point.x, point.y);
     }
@@ -36,9 +35,9 @@ CompactMenu {
     function performPending() {
         const action = pending; pending = "";
         if (!action) return;
-        if (["renameLocation", "rename", "duplicate", "newFile", "newFolder"].indexOf(action) >= 0) {
+        if (["rename", "duplicate", "newFile", "newFolder"].indexOf(action) >= 0) {
             nameDialog.action = action;
-            nameDialog.title = ({renameLocation:"Rename in Locations",rename:"Rename",duplicate:"Duplicate",newFile:"New File",newFolder:"New Folder"})[action];
+            nameDialog.title = ({rename:"Rename",duplicate:"Duplicate",newFile:"New File",newFolder:"New Folder"})[action];
             nameField.text = action === "newFile" ? "Untitled.md" : action === "newFolder" ? "New Folder" : target.name;
             if (action === "duplicate") {
                 const dot = folder ? -1 : target.name.lastIndexOf(".");
@@ -58,7 +57,7 @@ CompactMenu {
         else if (action === "open") library.rootFolder = target.url;
         else run(action);
     }
-    CompactMenuItem { text: "Rename in Locations…"; visible: menu.location; height: visible ? implicitHeight : 0; onTriggered: menu.later("renameLocation") }
+    CompactMenuItem { text: "Rename Folder…"; visible: menu.location; height: visible ? implicitHeight : 0; enabled: !!menu.target.available; onTriggered: menu.later("rename") }
     CompactMenuItem { text: "Remove from Locations"; visible: menu.location; height: visible ? implicitHeight : 0; onTriggered: menu.library.removeLocation(menu.target.url) }
     CompactMenuItem { text: "Open"; visible: !menu.location && menu.folder; height: visible ? implicitHeight : 0; enabled: !!menu.target.available; onTriggered: menu.later("open") }
     CompactMenuItem { text: "Open in New Tab"; visible: !menu.location && !menu.folder; height: visible ? implicitHeight : 0; enabled: !!menu.target.available; onTriggered: menu.later("tab") }
@@ -120,9 +119,8 @@ CompactMenu {
             Label { id: nameError; Layout.fillWidth: true; wrapMode: Text.Wrap; visible: text !== "" }
         }
         function submit() {
-            const ok = action === "renameLocation" ? menu.library.renameLocation(menu.target.url, nameField.text)
-                : backend.libraryItemAction(menu.target.url, action, nameField.text);
-            if (ok) close(); else nameError.text = action === "renameLocation" ? "Enter a valid location label." : backend.status;
+            const ok = backend.libraryItemAction(menu.target.url, action, nameField.text);
+            if (ok) close(); else nameError.text = backend.status;
         }
         footer: DialogButtonBox {
             Button { text: "Cancel"; DialogButtonBox.buttonRole: DialogButtonBox.RejectRole }

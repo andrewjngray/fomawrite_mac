@@ -209,3 +209,7 @@ Locations now support Rename in Locations (persistent sidebar alias), Remove fro
 ### Cycle 44 — File and folder context-menu screenshots
 
 All visible top-level actions in Andrew's two new screenshots now have implementations. File: new tab/window, info, favorite, duplicate, rename, Trash, Finder, sharing, export, print, copy, creation, sorting, view options. Folder: open, info, favorite, duplicate, rename, Trash, Finder, sharing, library path, creation, sorting, view options. Get Info is an Omawrite metadata dialog; Share uses the macOS saved-file picker; export offers HTML/PDF; Copy offers path/Markdown/plain text/HTML; Print offers rendered/source/paginated preview. These submenu choices are not claims of unseen iA submenu parity. File actions preserve live buffers; folder mutations require contained documents to be closed. See Cycle 44 for bounded-copy and QA limitations.
+
+### Cycle 45 — Physical rename from Locations
+
+User feedback supersedes the Cycle 43 alias-only behavior: Locations now use Rename Folder to rename on disk, clear the renamed folder's old alias, and migrate saved paths including smart-search roots. Finder reveal verified against a synthetic renamed folder. Removing a Location still only removes its shortcut. Documents inside the folder must first be closed. Inline renaming as pictured in iA is not implemented; the operation uses a dialog.

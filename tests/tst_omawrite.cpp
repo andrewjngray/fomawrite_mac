@@ -100,6 +100,47 @@ private slots:
         QVERIFY(backend.modified()); backend.discardRecovery();
     }
 
+    void locationPhysicalRenameReplacesLegacyAlias() {
+        const QVariant searchesBefore = QSettings().value("library/savedSearches");
+        const auto restoreSearches = qScopeGuard([&] { QSettings().setValue("library/savedSearches", searchesBefore); });
+        QTemporaryDir dir;
+        QVERIFY(QDir(dir.path()).mkdir("Original"));
+        Backend backend;
+        auto *library = qobject_cast<FileLibrary *>(backend.library());
+        library->setRootFolder(QUrl::fromLocalFile(dir.filePath("Original")));
+        const QUrl original = library->rootFolder();
+        const QUrl document = library->createDocument("Keep.md");
+        library->recordRecentFile(document);
+        library->toggleFavorite(document);
+        library->saveSearch("Keep", false);
+        QVERIFY(library->renameLocation(original, "Old sidebar alias"));
+        QVERIFY(QDir(dir.path()).mkdir("Occupied"));
+        QVERIFY(!backend.libraryItemAction(original, "rename", "Occupied"));
+        QCOMPARE(library->rootFolder(), original);
+        QVERIFY(QFileInfo::exists(document.toLocalFile()));
+        QVERIFY(backend.libraryItemAction(original, "rename", "Renamed folder"));
+        const QUrl renamed = QUrl::fromLocalFile(QFileInfo(dir.filePath("Renamed folder")).canonicalFilePath());
+        QVERIFY(!QFileInfo::exists(original.toLocalFile()));
+        QVERIFY(QFileInfo::exists(renamed.toLocalFile() + "/Keep.md"));
+        QCOMPARE(library->rootFolder(), renamed);
+        QCOMPARE(library->savedSearches().first().toMap().value("root").toUrl(), renamed);
+        QCOMPARE(library->recentFiles().first().toMap().value("url").toUrl().toLocalFile(), renamed.toLocalFile() + "/Keep.md");
+        FileLibrary reopened;
+        QCOMPARE(reopened.rootFolder(), renamed);
+        bool found = false;
+        for (const auto &item : reopened.locations()) {
+            const auto entry = item.toMap();
+            if (entry.value("url").toUrl() == renamed) {
+                found = true;
+                QCOMPARE(entry.value("name").toString(), QString("Renamed folder"));
+            }
+            QVERIFY(entry.value("url").toUrl() != original);
+        }
+        QVERIFY(found);
+        QVERIFY(library->copyPath(renamed));
+        QCOMPARE(QGuiApplication::clipboard()->text(), renamed.toLocalFile());
+    }
+
     void locationContextActionsPreserveFiles() {
         QTemporaryDir dir;
         FileLibrary library;

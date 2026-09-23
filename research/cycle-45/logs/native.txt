@@ -1,0 +1,8 @@
+Native QA: Omawrite Dev
+Normal quit/restart preserved three existing tabs; no unsaved prompt occurred.
+Open by Path: research/cycle-45/sample/Before
+Location menu: Rename Folder -> After
+Sidebar and toolbar: After
+Finder Show in Finder selected URL: file:///Users/andrewgray/repo/projects/omawrite_mac/research/cycle-45/sample/After/
+Filesystem: Before absent; After/Note.md unchanged.
+Everyday app quit normally without unsaved prompt before bundle replacement.
