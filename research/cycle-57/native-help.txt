@@ -1,0 +1,19 @@
+Cycle 57a native Help checkpoint — 24 September 2026
+
+Artifact
+- Refreshed stable dist/Omawrite Dev.app through Cycle 57a.
+- ./bin/build passed.
+- Full native-access ./bin/test: 97 passed, 0 failed, 0 skipped.
+
+Verified through macOS accessibility
+- Help contained Omawrite Help, What’s New in Omawrite and Keyboard Shortcuts.
+- Omawrite Help opened the bundled offline help page.
+- What’s New in Omawrite opened the bundled offline recent-features page.
+- Close dismissed a page, and Escape dismissed a page.
+- Synthetic research/cycle-47/sample/Templates.md source and status remained unchanged.
+
+Not verified
+- Screenshot capture was unavailable, so pixel styling was not inspected.
+- Dark/narrow layout, link and scroll behavior, VoiceOver and OS Help search were not checked.
+- Online Support is absent because no destination was verified.
+- Remaining Window and application-menu AppKit behavior is open.

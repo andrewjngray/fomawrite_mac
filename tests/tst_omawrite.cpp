@@ -457,6 +457,85 @@ private slots:
         QVERIFY(!document.isUndoAvailable());
     }
 
+    void bundledHelpIsAllowlistedAndDoesNotEditDraft() {
+        Backend backend;
+        const QString help = backend.bundledHelp(QStringLiteral("help"));
+        const QString whatsNew = backend.bundledHelp(QStringLiteral("whats-new"));
+        QVERIFY(help.startsWith(QStringLiteral("# Omawrite Help")));
+        QVERIFY(help.contains(QStringLiteral("ordinary UTF-8 Markdown")));
+        QVERIFY(whatsNew.startsWith(QStringLiteral("# What’s New in Omawrite")));
+        QVERIFY(!help.contains(QStringLiteral("/Users/")));
+        const QString unavailable = backend.bundledHelp(QStringLiteral("../../README.md"));
+        QVERIFY(unavailable.startsWith(QStringLiteral("# Help unavailable")));
+        QVERIFY(!unavailable.contains(QStringLiteral("Omawrite Mac")));
+
+        QQmlEngine engine;
+        engine.rootContext()->setContextProperty("backend", &backend);
+        QQmlComponent component(&engine, QUrl::fromLocalFile(QFINDTESTDATA("../src/Main.qml")));
+        QScopedPointer<QObject> window(component.create());
+        QVERIFY2(window, qPrintable(component.errorString()));
+        auto *editor = window->findChild<QObject *>("sourceEditor");
+        auto *helpAction = window->findChild<QObject *>("helpOmawrite");
+        auto *whatsNewAction = window->findChild<QObject *>("helpWhatsNew");
+        auto *shortcutsAction = window->findChild<QObject *>("helpKeyboardShortcuts");
+        auto *dialog = window->findChild<QObject *>("helpDialog");
+        auto *viewer = window->findChild<QObject *>("helpDocumentText");
+        auto *shortcuts = window->findChild<QObject *>("shortcutsDialog");
+        QVERIFY(editor && helpAction && whatsNewAction && shortcutsAction && dialog
+                && viewer && shortcuts);
+
+        editor->setProperty("text", QStringLiteral("# Synthetic dirty draft\n\nKeep this exact text."));
+        QVERIFY(editor->setProperty("cursorPosition", 12));
+        QTest::qWait(850); // Let the draft's own recovery write settle before comparison.
+        const QString source = editor->property("text").toString();
+        const int cursor = editor->property("cursorPosition").toInt();
+        const bool canUndo = editor->property("canUndo").toBool();
+        const bool modified = backend.modified();
+        const QString status = backend.status();
+        const QDir recoveryDirectory(QStandardPaths::writableLocation(QStandardPaths::AppDataLocation));
+        auto recoveryContents = [&] {
+            QMap<QString, QByteArray> contents;
+            for (const QString &fileName : recoveryDirectory.entryList(
+                     {QStringLiteral("recovery-*.json")}, QDir::Files)) {
+                QFile file(recoveryDirectory.filePath(fileName));
+                if (file.open(QIODevice::ReadOnly)) contents.insert(fileName, file.readAll());
+            }
+            return contents;
+        };
+        const auto recoveryBefore = recoveryContents();
+
+        QCOMPARE(helpAction->property("text").toString(), QStringLiteral("Omawrite Help"));
+        QCOMPARE(whatsNewAction->property("text").toString(),
+                 QStringLiteral("What’s New in Omawrite"));
+        QVERIFY(QMetaObject::invokeMethod(helpAction, "triggered"));
+        QTRY_VERIFY(dialog->property("opened").toBool());
+        QCOMPARE(dialog->property("title").toString(), QStringLiteral("Omawrite Help"));
+        QVERIFY(viewer->property("readOnly").toBool());
+        QVERIFY(viewer->property("text").toString().startsWith(QStringLiteral("# Omawrite Help")));
+        auto *quickWindow = qobject_cast<QWindow *>(window.data());
+        QVERIFY(quickWindow);
+        QTest::keyClick(quickWindow, Qt::Key_Escape);
+        QTRY_VERIFY(!dialog->property("opened").toBool());
+
+        QVERIFY(QMetaObject::invokeMethod(whatsNewAction, "triggered"));
+        QTRY_VERIFY(dialog->property("opened").toBool());
+        QCOMPARE(dialog->property("title").toString(), QStringLiteral("What’s New in Omawrite"));
+        QVERIFY(viewer->property("text").toString().contains(QStringLiteral("Recent local improvements")));
+        QVERIFY(QMetaObject::invokeMethod(dialog, "close"));
+        QVERIFY(QMetaObject::invokeMethod(shortcutsAction, "triggered"));
+        QTRY_VERIFY(shortcuts->property("opened").toBool());
+        QVERIFY(QMetaObject::invokeMethod(shortcuts, "close"));
+
+        QTest::qWait(850);
+        QCOMPARE(editor->property("text").toString(), source);
+        QCOMPARE(editor->property("cursorPosition").toInt(), cursor);
+        QCOMPARE(editor->property("canUndo").toBool(), canUndo);
+        QCOMPARE(backend.modified(), modified);
+        QCOMPARE(backend.status(), status);
+        QCOMPARE(recoveryContents(), recoveryBefore);
+        backend.discardRecovery();
+    }
+
     void themesPersistWithoutEditingDocuments() {
         Backend backend;
         QQmlEngine engine; engine.rootContext()->setContextProperty("backend", &backend);

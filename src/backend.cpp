@@ -373,6 +373,19 @@ Backend::~Backend() { liveBackends.remove(this); }
 
 int Backend::documentRevision() const { return m_document ? m_document->revision() : 0; }
 
+QString Backend::bundledHelp(const QString &page) const {
+    static const QMap<QString, QString> resources{
+        {QStringLiteral("help"), QStringLiteral(":/help/omawrite-help.md")},
+        {QStringLiteral("whats-new"), QStringLiteral(":/help/whats-new.md")}};
+    const auto resource = resources.constFind(page);
+    if (resource == resources.cend())
+        return QStringLiteral("# Help unavailable\n\nThat bundled help page is not available.");
+    QFile file(resource.value());
+    if (!file.open(QIODevice::ReadOnly))
+        return QStringLiteral("# Help unavailable\n\nThe bundled help page could not be read.");
+    return QString::fromUtf8(file.readAll());
+}
+
 QUrl Backend::documentBaseUrl() const {
     const QString path = m_fileUrl.isLocalFile() ? QFileInfo(m_fileUrl.toLocalFile()).absolutePath()
         : m_library.rootFolder().toLocalFile();

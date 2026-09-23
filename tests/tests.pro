@@ -31,3 +31,4 @@ macx {
 QT += network
 SOURCES += ../src/workspace.cpp
 HEADERS += ../src/workspace.h
+RESOURCES += ../src/resources.qrc

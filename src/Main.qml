@@ -1178,7 +1178,18 @@ ApplicationWindow {
         }
         Platform.Menu {
             title: "Help"
-            Platform.MenuItem { text: "Keyboard Shortcuts"; onTriggered: shortcutsDialog.open() }
+            Platform.MenuItem {
+                objectName: "helpOmawrite"
+                text: "Omawrite Help"
+                onTriggered: helpDialog.showPage("help", "Omawrite Help")
+            }
+            Platform.MenuItem {
+                objectName: "helpWhatsNew"
+                text: "What’s New in Omawrite"
+                onTriggered: helpDialog.showPage("whats-new", "What’s New in Omawrite")
+            }
+            Platform.MenuSeparator {}
+            Platform.MenuItem { objectName: "helpKeyboardShortcuts"; text: "Keyboard Shortcuts"; onTriggered: shortcutsDialog.open() }
         }
     }
 
@@ -1742,6 +1753,7 @@ ApplicationWindow {
 
     Dialog {
         id: shortcutsDialog
+        objectName: "shortcutsDialog"
         modal: true
         title: "Keyboard shortcuts"
         width: Math.min(win.width - 40, win.scaledSize(440))
@@ -1750,6 +1762,37 @@ ApplicationWindow {
         contentItem: Label {
             text: win.isMac ? "⌘S  Save\n⇧⌘S  Save As\n⌘O  Open\n⌘N  New Window\n⌘W  Close Window\n⌘F  Find\n⌥⌘F  Find and Replace\n⌘B  Bold\n⌘I  Italic\n⌘K  Link\n⌘P  Print\n⌃⌘F  Fullscreen\n⌘?  Shortcuts" : "Ctrl+S  Save\nCtrl+Shift+S  Save As\nCtrl+O  Open\nCtrl+N  New Window\nCtrl+F  Find\nCtrl+H  Find and Replace\nCtrl+B  Bold\nCtrl+I  Italic\nCtrl+K  Link\nCtrl+P  Print\nF11 / Super+F  Fullscreen\nCtrl+?  Shortcuts"
             lineHeight: 1.5
+        }
+    }
+
+    Dialog {
+        id: helpDialog
+        objectName: "helpDialog"
+        property string markdown: ""
+        modal: false
+        dim: false
+        width: Math.min(win.width - 40, win.scaledSize(720))
+        height: Math.min(win.height - 60, win.scaledSize(640))
+        anchors.centerIn: parent
+        closePolicy: Popup.CloseOnEscape
+        standardButtons: Dialog.Close
+        function showPage(page, pageTitle) {
+            title = pageTitle;
+            markdown = backend.bundledHelp(page);
+            open();
+        }
+        contentItem: ScrollView {
+            TextArea {
+                objectName: "helpDocumentText"
+                text: helpDialog.markdown
+                textFormat: TextEdit.MarkdownText
+                readOnly: true
+                selectByMouse: true
+                wrapMode: TextEdit.Wrap
+                color: win.textColor
+                background: null
+                Accessible.name: helpDialog.title
+            }
         }
     }
 

@@ -1,6 +1,6 @@
 # iA Writer menu map and Omawrite gap audit — 23 September 2026
 
-This is the planning baseline after Omawrite Cycle 47 (76 tests), updated through combined Cycle 55c/56a source and partial native checks on 24 September. Current source passes 96 tests; Cycles 48–51 are complete and later cycles retain explicit acceptance gaps. It transcribes the menu screenshots in `screenshots/` and compares them with the source. It is an interface and behavior audit, not a claim that similarly named commands behave identically.
+This is the planning baseline after Omawrite Cycle 47 (76 tests), updated through Cycle 57a source and partial native checks on 24 September. Current source passes 97 tests; Cycles 48–51 are complete and later cycles retain explicit acceptance gaps. It transcribes the menu screenshots in `screenshots/` and compares them with the source. It is an interface and behavior audit, not a claim that similarly named commands behave identically.
 
 The screenshots contain personal filenames, locations and tags. This document records commands only. The images remain untracked reference material and should not be committed. Two files are empty duplicate captures: `3.48.34 PM(2)` and `3.49.37 PM(2)`. The duplicate `1.57.39 PM(2)` and `3.50.00 PM(2)` images add no distinct menu evidence.
 
@@ -232,7 +232,7 @@ These menus were not opened in the screenshot folder. The 24 September native in
 | Previous/Next tab, detach, merge, tab overview | **Match** | Native actions exist; labels differ and state-dependent enablement needs polish. |
 | Dynamic open-window list | **Unverified** | Multi-window ownership exists, but the source does not define a dynamic Window-menu document list. Check what AppKit injects in the packaged app. |
 | Application menu | **Partial** | iA's About/Updates/Settings/Services/Hide/Quit/Quit and Close All Windows are now captured. Omawrite has native lifecycle and Quit; remaining destinations/actions need a packaged-app audit. |
-| Help | **Gap** | iA exposes Help search, iA Writer Help, What's New and online support. Omawrite currently offers Keyboard Shortcuts only; it lacks equivalent guide, release notes and support destinations. |
+| Help | **Partial (Cycle 57a)** | Omawrite offers bundled offline Omawrite Help and What’s New in Omawrite in a read-only Markdown view, plus Keyboard Shortcuts. Native accessibility verified both pages and Close/Escape without changing a synthetic document. Screenshot capture was unavailable; dark/narrow/VoiceOver and OS Help search were not checked. Online Support remains absent because its destination is unverified. |
 
 ## Omawrite capabilities beyond the captured iA menus
 
