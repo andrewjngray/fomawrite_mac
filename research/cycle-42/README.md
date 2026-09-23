@@ -5,3 +5,5 @@ Final build and 70 tests pass. Stable Dev and ordinary packaged bundles share ca
 `bin/archive-mac-release mac-v0.2.0-rc1` verifies committed build inputs, builds/packages with a running-app guard, creates a ZIP, build/source manifest and SHA-256 checksums. Generated binaries remain outside Git; GitHub prerelease assets provide the binary archive. Repeatable procedure does not imply byte-identical signatures/timestamps.
 
 This is a release-candidate checkpoint, not completed iA parity. docs/release-acceptance.md lists all unresolved product and hardware acceptance. Existing personal/example edits were preserved and excluded from staging.
+
+Published: [Mac 0.2.0 RC1](https://github.com/andrewjngray/omawrite_mac/releases/tag/mac-v0.2.0-rc1). GitHub asset digests match local checksums. Final native follow-up evidence is in Cycle 41.

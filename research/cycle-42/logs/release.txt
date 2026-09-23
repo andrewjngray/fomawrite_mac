@@ -1,0 +1,5 @@
+Published prerelease: https://github.com/andrewjngray/omawrite_mac/releases/tag/mac-v0.2.0-rc1
+Compiled source: 02aed0d5909341c4031ae63609c7c4d2bd75457d
+ZIP: Omawrite-Mac-arm64.zip; 61907226 bytes
+ZIP SHA-256: 46f24a874436be0237f702247ccb4f253eb64197ac68ddef026a747e684054d4
+GitHub reported digest matches local checksum. BUILD-INFO.txt and SHA256SUMS.txt both uploaded. ZIP integrity and both bundle signatures passed.
