@@ -1,6 +1,6 @@
 # iA Writer menu map and Omawrite gap audit — 23 September 2026
 
-This is the planning baseline after Omawrite Cycle 47 (76 tests), with the Cycle 48 Show Date row updated. It transcribes the menu screenshots in `screenshots/` and compares them with the source. It is an interface and behavior audit, not a claim that similarly named commands behave identically.
+This is the planning baseline after Omawrite Cycle 47 (76 tests), with completed Cycle 48–49 rows updated. It transcribes the menu screenshots in `screenshots/` and compares them with the source. It is an interface and behavior audit, not a claim that similarly named commands behave identically.
 
 The screenshots contain personal filenames, locations and tags. This document records commands only. The images remain untracked reference material and should not be committed. Two files are empty duplicate captures: `3.48.34 PM(2)` and `3.49.37 PM(2)`. The duplicate `1.57.39 PM(2)` and `3.50.00 PM(2)` images add no distinct menu evidence.
 
@@ -164,8 +164,8 @@ These menus were not opened in this folder. The older inspection recorded the st
 
 | iA capability | Omawrite status | Remaining difference |
 |---|---|---|
-| Headings 1–6 and Body | **Partial** | Working commands exist, but Omawrite places Body inside Headings rather than at top level. |
-| Lists and task completion | **Partial** | Bulleted, numbered, task and completion toggling exist. Ordered task-list creation is missing as a distinct command. Deep nested/fenced edge cases remain partial. |
+| Headings 1–6 and Body | **Match (Cycle 49)** | Body now follows the Headings submenu at top level. Native menu order and Markdown behavior were checked. |
+| Lists and task completion | **Partial (Cycle 49)** | List, Task List, Ordered List, Ordered Task List and completion now share the captured submenu structure; numbered checkbox creation and completion work with Undo. Deep nested-list behavior remains partial. |
 | Blockquote; Indent/Outdent; line movement | **Match** | Selection-aware operations use atomic undo. |
 | Bold, Italic, Strikethrough, Highlight | **Match** | Portable `==highlight==` behavior depends on Omawrite’s renderer; delimiter edge cases remain bounded. |
 | Inline code / code block | **Match** | Backtick-safe inline code and fenced block insertion exist. |
@@ -175,7 +175,7 @@ These menus were not opened in this folder. The older inspection recorded the st
 | Content Block | **Partial** | Bounded Markdown, CSV, code and local-image inclusions exist. Full rebasing, title syntax and cycle/grammar parity remain incomplete. |
 | Hashtag | **Match** | Insert plus bounded saved-file tag indexing/navigation exist. |
 | Date / Table / TOC / Horizontal Rule / Page Break | **Partial** | Each has a working command. Table editing is basic, TOC is generated rather than maintained live, and paginated edge cases remain. |
-| Clear Styles | **Partial** | Omawrite removes surrounding supported inline styles from a selection; it is not a complete block-and-inline reset. |
+| Clear Styles | **Partial (Cycle 49)** | Explicit selections can clear supported outer inline wrappers and simple whole-line heading, quote and list/task markers in one undoable action. Code, links and ambiguous or nested Markdown are refused without mutation; this is not a complete block-and-inline reset. |
 
 ### Authors and Focus
 

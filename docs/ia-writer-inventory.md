@@ -1,10 +1,12 @@
 # iA Writer reference inventory
 
-**Current menu audit — 23 September 2026:** The 30 files in `screenshots/` have been reviewed against the Cycle 47 baseline. The consolidated [screenshot-backed menu map and current gap audit](ia-menu-audit-2026-09-23.md), with its Cycle 48 Show Date update, supersedes the dated command-status descriptions below. It records the expanded Format, View, Focus, Go and Window evidence, current implemented/partial/gap status, and Omawrite-only additions. Hidden iA submenus and the uncaptured Authors/Application/Help menus remain explicitly unverified. The [sequential closeout plan](menu-closeout-plan.md) schedules Cycles 48–59.
+**Current menu audit — 23 September 2026:** The 30 files in `screenshots/` have been reviewed against the Cycle 47 baseline. The consolidated [screenshot-backed menu map and current gap audit](ia-menu-audit-2026-09-23.md), updated through Cycle 49, supersedes the dated command-status descriptions below. It records the expanded Format, View, Focus, Go and Window evidence, current implemented/partial/gap status, and Omawrite-only additions. Hidden iA submenus and the uncaptured Authors/Application/Help menus remain explicitly unverified. The [sequential closeout plan](menu-closeout-plan.md) schedules Cycles 48–59.
 
 **Cycle 48 overlay:** Show Date now has Date Modified, Date Created and None in the native View menu, library options, sort popover and file context menu. The persisted former on/off preference migrates to the new choice. This closes the date-field selector only; Tree/List navigation and other View gaps remain open. [Build and native evidence](../research/cycle-48/README.md).
 
-**Current status — 23 September 2026:** Cycle 48 is the latest local build, with 78 tests passing. Mac 0.2.0 RC1 remains the older Cycle 42 downloadable release. The [release acceptance ledger](release-acceptance.md) and [menu closeout plan](menu-closeout-plan.md) track unresolved parity and hardware checks; dated counts below are historical.
+**Cycle 49 overlay:** Format follows the captured group order, with Body outside Headings and Page Break in Format. Ordered Task List and numbered-task completion work with Undo. Clear Styles supports explicit, simple block/outer-inline selections and refuses ambiguous Markdown; it remains partial. [Build and native evidence](../research/cycle-49/README.md).
+
+**Current status — 23 September 2026:** Cycle 49 is the latest local build, with 80 tests passing. Mac 0.2.0 RC1 remains the older Cycle 42 downloadable release. The [release acceptance ledger](release-acceptance.md) and [menu closeout plan](menu-closeout-plan.md) track unresolved parity and hardware checks; dated counts below are historical.
 
 
 ## Current overlay — Cycles 34c–38, 23 September 2026

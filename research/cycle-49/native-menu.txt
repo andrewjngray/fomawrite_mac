@@ -23,3 +23,12 @@ Live actions on synthetic document:
   The refusal caused no source change. A targeted backend correction and regression test followed; ./bin/build and ./bin/test then passed with 80 tests. Final package/native recheck is pending safe closure of running apps.
 
 The Dev app also stopped responding to the UI inspection tool after closing a separate Cycle 48 QA window. The ordinary app's UI inspection likewise timed out after attempting to close the disposable Cycle 49 window through its unsaved-change prompt. No private writing was edited. Do not force-replace a running bundle.
+
+Final recheck after normal app closure:
+  ./bin/prepare-dev-app: PASS; stable Dev bundle refreshed.
+  Dev opened the synthetic Cycle 49 sample in a separate QA window.
+  Clear Styles on ## **Styled sample**: PASS, result Styled sample.
+  Undo: PASS, restored ## **Styled sample**.
+  Redo: PASS, result Styled sample; cropped sample-only screenshot saved.
+  Undo then Save: PASS, original Markdown restored; Git shows no sample-byte change.
+  ./bin/package-mac: PASS; ordinary bundle refreshed from corrected build.
