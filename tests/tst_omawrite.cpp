@@ -8,6 +8,7 @@
 #include <QUuid>
 #include <cstdlib>
 #include <QFont>
+#include <QFontDatabase>
 #include <QTextBlock>
 #include <QTextLayout>
 #include <QTextDocument>
@@ -35,6 +36,8 @@ private slots:
         QCoreApplication::setOrganizationName("OmawriteTests");
         QCoreApplication::setApplicationName("OmawriteTests");
         QVERIFY(m_settingsDirectory.isValid());
+        for (const QString &face : {"Regular", "Italic", "Bold", "BoldItalic"})
+            QVERIFY(QFontDatabase::addApplicationFont(QFINDTESTDATA("../fonts/iAWriterMonoS-" + face + ".ttf")) >= 0);
         QCoreApplication::setAttribute(Qt::AA_DontUseNativeDialogs);
         QStandardPaths::setTestModeEnabled(true);
         QQuickStyle::setStyle(QStringLiteral("Material"));
@@ -517,6 +520,46 @@ private slots:
         QCOMPARE(counts["shared"],110); QCOMPARE(counts["visible"],110); QVERIFY(!counts.contains("hidden")); QVERIFY(!counts.contains("alsohidden"));
         QTemporaryDir empty; library.setRootFolder(QUrl::fromLocalFile(empty.path())); QVERIFY(library.tagIndex().isEmpty()); library.refreshTags();
         QTRY_VERIFY_WITH_TIMEOUT(!library.tagStatus().startsWith("Scanning"),10000); QVERIFY(library.tagIndex().isEmpty());
+    }
+
+    void templatesSharePreviewAndExportWithoutEditingSource() {
+        QTemporaryDir dir;
+        Backend backend;
+        const auto reset = qScopeGuard([&] { backend.setOutputStyle(0); backend.discardRecovery(); });
+        QQmlEngine engine; engine.rootContext()->setContextProperty("backend", &backend);
+        QQmlComponent component(&engine, QUrl::fromLocalFile(QFINDTESTDATA("../src/Main.qml")));
+        QScopedPointer<QObject> window(component.create()); QVERIFY2(window, qPrintable(component.errorString()));
+        auto *editor = window->findChild<QObject *>("sourceEditor");
+        auto *preview = window->findChild<QObject *>("renderedPreview");
+        QVERIFY(editor); QVERIFY(preview);
+        const QString source = "# Template specimen\n\nA paragraph with **bold**, *italic* and [a link](https://example.com).\n\n## Second heading\n\n> A quotation.\n\n- First item\n- Second item\n\n```cpp\nconst int answer = 42;\n```\n\n| Name | Value |\n| --- | --- |\n| Sample | 42 |\n";
+        editor->setProperty("text", source);
+        backend.saveAs(QUrl::fromLocalFile(dir.filePath("Source.md")));
+        auto *quick = qvariant_cast<QQuickTextDocument *>(preview->property("textDocument")); QVERIFY(quick);
+        const QString evidence = qEnvironmentVariable("OMAWRITE_TEMPLATE_EVIDENCE");
+        if (!evidence.isEmpty()) QVERIFY(QDir().mkpath(evidence));
+        for (int style : {0, 1, 2, 4, 5, 6, 7, 0}) {
+            backend.setOutputStyle(style);
+            QTRY_COMPARE(preview->property("font").value<QFont>().family(), backend.outputFont());
+            QTRY_VERIFY(quick->textDocument()->toPlainText().contains("Template specimen"));
+            QTRY_COMPARE(quick->textDocument()->begin().blockFormat().lineHeight(), qreal(style == 2 || style == 7 ? 200 : style == 4 ? 150 : 135));
+            QCOMPARE(editor->property("text").toString(), source);
+            QVERIFY(!backend.modified());
+            const QString htmlPath = dir.filePath(QString::number(style) + ".html");
+            QVERIFY(backend.exportDocument(QUrl::fromLocalFile(htmlPath), "html"));
+            QFile html(htmlPath); QVERIFY(html.open(QIODevice::ReadOnly));
+            const auto bytes = html.readAll();
+            QVERIFY(bytes.contains(backend.outputFont().toUtf8()));
+            QVERIFY(bytes.contains("<table"));
+            QVERIFY(bytes.contains("answer"));
+            if (style == 7) QVERIFY(bytes.contains("text-indent:36px"));
+            if (!evidence.isEmpty()) {
+                QFile::remove(evidence + "/template-" + QString::number(style) + ".html");
+                QVERIFY(QFile::copy(htmlPath, evidence + "/template-" + QString::number(style) + ".html"));
+                QVERIFY(backend.exportDocument(QUrl::fromLocalFile(evidence + "/template-" + QString::number(style) + ".pdf"), "pdf"));
+            }
+            Backend reopened; QCOMPARE(reopened.outputStyle(), style);
+        }
     }
 
     void outputStylesPersistAndHtmlEmbedsLocalImages() {

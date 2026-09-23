@@ -789,3 +789,19 @@ Known limits: parent-first and child-first backend paths are tested, but only th
 Artifacts: dist/Omawrite Dev.app and dist/Omawrite.app. GitHub RC1 archive remains Cycle 42.
 
 Optional exercise: use Locations + on a folder inside repo, choose Add to Favorites instead, then click its Favorite. Verify the folder opens without adding another Location and no files move.
+
+## Cycle 47 — Unified preview/output templates
+
+Scope: Andrew's View → Template screenshot. Unify selection across preview and output and add useful named presets with honest limits.
+
+Changes: View → Template replaces Output Style and the separate Preview Typeface menu. Modern, Classic, Manuscript Mono, GitHub, Helvetica, Palatino, MLA Draft and Custom share persisted selection, font and C++ block/table formatting. Existing Sans/Serif/Mono quick commands now select the corresponding template. Preview footer names the active template; screen text size remains a reading adjustment. Markdown and editor typography are unchanged. PDF/print pagination now uses consistent point-based geometry and formatted-HTML normalization fixes Qt table-header alignment in preview and output. See [reasoning and preset details](template-design.md).
+
+Validation: ./bin/build and ./bin/test pass, 76 tests, zero failures. New regression exercises all seven built-ins and return to Modern, live preview font/line-height, persisted selection, HTML output content, and unchanged source/modified state. Existing custom-style, page-break, rollback, recovery, links and Markdown tests pass. Tests now load bundled Mono fonts for representative export evidence. Existing Qt font alias/SplitView teardown warnings remain.
+
+Visual QA: generated HTML/PDF specimens for all seven presets; rendered and inspected the seven single-page PDFs. This caught and fixed high-DPI geometry, decoration font scaling and first-header-cell alignment. Native Dev verified View → Template menu, GitHub selection, persisted GitHub after restart, corrected table rendering, MLA Draft, and return to Modern; source stayed clean. Both apps closed normally before refresh. Evidence under research/cycle-47/.
+
+Known gaps: Duo/Quattro, full MLA compliance, iA template-package import, physical printing, dark/narrow/VoiceOver matrix, browser HTML rendering and long multi-page table stress remain unverified or unimplemented. Templates share typography/content styles, not identical line wrapping between differently sized screen/page surfaces. Continuous preview omits page decorations; use paginated preview.
+
+Artifacts: dist/Omawrite Dev.app and dist/Omawrite.app. GitHub RC1 binary remains the older Cycle 42 download.
+
+Optional exercise: open research/cycle-47/sample/Templates.md and use View → Template to compare Classic, GitHub and Palatino. Export or use Paginated Preview; report the preferred reading style and spacing.

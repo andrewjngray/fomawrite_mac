@@ -29,8 +29,13 @@ Rectangle {
     onTypefaceChanged: refreshTimer.restart()
     onDarkModeChanged: refreshTimer.restart()
     function refresh() {
-        renderedMarkdown = renderer.previewMarkdown(markdown);
-        Qt.callLater(function() { root.renderer.stylePreview(previewText.textDocument); });
+        // Reparse when font size/theme changes too: normalized HTML contains
+        // explicit formatting from the previous preview pass.
+        renderedMarkdown = "";
+        Qt.callLater(function() {
+            renderedMarkdown = renderer.previewMarkdown(markdown);
+            Qt.callLater(function() { root.renderer.stylePreview(previewText.textDocument); });
+        });
     }
     function reload() {
         // Force a fresh Markdown parse even when the source has not changed.
@@ -38,6 +43,7 @@ Rectangle {
         renderedMarkdown = "";
         Qt.callLater(refresh);
     }
+    Connections { target: root.renderer; function onOutputStyleChanged() { root.reload(); } }
     Component.onCompleted: refresh()
 
     Timer { id: refreshTimer; interval: 120; onTriggered: root.refresh() }
@@ -89,7 +95,7 @@ Rectangle {
         Rectangle { width: parent.width; height: 1; color: backend.palette.border }
         RowLayout {
             anchors.fill: parent; anchors.leftMargin: 12; anchors.rightMargin: 12
-            Label { text: "Markdown"; font.pixelSize: 11; color: backend.palette.muted }
+            Label { text: root.renderer.outputTemplateName; font.pixelSize: 11; color: backend.palette.muted }
             Item { Layout.fillWidth: true }
             ChromeButton { text: "Split"; hint: "Split layout"; darkMode: root.darkMode; checked: root.layoutMode === 1; onClicked: root.layoutRequested(1) }
             ChromeButton { text: "Full"; hint: "Preview layout"; darkMode: root.darkMode; checked: root.layoutMode === 2; onClicked: root.layoutRequested(2) }

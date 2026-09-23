@@ -117,9 +117,9 @@ QtObject {
         case "split": return settings.layoutMode === 1;
         case "preview": return settings.layoutMode === 2;
         case "togglePreview": return settings.layoutMode !== 0;
-        case "sans": return settings.previewStyle === 0;
-        case "serif": return settings.previewStyle === 1;
-        case "mono": return settings.previewStyle === 2;
+        case "sans": return backend.outputStyle === 0;
+        case "serif": return backend.outputStyle === 1;
+        case "mono": return backend.outputStyle === 2;
         case "markup": return settings.showMarkup;
         case "sentence": return settings.sentenceFocus;
         case "paragraph": return settings.paragraphFocus;
@@ -152,9 +152,9 @@ QtObject {
         case "preview": settings.layoutMode = 2; break;
         case "togglePreview": settings.layoutMode = settings.layoutMode === 0 ? 1 : 0; break;
         case "reloadPreview": preview.reload(); break;
-        case "sans": settings.previewStyle = 0; break;
-        case "serif": settings.previewStyle = 1; break;
-        case "mono": settings.previewStyle = 2; break;
+        case "sans": backend.setOutputStyle(0); break;
+        case "serif": backend.setOutputStyle(1); break;
+        case "mono": backend.setOutputStyle(2); break;
         case "markup": settings.showMarkup = !settings.showMarkup; break;
         case "outline": outlineRequested(); break;
         case "statistics": statisticsRequested(); break;

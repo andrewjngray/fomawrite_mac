@@ -8,6 +8,7 @@
 #include <QScopeGuard>
 #include <QCryptographicHash>
 #include <QTextFragment>
+#include <QTextTable>
 #include <QJsonArray>
 #include <QPdfWriter>
 #include <QPageSetupDialog>
@@ -348,7 +349,7 @@ Backend::Backend(QObject *parent, bool outputOnly) : QObject(parent), m_library(
                 emit externalChangeDetected(deleted, m_modified);
             });
 
-    m_outputStyle=qBound(0,QSettings().value("output/style",0).toInt(),3);
+    m_outputStyle=qBound(0,QSettings().value("output/style",0).toInt(),7);
     m_customOutputFont=QSettings().value("output/font","Georgia").toString();
     m_customOutputSize=qBound(8,QSettings().value("output/size",12).toInt(),32);
     m_outputHeader=QSettings().value("output/header").toString().left(200);
@@ -813,29 +814,10 @@ void Backend::stylePreview(QObject *textDocument) {
     if (!quick || !quick->textDocument() || quick->textDocument() == m_document) return;
     QTextDocument *preview = quick->textDocument();
     preview->setUndoRedoEnabled(false);
-    for (QTextBlock block = preview->begin(); block.isValid(); block = block.next()) {
-        QTextBlockFormat format = block.blockFormat();
-        format.setLineHeight(135, QTextBlockFormat::ProportionalHeight);
-        format.setTopMargin(format.headingLevel() > 0 && block.blockNumber() > 0 ? 18 : 0);
-        format.setBottomMargin(block.textList() ? 4 : 12);
-        QTextCursor cursor(block);
-        cursor.setBlockFormat(format);
-        for (auto it=block.begin(); !it.atEnd(); ++it) {
-            const auto fragment=it.fragment();
-            if (!fragment.isValid() || !fragment.charFormat().isAnchor()) continue;
-            QTextCursor link(preview); link.setPosition(fragment.position()); link.setPosition(fragment.position()+fragment.length(),QTextCursor::KeepAnchor);
-            QTextCharFormat ink; ink.setForeground(QColor(palette().value("focus").toString())); ink.setFontUnderline(true); link.mergeCharFormat(ink);
-        }
-        if (format.headingLevel() > 0) {
-            QTextCharFormat heading;
-            // Qt Quick applies its pixel font separately from the document default.
-            // Relative adjustment follows the actual preview font at every size.
-            heading.setProperty(QTextFormat::FontSizeAdjustment, format.headingLevel() == 1 ? 3 : format.headingLevel() == 2 ? 2 : 0);
-            heading.setFontWeight(QFont::Bold);
-            cursor.select(QTextCursor::BlockUnderCursor);
-            cursor.mergeCharFormat(heading);
-        }
-    }
+    applyTemplate(*preview, true);
+    // Match paginated output and discard stale Markdown table layout caches.
+    preview->setHtml(preview->toHtml());
+
 }
 
 QPair<int, int> Backend::sentenceRange(const QString &text, int position) {
@@ -1838,7 +1820,96 @@ void Backend::reapplyTypographyToChange() {
 
 QString Backend::previewMarkdown(const QString &source) const { return expandedMarkdown(source, documentBaseUrl()); }
 
-void Backend::setOutputStyle(int style) { m_outputStyle = qBound(0, style, 3); QSettings().setValue("output/style",m_outputStyle); emit outputStyleChanged(); }
+QString Backend::outputFont() const {
+    return QStringList{"Helvetica Neue", "Georgia", "iA Writer Mono S", m_customOutputFont,
+                       "Helvetica Neue", "Helvetica", "Palatino", "Times New Roman"}.value(m_outputStyle);
+}
+int Backend::outputPointSize() const { return m_outputStyle == 3 ? m_customOutputSize : 12; }
+QString Backend::outputTemplateName() const {
+    return QStringList{"Modern (Sans)", "Classic (Serif)", "Manuscript (Mono)", "Custom",
+                       "GitHub", "Helvetica", "Palatino", "MLA Draft"}.value(m_outputStyle);
+}
+void Backend::setOutputStyle(int style) {
+    if (style < 0 || style > 7) return;
+    m_outputStyle = style;
+    QSettings().setValue("output/style", style);
+    emit outputStyleChanged();
+}
+
+void Backend::applyTemplate(QTextDocument &document, bool preview) const {
+    const bool manuscript = m_outputStyle == 2 || m_outputStyle == 7;
+    const bool github = m_outputStyle == 4;
+    const QColor muted(preview ? palette().value("muted").toString() : "#555555");
+    const QColor panel(preview ? palette().value("panel").toString() : "#f3f4f6");
+    const QColor border(preview ? palette().value("border").toString() : "#c8ccd0");
+    for (QTextBlock block = document.begin(); block.isValid(); block = block.next()) {
+        auto format = block.blockFormat();
+        const int heading = format.headingLevel();
+        const bool code = format.hasProperty(QTextFormat::BlockCodeFence)
+            || format.hasProperty(QTextFormat::BlockCodeLanguage) || format.nonBreakableLines();
+        const bool quote = format.intProperty(QTextFormat::BlockQuoteLevel) > 0;
+        format.setLineHeight(manuscript && !code ? 200 : github ? 150 : 135, QTextBlockFormat::ProportionalHeight);
+        format.setTopMargin(heading > 0 && block.blockNumber() > 0 ? 18 : 0);
+        format.setBottomMargin(manuscript || code ? 0 : block.textList() ? 4 : 12);
+        // MLA Draft deliberately does not claim full citation or submission compliance.
+        const bool tableCell = QTextCursor(block).currentTable() != nullptr;
+        if (tableCell) format.setBottomMargin(0);
+        format.setTextIndent(m_outputStyle == 7 && !heading && !code && !quote && !block.textList() && !tableCell ? 36 : 0);
+        if (m_outputStyle == 7 && heading == 1) format.setAlignment(Qt::AlignHCenter);
+        if (quote) { format.setLeftMargin(24); format.setRightMargin(12); }
+        if (code) { format.setBackground(panel); format.setLeftMargin(12); format.setRightMargin(12); }
+        QTextCursor cursor(block);
+        cursor.setBlockFormat(format);
+        if (heading || quote || code) {
+            QTextCharFormat ink;
+            if (heading) {
+                ink.setProperty(QTextFormat::FontSizeAdjustment, manuscript ? 0 : heading == 1 ? 3 : heading == 2 ? 2 : 0);
+                ink.setFontWeight(m_outputStyle == 7 ? QFont::Normal : QFont::Bold);
+            }
+            if (quote) ink.setForeground(muted);
+            if (code) ink.setFontFamilies({"iA Writer Mono S"});
+            cursor.setPosition(block.position());
+            cursor.setPosition(block.position() + block.length() - 1, QTextCursor::KeepAnchor);
+            cursor.mergeCharFormat(ink);
+        }
+        for (auto it = block.begin(); !it.atEnd(); ++it) {
+            const auto fragment = it.fragment();
+            if (!fragment.isValid() || !fragment.charFormat().isAnchor()) continue;
+            QTextCursor link(&document); link.setPosition(fragment.position());
+            link.setPosition(fragment.position() + fragment.length(), QTextCursor::KeepAnchor);
+            QTextCharFormat ink;
+            ink.setForeground(QColor(preview ? palette().value("focus").toString() : "#245da8"));
+            ink.setFontUnderline(true); link.mergeCharFormat(ink);
+        }
+    }
+    QList<QTextFrame *> frames{document.rootFrame()};
+    while (!frames.isEmpty()) {
+        auto *frame = frames.takeLast();
+        frames.append(frame->childFrames());
+        if (auto *table = qobject_cast<QTextTable *>(frame)) {
+            auto format = table->format();
+            format.setBorder(0.5); format.setBorderBrush(border); format.setBorderStyle(QTextFrameFormat::BorderStyle_Solid);
+            format.setCellPadding(github ? 8 : 5); format.setCellSpacing(0);
+            format.setWidth(QTextLength(QTextLength::PercentageLength, 100));
+            format.setColumnWidthConstraints(QList<QTextLength>(table->columns(), QTextLength(QTextLength::PercentageLength, 100.0 / table->columns())));
+            table->setFormat(format);
+            for (int row = 0; row < table->rows(); ++row) for (int column = 0; column < table->columns(); ++column) {
+                auto cell = table->cellAt(row, column);
+                auto cellFormat = cell.format().toTableCellFormat();
+                cellFormat.setVerticalAlignment(QTextCharFormat::AlignTop);
+                cellFormat.setBorder(0.5); cellFormat.setBorderBrush(border);
+                cellFormat.setBorderStyle(QTextFrameFormat::BorderStyle_Solid);
+                cell.setFormat(cellFormat);
+                if (row == 0) {
+                    auto header = cell.firstCursorPosition();
+                    header.setPosition(cell.lastCursorPosition().position(), QTextCursor::KeepAnchor);
+                    QTextCharFormat bold; bold.setFontWeight(QFont::Bold); header.mergeCharFormat(bold);
+                }
+            }
+        }
+    }
+}
+
 
 bool Backend::loadOutputStyle(const QUrl &url) {
     QFile file(url.toLocalFile());
@@ -1858,8 +1929,7 @@ bool Backend::loadOutputStyle(const QUrl &url) {
 }
 
 void Backend::prepareOutput(QTextDocument &document, bool plain) const {
-    const QStringList families{"Helvetica Neue", "Georgia", "iA Writer Mono S", m_customOutputFont};
-    document.setDefaultFont(QFont(families.value(m_outputStyle), m_outputStyle == 3 ? m_customOutputSize : 12));
+    document.setDefaultFont(QFont(outputFont(), outputPointSize()));
     document.setBaseUrl(documentBaseUrl());
     if (plain) document.setPlainText(currentDocumentText());
     else {
@@ -1870,6 +1940,7 @@ void Backend::prepareOutput(QTextDocument &document, bool plain) const {
             QTextCursor cursor(&document); cursor.setPosition(block.position()); cursor.setPosition(block.position()+block.length()-1,QTextCursor::KeepAnchor); cursor.removeSelectedText();
             QTextBlockFormat format=cursor.blockFormat(); format.setPageBreakPolicy(QTextFormat::PageBreak_AlwaysBefore); cursor.setBlockFormat(format);
         }
+        applyTemplate(document, false);
     }
 }
 
@@ -2209,21 +2280,32 @@ bool Backend::exportAuthorship(const QUrl &destination) {
 }
 
 void Backend::paintOutput(QPagedPaintDevice &device, QTextDocument &document) const {
-    const int dpi=device.logicalDpiX(); const QRect page=device.pageLayout().paintRectPixels(dpi);
-    const qreal scale=dpi/72.0, margin=24*scale;
-    document.documentLayout()->setPaintDevice(&device);
+    // Normalize Markdown-import layout caches before paginating rich content.
+    const QString html = document.toHtml();
+    document.setHtml(html);
+    // Lay out in points, then scale once for the output device. Mixing high-DPI
+    // font metrics with unscaled block/table dimensions collapses table columns.
+    const int dpi = device.logicalDpiX();
+    const qreal scale = dpi / 72.0, margin = 24;
+    const QRectF pixels = device.pageLayout().paintRectPixels(dpi);
+    const QRectF page(0, 0, pixels.width() / scale, pixels.height() / scale);
+    QImage metrics(1, 1, QImage::Format_ARGB32);
+    metrics.setDotsPerMeterX(2835); metrics.setDotsPerMeterY(2835);
+    document.documentLayout()->setPaintDevice(&metrics);
+    const auto restoreDevice = qScopeGuard([&] { document.documentLayout()->setPaintDevice(nullptr); });
     const bool decorated=m_outputStyle!=0;
     const qreal inset=decorated?margin:0;
     const QSizeF content(page.width(),qMax(100.0,page.height()-2*inset));
     document.setPageSize(content);
     const int count=document.pageCount(), titlePages=(m_outputStyle==3 && m_outputTitlePage)?1:0;
     QPainter painter(&device);
-    if(titlePages) { painter.setFont(QFont(m_customOutputFont,24)); painter.drawText(QRectF(0,0,page.width(),page.height()),Qt::AlignCenter|Qt::TextWordWrap,fileName()); device.newPage(); }
+    painter.scale(scale, scale);
+    if(titlePages) { QFont titleFont(m_customOutputFont); titleFont.setPixelSize(24); painter.setFont(titleFont); painter.drawText(QRectF(0,0,page.width(),page.height()),Qt::AlignCenter|Qt::TextWordWrap,fileName()); device.newPage(); }
     for(int index=0;index<count;++index) {
         if(index) device.newPage();
         if(decorated) {
             auto expand=[&](QString text) { return text.replace("{title}",fileName()).replace("{page}",QString::number(index+1+titlePages)).replace("{pages}",QString::number(count+titlePages)); };
-            painter.setFont(QFont("Helvetica Neue",9)); painter.setPen(Qt::black);
+            QFont decorationFont("Helvetica Neue"); decorationFont.setPixelSize(9); painter.setFont(decorationFont); painter.setPen(Qt::black);
             painter.drawText(QRectF(0,0,page.width(),inset),Qt::AlignLeft|Qt::AlignVCenter,expand(m_outputStyle==3?m_outputHeader:"{title}"));
             painter.drawText(QRectF(0,page.height()-inset,page.width(),inset),Qt::AlignHCenter|Qt::AlignVCenter,expand(m_outputStyle==3?m_outputFooter:"{page} / {pages}"));
         }

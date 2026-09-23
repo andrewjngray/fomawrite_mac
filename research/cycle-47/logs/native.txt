@@ -1,0 +1,8 @@
+Dev and everyday apps quit normally without unsaved prompts before bundle refresh.
+Native View -> Template lists all implemented presets and Custom.
+Opened synthetic Templates.md through Open by Path.
+Selected GitHub; preview/footer changed and document remained clean.
+GitHub persisted through restart. Table header alignment visually verified after final correction.
+Selected MLA Draft then Modern; source remained clean.
+Seven one-page PDF specimens rendered and reviewed; no clipping or misaligned headers in final samples.
+Final refresh: Larger Text increased preview size with aligned table; Smaller Text restored it.

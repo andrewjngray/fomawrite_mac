@@ -217,3 +217,7 @@ User feedback supersedes the Cycle 43 alias-only behavior: Locations now use Ren
 ### Cycle 46 — Location overlap restriction
 
 Implemented the supplied iA warning's parent/child exclusion rule, plus an Omawrite convenience: Add to Favorites instead. Existing nested Locations migrate to Favorites without disk changes. Folder navigation remains independent of Location registration. See location-design.md for rationale and limits; iA's internal technical reason remains an inference.
+
+### Cycle 47 — View Template screenshot
+
+Shared preview/output selection and formatting now implemented for Modern Sans, Classic Serif, Manuscript Mono, GitHub, Helvetica, Palatino and MLA Draft, plus existing JSON Custom. Duo/Quattro are not yet bundled. MLA Draft is only a manuscript starting point; it is not full MLA style or an iA template import. Continuous preview and paginated output share font/block/table rules, with screen zoom and page decorations appropriate to each surface. See template-design.md for the exact boundaries.

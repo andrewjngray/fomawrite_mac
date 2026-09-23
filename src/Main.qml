@@ -74,7 +74,6 @@ ApplicationWindow {
         property bool paragraphFocus: false
         onParagraphFocusChanged: backend.setFocusPosition(editor.cursorPosition, paragraphFocus, sentenceFocus)
         property bool automaticVersions: false
-        property int previewStyle: 0
         onShowMarkupChanged: backend.setShowMarkup(showMarkup)
     }
 
@@ -233,9 +232,9 @@ ApplicationWindow {
         MenuItem { text: "Smaller text"; enabled: workspaceSettings.writingSize > 12; onTriggered: workspaceCommands.run("smaller") }
         MenuItem { text: "Reset text size"; onTriggered: workspaceCommands.run("resetSize") }
         MenuSeparator {}
-        MenuItem { text: "Preview: Sans"; checkable: true; checked: workspaceSettings.previewStyle === 0; onTriggered: workspaceCommands.run("sans") }
-        MenuItem { text: "Preview: Serif"; checkable: true; checked: workspaceSettings.previewStyle === 1; onTriggered: workspaceCommands.run("serif") }
-        MenuItem { text: "Preview: Mono"; checkable: true; checked: workspaceSettings.previewStyle === 2; onTriggered: workspaceCommands.run("mono") }
+        MenuItem { text: "Template: Modern"; checkable: true; checked: backend.outputStyle === 0; onTriggered: workspaceCommands.run("sans") }
+        MenuItem { text: "Template: Classic"; checkable: true; checked: backend.outputStyle === 1; onTriggered: workspaceCommands.run("serif") }
+        MenuItem { text: "Template: Manuscript"; checkable: true; checked: backend.outputStyle === 2; onTriggered: workspaceCommands.run("mono") }
     }
 
     Material.theme: darkMode ? Material.Dark : Material.Light
@@ -661,11 +660,18 @@ ApplicationWindow {
         Platform.Menu {
             title: "View"
             Platform.Menu {
-                title: "Output Style"
-                Platform.MenuItem { text: "Clean Sans"; onTriggered: backend.setOutputStyle(0) }
-                Platform.MenuItem { text: "Reading Serif"; checkable: true; checked: backend.outputStyle === 1; onTriggered: backend.setOutputStyle(1) }
-                Platform.MenuItem { text: "Manuscript Mono"; checkable: true; checked: backend.outputStyle === 2; onTriggered: backend.setOutputStyle(2) }
-                Platform.MenuItem { text: "Load Custom Style…"; onTriggered: outputStyleDialog.open() }
+                title: "Template"
+                Platform.MenuItem { text: "Modern (Sans)"; checkable: true; checked: backend.outputStyle === 0; onTriggered: backend.setOutputStyle(0) }
+                Platform.MenuItem { text: "Classic (Serif)"; checkable: true; checked: backend.outputStyle === 1; onTriggered: backend.setOutputStyle(1) }
+                Platform.MenuItem { text: "Manuscript (Mono)"; checkable: true; checked: backend.outputStyle === 2; onTriggered: backend.setOutputStyle(2) }
+                Platform.MenuSeparator {}
+                Platform.MenuItem { text: "GitHub"; checkable: true; checked: backend.outputStyle === 4; onTriggered: backend.setOutputStyle(4) }
+                Platform.MenuItem { text: "Helvetica"; checkable: true; checked: backend.outputStyle === 5; onTriggered: backend.setOutputStyle(5) }
+                Platform.MenuItem { text: "Palatino"; checkable: true; checked: backend.outputStyle === 6; onTriggered: backend.setOutputStyle(6) }
+                Platform.MenuItem { text: "MLA Draft"; checkable: true; checked: backend.outputStyle === 7; onTriggered: backend.setOutputStyle(7) }
+                Platform.MenuSeparator {}
+                Platform.MenuItem { text: "Custom"; checkable: true; checked: backend.outputStyle === 3; onTriggered: backend.setOutputStyle(3) }
+                Platform.MenuItem { text: "Load Custom Template…"; onTriggered: outputStyleDialog.open() }
             }
             Platform.MenuItem { text: "Synchronized Scrolling"; checkable: true; checked: workspaceSettings.synchronizedScroll; onTriggered: workspaceSettings.synchronizedScroll = !workspaceSettings.synchronizedScroll }
             NativeCommand { commandId: "library" }
@@ -706,12 +712,6 @@ ApplicationWindow {
                 NativeCommand { commandId: "editor" }
                 NativeCommand { commandId: "split" }
                 NativeCommand { commandId: "preview" }
-            }
-            Platform.Menu {
-                title: "Preview Typeface"
-                NativeCommand { commandId: "sans" }
-                NativeCommand { commandId: "serif" }
-                NativeCommand { commandId: "mono" }
             }
             Platform.MenuSeparator {}
             NativeCommand { commandId: "outline" }
@@ -1087,8 +1087,8 @@ ApplicationWindow {
     }
     Dialogs.FileDialog {
         id: outputStyleDialog
-        title: "Load Output Style"
-        nameFilters: ["Output style (*.json)"]
+        title: "Load Custom Template"
+        nameFilters: ["Custom template (*.json)"]
         onAccepted: backend.loadOutputStyle(selectedFile)
     }
 
@@ -1993,8 +1993,8 @@ ApplicationWindow {
             SplitView.fillWidth: workspaceSettings.layoutMode === 2
             SplitView.preferredWidth: Math.max(260, (win.width - (organizerPane.visible ? organizerPane.width : 0) - (libraryPane.visible ? libraryPane.width : 0)) / 2)
             SplitView.minimumWidth: 220
-            typeface: ["Helvetica Neue", "Georgia", "iA Writer Mono S"][workspaceSettings.previewStyle]
-            textSize: Math.max(12, workspaceSettings.writingSize - 2)
+            typeface: backend.outputFont
+            textSize: Math.max(12, backend.outputPointSize * 4 / 3 + workspaceSettings.writingSize - 19)
             layoutMode: workspaceSettings.layoutMode
             onLayoutRequested: function(mode) { workspaceCommands.run(["editor", "split", "preview"][mode]); }
             onLinkRequested: function(link) {

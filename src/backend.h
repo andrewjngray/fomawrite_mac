@@ -23,6 +23,9 @@ class QLockFile;
 class Backend : public QObject {
     Q_OBJECT
     Q_PROPERTY(int outputStyle READ outputStyle NOTIFY outputStyleChanged)
+    Q_PROPERTY(QString outputFont READ outputFont NOTIFY outputStyleChanged)
+    Q_PROPERTY(int outputPointSize READ outputPointSize NOTIFY outputStyleChanged)
+    Q_PROPERTY(QString outputTemplateName READ outputTemplateName NOTIFY outputStyleChanged)
     Q_PROPERTY(QObject *library READ library CONSTANT)
     Q_PROPERTY(QUrl documentBaseUrl READ documentBaseUrl NOTIFY fileUrlChanged)
     Q_PROPERTY(QUrl fileUrl READ fileUrl NOTIFY fileUrlChanged)
@@ -114,6 +117,9 @@ public:
     Q_INVOKABLE void printPreview();
     Q_INVOKABLE bool exportDocument(const QUrl &destination, const QString &format);
     int outputStyle() const { return m_outputStyle; }
+    QString outputFont() const;
+    int outputPointSize() const;
+    QString outputTemplateName() const;
     Q_INVOKABLE void setOutputStyle(int style);
     Q_INVOKABLE bool loadOutputStyle(const QUrl &file);
     Q_INVOKABLE void newWindow();
@@ -194,6 +200,7 @@ private:
     bool saveAuthorship(const QUrl &url);
     void loadAuthorship(const QUrl &url);
     void paintOutput(QPagedPaintDevice &device, QTextDocument &document) const;
+    void applyTemplate(QTextDocument &document, bool preview) const;
     void prepareOutput(QTextDocument &document, bool plain = false) const;
     int m_outputStyle = 0;
     QString m_customOutputFont;
