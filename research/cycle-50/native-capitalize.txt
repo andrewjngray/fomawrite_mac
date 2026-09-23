@@ -1,0 +1,7 @@
+Omawrite Cycle 50b native verification — 24 September 2026
+
+The previously uncertain Cycle 54c disposable draft had closed; Dev visibly showed clean saved Second.md. It was quit normally and refreshed with `./bin/prepare-dev-app` after the current build and 102/0/0 native-access test run.
+
+The refreshed Dev app reopened clean Second.md. In a disposable Untitled.md draft, selecting `tEST of THE wORLD` exposed Edit → Transformations in the captured order: Make Upper Case, Make Lower Case, Capitalize, Make Title Case. Choosing Capitalize produced `Test Of The World`, and Command-Z restored `tEST of THE wORLD`. File → Close offered Cancel, Discard and Save. Discard closed the disposable draft; the process exited, and reopening Dev followed by choosing Second.md showed the saved sample clean. No private writing was changed.
+
+The ordinary app was quit normally from a clean saved document, repackaged with `./bin/package-mac`, and reopened that saved document clean. Both ordinary and Dev bundles passed strict local signature verification. The ordinary bundle's transformation menu was not separately exercised. No screenshot file was persisted.

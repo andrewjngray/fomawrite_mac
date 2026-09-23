@@ -5,3 +5,5 @@
 - [x] Disposable edit survived File → Close → Cancel, then was discarded through the normal prompt before quit.
 - [ ] Andrew: report any confusing File/Edit order, command name or disabled state.
 - [ ] Keyboard-only, dark, narrow and VoiceOver traversal.
+- [x] Phase 50b: the four Transformations labels and order match the captured iA menu; disposable Dev Capitalize and Undo passed.
+- [ ] Andrew: in disposable text, compare Capitalize and Make Title Case on `tEST of THE wORLD`; report which result you prefer for titles and acronyms.

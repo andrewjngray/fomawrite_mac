@@ -1,0 +1,7 @@
+iA Writer Transformations sample — 24 September 2026
+
+In an isolated new iA document, selecting `tEST words` and choosing Edit → Transformations → Capitalize yielded `Test Words`, with the result selected.
+
+Selecting `tEST of THE wORLD` and choosing Capitalize yielded `Test Of The World`. One Undo restored the original text. After Undo, choosing Make Title Case on the same original yielded `tEST of the wORLD`. This establishes a meaningful distinction between the observed commands but does not establish iA's full punctuation, locale or title-style rules.
+
+Only the two auto-saved synthetic sample files were moved to Trash through iA's recoverable context-menu action. The previously open saved document was restored and not edited.

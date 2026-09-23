@@ -818,7 +818,7 @@ QVariantMap Backend::editMarkdown(const QString &action, int start, int end) {
         if (last < text.size() && text.at(last) != '\n') table += '\n';
         return replaceText(first, last, table);
     }
-    if (action == "uppercase" || action == "lowercase" || action == "titlecase" || action == "clearInline") {
+    if (action == "uppercase" || action == "lowercase" || action == "capitalize" || action == "titlecase" || action == "clearInline") {
         if (first == last) { setStatus(QStringLiteral("Select text first.")); return {}; }
         QString selected = text.mid(first, last - first);
         if (selected.contains('`') || selected.contains("](") || selected.contains("][") || selected.contains("://")) {
@@ -827,7 +827,7 @@ QVariantMap Backend::editMarkdown(const QString &action, int start, int end) {
         }
         if (action == "uppercase") selected = selected.toUpper();
         else if (action == "lowercase") selected = selected.toLower();
-        else if (action == "titlecase") {
+        else if (action == "capitalize" || action == "titlecase") {
             selected = selected.toLower();
             const QRegularExpression word(QStringLiteral("\\b\\p{L}[\\p{L}\\p{M}]*"), QRegularExpression::UseUnicodePropertiesOption);
             QList<QRegularExpressionMatch> words;

@@ -1609,6 +1609,60 @@ private slots:
         backend.discardRecovery();
     }
 
+    void capitalizeTransformationMatchesMenuAndPreservesUndo() {
+        Backend backend;
+        QQmlEngine engine;
+        engine.rootContext()->setContextProperty("backend", &backend);
+        QQmlComponent component(&engine, QUrl::fromLocalFile(QFINDTESTDATA("../src/Main.qml")));
+        QScopedPointer<QObject> window(component.create());
+        QVERIFY2(window, qPrintable(component.errorString()));
+        auto *editor = window->findChild<QObject *>("sourceEditor");
+        auto *transformations = window->findChild<QObject *>("editTransformations");
+        QVERIFY(editor && transformations);
+
+        const QStringList expectedLabels = {QStringLiteral("Make Upper Case"),
+                                            QStringLiteral("Make Lower Case"),
+                                            QStringLiteral("Capitalize"),
+                                            QStringLiteral("Make Title Case")};
+        const QStringList objectNames = {QStringLiteral("editUppercase"),
+                                         QStringLiteral("editLowercase"),
+                                         QStringLiteral("editCapitalize"),
+                                         QStringLiteral("editTitleCase")};
+        QStringList labels;
+        QStringList orderedNames;
+        for (auto *item : transformations->children()) {
+            if (objectNames.contains(item->objectName()))
+                orderedNames.append(item->objectName());
+        }
+        QCOMPARE(orderedNames, objectNames);
+        for (const auto &name : orderedNames) {
+            auto *item = transformations->findChild<QObject *>(name);
+            QVERIFY(item);
+            labels.append(item->property("text").toString());
+        }
+        QCOMPARE(labels, expectedLabels);
+
+        const QString source = QStringLiteral("tEST of THE wORLD — café STRAßE");
+        editor->setProperty("text", source);
+        QVERIFY(QMetaObject::invokeMethod(editor, "select", Q_ARG(int, 0),
+                                          Q_ARG(int, source.size())));
+        auto *capitalize = transformations->findChild<QObject *>("editCapitalize");
+        QVERIFY(capitalize->property("enabled").toBool());
+        QVERIFY(QMetaObject::invokeMethod(capitalize, "triggered"));
+        QCOMPARE(editor->property("text").toString(),
+                 QStringLiteral("Test Of The World — Café Straße"));
+        QCOMPARE(editor->property("selectedText").toString(),
+                 QStringLiteral("Test Of The World — Café Straße"));
+        QVERIFY(QMetaObject::invokeMethod(editor, "undo"));
+        QCOMPARE(editor->property("text").toString(), source);
+
+        const QString protectedLink = QStringLiteral("[Label](https://example.com)");
+        editor->setProperty("text", protectedLink);
+        QVERIFY(backend.editMarkdown("capitalize", 0, protectedLink.size()).isEmpty());
+        QCOMPARE(editor->property("text").toString(), protectedLink);
+        backend.discardRecovery();
+    }
+
     void currentDocumentCompletionsAreExplicitAndMarkdownAware() {
         Backend backend;
         QQmlEngine engine;

@@ -950,10 +950,12 @@ ApplicationWindow {
                 }
             }
             Platform.Menu {
+                objectName: "editTransformations"
                 title: "Transformations"
-                Platform.MenuItem { objectName: "editUppercase"; text: "UPPERCASE"; enabled: win.editTarget === editor && editor.selectedText.length > 0; onTriggered: win.editMarkdown("uppercase") }
-                Platform.MenuItem { objectName: "editLowercase"; text: "lowercase"; enabled: win.editTarget === editor && editor.selectedText.length > 0; onTriggered: win.editMarkdown("lowercase") }
-                Platform.MenuItem { objectName: "editTitleCase"; text: "Title Case"; enabled: win.editTarget === editor && editor.selectedText.length > 0; onTriggered: win.editMarkdown("titlecase") }
+                Platform.MenuItem { objectName: "editUppercase"; text: "Make Upper Case"; enabled: win.editTarget === editor && editor.selectedText.length > 0; onTriggered: win.editMarkdown("uppercase") }
+                Platform.MenuItem { objectName: "editLowercase"; text: "Make Lower Case"; enabled: win.editTarget === editor && editor.selectedText.length > 0; onTriggered: win.editMarkdown("lowercase") }
+                Platform.MenuItem { objectName: "editCapitalize"; text: "Capitalize"; enabled: win.editTarget === editor && editor.selectedText.length > 0; onTriggered: win.editMarkdown("capitalize") }
+                Platform.MenuItem { objectName: "editTitleCase"; text: "Make Title Case"; enabled: win.editTarget === editor && editor.selectedText.length > 0; onTriggered: win.editMarkdown("titlecase") }
             }
             Platform.Menu {
                 title: "Speech"
