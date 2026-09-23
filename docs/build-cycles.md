@@ -592,3 +592,13 @@ Planned scope: searchable existing workspace commands with keyboard navigation a
 **Artifacts / exercise:** Stable `dist/Omawrite Dev.app` and `dist/Omawrite.app`; [evidence](../research/cycle-32/README.md). Open two disposable documents, merge them as tabs, place the cursor partway through one, Quit and reopen. Verify order and cursor; explicitly closing a document removes it from the next restored session.
 
 **Next:** Cycle 33 themes. [Ten cycles remain in the updated plan](remaining-cycles.md), including themes; full iA parity remains unclaimed.
+
+## Cycle 33 — Workspace themes
+
+**Scope / changes:** Aa → Theme offers Follow system (reset), Light, Dark and Warm paper. Persisted selection updates existing windows. Shared palette covers writing surfaces, preview, library/organizer, chrome, filter, menus and in-app dialogs; blue folder/gray file icons retained. macOS native window appearance follows the selected light/dark mode. Export/print styling is independent.
+
+**Verification:** Build and 57 tests passed. Tests invoke theme menu actions, check persistence/manual overrides/reset, text/modified preservation and 4.5:1 text/muted contrast against panels. Native Warm paper and Dark visually inspected on synthetic sample tabs; restart retained Dark and switching to the second tab retained the theme. Native tab bar now changes appearance. Sample-only screenshots reviewed.
+
+**Limits:** Bundled presets only; no Typora CSS imports or theme editor. macOS native tab labels can be faint while the app is inactive; broader accessibility/system-picker/high-contrast audits remain in Cycle 41. Linux custom Omarchy colors retain their existing behavior in Follow system and are not native-tested here.
+
+**Artifact / exercise:** Stable Dev build; ordinary package refreshed with the following safety increment. Aa → Theme → Warm paper, then Dark; compare the library and preview and report a preferred default. Reset with Follow system. [Evidence](../research/cycle-33/README.md).

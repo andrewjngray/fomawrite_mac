@@ -7,8 +7,8 @@ Dialog {
     property bool deleted: false
     property bool locallyModified: false
     property bool darkMode: true
-    property color textColor: darkMode ? "#d0d0d0" : "#42464c"
-    property color strongTextColor: darkMode ? "#eeeeee" : "#222324"
+    property color textColor: backend.palette.text
+    property color strongTextColor: backend.palette.text
     property color activeButtonColor: "#428bca"
     property int containerWidth: 520
     property int containerHeight: 320
@@ -28,8 +28,8 @@ Dialog {
     onOpened: (deleted ? keepButton : reloadButton).forceActiveFocus()
 
     background: Rectangle {
-        color: root.darkMode ? "#1a1a1a" : "#ffffff"
-        border.color: root.darkMode ? "#343434" : "#d8d8d8"
+        color: backend.palette.panel
+        border.color: backend.palette.border
         radius: 0
     }
 

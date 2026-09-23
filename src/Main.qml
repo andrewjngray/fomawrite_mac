@@ -26,7 +26,7 @@ ApplicationWindow {
     readonly property color pageColor: backend.themeBackground
     readonly property color textColor: backend.themeForeground
     readonly property color strongTextColor: backend.themeForeground
-    readonly property color mutedColor: darkMode ? "#909191" : "#7b8490"
+    readonly property color mutedColor: backend.palette.muted
     readonly property color selectionFill: backend.themeSelection
     // The desktop's text size knob (GNOME's text-scaling-factor, which
     // `omarchy display text size` drives) anchored so its 12px default leaves
@@ -102,7 +102,7 @@ ApplicationWindow {
         height: 44
         z: 20
         background: Rectangle {
-            color: win.darkMode ? "#24262a" : "#fafaf9"
+            color: backend.palette.panel
             MouseArea { anchors.fill: parent; onPressed: win.startSystemMove(); onDoubleClicked: win.visibility === Window.Maximized ? win.showNormal() : win.showMaximized() }
         }
         // Align the toolbar groups with the panes below, including native window controls.
@@ -123,7 +123,7 @@ ApplicationWindow {
                 ChromeButton { iconName: "plus"; hint: "New document"; darkMode: win.darkMode; onClicked: libraryPane.newDocument() }
                 ChromeButton { iconName: "down"; hint: "Library options"; darkMode: win.darkMode; onClicked: libraryPane.showOptions(this) }
             }
-            Label { Accessible.description: backend.status; text: backend.fileName; color: win.darkMode ? "#d5d8dd" : "#54585f"; font.pixelSize: 15; font.weight: Font.Normal; elide: Text.ElideMiddle; horizontalAlignment: Text.AlignLeft; Layout.fillWidth: true }
+            Label { Accessible.description: backend.status; text: backend.fileName; color: backend.palette.muted; font.pixelSize: 15; font.weight: Font.Normal; elide: Text.ElideMiddle; horizontalAlignment: Text.AlignLeft; Layout.fillWidth: true }
             ChromeButton { iconName: "outline"; hint: "Document outline"; darkMode: win.darkMode; onClicked: workspaceCommands.run("outline") }
             ChromeButton { text: "Aa"; hint: "Writing options"; darkMode: win.darkMode; onClicked: writingOptions.open() }
             ChromeButton { iconName: "search"; hint: "Find in document"; darkMode: win.darkMode; onClicked: win.openSearch(false, false) }
@@ -133,7 +133,7 @@ ApplicationWindow {
 
     footer: ToolBar {
         implicitHeight: 18
-        background: Rectangle { color: win.darkMode ? "#24262a" : "#f7f7f7" }
+        background: Rectangle { color: backend.palette.panel }
         Label {
             anchors.fill: parent; anchors.leftMargin: 12; anchors.rightMargin: 12
             text: backend.status; font.pixelSize: 10; color: win.mutedColor
@@ -186,9 +186,17 @@ ApplicationWindow {
     }
     Menu {
         id: writingOptions
+        objectName: "writingOptions"
         width: 250
         x: Math.max(0, win.width - width - 160)
         y: 44
+        Menu { title: "Theme"
+            MenuItem { objectName: "themeSystem"; text: "Follow system (reset)"; checkable: true; checked: backend.themePreset === "system"; onTriggered: backend.themePreset = "system" }
+            MenuItem { objectName: "themeLight"; text: "Light"; checkable: true; checked: backend.themePreset === "light"; onTriggered: backend.themePreset = "light" }
+            MenuItem { objectName: "themeDark"; text: "Dark"; checkable: true; checked: backend.themePreset === "dark"; onTriggered: backend.themePreset = "dark" }
+            MenuItem { objectName: "themePaper"; text: "Warm paper"; checkable: true; checked: backend.themePreset === "paper"; onTriggered: backend.themePreset = "paper" }
+        }
+        MenuSeparator {}
         MenuItem { text: "Show Markdown syntax"; checkable: true; checked: workspaceSettings.showMarkup; onTriggered: workspaceCommands.run("markup") }
         MenuItem { text: "Paragraph focus"; checkable: true; checked: workspaceSettings.paragraphFocus; onTriggered: workspaceCommands.run("paragraph") }
         MenuItem { text: "Typewriter scrolling"; checkable: true; checked: workspaceSettings.typewriter; onTriggered: workspaceCommands.run("typewriter") }
@@ -204,6 +212,8 @@ ApplicationWindow {
 
     Material.theme: darkMode ? Material.Dark : Material.Light
     Material.accent: backend.themeAccent
+    Material.background: backend.palette.panel
+    Material.foreground: backend.themeForeground
     color: pageColor
 
     onClosing: function(close) {
@@ -1195,7 +1205,7 @@ ApplicationWindow {
         orientation: Qt.Horizontal
         handle: Rectangle {
             implicitWidth: 1
-            color: SplitHandle.hovered || SplitHandle.pressed ? "#426da7" : (win.darkMode ? "#35383c" : "#e1e3e6")
+            color: SplitHandle.hovered || SplitHandle.pressed ? "#426da7" : (backend.palette.border)
         }
         OrganizerPane {
             id: organizerPane
@@ -1223,7 +1233,7 @@ ApplicationWindow {
         }
         Rectangle {
             id: editorPane
-            color: win.darkMode ? "#202124" : "#f7f7f7"
+            color: backend.palette.page
             visible: workspaceSettings.layoutMode !== 2
             SplitView.fillWidth: true
             SplitView.minimumWidth: 260
@@ -1712,8 +1722,8 @@ ApplicationWindow {
             anchors.right: parent.right
             anchors.bottom: parent.bottom
             height: 34
-            color: win.darkMode ? "#24262a" : "#fafafa"
-            Rectangle { width: parent.width; height: 1; color: win.darkMode ? "#373a40" : "#e5e6e8" }
+            color: backend.palette.panel
+            Rectangle { width: parent.width; height: 1; color: backend.palette.border }
             RowLayout {
                 anchors.fill: parent
                 anchors.leftMargin: 6

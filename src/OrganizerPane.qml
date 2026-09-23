@@ -17,7 +17,7 @@ Rectangle {
         property bool recentsExpanded: true
     }
     signal openRequested(url file)
-    color: darkMode ? "#1c1e22" : "#fafaf9"
+    color: backend.palette.panel
     function activate(entry) {
         if (entry.directory) library.rootFolder = entry.url;
         else openRequested(entry.url);
@@ -31,7 +31,7 @@ Rectangle {
             width: organizerScroll.availableWidth
             spacing: 2
             RowLayout {
-                Label { text: "Locations"; font.pixelSize: 12; font.bold: false; color: root.darkMode ? "#92969e" : "#777c83"; Layout.fillWidth: true }
+                Label { text: "Locations"; font.pixelSize: 12; font.bold: false; color: backend.palette.muted; Layout.fillWidth: true }
                 ChromeButton { darkMode: root.darkMode; iconName: "plus"; Accessible.name: "Add library location"; onClicked: locationDialog.open() }
             }
             Repeater {

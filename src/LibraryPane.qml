@@ -33,7 +33,7 @@ Rectangle {
     }
     signal openRequested(url file)
     signal createRequested(string name, bool inNewWindow)
-    color: darkMode ? "#202124" : "#fafaf9"
+    color: backend.palette.panel
     objectName: "libraryPane"
     function chooseFolder() { folderDialog.open(); }
     function newDocument(inNewWindow) { newFileDialog.inNewWindow = !!inNewWindow; newFileDialog.open(); }
@@ -66,10 +66,10 @@ Rectangle {
                 onClicked: sortMenu.open()
                 contentItem: RowLayout {
                     spacing: 3
-                    Text { id: sortLabel; text: sortButton.text; font.family: Qt.platform.os === "osx" ? Qt.application.font.family : "Helvetica Neue"; font.pixelSize: 12; color: root.darkMode ? "#c3c7ce" : "#777c83" }
-                    LineIcon { name: "down"; ink: root.darkMode ? "#c3c7ce" : "#777c83"; Layout.preferredWidth: 12; Layout.preferredHeight: 12 }
+                    Text { id: sortLabel; text: sortButton.text; font.family: Qt.platform.os === "osx" ? Qt.application.font.family : "Helvetica Neue"; font.pixelSize: 12; color: backend.palette.muted }
+                    LineIcon { name: "down"; ink: backend.palette.muted; Layout.preferredWidth: 12; Layout.preferredHeight: 12 }
                 }
-                background: Rectangle { radius: height / 2; color: root.darkMode ? "#303238" : "#eff0f2"; border.width: sortButton.activeFocus ? 1 : 0; border.color: "#426da7" }
+                background: Rectangle { radius: height / 2; color: backend.palette.field; border.width: sortButton.activeFocus ? 1 : 0; border.color: backend.palette.focus }
             }
             Item { Layout.fillWidth: true }
             ChromeButton {
@@ -115,14 +115,14 @@ Rectangle {
                 }
                 background: Rectangle {
                     radius: 7
-                    color: entry.highlighted ? (root.darkMode ? "#343434" : "#ebebea")
-                        : entry.hovered ? (root.darkMode ? "#2b2d31" : "#e9ecf0") : "transparent"
+                    color: entry.highlighted ? (backend.palette.hover)
+                        : entry.hovered ? (backend.palette.hover) : "transparent"
                 }
                 contentItem: RowLayout {
                     spacing: 7
                     LineIcon {
                         name: entry.modelData.directory ? "folder" : "editor"
-                        ink: entry.modelData.directory ? (root.darkMode ? "#63c9f1" : "#159dcc") : (root.darkMode ? "#b4b4b4" : "#666666")
+                        ink: entry.modelData.directory ? backend.palette.folder : backend.palette.muted
                         Layout.preferredWidth: 18
                         Layout.preferredHeight: 18
                     }
@@ -131,10 +131,10 @@ Rectangle {
                         Layout.fillWidth: true
                         RowLayout {
                             Layout.fillWidth: true
-                            Label { text: entry.modelData.name; font.pixelSize: 14; color: root.darkMode ? "#e3e5e9" : "#30343b"; elide: Text.ElideMiddle; Layout.fillWidth: true }
-                            Label { visible: !entry.modelData.directory && displaySettings.showDates; text: entry.modelData.modified; font.pixelSize: 10; color: "#92969e" }
+                            Label { text: entry.modelData.name; font.pixelSize: 14; color: backend.palette.text; elide: Text.ElideMiddle; Layout.fillWidth: true }
+                            Label { visible: !entry.modelData.directory && displaySettings.showDates; text: entry.modelData.modified; font.pixelSize: 10; color: backend.palette.muted }
                         }
-                        Label { visible: !entry.modelData.directory && displaySettings.showExcerpts; text: visible ? root.library.excerpt(entry.modelData.url) : ""; elide: Text.ElideRight; font.pixelSize: 11; color: "#92969e"; Layout.fillWidth: true }
+                        Label { visible: !entry.modelData.directory && displaySettings.showExcerpts; text: visible ? root.library.excerpt(entry.modelData.url) : ""; elide: Text.ElideRight; font.pixelSize: 11; color: backend.palette.muted; Layout.fillWidth: true }
                     }
                     LineIcon { visible: entry.modelData.directory; name: entry.modelData.expanded ? "down" : "right"; ink: "#92969e"; Layout.preferredWidth: 14; Layout.preferredHeight: 14 }
                 }
@@ -149,7 +149,7 @@ Rectangle {
                 horizontalAlignment: Text.AlignHCenter
                 visible: fileList.count === 0
                 text: root.library.rootFolder.toString() === "" ? "Choose a folder to begin.\nYour files stay on your Mac." : "No Markdown or text files here.\nExpand a folder or create a document."
-                color: root.darkMode ? "#929aa6" : "#78808c"
+                color: backend.palette.muted
                 font.pixelSize: 13
             }
         }
@@ -170,15 +170,15 @@ Rectangle {
             rightInset: 0
             topInset: 0
             bottomInset: 0
-            color: root.darkMode ? "#d5d8dd" : "#45484e"
-            placeholderTextColor: root.darkMode ? "#929aa6" : "#78808c"
+            color: backend.palette.text
+            placeholderTextColor: backend.palette.muted
             selectionColor: "#426da7"
             selectedTextColor: "white"
             font.pixelSize: 12
             text: root.library.filter
             onTextEdited: root.library.filter = text
             Accessible.name: "Filter visible library files"
-            background: Rectangle { radius: height / 2; color: root.darkMode ? "#292c31" : "#f0f1f3"; border.width: filterField.activeFocus ? 1 : 0; border.color: "#426da7" }
+            background: Rectangle { radius: height / 2; color: backend.palette.field; border.width: filterField.activeFocus ? 1 : 0; border.color: backend.palette.focus }
             Keys.onEscapePressed: { text = ""; root.library.filter = ""; }
         }
     }
@@ -191,12 +191,12 @@ Rectangle {
         CompactMenuItem { text: "Date Created"; ButtonGroup.group: sortFieldGroup; checkable: true; checked: root.library.sortMode === 2; onTriggered: root.commands.run("sortCreated") }
         CompactMenuItem { text: "Name"; ButtonGroup.group: sortFieldGroup; checkable: true; checked: root.library.sortMode === 0; onTriggered: root.commands.run("sortName") }
         CompactMenuItem { text: "Extension"; ButtonGroup.group: sortFieldGroup; checkable: true; checked: root.library.sortMode === 3; onTriggered: root.commands.run("sortExtension") }
-        MenuSeparator { padding: 4; implicitHeight: 9; contentItem: Rectangle { implicitHeight: 1; color: root.darkMode ? "#45484e" : "#dedfe2" } }
+        MenuSeparator { padding: 4; implicitHeight: 9; contentItem: Rectangle { implicitHeight: 1; color: backend.palette.border } }
         CompactMenuItem { text: "A to Z"; ButtonGroup.group: sortDirectionGroup; checkable: true; checked: root.library.ascending; onTriggered: root.commands.run("ascending") }
         CompactMenuItem { text: "Z to A"; ButtonGroup.group: sortDirectionGroup; checkable: true; checked: !root.library.ascending; onTriggered: root.commands.run("descending") }
-        MenuSeparator { padding: 4; implicitHeight: 9; contentItem: Rectangle { implicitHeight: 1; color: root.darkMode ? "#45484e" : "#dedfe2" } }
+        MenuSeparator { padding: 4; implicitHeight: 9; contentItem: Rectangle { implicitHeight: 1; color: backend.palette.border } }
         CompactMenuItem { text: "Pin Folders to Top"; checkable: true; checked: root.library.foldersFirst; onTriggered: root.commands.run("foldersFirst") }
-        MenuSeparator { padding: 4; implicitHeight: 9; contentItem: Rectangle { implicitHeight: 1; color: root.darkMode ? "#45484e" : "#dedfe2" } }
+        MenuSeparator { padding: 4; implicitHeight: 9; contentItem: Rectangle { implicitHeight: 1; color: backend.palette.border } }
         CompactMenuItem { text: "Show Date"; checkable: true; checked: displaySettings.showDates; onTriggered: root.commands.run("dates") }
         CompactMenuItem { text: "Show Text Excerpts"; checkable: true; checked: displaySettings.showExcerpts; onTriggered: root.commands.run("excerpts") }
     }

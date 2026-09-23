@@ -4,7 +4,7 @@ import QtQuick.Controls
 Button {
     id: control
     property bool darkMode: false
-    property color iconColor: iconName === "folder" ? (darkMode ? "#63c9f1" : "#159dcc") : "transparent"
+    property color iconColor: iconName === "folder" ? (backend.palette.folder) : "transparent"
     font.pixelSize: 14
     property string iconName: ""
     property bool alignLeft: false
@@ -27,7 +27,7 @@ Button {
     ToolTip.visible: hovered && hint !== ""
     ToolTip.text: hint
     contentItem: Item {
-        readonly property color ink: !control.enabled ? "#96999e" : control.checked ? (control.darkMode ? "#eeeeee" : "#292929") : control.darkMode ? "#d5d8dd" : "#595959"
+        readonly property color ink: !control.enabled ? "#96999e" : control.checked ? (backend.palette.text) : backend.palette.muted
         LineIcon {
             visible: control.iconName !== ""
             name: control.iconName
@@ -51,8 +51,8 @@ Button {
     }
     background: Rectangle {
         radius: 8
-        color: control.checked ? (control.darkMode ? "#343434" : "#ebebea") : control.down || control.hovered ? (control.darkMode ? "#303339" : "#e8eaed") : "transparent"
+        color: control.checked ? (backend.palette.hover) : control.down || control.hovered ? (backend.palette.hover) : "transparent"
         border.width: control.visualFocus ? 1 : 0
-        border.color: "#426da7"
+        border.color: backend.palette.focus
     }
 }

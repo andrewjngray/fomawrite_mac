@@ -144,3 +144,8 @@ void restoreMacWorkspaceTabs(const QList<QWindow *> &windows) {
         previous = native;
     }
 }
+
+void applyMacWindowTheme(QWindow *window, bool followSystem, bool dark) {
+    NSView *view = reinterpret_cast<NSView *>(window->winId());
+    view.window.appearance = followSystem ? nil : [NSAppearance appearanceNamed:dark ? NSAppearanceNameDarkAqua : NSAppearanceNameAqua];
+}

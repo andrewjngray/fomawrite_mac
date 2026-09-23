@@ -12,8 +12,8 @@ Menu {
     popupType: Popup.Item
     background: Rectangle {
         radius: 10
-        color: menu.darkMode ? "#292b30" : "#fafafa"
-        border.color: menu.darkMode ? "#484b52" : "#d5d7da"
+        color: backend.palette.panel
+        border.color: backend.palette.border
         border.width: 1
     }
 }

@@ -34,14 +34,14 @@ Button {
         color: control.primary
             ? (control.down ? "#347ab3" : control.hovered ? "#4b96d0" : control.activeColor)
             : control.down
-                ? (control.darkMode ? "#2a2a2a" : "#dedede")
+                ? (backend.palette.hover)
                 : control.hovered
-                    ? (control.darkMode ? "#242424" : "#eeeeee")
-                    : (control.darkMode ? "#202020" : "#f6f6f6")
+                    ? (backend.palette.hover)
+                    : (backend.palette.panel)
         border.color: control.activeFocus
-            ? (control.darkMode ? "#eeeeee" : "#222324")
+            ? (backend.palette.text)
             : control.primary
                 ? "#367eb7"
-                : (control.darkMode ? "#424242" : "#c8c8c8")
+                : (backend.palette.border)
     }
 }

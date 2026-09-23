@@ -17,26 +17,26 @@ MenuItem {
         anchors.verticalCenter: parent.verticalCenter
         name: item.iconName
         visible: item.iconName !== "" && !item.checkable
-        ink: item.highlighted ? "#ffffff" : item.darkMode ? "#e5e7eb" : "#30343b"
+        ink: item.highlighted ? "#ffffff" : backend.palette.text
     }
     arrow: LineIcon {
         x: item.width - width - 8
         anchors.verticalCenter: parent.verticalCenter
         name: "right"; visible: item.subMenu !== null
-        ink: item.highlighted ? "#ffffff" : item.darkMode ? "#e5e7eb" : "#30343b"
+        ink: item.highlighted ? "#ffffff" : backend.palette.text
     }
     indicator: Text {
         x: 7
         anchors.verticalCenter: parent.verticalCenter
         text: item.checked ? "✓" : ""
         font.pixelSize: 13
-        color: item.highlighted ? "#ffffff" : item.darkMode ? "#e5e7eb" : "#30343b"
+        color: item.highlighted ? "#ffffff" : backend.palette.text
     }
     contentItem: Text {
         text: item.text
         font: item.font
         verticalAlignment: Text.AlignVCenter
-        color: !item.enabled ? "#92969e" : item.highlighted ? "#ffffff" : item.darkMode ? "#e5e7eb" : "#30343b"
+        color: !item.enabled ? "#92969e" : item.highlighted ? "#ffffff" : backend.palette.text
     }
     background: Rectangle {
         radius: 5

@@ -28,6 +28,8 @@ class Backend : public QObject {
     Q_PROPERTY(bool modified READ modified NOTIFY modifiedChanged)
     Q_PROPERTY(QString status READ status NOTIFY statusChanged)
     Q_PROPERTY(int wordCount READ wordCount NOTIFY wordCountChanged)
+    Q_PROPERTY(QString themePreset READ themePreset WRITE setThemePreset NOTIFY themePresetChanged)
+    Q_PROPERTY(QVariantMap palette READ palette NOTIFY themeColorsChanged)
     Q_PROPERTY(bool darkMode READ darkMode WRITE setDarkMode NOTIFY darkModeChanged)
     Q_PROPERTY(qreal textScale READ textScale WRITE setTextScale NOTIFY textScaleChanged)
     Q_PROPERTY(QString themeBackground READ themeBackground NOTIFY themeColorsChanged)
@@ -56,6 +58,9 @@ public:
     bool modified() const { return m_modified; }
     QString status() const { return m_status; }
     int wordCount() const { return m_wordCount; }
+    QString themePreset() const { return m_themePreset; }
+    void setThemePreset(const QString &preset);
+    QVariantMap palette() const;
     bool darkMode() const { return m_darkMode; }
     void setDarkMode(bool darkMode);
     qreal textScale() const { return m_textScale; }
@@ -145,6 +150,7 @@ signals:
     void modifiedChanged();
     void statusChanged();
     void wordCountChanged();
+    void themePresetChanged();
     void darkModeChanged();
     void textScaleChanged();
     void themeColorsChanged();
@@ -194,6 +200,8 @@ private:
     bool m_modified = false;
     QString m_status;
     int m_wordCount = 0;
+    bool m_systemDarkMode = true;
+    QString m_themePreset = "system";
     bool m_darkMode = true;
     qreal m_textScale = 1.0;
     bool m_loading = false;

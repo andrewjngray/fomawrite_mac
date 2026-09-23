@@ -201,6 +201,8 @@ Backend::Backend(QObject *parent) : QObject(parent), m_library(this) {
                 emit externalChangeDetected(deleted, m_modified);
             });
 
+    const auto preset = QSettings().value("appearance/theme", "system").toString();
+    if (QStringList{"system", "light", "dark", "paper"}.contains(preset)) m_themePreset = preset;
     loadOmarchyTheme();
     watchOmarchyTheme();
     connect(&m_themeWatcher, &QFileSystemWatcher::fileChanged, this, [this]() {
@@ -240,12 +242,29 @@ QString Backend::fileName() const {
 }
 
 void Backend::setDarkMode(bool darkMode) {
-    if (m_darkMode == darkMode)
-        return;
-
-    m_darkMode = darkMode;
+    m_systemDarkMode = darkMode;
     loadOmarchyTheme();
-    emit darkModeChanged();
+}
+
+void Backend::setThemePreset(const QString &preset) {
+    if (!QStringList{"system", "light", "dark", "paper"}.contains(preset) || m_themePreset == preset) return;
+    m_themePreset = preset;
+    QSettings().setValue("appearance/theme", preset);
+    loadOmarchyTheme();
+    emit themePresetChanged();
+}
+
+QVariantMap Backend::palette() const {
+    const bool paper = m_themePreset == "paper";
+    return {{"page", m_themeBackground}, {"text", m_themeForeground},
+        {"panel", m_darkMode ? "#222428" : paper ? "#f0e8d8" : "#fafaf9"},
+        {"muted", m_darkMode ? "#afb5bf" : paper ? "#706451" : "#616975"},
+        {"border", m_darkMode ? "#50545c" : paper ? "#c9bda7" : "#d5d7da"},
+        {"hover", m_darkMode ? "#34383f" : paper ? "#e5dac4" : "#e8eaed"},
+        {"field", m_darkMode ? "#2b2e34" : paper ? "#eae0cd" : "#eff0f2"},
+        {"focus", m_darkMode ? "#9ec5ff" : "#285e9e"},
+        {"folder", m_darkMode ? "#63c9f1" : "#087fa9"},
+        {"selection", m_themeSelection}};
 }
 
 void Backend::setTextScale(qreal textScale) {
@@ -1387,6 +1406,8 @@ void Backend::watchCurrentFile() {
 }
 
 void Backend::loadOmarchyTheme() {
+    const bool oldDark = m_darkMode;
+    m_darkMode = m_themePreset == "dark" || (m_themePreset == "system" && m_systemDarkMode);
     m_themeBackground = m_darkMode ? QStringLiteral("#101010") : QStringLiteral("#ffffff");
     m_themeForeground = m_darkMode ? QStringLiteral("#eeeeee") : QStringLiteral("#222324");
 #ifdef Q_OS_MACOS
@@ -1402,7 +1423,7 @@ void Backend::loadOmarchyTheme() {
         + QStringLiteral("/.local/state/omarchy/current/theme/colors.toml");
     QString themeMode;
     QFile file(colorsPath);
-    if (file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+    if (m_themePreset == "system" && file.open(QIODevice::ReadOnly | QIODevice::Text)) {
         QTextStream in(&file);
         while (!in.atEnd()) {
             const QString line = in.readLine().trimmed();
@@ -1455,6 +1476,13 @@ void Backend::loadOmarchyTheme() {
         emit darkModeChanged();
     }
 
+    if (m_themePreset == "paper") {
+        m_themeBackground = "#faf4e6";
+        m_themeForeground = "#342f27";
+        m_themeAccent = "#285e9e";
+        m_themeSelection = "#345f98";
+    }
+    if (oldDark != m_darkMode) emit darkModeChanged();
     if (m_highlighter) {
         m_highlighter->setDarkMode(m_darkMode);
         m_highlighter->setColors(m_themeBackground, m_themeForeground, m_themeAccent);

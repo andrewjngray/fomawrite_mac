@@ -187,3 +187,5 @@ Library filter now uses a fixed placeholder and bounded rounded field at narrow 
 Saved-file windows now restore bounds, library roots and cursor positions; macOS tab groups/order and active document are restored. Repeated launches of the same installed executable forward paths and focus an already-open canonical path. Dev and ordinary bundles remain separate owners. Full lifecycle stress remains partial: fullscreen/minimized/display states, exhaustive multi-dirty quit cancellation and crash/disk failure cases still need coverage.
 
 Themes are a new Andrew-requested product concept, planned for Cycle 33: shared workspace/preview presets and persisted selection. They are not implemented yet and are not evidence of iA theme parity. See [remaining cycle plan](remaining-cycles.md).
+
+Cycle 33 implements Andrew's themes addition (not an iA parity claim): Follow system, Light, Dark and Warm paper; persisted, synchronized across windows and matching preview. Bundled presets only; output styles independent. Native/system accessibility audit remains.

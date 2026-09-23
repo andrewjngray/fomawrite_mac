@@ -2,6 +2,7 @@
 #include "workspace.h"
 #include <QtConcurrent>
 #include <QtTest>
+#include <cmath>
 #include <QFont>
 #include <QTextBlock>
 #include <QTextLayout>
@@ -36,6 +37,39 @@ private slots:
         QSettings::setDefaultFormat(QSettings::IniFormat);
         QSettings::setPath(QSettings::IniFormat, QSettings::UserScope,
                            m_settingsDirectory.path());
+    }
+
+    void themesPersistWithoutEditingDocuments() {
+        Backend backend;
+        QQmlEngine engine; engine.rootContext()->setContextProperty("backend", &backend);
+        QQmlComponent component(&engine, QUrl::fromLocalFile(QFINDTESTDATA("../src/Main.qml")));
+        QScopedPointer<QObject> window(component.create()); QVERIFY2(window, qPrintable(component.errorString()));
+        auto *editor = window->findChild<QObject *>("sourceEditor"); QVERIFY(editor);
+        editor->setProperty("text", "theme-independent Markdown");
+        for (const auto &preset : {"light", "dark", "paper"}) {
+            auto *choice = window->findChild<QObject *>(QString("theme%1").arg(preset == QString("paper") ? "Paper" : preset == QString("dark") ? "Dark" : "Light"));
+            QVERIFY(choice); QVERIFY(QMetaObject::invokeMethod(choice, "triggered"));
+            QCOMPARE(backend.themePreset(), QString(preset));
+            backend.setDarkMode(true); // manual presets override system changes
+            QCOMPARE(backend.darkMode(), preset == QString("dark"));
+            Backend reopened; QCOMPARE(reopened.themePreset(), QString(preset));
+            QCOMPARE(reopened.themeBackground(), backend.themeBackground());
+            QCOMPARE(editor->property("text").toString(), QString("theme-independent Markdown"));
+            QVERIFY(backend.modified());
+            auto luminance = [](QColor c) {
+                auto linear=[](double v) { return v <= 0.04045 ? v/12.92 : std::pow((v+0.055)/1.055, 2.4); };
+                return .2126*linear(c.redF())+.7152*linear(c.greenF())+.0722*linear(c.blueF());
+            };
+            const auto palette = backend.palette();
+            for (auto role : {"text", "muted"}) {
+                const double a=luminance(QColor(palette[role].toString())), b=luminance(QColor(palette["panel"].toString()));
+                QVERIFY((qMax(a,b)+.05)/(qMin(a,b)+.05) >= 4.5);
+            }
+        }
+        backend.setThemePreset("invalid"); QCOMPARE(backend.themePreset(), QString("paper"));
+        backend.setThemePreset("system"); backend.setDarkMode(false); QVERIFY(!backend.darkMode());
+        backend.setDarkMode(true); QVERIFY(backend.darkMode());
+        backend.discardRecovery();
     }
 
     void workspacePersistsAndRejectsCorruption() {

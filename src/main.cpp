@@ -26,6 +26,7 @@
 #include "systemtheme.h"
 #ifdef Q_OS_MACOS
 void configureMacWindowChrome(QWindow *window);
+void applyMacWindowTheme(QWindow *window, bool followSystem, bool dark);
 QVariantMap macWorkspaceState(QWindow *window);
 void restoreMacWorkspaceTabs(const QList<QWindow *> &windows);
 #endif
@@ -174,6 +175,10 @@ int main(int argc, char *argv[]) {
         auto session = std::make_shared<Session>();
         session->backend = new Backend(&app);
         auto *backend = session->backend.data();
+        QObject::connect(backend, &Backend::themePresetChanged, &app, [&, backend] {
+            for (const auto &other : sessions)
+                if (other->backend && other->backend != backend) other->backend->setThemePreset(backend->themePreset());
+        });
         backend->setDarkMode(systemTheme.darkMode());
         backend->setTextScale(systemTheme.textScale());
         backend->focusExistingDocument = [&, backend](const QUrl &target) { return focusExisting(target, backend); };
@@ -192,6 +197,12 @@ int main(int argc, char *argv[]) {
         backend->setParentWindow(session->window);
 #ifdef Q_OS_MACOS
         configureMacWindowChrome(session->window);
+        const auto applyWindowTheme = [session] {
+            if (session->window && session->backend)
+                applyMacWindowTheme(session->window, session->backend->themePreset() == "system", session->backend->darkMode());
+        };
+        QObject::connect(backend, &Backend::themeColorsChanged, session->window, applyWindowTheme);
+        applyWindowTheme();
 #endif
         sessions.append(session);
         QObject::connect(session->window, &QWindow::activeChanged, &app, [&, session] {

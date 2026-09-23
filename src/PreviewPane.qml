@@ -22,7 +22,7 @@ Rectangle {
     }
     signal layoutRequested(int mode)
     signal linkRequested(url link)
-    color: darkMode ? "#191b1e" : "#ffffff"
+    color: backend.palette.page
     property string renderedMarkdown: ""
     onMarkdownChanged: refreshTimer.restart()
     onTextSizeChanged: refreshTimer.restart()
@@ -66,8 +66,9 @@ Rectangle {
             wrapMode: TextEdit.Wrap
             font.family: root.typeface
             font.pixelSize: root.textSize
-            color: root.darkMode ? "#e6e8ec" : "#242831"
-            selectionColor: "#c9d9f0"
+            color: backend.palette.text
+            selectionColor: backend.palette.selection
+            selectedTextColor: "white"
             onLinkActivated: function(link) { if (String(link).charAt(0) === "#") root.jumpToAnchor(String(link).slice(1)); else root.linkRequested(link); }
             Accessible.name: "Rendered Markdown preview"
         }
@@ -76,18 +77,18 @@ Rectangle {
             visible: root.markdown.length === 0
             text: "Your words, beautifully read.\nStart writing to see a live preview."
             horizontalAlignment: Text.AlignHCenter
-            color: root.darkMode ? "#929aa6" : "#8b919b"
+            color: backend.palette.muted
             font.pixelSize: 15
             lineHeight: 1.5
         }
     }
     Rectangle {
         anchors.left: parent.left; anchors.right: parent.right; anchors.bottom: parent.bottom
-        height: 34; color: root.darkMode ? "#24262a" : "#fafafa"
-        Rectangle { width: parent.width; height: 1; color: root.darkMode ? "#373a40" : "#e5e6e8" }
+        height: 34; color: backend.palette.panel
+        Rectangle { width: parent.width; height: 1; color: backend.palette.border }
         RowLayout {
             anchors.fill: parent; anchors.leftMargin: 12; anchors.rightMargin: 12
-            Label { text: "Markdown"; font.pixelSize: 11; color: root.darkMode ? "#92969e" : "#777c83" }
+            Label { text: "Markdown"; font.pixelSize: 11; color: backend.palette.muted }
             Item { Layout.fillWidth: true }
             ChromeButton { text: "Split"; hint: "Split layout"; darkMode: root.darkMode; checked: root.layoutMode === 1; onClicked: root.layoutRequested(1) }
             ChromeButton { text: "Full"; hint: "Preview layout"; darkMode: root.darkMode; checked: root.layoutMode === 2; onClicked: root.layoutRequested(2) }
