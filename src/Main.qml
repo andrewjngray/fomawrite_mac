@@ -878,6 +878,8 @@ ApplicationWindow {
 
     Dialog {
         id: analysisDialog
+        objectName: "writingReviewDialog"
+        closePolicy: Popup.CloseOnEscape
         property var results: []
         title: "Writing review — suggestions, not corrections"
         modal: false
