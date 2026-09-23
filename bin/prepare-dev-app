@@ -3,21 +3,21 @@
 set -eu
 ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
 [ "$(uname -s)" = Darwin ] || { echo 'Run on macOS.' >&2; exit 1; }
-DEV_APP="$ROOT/dist/Omawrite Dev.app"
-DEV_EXEC="$DEV_APP/Contents/MacOS/Omawrite"
+DEV_APP="$ROOT/dist/Fomawrite Dev.app"
+DEV_EXEC="$DEV_APP/Contents/MacOS/Fomawrite"
 PROCESS_LIST="$(/bin/ps -axo comm=)" || { echo 'Cannot check running apps; leaving development bundle untouched.' >&2; exit 1; }
 if printf '%s\n' "$PROCESS_LIST" | /usr/bin/awk -v executable="$DEV_EXEC" '$0 == executable {found=1} END {exit !found}'; then
-    echo 'Omawrite Dev is running. Save your work and close it normally before preparing a new build.' >&2
+    echo 'Fomawrite Dev is running. Save your work and close it normally before preparing a new build.' >&2
     exit 2
 fi
-[ -d "$ROOT/build/Omawrite.app" ] || { echo 'Run ./bin/build first.' >&2; exit 1; }
+[ -d "$ROOT/build/Fomawrite.app" ] || { echo 'Run ./bin/build first.' >&2; exit 1; }
 mkdir -p "$ROOT/dist"
 # Replace only our generated QA bundle, after the running-process guard above.
 rm -rf "$DEV_APP"
-ditto "$ROOT/build/Omawrite.app" "$DEV_APP"
-/usr/libexec/PlistBuddy -c 'Set :CFBundleIdentifier io.github.andrewjngray.omawrite.dev' "$DEV_APP/Contents/Info.plist"
-/usr/libexec/PlistBuddy -c 'Set :CFBundleName Omawrite Dev' "$DEV_APP/Contents/Info.plist"
-/usr/libexec/PlistBuddy -c 'Set :CFBundleDisplayName Omawrite Dev' "$DEV_APP/Contents/Info.plist"
+ditto "$ROOT/build/Fomawrite.app" "$DEV_APP"
+/usr/libexec/PlistBuddy -c 'Set :CFBundleIdentifier io.github.andrewjngray.fomawrite.dev' "$DEV_APP/Contents/Info.plist"
+/usr/libexec/PlistBuddy -c 'Set :CFBundleName Fomawrite Dev' "$DEV_APP/Contents/Info.plist"
+/usr/libexec/PlistBuddy -c 'Set :CFBundleDisplayName Fomawrite Dev' "$DEV_APP/Contents/Info.plist"
 codesign --force --deep --sign - "$DEV_APP"
 codesign --verify --deep --strict "$DEV_APP"
 printf 'Prepared %s\n' "$DEV_APP"

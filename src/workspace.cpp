@@ -66,7 +66,7 @@ InstanceBroker::Result InstanceBroker::start(const QString &directory, const QSt
         if (reply == "OK\n") return Forwarded;
         break;
     }
-    m_error = "The running Omawrite could not receive this request. Try again after it finishes its current dialog.";
+    m_error = "The running Fomawrite could not receive this request. Try again after it finishes its current dialog.";
     return Failed;
 }
 

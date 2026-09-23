@@ -4,6 +4,40 @@
 #include <QWindow>
 #import <AppKit/AppKit.h>
 
+void migrateMacPreferences() {
+    NSString *bundleId = [[NSBundle mainBundle] bundleIdentifier];
+    if (![bundleId isEqualToString:@"io.github.andrewjngray.fomawrite"]
+        && ![bundleId isEqualToString:@"io.github.andrewjngray.fomawrite.dev"]) return;
+
+    // Qt uses the organization domain plus applicationName for QSettings;
+    // both old Mac bundles shared this domain, independently of their bundle IDs.
+    CFStringRef source = CFSTR("io.github.andrewjngray.omawrite");
+    CFStringRef destination = CFSTR("io.github.andrewjngray.fomawrite");
+    CFStringRef marker = CFSTR("migration.omawritePreferencesComplete");
+    CFPropertyListRef completed = CFPreferencesCopyValue(marker, destination,
+        kCFPreferencesCurrentUser, kCFPreferencesAnyHost);
+    if (completed) { CFRelease(completed); return; }
+    CFArrayRef keys = CFPreferencesCopyKeyList(source, kCFPreferencesCurrentUser,
+                                               kCFPreferencesAnyHost);
+    if (!keys) return;
+    for (CFIndex i = 0; i < CFArrayGetCount(keys); ++i) {
+        CFStringRef key = (CFStringRef)CFArrayGetValueAtIndex(keys, i);
+        // The fresh bundle may already have Qt's default values after one
+        // launch, so the one-time migration gives old user choices priority.
+        if (CFStringHasPrefix(key, CFSTR("NS"))) continue;
+        CFPropertyListRef value = CFPreferencesCopyValue(key, source,
+            kCFPreferencesCurrentUser, kCFPreferencesAnyHost);
+        if (!value) continue;
+        CFPreferencesSetValue(key, value, destination,
+            kCFPreferencesCurrentUser, kCFPreferencesAnyHost);
+        CFRelease(value);
+    }
+    CFPreferencesSetValue(marker, kCFBooleanTrue, destination,
+        kCFPreferencesCurrentUser, kCFPreferencesAnyHost);
+    CFPreferencesSynchronize(destination, kCFPreferencesCurrentUser, kCFPreferencesAnyHost);
+    CFRelease(keys);
+}
+
 // Keep Qt's expanded client area, but let our one toolbar own the title label.
 void configureMacWindowChrome(QWindow *window) {
     if (!window) return;
@@ -11,11 +45,11 @@ void configureMacWindowChrome(QWindow *window) {
     NSWindow *native = view.window;
     // Request the roomier native unified title bar. AppKit owns control size,
     // placement and corner treatment; Qt continues to draw the toolbar items.
-    native.tabbingIdentifier = @"OmawriteDocuments";
+    native.tabbingIdentifier = @"FomawriteDocuments";
     native.tabbingMode = NSWindowTabbingModeDisallowed;
     native.toolbarStyle = NSWindowToolbarStyleUnified;
     if (!native.toolbar) {
-        NSToolbar *toolbar = [[NSToolbar alloc] initWithIdentifier:@"OmawriteWindowToolbar"];
+        NSToolbar *toolbar = [[NSToolbar alloc] initWithIdentifier:@"FomawriteWindowToolbar"];
         toolbar.allowsUserCustomization = NO;
         toolbar.displayMode = NSToolbarDisplayModeIconOnly;
         native.toolbar = toolbar;
@@ -50,7 +84,7 @@ void performMacWindowAction(QWindow *window, const QString &action, const QStrin
     else if (action == "front") [NSApp arrangeInFront:nil];
     else if (action == "merge") {
         for (NSWindow *other in NSApp.windows) {
-            if (other != native && [other.tabbingIdentifier isEqualToString:@"OmawriteDocuments"] && other.isVisible) {
+            if (other != native && [other.tabbingIdentifier isEqualToString:@"FomawriteDocuments"] && other.isVisible) {
                 native.tabbingMode = NSWindowTabbingModePreferred;
                 other.tabbingMode = NSWindowTabbingModePreferred;
                 [native addTabbedWindow:other ordered:NSWindowAbove];

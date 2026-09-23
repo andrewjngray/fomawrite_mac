@@ -1,4 +1,4 @@
-# What’s New in Omawrite
+# What’s New in Fomawrite
 
 Recent local improvements include:
 
@@ -14,4 +14,4 @@ Recent local improvements include:
 - a local Authors setup profile kept separate from manual annotations;
 - bundled offline Help and What’s New pages.
 
-Omawrite remains a local Markdown editor rather than a claim of complete iA Writer or Typora parity. Some captured menu categories and advanced platform workflows are still intentionally absent until their behavior can be observed and implemented safely.
+Fomawrite remains a local Markdown editor rather than a claim of complete iA Writer or Typora parity. Some captured menu categories and advanced platform workflows are still intentionally absent until their behavior can be observed and implemented safely.

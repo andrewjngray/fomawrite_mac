@@ -19,7 +19,7 @@ ApplicationWindow {
     visible: true
     font.family: Qt.platform.os === "osx" ? Qt.application.font.family : "Helvetica Neue"
     font.pixelSize: 13
-    title: (backend.modified ? "* " : "") + backend.fileName + " - Omawrite"
+    title: (backend.modified ? "* " : "") + backend.fileName + " - Fomawrite"
 
     readonly property bool isMac: Qt.platform.os === "osx"
     readonly property bool darkMode: backend.darkMode
@@ -888,7 +888,7 @@ ApplicationWindow {
             Platform.MenuItem { objectName: "filePageSetup"; text: "Page Setup…"; onTriggered: backend.pageSetup() }
             Platform.MenuSeparator {}
             Platform.Menu {
-                title: "Omawrite Extras"
+                title: "Fomawrite Extras"
                 Platform.MenuItem { objectName: "fileNewWindow"; text: "New Window"; onTriggered: backend.newWindow() }
                 Platform.MenuItem { objectName: "fileNewFolder"; text: "New Folder…"; enabled: backend.library.rootFolder.toString() !== ""; onTriggered: libraryPane.newFolder() }
                 Platform.MenuItem { objectName: "fileOpenPath"; text: "Open by Path…"; shortcut: "Ctrl+Shift+O"; onTriggered: openPathDialog.open() }
@@ -898,7 +898,7 @@ ApplicationWindow {
             }
             Platform.MenuSeparator {}
             Platform.MenuItem {
-                text: "Quit Omawrite"
+                text: "Quit Fomawrite"
                 role: Platform.MenuItem.QuitRole
                 onTriggered: backend.requestQuit()
             }
@@ -1271,14 +1271,14 @@ ApplicationWindow {
         Platform.Menu {
             title: "Help"
             Platform.MenuItem {
-                objectName: "helpOmawrite"
-                text: "Omawrite Help"
-                onTriggered: helpDialog.showPage("help", "Omawrite Help")
+                objectName: "helpFomawrite"
+                text: "Fomawrite Help"
+                onTriggered: helpDialog.showPage("help", "Fomawrite Help")
             }
             Platform.MenuItem {
                 objectName: "helpWhatsNew"
-                text: "What’s New in Omawrite"
-                onTriggered: helpDialog.showPage("whats-new", "What’s New in Omawrite")
+                text: "What’s New in Fomawrite"
+                onTriggered: helpDialog.showPage("whats-new", "What’s New in Fomawrite")
             }
             Platform.MenuSeparator {}
             Platform.MenuItem { objectName: "helpKeyboardShortcuts"; text: "Keyboard Shortcuts"; onTriggered: shortcutsDialog.open() }
@@ -1435,7 +1435,7 @@ ApplicationWindow {
         standardButtons: Dialog.Close
         ColumnLayout {
             anchors.fill: parent
-            Label { Layout.fillWidth: true; wrapMode: Text.Wrap; text: "Manual labels, not verified provenance. Edits can inherit nearby labels. Save writes a hidden .omawrite-authors.json sidecar; keep it with the Markdown file. External edits invalidate labels. Copy/paste between Omawrite windows preserves labels; other apps may remove them. External plain text is unlabelled. Export metadata separately to keep manual assertions with matching Markdown." }
+            Label { Layout.fillWidth: true; wrapMode: Text.Wrap; text: "Manual labels, not verified provenance. Edits can inherit nearby labels. Save writes a hidden .omawrite-authors.json sidecar; keep it with the Markdown file. External edits invalidate labels. Copy/paste between Fomawrite windows preserves labels; other apps may remove them. External plain text is unlabelled. Export metadata separately to keep manual assertions with matching Markdown." }
             TextField { id: authorName; Layout.fillWidth: true; placeholderText: "Author or source name (optional)" }
             RowLayout {
                 Repeater {

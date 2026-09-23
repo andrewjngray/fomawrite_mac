@@ -4,10 +4,10 @@ ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
 . "$ROOT/bin/qt-env"
 mkdir -p "$ROOT/build"
 cd "$ROOT/build"
-"$QMAKE" "$ROOT/omawrite.pro"
+"$QMAKE" "$ROOT/fomawrite.pro"
 make -j"$JOBS"
 if [ "$(uname -s)" = Darwin ]; then
-  echo "Built $ROOT/build/Omawrite.app"
+  echo "Built $ROOT/build/Fomawrite.app"
 else
-  echo "Built $ROOT/build/omawrite"
+  echo "Built $ROOT/build/fomawrite"
 fi

@@ -28,13 +28,13 @@
 #include "backend.h"
 #include "markdownhighlighter.h"
 
-class OmawriteTest : public QObject {
+class FomawriteTest : public QObject {
     Q_OBJECT
 
 private slots:
     void initTestCase() {
-        QCoreApplication::setOrganizationName("OmawriteTests");
-        QCoreApplication::setApplicationName("OmawriteTests");
+        QCoreApplication::setOrganizationName("FomawriteTests");
+        QCoreApplication::setApplicationName("FomawriteTests");
         QVERIFY(m_settingsDirectory.isValid());
         for (const QString &face : {"Regular", "Italic", "Bold", "BoldItalic"})
             QVERIFY(QFontDatabase::addApplicationFont(QFINDTESTDATA("../fonts/iAWriterMonoS-" + face + ".ttf")) >= 0);
@@ -512,13 +512,13 @@ private slots:
         Backend backend;
         const QString help = backend.bundledHelp(QStringLiteral("help"));
         const QString whatsNew = backend.bundledHelp(QStringLiteral("whats-new"));
-        QVERIFY(help.startsWith(QStringLiteral("# Omawrite Help")));
+        QVERIFY(help.startsWith(QStringLiteral("# Fomawrite Help")));
         QVERIFY(help.contains(QStringLiteral("ordinary UTF-8 Markdown")));
-        QVERIFY(whatsNew.startsWith(QStringLiteral("# What’s New in Omawrite")));
+        QVERIFY(whatsNew.startsWith(QStringLiteral("# What’s New in Fomawrite")));
         QVERIFY(!help.contains(QStringLiteral("/Users/")));
         const QString unavailable = backend.bundledHelp(QStringLiteral("../../README.md"));
         QVERIFY(unavailable.startsWith(QStringLiteral("# Help unavailable")));
-        QVERIFY(!unavailable.contains(QStringLiteral("Omawrite Mac")));
+        QVERIFY(!unavailable.contains(QStringLiteral("Fomawrite Mac")));
 
         QQmlEngine engine;
         engine.rootContext()->setContextProperty("backend", &backend);
@@ -526,7 +526,7 @@ private slots:
         QScopedPointer<QObject> window(component.create());
         QVERIFY2(window, qPrintable(component.errorString()));
         auto *editor = window->findChild<QObject *>("sourceEditor");
-        auto *helpAction = window->findChild<QObject *>("helpOmawrite");
+        auto *helpAction = window->findChild<QObject *>("helpFomawrite");
         auto *whatsNewAction = window->findChild<QObject *>("helpWhatsNew");
         auto *shortcutsAction = window->findChild<QObject *>("helpKeyboardShortcuts");
         auto *dialog = window->findChild<QObject *>("helpDialog");
@@ -555,14 +555,14 @@ private slots:
         };
         const auto recoveryBefore = recoveryContents();
 
-        QCOMPARE(helpAction->property("text").toString(), QStringLiteral("Omawrite Help"));
+        QCOMPARE(helpAction->property("text").toString(), QStringLiteral("Fomawrite Help"));
         QCOMPARE(whatsNewAction->property("text").toString(),
-                 QStringLiteral("What’s New in Omawrite"));
+                 QStringLiteral("What’s New in Fomawrite"));
         QVERIFY(QMetaObject::invokeMethod(helpAction, "triggered"));
         QTRY_VERIFY(dialog->property("opened").toBool());
-        QCOMPARE(dialog->property("title").toString(), QStringLiteral("Omawrite Help"));
+        QCOMPARE(dialog->property("title").toString(), QStringLiteral("Fomawrite Help"));
         QVERIFY(viewer->property("readOnly").toBool());
-        QVERIFY(viewer->property("text").toString().startsWith(QStringLiteral("# Omawrite Help")));
+        QVERIFY(viewer->property("text").toString().startsWith(QStringLiteral("# Fomawrite Help")));
         auto *quickWindow = qobject_cast<QWindow *>(window.data());
         QVERIFY(quickWindow);
         QTest::keyClick(quickWindow, Qt::Key_Escape);
@@ -570,7 +570,7 @@ private slots:
 
         QVERIFY(QMetaObject::invokeMethod(whatsNewAction, "triggered"));
         QTRY_VERIFY(dialog->property("opened").toBool());
-        QCOMPARE(dialog->property("title").toString(), QStringLiteral("What’s New in Omawrite"));
+        QCOMPARE(dialog->property("title").toString(), QStringLiteral("What’s New in Fomawrite"));
         QVERIFY(viewer->property("text").toString().contains(QStringLiteral("Recent local improvements")));
         QVERIFY(QMetaObject::invokeMethod(dialog, "close"));
         QVERIFY(QMetaObject::invokeMethod(shortcutsAction, "triggered"));
@@ -741,17 +741,17 @@ private slots:
     }
 
     void recoverySnapshotsSurviveProcessExit() {
-        const bool child = qEnvironmentVariableIsSet("OMAWRITE_CRASH_FIXTURE");
+        const bool child = qEnvironmentVariableIsSet("FOMAWRITE_CRASH_FIXTURE");
         QTemporaryDir directory;
-        const QString sampleRoot = child ? qEnvironmentVariable("OMAWRITE_CRASH_FIXTURE") : directory.path();
-        const QString runId = child ? qEnvironmentVariable("OMAWRITE_CRASH_ID") : "Recovery-" + QUuid::createUuid().toString(QUuid::Id128);
+        const QString sampleRoot = child ? qEnvironmentVariable("FOMAWRITE_CRASH_FIXTURE") : directory.path();
+        const QString runId = child ? qEnvironmentVariable("FOMAWRITE_CRASH_ID") : "Recovery-" + QUuid::createUuid().toString(QUuid::Id128);
         const auto oldName = QCoreApplication::applicationName();
         QCoreApplication::setApplicationName(runId);
         const auto restoreName = qScopeGuard([&] { QCoreApplication::setApplicationName(oldName); });
         if (!child) {
             for (int i=0; i<2; ++i) { QFile file(sampleRoot + QString("/%1.md").arg(i)); QVERIFY(file.open(QIODevice::WriteOnly)); file.write("original"); }
             QProcess process; auto env=QProcessEnvironment::systemEnvironment();
-            env.insert("OMAWRITE_CRASH_FIXTURE", sampleRoot); env.insert("OMAWRITE_CRASH_ID", runId);
+            env.insert("FOMAWRITE_CRASH_FIXTURE", sampleRoot); env.insert("FOMAWRITE_CRASH_ID", runId);
             process.setProcessEnvironment(env);
             process.start(QCoreApplication::applicationFilePath(), {"recoverySnapshotsSurviveProcessExit"});
             QVERIFY(process.waitForFinished(15000)); QCOMPARE(process.exitCode(), 77);
@@ -934,7 +934,7 @@ private slots:
         editor->setProperty("text", source);
         backend.saveAs(QUrl::fromLocalFile(dir.filePath("Source.md")));
         auto *quick = qvariant_cast<QQuickTextDocument *>(preview->property("textDocument")); QVERIFY(quick);
-        const QString evidence = qEnvironmentVariable("OMAWRITE_TEMPLATE_EVIDENCE");
+        const QString evidence = qEnvironmentVariable("FOMAWRITE_TEMPLATE_EVIDENCE");
         if (!evidence.isEmpty()) QVERIFY(QDir().mkpath(evidence));
         for (int style : {0, 1, 2, 4, 5, 6, 7, 0}) {
             backend.setOutputStyle(style);
@@ -977,7 +977,7 @@ private slots:
         const auto pdf=QUrl::fromLocalFile(directory.filePath("output.pdf")); QVERIFY(backend.exportDocument(pdf,"pdf"));
         QFile pdfFile(pdf.toLocalFile()); QVERIFY(pdfFile.open(QIODevice::ReadOnly)); QVERIFY(pdfFile.readAll().contains("/Type /Page"));
         // Optional synthetic evidence location is explicitly set by the test runner.
-        const auto evidence=qEnvironmentVariable("OMAWRITE_OUTPUT_EVIDENCE");
+        const auto evidence=qEnvironmentVariable("FOMAWRITE_OUTPUT_EVIDENCE");
         if(!evidence.isEmpty()) { QDir().mkpath(evidence); QVERIFY(QFile::copy(pdf.toLocalFile(),evidence+"/pages.pdf")); QVERIFY(QFile::copy(html.toLocalFile(),evidence+"/portable.html")); }
         QFile style(directory.filePath("style.json")); QVERIFY(style.open(QIODevice::WriteOnly));
         style.write(R"({"fontFamily":"Georgia","pointSize":12,"header":"Sample header: {title}","footer":"Page {page} of {pages}","titlePage":true})"); style.close();
@@ -1275,7 +1275,7 @@ private slots:
         QVERIFY(backend.exportDocument(QUrl::fromLocalFile(directory.filePath("sample.pdf")), "pdf"));
         QFile pdf(directory.filePath("sample.pdf")); QVERIFY(pdf.open(QIODevice::ReadOnly));
         QVERIFY(pdf.readAll().startsWith("%PDF"));
-        const QString evidence = qEnvironmentVariable("OMAWRITE_EXPORT_EVIDENCE");
+        const QString evidence = qEnvironmentVariable("FOMAWRITE_EXPORT_EVIDENCE");
         if (!evidence.isEmpty()) {
             QVERIFY(backend.exportDocument(QUrl::fromLocalFile(evidence + "/sample.pdf"), "pdf"));
             QVERIFY(backend.exportDocument(QUrl::fromLocalFile(evidence + "/sample.html"), "html"));
@@ -4113,5 +4113,5 @@ private:
     QTemporaryDir m_settingsDirectory;
 };
 
-QTEST_MAIN(OmawriteTest)
-#include "tst_omawrite.moc"
+QTEST_MAIN(FomawriteTest)
+#include "tst_fomawrite.moc"

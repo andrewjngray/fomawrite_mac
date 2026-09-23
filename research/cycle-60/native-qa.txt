@@ -1,0 +1,11 @@
+Cycle 60 native QA — 24 September 2026
+
+Old ordinary and Dev bundles showed clean saved documents. They were quit normally before the new identities were launched.
+
+New Fomawrite Dev launched with window title ending in “Fomawrite”, app menu “Fomawrite Dev” and clean Second.md. On its initial package, the restored document was correct but the library settings were defaulted; the Qt preference-domain migration was corrected and both bundles refreshed. After relaunch, the previous location, favorites, Date Modified sort and clean Second.md were visible.
+
+New ordinary Fomawrite launched with window title ending in “Fomawrite”, app menu “Fomawrite”, a clean saved document, and the old library preferences visible. Neither app displayed an unsaved mark. No sample document content was edited and no screenshot was persisted.
+
+Both bundle IDs were inspected from Info.plist and strict deep codesign verification passed.
+
+Final refreshed bundles reopened clean saved documents. The new Application Support migration marker exists; old workspace files remain intact.

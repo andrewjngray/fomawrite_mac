@@ -1,6 +1,6 @@
-# Omawrite Help
+# Fomawrite Help
 
-Omawrite is a calm, local Markdown editor. Your documents remain ordinary UTF-8 Markdown files.
+Fomawrite is a calm, local Markdown editor. Your documents remain ordinary UTF-8 Markdown files.
 
 ## Start writing
 

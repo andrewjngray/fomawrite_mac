@@ -1,6 +1,6 @@
-# Using Omawrite Mac 0.2.0 RC1
+# Archived guide: Omawrite Mac 0.2.0 RC1
 
-Open the packaged `dist/Omawrite.app` for everyday use or `dist/Omawrite Dev.app` for QA. Both edit real local UTF-8 files. The archive contains an Apple Silicon app requiring macOS 14 or later, with bundled Qt and an ad-hoc signature.
+This guide describes the old pre-rename release. For the current product, use `dist/Fomawrite.app` or `dist/Fomawrite Dev.app`; see the [rename notes](product-rename.md). The archived RC1 was named Omawrite. Both edit real local UTF-8 files. The archive contains an Apple Silicon app requiring macOS 14 or later, with bundled Qt and an ad-hoc signature.
 
 ## Find and organize
 

@@ -2,7 +2,7 @@
 
 ## First session
 
-Run `./bin/build`, then `./bin/run examples/Welcome.md`. Edit and save a disposable copy. Run `./bin/test` before committing a change to editor behaviour. `./bin/package-mac` creates `dist/Omawrite.app` with Qt bundled.
+Run `./bin/build`, then `./bin/run examples/Welcome.md`. Edit and save a disposable copy. Run `./bin/test` before committing a change to editor behaviour. `./bin/package-mac` creates `dist/Fomawrite.app` with Qt bundled.
 
 The initial Homebrew-based bundle declares macOS 14 as its minimum. This checkout was built on Apple Silicon/macOS 26.6.2; compatibility with macOS 14 and Intel is not yet tested. Apple's Command Line Tools are sufficient for this qmake build; full Xcode is optional.
 
@@ -25,7 +25,7 @@ For a manual smoke test:
 5. Close while modified; verify cancelling keeps the window.
 6. Open a file from Finder using Open With; test cold launch and an existing window.
 7. Change system appearance; check readability and selection contrast.
-8. Launch `dist/Omawrite.app` after packaging, checking that menus and file pickers work.
+8. Launch `dist/Fomawrite.app` after packaging, checking that menus and file pickers work.
 
 Each new document feature should add a meaningful regression test for the behaviour it can break. Prioritise data preservation over broad visual snapshots.
 

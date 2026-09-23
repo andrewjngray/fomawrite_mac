@@ -9,6 +9,7 @@
 #include <QUrl>
 #include <QWindow>
 #include <QFile>
+#include <QSaveFile>
 #include <QFileOpenEvent>
 #include <functional>
 #include <QPointer>
@@ -29,7 +30,46 @@ void configureMacWindowChrome(QWindow *window);
 void applyMacWindowTheme(QWindow *window, bool followSystem, bool dark);
 QVariantMap macWorkspaceState(QWindow *window);
 void restoreMacWorkspaceTabs(const QList<QWindow *> &windows);
+void migrateMacPreferences();
 #endif
+
+static QString workspaceIdentity(const QString &executablePath) {
+    return QString::fromLatin1(QCryptographicHash::hash(
+        (QDir::homePath() + executablePath).toUtf8(), QCryptographicHash::Sha256).toHex().left(20));
+}
+
+// A renamed bundle has a new application-data directory and executable path.
+// Copy only missing state into the new namespace; never move or erase the old
+// recovery files, so an interrupted first launch remains recoverable there.
+static void migrateLegacyWorkspace(const QString &stateDirectory,
+                                   const QString &workspacePath) {
+    const QString markerPath = QDir(stateDirectory).filePath(
+        QStringLiteral("migration-omawrite-state.done"));
+    if (QFileInfo::exists(markerPath)) return;
+    QString oldExecutable = QCoreApplication::applicationFilePath();
+    oldExecutable.replace(QStringLiteral("/Fomawrite Dev.app/Contents/MacOS/Fomawrite"),
+                          QStringLiteral("/Omawrite Dev.app/Contents/MacOS/Omawrite"));
+    oldExecutable.replace(QStringLiteral("/Fomawrite.app/Contents/MacOS/Fomawrite"),
+                          QStringLiteral("/Omawrite.app/Contents/MacOS/Omawrite"));
+    if (oldExecutable == QCoreApplication::applicationFilePath()) return;
+    const QDir legacyDirectory(QFileInfo(stateDirectory).dir().filePath(QStringLiteral("omawrite")));
+    const QString oldWorkspace = legacyDirectory.filePath(
+        QStringLiteral("workspace-%1.json").arg(workspaceIdentity(oldExecutable)));
+    if (!QFileInfo::exists(workspacePath) && QFileInfo(oldWorkspace).isFile()
+        && !QFileInfo(oldWorkspace).isSymLink())
+        QFile::copy(oldWorkspace, workspacePath);
+    for (const QString &name : legacyDirectory.entryList({QStringLiteral("recovery-*.json")},
+                                                         QDir::Files | QDir::NoSymLinks)) {
+        const QString destination = QDir(stateDirectory).filePath(name);
+        if (!QFileInfo::exists(destination)) QFile::copy(legacyDirectory.filePath(name), destination);
+    }
+    // Without this marker a discarded old recovery could be recopied forever.
+    QSaveFile marker(markerPath);
+    if (marker.open(QIODevice::WriteOnly)) {
+        marker.write("Imported legacy state without removing its source.\n");
+        marker.commit();
+    }
+}
 
 // Finder delivers documents as events, rather than command-line arguments.
 class WriterApplication : public QApplication {
@@ -56,9 +96,9 @@ public:
 
 int main(int argc, char *argv[]) {
     WriterApplication app(argc, argv);
-    app.setApplicationName(QStringLiteral("omawrite"));
-    app.setDesktopFileName(QStringLiteral("omawrite"));
-    app.setWindowIcon(QIcon::fromTheme(QStringLiteral("omawrite")));
+    app.setApplicationName(QStringLiteral("fomawrite"));
+    app.setDesktopFileName(QStringLiteral("fomawrite"));
+    app.setWindowIcon(QIcon::fromTheme(QStringLiteral("fomawrite")));
 
     QFontDatabase::addApplicationFont(QStringLiteral(":/fonts/iAWriterMonoS-Regular.ttf"));
     QFontDatabase::addApplicationFont(QStringLiteral(":/fonts/iAWriterMonoS-Italic.ttf"));
@@ -66,24 +106,27 @@ int main(int argc, char *argv[]) {
     QFontDatabase::addApplicationFont(QStringLiteral(":/fonts/iAWriterMonoS-BoldItalic.ttf"));
     app.setOrganizationName(QStringLiteral("AndrewGray"));
     app.setOrganizationDomain(QStringLiteral("andrewjngray.github.io"));
-    app.setApplicationDisplayName(QStringLiteral("Omawrite Mac"));
+    app.setApplicationDisplayName(QStringLiteral("Fomawrite"));
     app.setApplicationVersion(QStringLiteral("0.2.0-rc1"));
+#ifdef Q_OS_MACOS
+    migrateMacPreferences();
+#endif
 
     QQuickStyle::setStyle(QStringLiteral("Material"));
 
-    const QString identity = QString::fromLatin1(QCryptographicHash::hash(
-        (QDir::homePath() + QCoreApplication::applicationFilePath()).toUtf8(), QCryptographicHash::Sha256).toHex().left(20));
+    const QString identity = workspaceIdentity(QCoreApplication::applicationFilePath());
     const QString stateDirectory = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
     QDir().mkpath(stateDirectory);
     const QString workspacePath = QDir(stateDirectory).filePath("workspace-" + identity + ".json");
+    migrateLegacyWorkspace(stateDirectory, workspacePath);
     QStringList launchPaths;
     for (const auto &arg : app.arguments().mid(1))
         if (!arg.startsWith('-')) launchPaths.append(QFileInfo(arg).absoluteFilePath());
     InstanceBroker broker;
-    const auto ownership = broker.start(QDir::tempPath(), "omawrite-" + identity, launchPaths);
+    const auto ownership = broker.start(QDir::tempPath(), "fomawrite-" + identity, launchPaths);
     if (ownership == InstanceBroker::Forwarded) return 0;
     if (ownership == InstanceBroker::Failed) {
-        QMessageBox::critical(nullptr, "Omawrite", broker.error()); return 1;
+        QMessageBox::critical(nullptr, "Fomawrite", broker.error()); return 1;
     }
     app.setQuitOnLastWindowClosed(false);
     SystemTheme systemTheme(&app);

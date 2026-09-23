@@ -54,7 +54,7 @@ For every increment:
 2. Record intended behavior and mapped parity IDs in `docs/build-cycles.md`. QML owns UI/state; C++ owns document I/O and new formatting transformations. Keep macOS implementation separate from Linux.
 3. Implement one useful slice. Preserve UTF-8 Markdown, selection/cursor, undo, dirty prompts, recovery and external-change handling. Never add dead menu placeholders to simulate completion.
 4. Run `./bin/build` and `./bin/test`. Add behavior tests appropriate to the change, especially for text/file mutations and shared action states.
-5. Close QA app normally after preserving unsaved work, then run `./bin/prepare-dev-app`. Reuse `dist/Omawrite Dev.app` and `io.github.andrewjngray.omawrite.dev`; announce app attachment. Follow the existing [app-access procedure](development-app-approvals.md).
+5. Close QA app normally after preserving unsaved work, then run `./bin/prepare-dev-app`. Reuse `dist/Fomawrite Dev.app` and `io.github.andrewjngray.fomawrite.dev`; announce app attachment. Follow the existing [app-access procedure](development-app-approvals.md).
 6. Verify affected native workflows with disposable fixtures; save sanitized screenshots/logs under `research/cycle-NN/` and an optional short exercise under `research/usability/cycle-NN.md`. Inspect exported artifacts when output changes.
 7. Record tests, native result, known gaps, runnable artifact and commit. Update the parity row only when its behavior is verified; partial coverage stays Partial. Never commit build/dist outputs or private screenshots. Incorporate Andrew’s feedback into the next increment.
 

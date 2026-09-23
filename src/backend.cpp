@@ -184,7 +184,7 @@ bool Backend::libraryItemAction(const QUrl &url, const QString &action, const QS
             if (!QDir().rename(path, destination)) return fail("Could not rename the folder.");
         } else {
             // Stage a bounded recursive copy beside the destination; publish only on success.
-            QTemporaryDir staging(QDir(parent).filePath(".omawrite-copy-XXXXXX"));
+            QTemporaryDir staging(QDir(parent).filePath(".fomawrite-copy-XXXXXX"));
             if (!staging.isValid()) return fail("Could not create the temporary copy.");
             QDirIterator scan(path, QDir::AllEntries | QDir::Hidden | QDir::System | QDir::NoDotAndDotDot, QDirIterator::Subdirectories);
             qint64 bytes = 0; int count = 0;
@@ -375,7 +375,7 @@ int Backend::documentRevision() const { return m_document ? m_document->revision
 
 QString Backend::bundledHelp(const QString &page) const {
     static const QMap<QString, QString> resources{
-        {QStringLiteral("help"), QStringLiteral(":/help/omawrite-help.md")},
+        {QStringLiteral("help"), QStringLiteral(":/help/fomawrite-help.md")},
         {QStringLiteral("whats-new"), QStringLiteral(":/help/whats-new.md")}};
     const auto resource = resources.constFind(page);
     if (resource == resources.cend())
@@ -1923,7 +1923,7 @@ void Backend::saveTo(const QUrl &url, bool protectExternalChanges) {
         if (QFileInfo(url.toLocalFile()).isSymLink() || !current.open(QIODevice::ReadOnly)
             || current.readAll() != m_lastKnownFileContents || current.error() != QFile::NoError) {
             file.cancelWriting();
-            setStatus("Autosave paused: file changed outside Omawrite."); return;
+            setStatus("Autosave paused: file changed outside Fomawrite."); return;
         }
     }
 
@@ -2353,9 +2353,9 @@ void Backend::prepareOutput(QTextDocument &document, bool plain) const {
     if (plain) document.setPlainText(currentDocumentText());
     else {
         QString markdown=previewMarkdown(currentDocumentText());
-        markdown.replace(QRegularExpression("(?m)^\\s*<!-- pagebreak -->\\s*$"), "\n\nOMAWRITE_PAGE_BREAK_SENTINEL\n\n");
+        markdown.replace(QRegularExpression("(?m)^\\s*<!-- pagebreak -->\\s*$"), "\n\nFOMAWRITE_PAGE_BREAK_SENTINEL\n\n");
         document.setMarkdown(markdown);
-        for(auto block=document.begin();block.isValid();block=block.next()) if(block.text()=="OMAWRITE_PAGE_BREAK_SENTINEL") {
+        for(auto block=document.begin();block.isValid();block=block.next()) if(block.text()=="FOMAWRITE_PAGE_BREAK_SENTINEL") {
             QTextCursor cursor(&document); cursor.setPosition(block.position()); cursor.setPosition(block.position()+block.length()-1,QTextCursor::KeepAnchor); cursor.removeSelectedText();
             QTextBlockFormat format=cursor.blockFormat(); format.setPageBreakPolicy(QTextFormat::PageBreak_AlwaysBefore); cursor.setBlockFormat(format);
         }
@@ -2368,7 +2368,7 @@ void Backend::printPreview() {
     QPrinter printer(QPrinter::HighResolution);
     if (m_pageLayout.isValid()) printer.setPageLayout(m_pageLayout);
     QPrintPreviewDialog dialog(&printer);
-    dialog.setWindowTitle("Omawrite — Paginated Preview");
+    dialog.setWindowTitle("Fomawrite — Paginated Preview");
     connect(&dialog,&QPrintPreviewDialog::paintRequested,this,[this](QPrinter *output) {
         QTextDocument rendered; prepareOutput(rendered,false); paintOutput(*output,rendered);
     });
@@ -2487,7 +2487,7 @@ void Backend::autosave() {
     if (!m_modified || !m_fileUrl.isLocalFile() || !m_hasKnownFileContents) return;
     QFile current(m_fileUrl.toLocalFile());
     if (!current.open(QIODevice::ReadOnly) || current.readAll() != m_lastKnownFileContents || current.error() != QFile::NoError) {
-        setStatus("Autosave paused: file changed outside Omawrite."); return;
+        setStatus("Autosave paused: file changed outside Fomawrite."); return;
     }
     saveTo(m_fileUrl, true);
 }

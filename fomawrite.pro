@@ -2,7 +2,7 @@ QT += core gui widgets printsupport qml quick quickcontrols2 quickdialogs2
 !macx: QT += dbus
 
 CONFIG += c++17 release
-TARGET = omawrite
+TARGET = fomawrite
 TEMPLATE = app
 
 HEADERS += \
@@ -18,7 +18,7 @@ SOURCES += \
 macx {
     SOURCES += src/systemtheme_mac.cpp
     OBJECTIVE_SOURCES += src/windowchrome_mac.mm
-    TARGET = Omawrite
+    TARGET = Fomawrite
     QMAKE_INFO_PLIST = macos/Info.plist
     QMAKE_MACOSX_DEPLOYMENT_TARGET = 14.0
 } else {

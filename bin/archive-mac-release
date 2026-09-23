@@ -6,18 +6,18 @@ cd "$ROOT"
 TAG="${1:?Usage: bin/archive-mac-release mac-vVERSION}"
 case "$TAG" in *[!A-Za-z0-9._-]*|'') echo 'Invalid release name' >&2; exit 1;; esac
 # User documents can be dirty; compiled inputs must match the commit.
-git diff --quiet HEAD -- src omawrite.pro macos bin fonts LICENSE || { echo 'Commit compiled inputs before archiving.' >&2; exit 1; }
+git diff --quiet HEAD -- src fomawrite.pro macos bin fonts LICENSE || { echo 'Commit compiled inputs before archiving.' >&2; exit 1; }
 "$ROOT/bin/package-mac"
-APP="$ROOT/dist/Omawrite.app"
+APP="$ROOT/dist/Fomawrite.app"
 codesign --verify --deep --strict "$APP"
 ARCH="$(uname -m)"
 OUTPUT="$ROOT/dist/releases/$TAG"
 [ ! -e "$OUTPUT" ] || { echo 'Archive already exists; choose a new release name.' >&2; exit 1; }
 mkdir -p "$OUTPUT"
-ARCHIVE="Omawrite-Mac-$ARCH.zip"
+ARCHIVE="Fomawrite-Mac-$ARCH.zip"
 ditto -c -k --sequesterRsrc --keepParent "$APP" "$OUTPUT/$ARCHIVE"
 {
-    echo "Omawrite Mac $TAG"
+    echo "Fomawrite Mac $TAG"
     echo "Source: $(git rev-parse HEAD)"
     echo "Architecture: $ARCH"
     echo "macOS build host: $(sw_vers -productVersion)"

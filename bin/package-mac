@@ -6,28 +6,28 @@ ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
 "$ROOT/bin/build"
 QT_BIN="$("$QMAKE" -query QT_INSTALL_BINS)"
 # Never replace a running editor bundle.
-PACKAGE_EXEC="$ROOT/dist/Omawrite.app/Contents/MacOS/Omawrite"
+PACKAGE_EXEC="$ROOT/dist/Fomawrite.app/Contents/MacOS/Fomawrite"
 PROCESS_LIST="$(/bin/ps -axo comm=)" || exit 1
 if printf '%s\n' "$PROCESS_LIST" | /usr/bin/awk -v executable="$PACKAGE_EXEC" '$0 == executable {found=1} END {exit !found}'; then
-    echo 'Omawrite is running. Save and quit normally before packaging.' >&2
+    echo 'Fomawrite is running. Save and quit normally before packaging.' >&2
     exit 2
 fi
 mkdir -p "$ROOT/dist"
 # ditto replaces matching files; remove only the generated bundle for a clean deployment.
-rm -rf "$ROOT/dist/Omawrite.app"
-ditto "$ROOT/build/Omawrite.app" "$ROOT/dist/Omawrite.app"
+rm -rf "$ROOT/dist/Fomawrite.app"
+ditto "$ROOT/build/Fomawrite.app" "$ROOT/dist/Fomawrite.app"
 # Preload QtQml so nested modules from split Homebrew packages participate
 # in the initial dependency scan, including their own framework paths.
 QML_CORE="$("$QMAKE" -query QT_INSTALL_QML)/QtQml"
-mkdir -p "$ROOT/dist/Omawrite.app/Contents/Resources/qml"
-cp -RL "$QML_CORE" "$ROOT/dist/Omawrite.app/Contents/Resources/qml/QtQml"
+mkdir -p "$ROOT/dist/Fomawrite.app/Contents/Resources/qml"
+cp -RL "$QML_CORE" "$ROOT/dist/Fomawrite.app/Contents/Resources/qml/QtQml"
 # Copied Qt plug-ins can carry provenance xattrs that make install_name_tool
 # refuse its own temporary rewrite inside this freshly generated bundle.
-xattr -cr "$ROOT/dist/Omawrite.app"
+xattr -cr "$ROOT/dist/Fomawrite.app"
 
-DYLD_FRAMEWORK_PATH="$("$QMAKE" -query QT_INSTALL_LIBS)" "$QT_BIN/macdeployqt" "$ROOT/dist/Omawrite.app" -qmldir="$ROOT/src" -libpath="$("$QMAKE" -query QT_INSTALL_LIBS)" -no-codesign -no-strip
-mkdir -p "$ROOT/dist/Omawrite.app/Contents/Resources/licenses"
-cp "$ROOT/LICENSE" "$ROOT/dist/Omawrite.app/Contents/Resources/licenses/Omawrite-MIT.txt"
-cp "$ROOT/fonts/OFL.txt" "$ROOT/dist/Omawrite.app/Contents/Resources/licenses/Fonts-OFL.txt"
-codesign --force --deep --sign - "$ROOT/dist/Omawrite.app"
-echo "Packaged $ROOT/dist/Omawrite.app (local ad-hoc signature)"
+DYLD_FRAMEWORK_PATH="$("$QMAKE" -query QT_INSTALL_LIBS)" "$QT_BIN/macdeployqt" "$ROOT/dist/Fomawrite.app" -qmldir="$ROOT/src" -libpath="$("$QMAKE" -query QT_INSTALL_LIBS)" -no-codesign -no-strip
+mkdir -p "$ROOT/dist/Fomawrite.app/Contents/Resources/licenses"
+cp "$ROOT/LICENSE" "$ROOT/dist/Fomawrite.app/Contents/Resources/licenses/Upstream-Omawrite-MIT.txt"
+cp "$ROOT/fonts/OFL.txt" "$ROOT/dist/Fomawrite.app/Contents/Resources/licenses/Fonts-OFL.txt"
+codesign --force --deep --sign - "$ROOT/dist/Fomawrite.app"
+echo "Packaged $ROOT/dist/Fomawrite.app (local ad-hoc signature)"

@@ -2,7 +2,7 @@
 set -eu
 ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
 if [ "$(uname -s)" = Darwin ]; then
-  exec "$ROOT/build/Omawrite.app/Contents/MacOS/Omawrite" "$@"
+  exec "$ROOT/build/Fomawrite.app/Contents/MacOS/Fomawrite" "$@"
 else
-  exec "$ROOT/build/omawrite" "$@"
+  exec "$ROOT/build/fomawrite" "$@"
 fi
