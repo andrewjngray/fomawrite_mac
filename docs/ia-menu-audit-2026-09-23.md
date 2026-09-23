@@ -1,6 +1,6 @@
 # iA Writer menu map and Omawrite gap audit — 23 September 2026
 
-This is the planning baseline after Omawrite Cycle 47 (76 tests), updated through Cycle 56a source and partial native checks on 24 September. Current source passes 94 tests; Cycles 48–51 are complete and later cycles retain explicit acceptance gaps. It transcribes the menu screenshots in `screenshots/` and compares them with the source. It is an interface and behavior audit, not a claim that similarly named commands behave identically.
+This is the planning baseline after Omawrite Cycle 47 (76 tests), updated through combined Cycle 55c/56a source and partial native checks on 24 September. Current source passes 96 tests; Cycles 48–51 are complete and later cycles retain explicit acceptance gaps. It transcribes the menu screenshots in `screenshots/` and compares them with the source. It is an interface and behavior audit, not a claim that similarly named commands behave identically.
 
 The screenshots contain personal filenames, locations and tags. This document records commands only. The images remain untracked reference material and should not be committed. Two files are empty duplicate captures: `3.48.34 PM(2)` and `3.49.37 PM(2)`. The duplicate `1.57.39 PM(2)` and `3.50.00 PM(2)` images add no distinct menu evidence.
 
@@ -185,7 +185,7 @@ These menus were not opened in the screenshot folder. The 24 September native in
 | Enable Focus Mode | **Partial (Cycle 55a)** | Native Focus menu now nests Sentence, Paragraph and Typewriter under this label. There is no separate master Focus switch; exact iA activation semantics remain unobserved. |
 | Sentence / Paragraph / Typewriter | **Partial (Cycle 55a)** | Existing controls are grouped in the captured order. Sentence/Paragraph are exclusive, Typewriter remains independent; visual dimming/scroll and checked-state native acceptance remain open. |
 | Syntax: parts of speech | **Partial** | Writing Review lists macOS lexical classes while open. It does not color words live in the editor or provide per-class visibility toggles. |
-| Style Check | **Partial (Cycle 55b)** | Focus → Enable Style Check → Custom is a persisted opt-in live overlay driven by the Writing Review word list. It scans the first 50,000 UTF-16 units, accepts at most 32 unique terms of 64 units each and returns at most 1,000 ordered non-overlapping matches outside code and URL destinations. Fillers, Clichés and Redundancies are not implemented. Native menu presence is verified; screenshot capture was unavailable, so the visual highlight is not yet accepted. |
+| Style Check | **Partial (Cycles 55b–55c)** | Focus → Enable Style Check has persisted, independent live Fillers and Custom toggles. Fillers matches `very`, `really`, `quite` and `just` as case-insensitive Unicode whole words. Both categories share the first-50,000-UTF-16-unit and 1,000-result caps and exclude fenced/indented/inline code, URL destinations and raw tags. Custom supports at most 32 unique terms of 64 units each and wins an exact overlap. Native menu presence and nonmutation were verified; screenshot capture was unavailable, so pixel styling is not accepted. Clichés, Redundancies and Show Syntax are absent. |
 | Hide Authors by category | **Gap** | Annotations can be listed and selected, but there is no live category overlay or visibility filtering. |
 
 ### View

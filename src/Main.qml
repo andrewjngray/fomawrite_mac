@@ -104,8 +104,15 @@ ApplicationWindow {
     Timer {
         id: customReviewRefreshTimer
         interval: 200
-        onTriggered: backend.setCustomReviewWords(
-                         workspaceSettings.styleCheckCustom ? workspaceSettings.reviewWords : "")
+        onTriggered: backend.setStyleReviewWords(workspaceSettings.reviewWords,
+                                                  workspaceSettings.styleCheckCustom,
+                                                  workspaceSettings.styleCheckFillers)
+    }
+    function applyStyleReviewNow() {
+        customReviewRefreshTimer.stop();
+        backend.setStyleReviewWords(workspaceSettings.reviewWords,
+                                    workspaceSettings.styleCheckCustom,
+                                    workspaceSettings.styleCheckFillers);
     }
     Connections {
         target: backend
@@ -137,10 +144,12 @@ ApplicationWindow {
         property bool styleCheckCustom: false
         onStyleCheckCustomChanged: {
             if (styleCheckCustom) customReviewRefreshTimer.restart();
-            else {
-                customReviewRefreshTimer.stop();
-                backend.setCustomReviewWords("");
-            }
+            else win.applyStyleReviewNow();
+        }
+        property bool styleCheckFillers: false
+        onStyleCheckFillersChanged: {
+            if (styleCheckFillers) customReviewRefreshTimer.restart();
+            else win.applyStyleReviewNow();
         }
         property string authorshipProfileName: ""
         property string authorshipProfileIdentifier: ""
@@ -1073,6 +1082,7 @@ ApplicationWindow {
             Platform.Menu {
                 objectName: "focusStyleCheckMenu"
                 title: "Enable Style Check"
+                NativeCommand { commandId: "fillersStyleCheck"; text: "Fillers" }
                 NativeCommand { commandId: "customStyleCheck"; text: "Custom" }
             }
             Platform.MenuSeparator {}
@@ -2247,7 +2257,7 @@ ApplicationWindow {
                 }
 
                 onTextChanged: {
-                    if (workspaceSettings.styleCheckCustom)
+                    if (workspaceSettings.styleCheckCustom || workspaceSettings.styleCheckFillers)
                         customReviewRefreshTimer.restart();
                     if (win.searchUpdating)
                         return;
@@ -2271,7 +2281,7 @@ ApplicationWindow {
                     backend.setShowMarkup(workspaceSettings.showMarkup);
                     backend.attachDocument(textDocument);
                     backend.setFocusPosition(cursorPosition, workspaceSettings.paragraphFocus, workspaceSettings.sentenceFocus);
-                    if (workspaceSettings.styleCheckCustom)
+                    if (workspaceSettings.styleCheckCustom || workspaceSettings.styleCheckFillers)
                         customReviewRefreshTimer.restart();
                     forceActiveFocus();
                 }

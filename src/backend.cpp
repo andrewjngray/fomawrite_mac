@@ -2413,26 +2413,32 @@ QString Backend::proseForReview(const QString &markdown) {
     return result;
 }
 
-QVariantList Backend::customReviewSpans(const QString &customWords) const {
+QVariantList Backend::styleReviewSpans(const QString &customWords,
+                                       bool customEnabled,
+                                       bool fillersEnabled) const {
     QVariantList spans;
     if (!m_document) return spans;
     const QString source = currentDocumentText();
     const QString prose = proseForReview(source); // Offset-preserving, first 50k UTF-16 units.
 
     QMap<QString, QString> uniqueWords;
-    int from = 0;
-    while (from <= customWords.size() && uniqueWords.size() < 32) {
-        const int comma = customWords.indexOf(',', from);
-        const int end = comma < 0 ? customWords.size() : comma;
-        const QString word = customWords.mid(from, end - from).trimmed();
-        from = comma < 0 ? customWords.size() + 1 : comma + 1;
-        if (word.isEmpty() || word.size() > 64) continue;
-        const QString folded = word.toCaseFolded();
-        if (!uniqueWords.contains(folded)) uniqueWords.insert(folded, word);
+    if (customEnabled) {
+        int from = 0;
+        while (from <= customWords.size() && uniqueWords.size() < 32) {
+            const int comma = customWords.indexOf(',', from);
+            const int end = comma < 0 ? customWords.size() : comma;
+            const QString word = customWords.mid(from, end - from).trimmed();
+            from = comma < 0 ? customWords.size() + 1 : comma + 1;
+            if (word.isEmpty() || word.size() > 64) continue;
+            const QString folded = word.toCaseFolded();
+            if (!uniqueWords.contains(folded)) uniqueWords.insert(folded, word);
+        }
     }
 
     struct MatchCursor {
         QString word;
+        QString label;
+        int priority;
         QRegularExpressionMatchIterator iterator;
         QRegularExpressionMatch match;
     };
@@ -2445,7 +2451,21 @@ QVariantList Backend::customReviewSpans(const QString &customWords) const {
         auto iterator = pattern.globalMatch(prose);
         if (iterator.hasNext()) {
             const auto match = iterator.next();
-            cursors.append({word, iterator, match});
+            cursors.append({word, QStringLiteral("Custom"), 0, iterator, match});
+        }
+    }
+    if (fillersEnabled) {
+        for (const QString &word : {QStringLiteral("very"), QStringLiteral("really"),
+                                    QStringLiteral("quite"), QStringLiteral("just")}) {
+            if (uniqueWords.contains(word.toCaseFolded())) continue; // Explicit Custom wins.
+            const QRegularExpression pattern(
+                QStringLiteral("(?<!%1)%2(?!%1)").arg(boundary, QRegularExpression::escape(word)),
+                QRegularExpression::CaseInsensitiveOption | QRegularExpression::UseUnicodePropertiesOption);
+            auto iterator = pattern.globalMatch(prose);
+            if (iterator.hasNext()) {
+                const auto match = iterator.next();
+                cursors.append({word, QStringLiteral("Fillers"), 1, iterator, match});
+            }
         }
     }
 
@@ -2462,28 +2482,43 @@ QVariantList Backend::customReviewSpans(const QString &customWords) const {
                     && candidate.match.capturedLength() > current.match.capturedLength())
                 || (candidate.match.capturedStart() == current.match.capturedStart()
                     && candidate.match.capturedLength() == current.match.capturedLength()
+                    && candidate.priority < current.priority)
+                || (candidate.match.capturedStart() == current.match.capturedStart()
+                    && candidate.match.capturedLength() == current.match.capturedLength()
+                    && candidate.priority == current.priority
                     && candidate.word.toCaseFolded() < current.word.toCaseFolded())) best = i;
         }
         auto &cursor = cursors[best];
         const int matchStart = cursor.match.capturedStart();
         const int matchEnd = cursor.match.capturedEnd();
         const QString matchedWord = source.mid(matchStart, cursor.match.capturedLength());
+        const QString label = cursor.label;
         if (cursor.iterator.hasNext()) cursor.match = cursor.iterator.next();
         else cursors.removeAt(best);
         if (matchStart < acceptedEnd) continue;
         spans.append(QVariantMap{{QStringLiteral("start"), matchStart},
                                  {QStringLiteral("end"), matchEnd},
-                                 {QStringLiteral("label"), QStringLiteral("Custom")},
+                                 {QStringLiteral("label"), label},
                                  {QStringLiteral("word"), matchedWord}});
         acceptedEnd = matchEnd;
     }
     return spans;
 }
 
+QVariantList Backend::customReviewSpans(const QString &customWords) const {
+    return styleReviewSpans(customWords, true, false);
+}
+
 void Backend::setCustomReviewWords(const QString &customWords) {
+    setStyleReviewWords(customWords, true, false);
+}
+
+void Backend::setStyleReviewWords(const QString &customWords,
+                                  bool customEnabled,
+                                  bool fillersEnabled) {
     if (!m_highlighter) return;
     QList<MarkdownHighlighter::Span> spans;
-    const QVariantList reviewSpans = customReviewSpans(customWords);
+    const QVariantList reviewSpans = styleReviewSpans(customWords, customEnabled, fillersEnabled);
     spans.reserve(reviewSpans.size());
     for (const QVariant &entry : reviewSpans) {
         const QVariantMap span = entry.toMap();

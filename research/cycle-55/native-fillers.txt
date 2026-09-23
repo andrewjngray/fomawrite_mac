@@ -1,0 +1,23 @@
+Cycle 55c native Fillers checkpoint — 24 September 2026
+
+Artifact
+- Refreshed stable dist/Omawrite Dev.app with combined Cycle 55c/56a source.
+- ./bin/build passed.
+- Full native-access ./bin/test: 96 passed, 0 failed, 0 skipped.
+
+Observed
+- Focus → Enable Style Check contained Fillers and Custom.
+- Fillers was toggled on the synthetic research/cycle-47/sample/Templates.md document.
+- Document source and saved status remained unchanged.
+
+Not verified
+- Screenshot capture was unavailable, so pixel styling, highlight color and checked-state appearance were not verified.
+- Keyboard traversal, dark/narrow/fullscreen behavior and VoiceOver remain open.
+
+Boundaries
+- Fillers contains exactly very, really, quite and just.
+- Matching is case-insensitive at Unicode whole-word boundaries.
+- Fillers and Custom share the first 50,000 UTF-16 units and 1,000 ordered non-overlapping match caps.
+- Fenced, indented and inline code, URL destinations and raw tags are excluded.
+- An exact Custom overlap takes precedence; toggles remain independent.
+- Clichés, Redundancies and Show Syntax are absent.

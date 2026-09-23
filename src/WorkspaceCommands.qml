@@ -94,6 +94,7 @@ QtObject {
         { id: "sentence", title: "Sentence Focus", toggle: true },
         { id: "paragraph", title: "Paragraph Focus", toggle: true },
         { id: "typewriter", title: "Typewriter Scrolling", toggle: true },
+        { id: "fillersStyleCheck", title: "Fillers", toggle: true },
         { id: "customStyleCheck", title: "Custom", toggle: true },
         { id: "strike", title: "Strikethrough" },
         { id: "inlineCode", title: "Inline Code" }
@@ -169,6 +170,7 @@ QtObject {
         case "sentence": return settings.sentenceFocus;
         case "paragraph": return settings.paragraphFocus;
         case "typewriter": return settings.typewriter;
+        case "fillersStyleCheck": return settings.styleCheckFillers;
         case "customStyleCheck": return settings.styleCheckCustom;
         default: return false;
         }
@@ -230,6 +232,7 @@ QtObject {
         case "sentence": settings.sentenceFocus = !settings.sentenceFocus; if (settings.sentenceFocus) settings.paragraphFocus = false; break;
         case "paragraph": settings.paragraphFocus = !settings.paragraphFocus; if (settings.paragraphFocus) settings.sentenceFocus = false; break;
         case "typewriter": settings.typewriter = !settings.typewriter; typewriterChanged(); break;
+        case "fillersStyleCheck": settings.styleCheckFillers = !settings.styleCheckFillers; break;
         case "customStyleCheck": settings.styleCheckCustom = !settings.styleCheckCustom; break;
         case "strike": editor.wrapSelection("~~", "~~"); break;
         case "inlineCode": editor.wrapSelection("`", "`"); break;

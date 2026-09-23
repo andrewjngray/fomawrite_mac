@@ -358,6 +358,53 @@ private slots:
         backend.discardRecovery();
     }
 
+    void fillerAndCustomReviewSpansMergeGlobally() {
+        Backend backend;
+        QQmlEngine engine;
+        engine.rootContext()->setContextProperty("backend", &backend);
+        QQmlComponent component(&engine, QUrl::fromLocalFile(QFINDTESTDATA("../src/Main.qml")));
+        QScopedPointer<QObject> window(component.create());
+        QVERIFY2(window, qPrintable(component.errorString()));
+        auto *editor = window->findChild<QObject *>("sourceEditor");
+        QVERIFY(editor);
+
+        const QString source = QStringLiteral(
+            "😀 Really very veryish quite just.\n"
+            "`really` <very> https://example.invalid/quite\n"
+            "/just raw tag\n");
+        editor->setProperty("text", source);
+        const QVariantList spans = backend.styleReviewSpans(
+            QStringLiteral("really"), true, true);
+        QCOMPARE(spans.size(), 4);
+        QCOMPARE(spans.at(0).toMap().value("start").toInt(), 3);
+        QCOMPARE(spans.at(0).toMap().value("word").toString(), QStringLiteral("Really"));
+        QCOMPARE(spans.at(0).toMap().value("label").toString(), QStringLiteral("Custom"));
+        for (int i = 1; i < spans.size(); ++i)
+            QCOMPARE(spans.at(i).toMap().value("label").toString(), QStringLiteral("Fillers"));
+        for (int i = 0; i < spans.size(); ++i) {
+            const QVariantMap span = spans.at(i).toMap();
+            QCOMPARE(source.mid(span.value("start").toInt(),
+                                span.value("end").toInt() - span.value("start").toInt()),
+                     span.value("word").toString());
+            if (i > 0)
+                QVERIFY(spans.at(i - 1).toMap().value("end").toInt()
+                        <= span.value("start").toInt());
+        }
+
+        QString repeated;
+        for (int i = 0; i < 1100; ++i) repeated += QStringLiteral("very custom ");
+        editor->setProperty("text", repeated);
+        const QVariantList capped = backend.styleReviewSpans(
+            QStringLiteral("custom"), true, true);
+        QCOMPARE(capped.size(), 1000);
+        for (int i = 1; i < capped.size(); ++i)
+            QVERIFY(capped.at(i - 1).toMap().value("start").toInt()
+                    < capped.at(i).toMap().value("start").toInt());
+        QCOMPARE(capped.at(0).toMap().value("label").toString(), QStringLiteral("Fillers"));
+        QCOMPARE(capped.at(1).toMap().value("label").toString(), QStringLiteral("Custom"));
+        backend.discardRecovery();
+    }
+
     void customReviewOverlayComposesWithMarkdownFocusAndSearch() {
         const QString source = QStringLiteral("**custom** [custom](url) `custom`\nplain custom");
         QTextDocument document;
@@ -2463,6 +2510,101 @@ private slots:
         reopenedSettings->setProperty("reviewWords", originalWords);
         reopenedSettings->setProperty("styleCheckCustom", originalEnabled);
         QVERIFY(QMetaObject::invokeMethod(reopenedSettings, "sync"));
+        backend.discardRecovery();
+    }
+
+    void fillerStyleCheckTogglesIndependentlyWithoutEditing() {
+        QTemporaryDir directory;
+        const QString path = directory.filePath(QStringLiteral("fillers.md"));
+        QFile file(path);
+        QVERIFY(file.open(QIODevice::WriteOnly));
+        file.write("Really custom just.\n");
+        file.close();
+
+        Backend backend;
+        QQmlEngine engine;
+        engine.rootContext()->setContextProperty("backend", &backend);
+        QQmlComponent component(&engine, QUrl::fromLocalFile(QFINDTESTDATA("../src/Main.qml")));
+        QScopedPointer<QObject> window(component.create());
+        QVERIFY2(window, qPrintable(component.errorString()));
+        auto *settings = window->findChild<QObject *>("workspaceSettings");
+        auto *commands = window->findChild<QObject *>("workspaceCommands");
+        auto *fillers = window->findChild<QObject *>("native_fillersStyleCheck");
+        auto *custom = window->findChild<QObject *>("native_customStyleCheck");
+        QVERIFY(settings && commands && fillers && custom);
+        const bool originalFillers = settings->property("styleCheckFillers").toBool();
+        const bool originalCustom = settings->property("styleCheckCustom").toBool();
+        const QString originalWords = settings->property("reviewWords").toString();
+        settings->setProperty("styleCheckFillers", false);
+        settings->setProperty("styleCheckCustom", false);
+        settings->setProperty("reviewWords", QStringLiteral("custom"));
+
+        auto run = [&](const QString &id) {
+            return QMetaObject::invokeMethod(commands, "run", Q_ARG(QVariant, id));
+        };
+        QCOMPARE(fillers->property("text").toString(), QStringLiteral("Fillers"));
+        QVERIFY(fillers->property("checkable").toBool());
+        QVERIFY(run(QStringLiteral("fillersStyleCheck")));
+        QVERIFY(settings->property("styleCheckFillers").toBool());
+        QVERIFY(!settings->property("styleCheckCustom").toBool());
+        QVERIFY(fillers->property("checked").toBool());
+        QVERIFY(QMetaObject::invokeMethod(settings, "sync"));
+        window.reset();
+
+        QScopedPointer<QObject> reopened(component.create());
+        QVERIFY2(reopened, qPrintable(component.errorString()));
+        settings = reopened->findChild<QObject *>("workspaceSettings");
+        commands = reopened->findChild<QObject *>("workspaceCommands");
+        fillers = reopened->findChild<QObject *>("native_fillersStyleCheck");
+        custom = reopened->findChild<QObject *>("native_customStyleCheck");
+        auto *editor = reopened->findChild<QObject *>("sourceEditor");
+        QVERIFY(settings && commands && fillers && custom && editor);
+        QCOMPARE(settings->property("styleCheckFillers").toBool(), true);
+        QCOMPARE(settings->property("styleCheckCustom").toBool(), false);
+        QVERIFY(fillers->property("checked").toBool());
+
+        backend.open(QUrl::fromLocalFile(path));
+        QCoreApplication::processEvents(); // Let the document-loaded caret reset finish first.
+        backend.markAuthorship(0, 6, QStringLiteral("Human"), QStringLiteral("Synthetic"));
+        QVERIFY(editor->setProperty("cursorPosition", 2));
+        const QString source = editor->property("text").toString();
+        const int cursorPosition = editor->property("cursorPosition").toInt();
+        const bool modified = backend.modified();
+        const bool canUndo = editor->property("canUndo").toBool();
+        const QVariantList annotations = backend.authorshipRanges();
+        auto *quick = qvariant_cast<QQuickTextDocument *>(editor->property("textDocument"));
+        QVERIFY(quick);
+        auto backgroundAt = [&](int position) {
+            const QTextBlock block = quick->textDocument()->findBlock(position);
+            const int local = position - block.position();
+            QBrush background;
+            for (const auto &range : block.layout()->formats())
+                if (local >= range.start && local < range.start + range.length)
+                    background = range.format.background();
+            return background;
+        };
+        QTRY_VERIFY_WITH_TIMEOUT(backgroundAt(0).style() != Qt::NoBrush, 1000);
+        QTRY_VERIFY_WITH_TIMEOUT(backgroundAt(14).style() != Qt::NoBrush, 1000);
+        QCOMPARE(backgroundAt(7).style(), Qt::NoBrush);
+
+        QVERIFY(run(QStringLiteral("customStyleCheck")));
+        QTRY_VERIFY_WITH_TIMEOUT(backgroundAt(7).style() != Qt::NoBrush, 1000);
+        QVERIFY(run(QStringLiteral("fillersStyleCheck")));
+        QVERIFY(!settings->property("styleCheckFillers").toBool());
+        QCOMPARE(backgroundAt(0).style(), Qt::NoBrush);
+        QCOMPARE(backgroundAt(14).style(), Qt::NoBrush);
+        QVERIFY(backgroundAt(7).style() != Qt::NoBrush);
+
+        QCOMPARE(editor->property("text").toString(), source);
+        QCOMPARE(editor->property("cursorPosition").toInt(), cursorPosition);
+        QCOMPARE(editor->property("canUndo").toBool(), canUndo);
+        QCOMPARE(backend.modified(), modified);
+        QCOMPARE(backend.authorshipRanges(), annotations);
+
+        settings->setProperty("reviewWords", originalWords);
+        settings->setProperty("styleCheckCustom", originalCustom);
+        settings->setProperty("styleCheckFillers", originalFillers);
+        QVERIFY(QMetaObject::invokeMethod(settings, "sync"));
         backend.discardRecovery();
     }
 
