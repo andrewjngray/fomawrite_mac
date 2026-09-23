@@ -1,0 +1,7 @@
+iA Writer sample-input observation — 24 September 2026
+
+An isolated new iA Writer draft was used to observe Edit → Substitutions → Smart Quotes. The previously open user document was not edited. On this installation, typing straight double quotes with Smart Quotes enabled produced curly quotation marks. A single Undo restored the straight quotation marks in the sample. With Smart Quotes turned off, a newly typed straight quote stayed straight. Auto-capitalization also occurred during the sample, but its setting and exact interaction with Undo were not isolated, so this is not evidence for a capitalization feature.
+
+The original Smart Quotes setting was restored after the test. Show Substitutions was briefly opened and then hidden again. iA Writer automatically put the synthetic draft in its library when the test window closed; only that synthetic file was moved to Trash through its recoverable context-menu action. The previously open saved document was reopened without edits.
+
+A second isolated draft typed `alpha -- beta` and displayed `Alpha -- beta`: no dash replacement was observed in that state. The Smart Dashes checked state was not established, so the result does not define the enabled behavior. That synthetic file was also moved to Trash and the same saved document reopened. Text Replacement, Smart Copy/Paste, IME composition, paste, Markdown code/URL exclusions and exact replacement grouping remain unobserved. This is a behavioral reference, not proof of Omawrite parity.

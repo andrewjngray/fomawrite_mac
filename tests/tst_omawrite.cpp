@@ -1697,6 +1697,73 @@ private slots:
         backend.discardRecovery();
     }
 
+    void smartQuotesAreOptInAtomicAndMarkdownAware() {
+        QSettings settings;
+        const QString key = QStringLiteral("workspace/smartQuotes");
+        const bool hadSetting = settings.contains(key);
+        const QVariant previousSetting = settings.value(key);
+        settings.setValue(key, true);
+        settings.sync();
+        const auto restore = qScopeGuard([&] {
+            if (hadSetting) settings.setValue(key, previousSetting);
+            else settings.remove(key);
+            settings.sync();
+        });
+
+        Backend backend;
+        QQmlEngine engine;
+        engine.rootContext()->setContextProperty(QStringLiteral("backend"), &backend);
+        QQmlComponent component(&engine, QUrl::fromLocalFile(QFINDTESTDATA("../src/Main.qml")));
+        QScopedPointer<QObject> window(component.create());
+        QVERIFY2(window, qPrintable(component.errorString()));
+        auto *editor = window->findChild<QObject *>(QStringLiteral("sourceEditor"));
+        auto *menuItem = window->findChild<QObject *>(QStringLiteral("editSmartQuotes"));
+        QVERIFY(editor && menuItem);
+        QVERIFY(menuItem->property("checked").toBool());
+
+        editor->setProperty("text", QString());
+        editor->setProperty("cursorPosition", 0);
+        QVariant inserted;
+        QVERIFY(QMetaObject::invokeMethod(window.data(), "insertSmartQuote",
+                                          Q_RETURN_ARG(QVariant, inserted)));
+        QVERIFY(inserted.toBool());
+        QCOMPARE(editor->property("text").toString(), QString::fromUtf8("“"));
+        editor->setProperty("text", QString::fromUtf8("“hello"));
+        editor->setProperty("cursorPosition", 6);
+        QVERIFY(QMetaObject::invokeMethod(window.data(), "insertSmartQuote",
+                                          Q_RETURN_ARG(QVariant, inserted)));
+        QVERIFY(inserted.toBool());
+        QCOMPARE(editor->property("text").toString(), QString::fromUtf8("“hello”"));
+        QVERIFY(QMetaObject::invokeMethod(editor, "undo"));
+        QCOMPARE(editor->property("text").toString(), QString::fromUtf8("“hello\""));
+        QVERIFY(QMetaObject::invokeMethod(editor, "undo"));
+        QCOMPARE(editor->property("text").toString(), QString::fromUtf8("“hello"));
+
+        editor->setProperty("text", QStringLiteral("`code "));
+        editor->setProperty("cursorPosition", 6);
+        QVERIFY(QMetaObject::invokeMethod(window.data(), "insertSmartQuote",
+                                          Q_RETURN_ARG(QVariant, inserted)));
+        QVERIFY(!inserted.toBool());
+        QCOMPARE(editor->property("text").toString(), QStringLiteral("`code "));
+
+        editor->setProperty("text", QStringLiteral("https://example.test/"));
+        editor->setProperty("cursorPosition", 21);
+        QVERIFY(QMetaObject::invokeMethod(window.data(), "insertSmartQuote",
+                                          Q_RETURN_ARG(QVariant, inserted)));
+        QVERIFY(!inserted.toBool());
+        editor->setProperty("text", QStringLiteral("[site](destination"));
+        editor->setProperty("cursorPosition", 18);
+        QVERIFY(QMetaObject::invokeMethod(window.data(), "insertSmartQuote",
+                                          Q_RETURN_ARG(QVariant, inserted)));
+        QVERIFY(!inserted.toBool());
+        editor->setProperty("text", QStringLiteral("<span class="));
+        editor->setProperty("cursorPosition", 12);
+        QVERIFY(QMetaObject::invokeMethod(window.data(), "insertSmartQuote",
+                                          Q_RETURN_ARG(QVariant, inserted)));
+        QVERIFY(!inserted.toBool());
+        backend.discardRecovery();
+    }
+
     void inlineFormattingAndStructuralInsertionUndo() {
         Backend backend;
         QQmlEngine engine;

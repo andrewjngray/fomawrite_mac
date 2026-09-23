@@ -154,6 +154,7 @@ ApplicationWindow {
         }
         property string authorshipProfileName: ""
         property string authorshipProfileIdentifier: ""
+        property bool smartQuotes: false
         property bool autosaveEnabled: false
         property bool synchronizedScroll: false
         property bool typewriter: false
@@ -490,6 +491,22 @@ ApplicationWindow {
         var completion = completionItems[index];
         completionPopup.close();
         editor.replaceAtomic(completionStart, completionEnd, completion);
+        editor.forceActiveFocus();
+        return true;
+    }
+
+    function insertSmartQuote() {
+        if (!workspaceSettings.smartQuotes || editor.inputMethodComposing
+            || editor.selectionStart !== editor.selectionEnd)
+            return false;
+        var position = editor.cursorPosition;
+        var replacement = backend.smartQuoteAt(position);
+        if (replacement.length === 0) return false;
+        // Keep the literal keystroke and the automatic substitution as two
+        // undo records, matching the native behavior: first Undo restores the
+        // straight quote, and a second Undo removes the typed character.
+        editor.replaceAtomic(position, position, "\"");
+        editor.replaceAtomic(position, position + 1, replacement);
         editor.forceActiveFocus();
         return true;
     }
@@ -900,6 +917,16 @@ ApplicationWindow {
                 Platform.MenuItem { objectName: "editFindSelection"; text: "Use Selection for Find"; enabled: editor.selectedText.length > 0; onTriggered: win.openSearch(false, true) }
             }
             Platform.MenuItem { objectName: "editSpelling"; text: "Spelling and Grammar…"; enabled: editor.length > 0; onTriggered: spellingDialog.open() }
+            Platform.Menu {
+                title: "Substitutions"
+                Platform.MenuItem {
+                    objectName: "editSmartQuotes"
+                    text: "Smart Quotes"
+                    checkable: true
+                    checked: workspaceSettings.smartQuotes
+                    onTriggered: workspaceSettings.smartQuotes = !workspaceSettings.smartQuotes
+                }
+            }
             Platform.Menu {
                 title: "Transformations"
                 Platform.MenuItem { objectName: "editUppercase"; text: "UPPERCASE"; enabled: win.editTarget === editor && editor.selectedText.length > 0; onTriggered: win.editMarkdown("uppercase") }
@@ -2312,6 +2339,12 @@ ApplicationWindow {
                     if (pasteKey || shiftInsert) {
                         if (!pasteClipboardUrlAsMarkdownLink())
                             pasteClipboardAsPlainText();
+                        event.accepted = true;
+                        return;
+                    }
+
+                    if (!(event.modifiers & (Qt.ControlModifier | Qt.AltModifier | Qt.MetaModifier))
+                        && event.text === "\"" && win.insertSmartQuote()) {
                         event.accepted = true;
                         return;
                     }

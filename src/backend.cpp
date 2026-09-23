@@ -553,7 +553,24 @@ static bool completionContextAllowed(const QString &markdown, int position) {
     if (token.contains(QStringLiteral("://")) || token.startsWith(QStringLiteral("www."))
         || token.startsWith(QStringLiteral("mailto:"))) return false;
     if (before.lastIndexOf(QStringLiteral("](")) > before.lastIndexOf(')')) return false;
+    if (before.lastIndexOf('<') > before.lastIndexOf('>')) return false;
     return true;
+}
+
+QString Backend::smartQuoteAt(int position) const {
+    if (!m_document) return {};
+    const QString text = currentDocumentText();
+    if (position < 0 || position > text.size() || !completionContextAllowed(text, position))
+        return {};
+
+    // This is deliberately a small typing heuristic. It never scans or
+    // rewrites existing text: a quote after whitespace/open punctuation opens,
+    // while a quote after prose or closing punctuation closes.
+    if (position == 0) return QString(QChar(0x201c));
+    const QChar previous = text.at(position - 1);
+    const bool opening = previous.isSpace()
+        || QStringLiteral("([{<\u2014\u2013-").contains(previous);
+    return QString(opening ? QChar(0x201c) : QChar(0x201d));
 }
 
 QVariantMap Backend::wordCompletions(int position) const {

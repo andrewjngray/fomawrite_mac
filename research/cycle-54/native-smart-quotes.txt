@@ -1,0 +1,7 @@
+Cycle 54b native Omawrite Dev check — 24 September 2026, macOS 27.0
+
+After normal Quit of the clean Dev window, ./bin/prepare-dev-app refreshed the stable bundle and identity. The Edit accessibility menu exposed Substitutions → Smart Quotes. The setting started off. Clicking the menu item enabled it.
+
+In a new disposable untitled draft, direct typing of `"hello"` displayed `“hello”` in the Markdown editor and preview. Command-Z changed the final curly quote back to a straight quote, leaving the earlier text intact. Clicking Smart Quotes again disabled it; direct typing of another double quote appended a straight quote. The setting was left off. Closing the dirty untitled draft displayed Cancel, Discard and Save; Discard removed only this test draft. The prior saved research/cycle-32/sample/Second.md was reopened with clean "Opened Second.md" status.
+
+The full native-access automated test run passed 100/0/0 (test-54b.log). No screenshot was persisted. Native IME, paste, selection replacement, non-US layouts, code/link exclusions, restarts and full accessibility remain unchecked.
