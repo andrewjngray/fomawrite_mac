@@ -1,0 +1,22 @@
+Cycle 56a native Authors checkpoint — 24 September 2026
+
+Artifact
+- Refreshed stable dist/Omawrite Dev.app through Cycle 56a.
+- ./bin/build passed.
+- Full native-access ./bin/test: 94 passed, 0 failed, 0 skipped.
+
+Observed
+- The macOS menu bar placed Authors between Format and View.
+- Authors → Set Up Authorship… opened a blank sheet with Name and optional Identifier.
+- Save was disabled with a blank Name.
+- Entering a synthetic Name enabled Save.
+- Cancel closed the sheet and returned to unchanged sample source and status.
+
+Deliberately not exercised
+- Native Save/reopen was not used, avoiding a retained fake profile. Automated coverage verifies persistence, editing and Cancel behavior.
+- Screenshot capture was unavailable.
+
+Boundaries
+- The local profile does not assign labels or change Markdown, sidecars, modified/Undo or recovery state.
+- Edit → Authorship Annotations remains manual and separate.
+- Post-setup iA menu behavior is unknown. There is no Mark As or Paste Edits From parity.

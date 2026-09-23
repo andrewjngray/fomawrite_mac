@@ -1,6 +1,6 @@
 # iA Writer menu map and Omawrite gap audit — 23 September 2026
 
-This is the planning baseline after Omawrite Cycle 47 (76 tests), updated through Cycle 55b source and partial native checks on 24 September. Current source passes 93 tests; Cycles 48–51 are complete and later cycles retain explicit acceptance gaps. It transcribes the menu screenshots in `screenshots/` and compares them with the source. It is an interface and behavior audit, not a claim that similarly named commands behave identically.
+This is the planning baseline after Omawrite Cycle 47 (76 tests), updated through Cycle 56a source and partial native checks on 24 September. Current source passes 94 tests; Cycles 48–51 are complete and later cycles retain explicit acceptance gaps. It transcribes the menu screenshots in `screenshots/` and compares them with the source. It is an interface and behavior audit, not a claim that similarly named commands behave identically.
 
 The screenshots contain personal filenames, locations and tags. This document records commands only. The images remain untracked reference material and should not be committed. Two files are empty duplicate captures: `3.48.34 PM(2)` and `3.49.37 PM(2)`. The duplicate `1.57.39 PM(2)` and `3.50.00 PM(2)` images add no distinct menu evidence.
 
@@ -181,7 +181,7 @@ These menus were not opened in the screenshot folder. The 24 September native in
 
 | iA capability | Omawrite status | Remaining difference |
 |---|---|---|
-| Set up authors / categories | **Partial** | Manual author name and Human/AI/Reference range labels exist. No dedicated Authors menu, reusable author registry or verified provenance. |
+| Set up authors / categories | **Partial (Cycle 56a)** | macOS now has Authors → Set Up Authorship… with a persistent required Name and optional Identifier. Automated coverage verifies validation, Save/Cancel/reopen persistence and complete document/sidecar/recovery isolation. Native QA observed the menu and blank sheet, then entered a synthetic Name to confirm Save became enabled and cancelled without changing source/status. Native Save/reopen was not exercised to avoid retaining a fake profile. The profile does not assign labels or verified provenance. Post-setup iA behavior, categories, Mark As and Paste Edits From remain unknown or unimplemented. |
 | Enable Focus Mode | **Partial (Cycle 55a)** | Native Focus menu now nests Sentence, Paragraph and Typewriter under this label. There is no separate master Focus switch; exact iA activation semantics remain unobserved. |
 | Sentence / Paragraph / Typewriter | **Partial (Cycle 55a)** | Existing controls are grouped in the captured order. Sentence/Paragraph are exclusive, Typewriter remains independent; visual dimming/scroll and checked-state native acceptance remain open. |
 | Syntax: parts of speech | **Partial** | Writing Review lists macOS lexical classes while open. It does not color words live in the editor or provide per-class visibility toggles. |

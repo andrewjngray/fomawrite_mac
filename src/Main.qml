@@ -142,6 +142,8 @@ ApplicationWindow {
                 backend.setCustomReviewWords("");
             }
         }
+        property string authorshipProfileName: ""
+        property string authorshipProfileIdentifier: ""
         property bool autosaveEnabled: false
         property bool synchronizedScroll: false
         property bool typewriter: false
@@ -923,6 +925,16 @@ ApplicationWindow {
             Platform.MenuItem { text: "Clear Styles"; enabled: editor.selectedText.length > 0; onTriggered: win.editMarkdown("clearStyles") }
         }
         Platform.Menu {
+            objectName: "authorsMenu"
+            title: "Authors"
+            visible: win.isMac
+            Platform.MenuItem {
+                objectName: "authorsSetupAction"
+                text: "Set Up Authorship…"
+                onTriggered: authorshipSetupDialog.open()
+            }
+        }
+        Platform.Menu {
             title: "View"
             Platform.Menu {
                 title: "Template"
@@ -1203,6 +1215,72 @@ ApplicationWindow {
     }
 
     Timer { interval: 60000; repeat: true; running: workspaceSettings.autosaveEnabled; onTriggered: { if (!unsavedChangesDialog.opened && win.pendingAction === "") backend.autosave(); } }
+    Dialog {
+        id: authorshipSetupDialog
+        objectName: "authorshipSetupDialog"
+        title: "Set Up Authorship"
+        modal: true
+        anchors.centerIn: parent
+        width: Math.min(480, win.width - 40)
+        closePolicy: Popup.CloseOnEscape
+        readonly property bool validProfile: {
+            var name = authorshipProfileName.text.trim();
+            var identifier = authorshipProfileIdentifier.text.trim();
+            var controls = /[\u0000-\u001f\u007f-\u009f]/;
+            return name.length > 0 && name.length <= 100
+                    && identifier.length <= 200
+                    && !controls.test(name) && !controls.test(identifier);
+        }
+        onOpened: {
+            authorshipProfileName.text = workspaceSettings.authorshipProfileName;
+            authorshipProfileIdentifier.text = workspaceSettings.authorshipProfileIdentifier;
+            authorshipProfileName.forceActiveFocus();
+            authorshipProfileName.selectAll();
+        }
+        function saveProfile() {
+            if (!validProfile) return;
+            workspaceSettings.authorshipProfileName = authorshipProfileName.text.trim();
+            workspaceSettings.authorshipProfileIdentifier = authorshipProfileIdentifier.text.trim();
+            close();
+        }
+        ColumnLayout {
+            anchors.fill: parent
+            Label { text: "Name" }
+            TextField {
+                id: authorshipProfileName
+                objectName: "authorshipProfileName"
+                Layout.fillWidth: true
+                placeholderText: "Required"
+                onAccepted: if (authorshipSetupDialog.validProfile) authorshipSetupDialog.saveProfile()
+            }
+            Label { text: "Identifier (optional)" }
+            TextField {
+                id: authorshipProfileIdentifier
+                objectName: "authorshipProfileIdentifier"
+                Layout.fillWidth: true
+                placeholderText: "Optional"
+                onAccepted: if (authorshipSetupDialog.validProfile) authorshipSetupDialog.saveProfile()
+            }
+            Label {
+                Layout.fillWidth: true
+                wrapMode: Text.Wrap
+                text: "This local profile does not label existing or future text automatically. Use Edit → Authorship Annotations for manual labels."
+            }
+        }
+        footer: DialogButtonBox {
+            Button {
+                objectName: "authorshipProfileCancel"
+                text: "Cancel"
+                DialogButtonBox.buttonRole: DialogButtonBox.RejectRole
+            }
+            Button {
+                objectName: "authorshipProfileSave"
+                text: "Save"
+                enabled: authorshipSetupDialog.validProfile
+                onClicked: authorshipSetupDialog.saveProfile()
+            }
+        }
+    }
     Dialog {
         id: versionsDialog
         objectName: "versionsDialog"

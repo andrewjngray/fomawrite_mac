@@ -2466,6 +2466,118 @@ private slots:
         backend.discardRecovery();
     }
 
+    void authorshipSetupPersistsSafelyWithoutLabellingDocument() {
+        QTemporaryDir directory;
+        const QString documentPath = directory.filePath(QStringLiteral("authors.md"));
+        QFile documentFile(documentPath);
+        QVERIFY(documentFile.open(QIODevice::WriteOnly));
+        const QByteArray source("# Synthetic authorship\n\nPlain local Markdown.\n");
+        QCOMPARE(documentFile.write(source), source.size());
+        documentFile.close();
+
+        Backend backend;
+        QQmlEngine engine;
+        engine.rootContext()->setContextProperty("backend", &backend);
+        QQmlComponent component(&engine, QUrl::fromLocalFile(QFINDTESTDATA("../src/Main.qml")));
+        QScopedPointer<QObject> window(component.create());
+        QVERIFY2(window, qPrintable(component.errorString()));
+        backend.open(QUrl::fromLocalFile(documentPath));
+
+        auto *settings = window->findChild<QObject *>("workspaceSettings");
+        auto *editor = window->findChild<QObject *>("sourceEditor");
+        auto *menu = window->findChild<QObject *>("authorsMenu");
+        auto *setup = window->findChild<QObject *>("authorsSetupAction");
+        auto *dialog = window->findChild<QObject *>("authorshipSetupDialog");
+        auto *name = window->findChild<QObject *>("authorshipProfileName");
+        auto *identifier = window->findChild<QObject *>("authorshipProfileIdentifier");
+        auto *save = window->findChild<QObject *>("authorshipProfileSave");
+        auto *cancel = window->findChild<QObject *>("authorshipProfileCancel");
+        QVERIFY(settings && editor && menu && setup && dialog && name && identifier
+                && save && cancel);
+
+        const QString originalName = settings->property("authorshipProfileName").toString();
+        const QString originalIdentifier = settings->property("authorshipProfileIdentifier").toString();
+        settings->setProperty("authorshipProfileName", QString());
+        settings->setProperty("authorshipProfileIdentifier", QString());
+
+        QCOMPARE(menu->property("title").toString(), QStringLiteral("Authors"));
+        QCOMPARE(setup->property("text").toString(), QStringLiteral("Set Up Authorship…"));
+        QVERIFY(QMetaObject::invokeMethod(setup, "triggered"));
+        QTRY_VERIFY(dialog->property("opened").toBool());
+        QVERIFY(!save->property("enabled").toBool());
+        name->setProperty("text", QStringLiteral("   "));
+        QVERIFY(!save->property("enabled").toBool());
+        name->setProperty("text", QString(101, QLatin1Char('n')));
+        QVERIFY(!save->property("enabled").toBool());
+        name->setProperty("text", QStringLiteral("Bad\tName"));
+        QVERIFY(!save->property("enabled").toBool());
+        name->setProperty("text", QStringLiteral("  Test Writer  "));
+        identifier->setProperty("text", QString(201, QLatin1Char('i')));
+        QVERIFY(!save->property("enabled").toBool());
+        identifier->setProperty("text", QStringLiteral("  test@example.invalid  "));
+        QVERIFY(save->property("enabled").toBool());
+
+        const QString textBefore = editor->property("text").toString();
+        const QString statusBefore = backend.status();
+        const bool modifiedBefore = backend.modified();
+        const bool undoBefore = editor->property("canUndo").toBool();
+        const QDir recoveryDirectory(QStandardPaths::writableLocation(QStandardPaths::AppDataLocation));
+        auto recoveryContents = [&] {
+            QMap<QString, QByteArray> contents;
+            for (const QString &fileName : recoveryDirectory.entryList(
+                     {QStringLiteral("recovery-*.json")}, QDir::Files)) {
+                QFile file(recoveryDirectory.filePath(fileName));
+                if (file.open(QIODevice::ReadOnly)) contents.insert(fileName, file.readAll());
+            }
+            return contents;
+        };
+        const auto recoveryBefore = recoveryContents();
+        QVERIFY(QMetaObject::invokeMethod(save, "clicked"));
+        QTRY_VERIFY(!dialog->property("opened").toBool());
+        QCOMPARE(settings->property("authorshipProfileName").toString(),
+                 QStringLiteral("Test Writer"));
+        QCOMPARE(settings->property("authorshipProfileIdentifier").toString(),
+                 QStringLiteral("test@example.invalid"));
+
+        QCOMPARE(editor->property("text").toString(), textBefore);
+        QCOMPARE(backend.status(), statusBefore);
+        QCOMPARE(backend.modified(), modifiedBefore);
+        QCOMPARE(editor->property("canUndo").toBool(), undoBefore);
+        QVERIFY(backend.authorshipRanges().isEmpty());
+        QVERIFY(!QFileInfo::exists(directory.filePath(
+            QStringLiteral(".authors.md.omawrite-authors.json"))));
+        QTest::qWait(850);
+        QCOMPARE(recoveryContents(), recoveryBefore);
+
+        QVERIFY(QMetaObject::invokeMethod(setup, "triggered"));
+        QTRY_VERIFY(dialog->property("opened").toBool());
+        QCOMPARE(name->property("text").toString(), QStringLiteral("Test Writer"));
+        QCOMPARE(identifier->property("text").toString(), QStringLiteral("test@example.invalid"));
+        name->setProperty("text", QStringLiteral("Cancelled Writer"));
+        identifier->setProperty("text", QStringLiteral("cancelled@example.invalid"));
+        QVERIFY(QMetaObject::invokeMethod(cancel, "clicked"));
+        QTRY_VERIFY(!dialog->property("opened").toBool());
+        QCOMPARE(settings->property("authorshipProfileName").toString(),
+                 QStringLiteral("Test Writer"));
+        QCOMPARE(settings->property("authorshipProfileIdentifier").toString(),
+                 QStringLiteral("test@example.invalid"));
+        QVERIFY(QMetaObject::invokeMethod(settings, "sync"));
+        window.reset();
+
+        QScopedPointer<QObject> reopened(component.create());
+        QVERIFY2(reopened, qPrintable(component.errorString()));
+        auto *reopenedSettings = reopened->findChild<QObject *>("workspaceSettings");
+        QVERIFY(reopenedSettings);
+        QCOMPARE(reopenedSettings->property("authorshipProfileName").toString(),
+                 QStringLiteral("Test Writer"));
+        QCOMPARE(reopenedSettings->property("authorshipProfileIdentifier").toString(),
+                 QStringLiteral("test@example.invalid"));
+        reopenedSettings->setProperty("authorshipProfileName", originalName);
+        reopenedSettings->setProperty("authorshipProfileIdentifier", originalIdentifier);
+        QVERIFY(QMetaObject::invokeMethod(reopenedSettings, "sync"));
+        backend.discardRecovery();
+    }
+
     void sharedFormattingCommandsPreserveUndo() {
         QTemporaryDir directory;
         QFile sample(directory.filePath("format.md"));
