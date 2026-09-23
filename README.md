@@ -77,3 +77,7 @@ Authorship metadata now follows Duplicate, Rename and Move; current verification
 ### Cycle 32 checkpoint
 
 Saved documents now restore their windows, native tab order, cursor and library root after Quit/relaunch. Repeated launches of the same installed app forward requests to its existing process. Build and 56 tests pass; native sample restart/duplicate-open checks passed. See [Cycle 32 evidence](research/cycle-32/README.md) and [the ten remaining cycles](docs/remaining-cycles.md), with whole-workspace themes next.
+
+### Cycles 33 / 34a checkpoint
+
+Aa → Theme now offers Follow system, Light, Dark and Warm paper across the workspace and preview. Recovery preserves the pre-crash disk baseline for safe autosave checks. Quit waits for every document's approval before closing windows, so a later Cancel retains earlier drafts. Build and 59 tests pass; native themes/restart and two-draft Quit/Cancel verified. [Nine planned cycles remain](docs/remaining-cycles.md), including the unfinished safety/version checks in Cycle 34.

@@ -48,6 +48,8 @@ public:
 
     void setParentWindow(QWindow *window);
     std::function<bool(const QUrl &)> focusExistingDocument;
+    int documentRevision() const;
+    Q_INVOKABLE void notifyQuitReady() { emit quitReady(); }
     Q_INVOKABLE void notifyWindowClosed() { emit windowClosed(); }
     Q_INVOKABLE void requestQuit() { emit quitRequested(); }
     Q_INVOKABLE void cancelQuit() { emit quitCanceled(); }
@@ -141,6 +143,7 @@ public:
 signals:
     void newWindowRequested(const QUrl &url);
     void quitRequested();
+    void quitReady();
     void quitCanceled();
     void windowClosed();
     void saveFailed();
@@ -177,7 +180,7 @@ private:
     QString m_customOutputFont;
     int m_customOutputSize = 12;
     QPageLayout m_pageLayout;
-    void saveTo(const QUrl &url);
+    void saveTo(const QUrl &url, bool protectExternalChanges = false);
     QUrl suggestedSaveUrl() const;
     QString currentDocumentText() const;
     void setWordCount(int words);

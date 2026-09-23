@@ -217,6 +217,8 @@ Backend::Backend(QObject *parent) : QObject(parent), m_library(this) {
 
 Backend::~Backend() = default;
 
+int Backend::documentRevision() const { return m_document ? m_document->revision() : 0; }
+
 QUrl Backend::documentBaseUrl() const {
     const QString path = m_fileUrl.isLocalFile() ? QFileInfo(m_fileUrl.toLocalFile()).absolutePath()
         : m_library.rootFolder().toLocalFile();
@@ -1278,7 +1280,7 @@ void Backend::setStatus(const QString &status) {
     emit statusChanged();
 }
 
-void Backend::saveTo(const QUrl &url) {
+void Backend::saveTo(const QUrl &url, bool protectExternalChanges) {
     if (focusExistingDocument && focusExistingDocument(url)) {
         setStatus("That file is already open in another window. Choose a different path.");
         emit saveFailed(); emit quitCanceled(); return;
@@ -1302,7 +1304,21 @@ void Backend::saveTo(const QUrl &url) {
     }
 
     const QByteArray contents = currentDocumentText().toUtf8();
-    file.write(contents);
+    if (file.write(contents) != contents.size()) {
+        file.cancelWriting(); m_closeAfterSave = false;
+        setStatus("Could not write complete document; original file retained.");
+        emit saveFailed(); emit quitCanceled(); return;
+    }
+    // Recheck after staging, immediately before replacement. This narrows the
+    // race with non-cooperating writers; no portable atomic compare-and-swap exists.
+    if (protectExternalChanges) {
+        QFile current(url.toLocalFile());
+        if (QFileInfo(url.toLocalFile()).isSymLink() || !current.open(QIODevice::ReadOnly)
+            || current.readAll() != m_lastKnownFileContents || current.error() != QFile::NoError) {
+            file.cancelWriting();
+            setStatus("Autosave paused: file changed outside Omawrite."); return;
+        }
+    }
 
     // QSaveFile commits by replacing the target. Stop watching the old inode
     // before that replacement so our own write is not classified as external.
@@ -1363,7 +1379,10 @@ void Backend::writeRecovery() {
     if (!file.open(QIODevice::WriteOnly))
         return;
     const QJsonObject recovery{{QStringLiteral("fileUrl"), m_fileUrl.toString()},
-                               {QStringLiteral("text"), currentDocumentText()}, {QStringLiteral("authorship"), authorshipData()}};
+                               {QStringLiteral("text"), currentDocumentText()}, {QStringLiteral("authorship"), authorshipData()},
+                               {"knownDiskContents", m_hasKnownFileContents},
+                               {"diskContents", QString::fromLatin1(m_lastKnownFileContents.toBase64())}};
+    file.setPermissions(QFileDevice::ReadOwner | QFileDevice::WriteOwner);
     file.write(QJsonDocument(recovery).toJson(QJsonDocument::Compact));
     file.commit();
 }
@@ -1379,14 +1398,12 @@ void Backend::restoreRecovery() {
     loadDocumentText(recovery.value(QStringLiteral("text")).toString());
     applyAuthorshipData(recovery.value("authorship").toObject());
     const QUrl recoveredUrl(recovery.value(QStringLiteral("fileUrl")).toString());
-    QFile diskFile(recoveredUrl.toLocalFile());
-    if (recoveredUrl.isLocalFile() && diskFile.open(QIODevice::ReadOnly)) {
-        m_lastKnownFileContents = diskFile.readAll();
-        m_hasKnownFileContents = true;
-    } else {
-        m_lastKnownFileContents.clear();
-        m_hasKnownFileContents = false;
-    }
+    // Never bless edits made by another writer while this app was closed.
+    // Older snapshots have no baseline: recover the text but require manual Save.
+    m_hasKnownFileContents = recovery.value("knownDiskContents").toBool(false)
+        && recovery.value("diskContents").isString();
+    m_lastKnownFileContents = m_hasKnownFileContents
+        ? QByteArray::fromBase64(recovery.value("diskContents").toString().toLatin1()) : QByteArray();
     setFileUrl(recoveredUrl);
     setModified(true);
     setStatus(QStringLiteral("Recovered unsaved changes"));
@@ -1721,10 +1738,10 @@ bool Backend::restoreVersion(const QUrl &url) {
 void Backend::autosave() {
     if (!m_modified || !m_fileUrl.isLocalFile() || !m_hasKnownFileContents) return;
     QFile current(m_fileUrl.toLocalFile());
-    if (!current.open(QIODevice::ReadOnly) || current.readAll() != m_lastKnownFileContents) {
+    if (!current.open(QIODevice::ReadOnly) || current.readAll() != m_lastKnownFileContents || current.error() != QFile::NoError) {
         setStatus("Autosave paused: file changed outside Omawrite."); return;
     }
-    saveTo(m_fileUrl);
+    saveTo(m_fileUrl, true);
 }
 
 QVariantList Backend::writingAnalysis(const QString &text, const QString &customWords) {

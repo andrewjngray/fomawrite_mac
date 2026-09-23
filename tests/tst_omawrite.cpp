@@ -3,6 +3,10 @@
 #include <QtConcurrent>
 #include <QtTest>
 #include <cmath>
+#include <QProcess>
+#include <QScopeGuard>
+#include <QUuid>
+#include <cstdlib>
 #include <QFont>
 #include <QTextBlock>
 #include <QTextLayout>
@@ -190,6 +194,71 @@ private slots:
         QVERIFY(QMetaObject::invokeMethod(prompt, "discardRequested"));
         QCOMPARE(editor->property("text").toString(), QString("file contents"));
         QVERIFY(!backend.modified()); backend.discardRecovery();
+    }
+
+    void recoverySnapshotsSurviveProcessExit() {
+        const bool child = qEnvironmentVariableIsSet("OMAWRITE_CRASH_FIXTURE");
+        QTemporaryDir directory;
+        const QString sampleRoot = child ? qEnvironmentVariable("OMAWRITE_CRASH_FIXTURE") : directory.path();
+        const QString runId = child ? qEnvironmentVariable("OMAWRITE_CRASH_ID") : "Recovery-" + QUuid::createUuid().toString(QUuid::Id128);
+        const auto oldName = QCoreApplication::applicationName();
+        QCoreApplication::setApplicationName(runId);
+        const auto restoreName = qScopeGuard([&] { QCoreApplication::setApplicationName(oldName); });
+        if (!child) {
+            for (int i=0; i<2; ++i) { QFile file(sampleRoot + QString("/%1.md").arg(i)); QVERIFY(file.open(QIODevice::WriteOnly)); file.write("original"); }
+            QProcess process; auto env=QProcessEnvironment::systemEnvironment();
+            env.insert("OMAWRITE_CRASH_FIXTURE", sampleRoot); env.insert("OMAWRITE_CRASH_ID", runId);
+            process.setProcessEnvironment(env);
+            process.start(QCoreApplication::applicationFilePath(), {"recoverySnapshotsSurviveProcessExit"});
+            QVERIFY(process.waitForFinished(15000)); QCOMPARE(process.exitCode(), 77);
+            QFile external(sampleRoot + "/0.md"); QVERIFY(external.open(QIODevice::WriteOnly)); external.write("external writer"); external.close();
+        }
+        std::vector<std::unique_ptr<Backend>> backends;
+        std::vector<std::unique_ptr<QQmlEngine>> engines;
+        std::vector<std::unique_ptr<QObject>> windows;
+        for (int i=0; i<2; ++i) {
+            backends.push_back(std::make_unique<Backend>());
+            auto *backend=backends.back().get();
+            engines.push_back(std::make_unique<QQmlEngine>());
+            auto *engine=engines.back().get(); engine->rootContext()->setContextProperty("backend", backend);
+            QQmlComponent component(engine, QUrl::fromLocalFile(QFINDTESTDATA("../src/Main.qml")));
+            windows.emplace_back(component.create()); QVERIFY2(windows.back(), qPrintable(component.errorString()));
+            auto *editor=windows.back()->findChild<QObject *>("sourceEditor"); QVERIFY(editor);
+            if (child) {
+                QVERIFY(backend->open(QUrl::fromLocalFile(sampleRoot + QString("/%1.md").arg(i))));
+                editor->setProperty("text", QString("recovered draft %1").arg(i));
+                backend->markAuthorship(0, 9, "Reference", "Synthetic source");
+            } else {
+                QVERIFY(backend->modified());
+                const QString name=QFileInfo(backend->fileUrl().toLocalFile()).baseName();
+                QCOMPARE(editor->property("text").toString(), "recovered draft " + name);
+                QCOMPARE(backend->authorshipRanges().size(), 1);
+                backend->autosave();
+                QFile disk(backend->fileUrl().toLocalFile()); QVERIFY(disk.open(QIODevice::ReadOnly));
+                if (name == "0") { QVERIFY(backend->modified()); QCOMPARE(disk.readAll(), QByteArray("external writer")); }
+                else { QVERIFY(!backend->modified()); QCOMPARE(disk.readAll(), QByteArray("recovered draft 1")); }
+                backend->discardRecovery();
+            }
+        }
+        if (child) { QTest::qWait(1100); std::_Exit(77); } // real process exit without destructors or save prompts
+    }
+
+    void quitPreparationDoesNotCloseOrDiscard() {
+        Backend backend;
+        QQmlEngine engine; engine.rootContext()->setContextProperty("backend", &backend);
+        QQmlComponent component(&engine, QUrl::fromLocalFile(QFINDTESTDATA("../src/Main.qml")));
+        QScopedPointer<QObject> window(component.create()); QVERIFY2(window, qPrintable(component.errorString()));
+        auto *editor=window->findChild<QObject *>("sourceEditor"); editor->setProperty("text", "keep this draft");
+        QSignalSpy closed(&backend, &Backend::windowClosed), ready(&backend, &Backend::quitReady);
+        QVERIFY(QMetaObject::invokeMethod(window.data(), "prepareQuit"));
+        auto *prompt=window->findChild<QObject *>("unsavedChangesPrompt"); QVERIFY(prompt);
+        QVERIFY(QMetaObject::invokeMethod(prompt, "discardRequested"));
+        QCOMPARE(ready.size(), 1); QCOMPARE(closed.size(), 0);
+        QVERIFY(backend.modified()); QCOMPARE(editor->property("text").toString(), QString("keep this draft"));
+        const auto revision=backend.documentRevision();
+        QVERIFY(QMetaObject::invokeMethod(editor, "insert", Q_ARG(int, 0), Q_ARG(QString, "new ")));
+        QVERIFY(backend.documentRevision() != revision);
+        backend.discardRecovery();
     }
 
     void autosaveRefusesExternalChanges() {

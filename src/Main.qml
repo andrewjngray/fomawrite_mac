@@ -216,6 +216,16 @@ ApplicationWindow {
     Material.foreground: backend.themeForeground
     color: pageColor
 
+    function prepareQuit() {
+        pendingAction = "quit";
+        if (backend.modified) unsavedChangesDialog.open();
+        else completePendingAction();
+    }
+    function commitQuit() {
+        backend.discardRecovery();
+        closeConfirmed = true;
+        close();
+    }
     onClosing: function(close) {
         if (closeConfirmed || !backend.modified) {
             backend.notifyWindowClosed();
@@ -286,7 +296,9 @@ ApplicationWindow {
     function completePendingAction() {
         var action = pendingAction;
         pendingAction = "";
-        if (action === "close") {
+        if (action === "quit") {
+            backend.notifyQuitReady();
+        } else if (action === "close") {
             closeConfirmed = true;
             close();
         } else if (action === "open") {

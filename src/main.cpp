@@ -114,6 +114,8 @@ int main(int argc, char *argv[]) {
     QList<std::shared_ptr<Session>> sessions;
     QPointer<QWindow> lastActiveWindow;
     bool quitting = false;
+    bool committingQuit = false;
+    QMap<Backend *, int> preparedForQuit;
     QJsonArray quitWorkspace;
     const auto capture = [&] {
         QJsonArray windows;
@@ -145,18 +147,27 @@ int main(int argc, char *argv[]) {
     std::function<void()> closeNext;
     closeNext = [&] {
         if (!quitting) return;
+        if (committingQuit) {
+            if (sessions.isEmpty()) { app.allowExit = true; app.quit(); }
+            return;
+        }
         for (const auto &session : sessions) {
-            if (session->window) {
-                session->window->show();
-                session->window->raise();
-                session->window->requestActivate();
-                session->window->close();
+            if (!session->window || !session->backend) continue;
+            if (!preparedForQuit.contains(session->backend)
+                || preparedForQuit.value(session->backend) != session->backend->documentRevision()) {
+                session->window->show(); session->window->raise(); session->window->requestActivate();
+                QMetaObject::invokeMethod(session->window, "prepareQuit");
                 return;
             }
         }
-        app.allowExit = true; app.quit();
+        // Every document has approved this exact revision. Close synchronously
+        // only now, so Cancel at a later prompt leaves earlier windows intact.
+        committingQuit = true;
+        for (const auto &session : sessions)
+            if (session->window) QMetaObject::invokeMethod(session->window, "commitQuit");
+        if (sessions.isEmpty()) { app.allowExit = true; app.quit(); }
     };
-    app.guardedQuit = [&] { if (quitting) return; quitWorkspace = capture(); quitting = true; persist(); closeNext(); };
+    app.guardedQuit = [&] { if (quitting) return; preparedForQuit.clear(); committingQuit = false; quitWorkspace = capture(); quitting = true; persist(); closeNext(); };
     const auto focusExisting = [&](const QUrl &url, Backend *except) {
         const auto path = QFileInfo(url.toLocalFile()).canonicalFilePath();
         if (path.isEmpty()) return false;
@@ -185,6 +196,11 @@ int main(int argc, char *argv[]) {
         QObject::connect(&systemTheme, &SystemTheme::darkModeChanged, backend, &Backend::setDarkMode);
         QObject::connect(&systemTheme, &SystemTheme::textScaleChanged, backend, &Backend::setTextScale);
         QObject::connect(backend, &Backend::newWindowRequested, &app, createWindow);
+        QObject::connect(backend, &Backend::quitReady, &app, [&, backend] {
+            if (!quitting) return;
+            preparedForQuit[backend] = backend->documentRevision();
+            QTimer::singleShot(0, &app, closeNext);
+        });
         QObject::connect(backend, &Backend::quitRequested, &app, [&] { app.guardedQuit(); });
         QObject::connect(backend, &Backend::quitCanceled, &app, [&] { quitting = false; persist(); });
         session->engine = new QQmlApplicationEngine(&app);

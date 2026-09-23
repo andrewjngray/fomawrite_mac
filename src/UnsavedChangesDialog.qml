@@ -48,7 +48,7 @@ Dialog {
 
         Label {
             width: parent.width
-            text: "Save changes to " + root.fileName + (root.pendingAction === "close" ? " before closing?" : " before switching documents?")
+            text: "Save changes to " + root.fileName + ((root.pendingAction === "close" || root.pendingAction === "quit") ? " before closing?" : " before switching documents?")
             color: root.textColor
             wrapMode: Text.Wrap
             font.family: "iA Writer Mono S"

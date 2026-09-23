@@ -1,10 +1,10 @@
-# Remaining build plan — 22 September 2026
+# Remaining build plan — 23 September 2026
 
-Cycle 32 delivers saved-file workspace restoration and same-installation launch coordination. There are **10 planned cycles after 32**, including Andrew's new themes request. This is an estimate for the agreed personal-editor closeout scope, not a guarantee of complete iA Writer parity. Larger features or failures can require another increment. The inventory and closeout audit remain the acceptance backlog.
+Cycle 33 themes is complete. Cycle 34a closes recovery-baseline and cancellable-Quit defects, but the remainder of Cycle 34 is still open. There are **9 planned cycles remaining (34–42)**, counting the unfinished part of 34. This is an estimate for the agreed personal-editor scope, not a guarantee of complete iA Writer parity. Larger features or failures can require another increment. The inventory and closeout audit remain the acceptance backlog.
 
 | Cycle | Deliverable | Completion criteria |
 |---|---|---|
-| 33 | Themes | Persisted whole-workspace presets: light, dark and warm paper; editor, library, organizer, dialogs and preview share readable colors. Keep blue folders and gray document icons. Follow-system option, reset, keyboard focus/selection contrast and restart checks. |
+| 33 (complete) | Themes | Persisted whole-workspace presets: light, dark and warm paper; editor, library, organizer, dialogs and preview share readable colors. Keep blue folders and gray document icons. Follow-system option, reset, keyboard focus/selection contrast and restart checks. |
 | 34 | Recovery, autosave and versions | Multi-window crash/relaunch and quit-cancel matrix; external-write conflicts, unavailable disks and save failures; agree version/sidecar behavior. Close remaining session edge cases, including minimized/fullscreen and display changes. |
 | 35 | Authorship workflows | Clipboard/export behavior, paste/edit/undo and recovery checks; clear provenance limitations and visualization. |
 | 36 | Markdown and document navigation | Finish agreed footnote/content-block/link-resolution cases; nested relative assets, anchors and long-document scroll checks. |

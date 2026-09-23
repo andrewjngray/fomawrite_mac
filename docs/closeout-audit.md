@@ -45,3 +45,7 @@ Authorship migration for Duplicate/Rename/Move is implemented and verified with 
 ## Cycle 32 follow-up
 
 Same-installation cross-launch ownership and saved-file window/cursor/native-tab restoration are now implemented. Native two-tab restart and duplicate-launch focus passed; 56 regression tests pass. The Cycle 25a/25b rows above describe the original audit and are superseded for these specific items. Their exhaustive lifecycle, multi-dirty cancellation, fullscreen/minimized and display checks remain open. [Ten planned cycles remain](remaining-cycles.md), including Andrew's new themes concept as Cycle 33.
+
+## Cycles 33 / 34a follow-up — 23 September 2026
+
+Workspace themes are implemented as a separate product addition. Cycle 34a fixes recovery baseline handling and makes multi-document Quit cancellation retain earlier windows/drafts. A real synthetic subprocess-exit test recovers two annotated drafts and protects intervening external edits; native two-tab Discard/Cancel passed. 59 tests pass. The old sequential-quit limitation is superseded; remaining safety/version/display stress is still open. Nine cycles remain, counting the unfinished part of 34.
