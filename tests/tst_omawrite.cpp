@@ -1733,6 +1733,92 @@ private slots:
         backend.library()->setProperty("ascending", true);
     }
 
+    void nativeFileAndEditMenuActionsRespectFocusAndGuards() {
+        QTemporaryDir directory;
+        Backend backend;
+        QQmlEngine engine;
+        engine.rootContext()->setContextProperty("backend", &backend);
+        QQmlComponent component(&engine, QUrl::fromLocalFile(QFINDTESTDATA("../src/Main.qml")));
+        QVERIFY2(component.isReady(), qPrintable(component.errorString()));
+        QScopedPointer<QObject> window(component.create());
+        QVERIFY(window);
+        auto *editor = window->findChild<QObject *>("sourceEditor");
+        QVERIFY(editor);
+        auto action = [&](const char *name) -> QObject * { return window->findChild<QObject *>(name); };
+
+        auto *duplicate = action("fileDuplicate");
+        auto *rename = action("fileRename");
+        auto *move = action("fileMove");
+        auto *createVersion = action("fileCreateVersion");
+        auto *restoreVersion = action("fileRestoreVersion");
+        auto *revealFinder = action("fileRevealFinder");
+        auto *revealLibrary = action("fileRevealLibrary");
+        QVERIFY(duplicate && rename && move && createVersion && restoreVersion && revealFinder && revealLibrary);
+        QVERIFY(!duplicate->property("enabled").toBool());
+        QVERIFY(!rename->property("enabled").toBool());
+        QVERIFY(!move->property("enabled").toBool());
+        QVERIFY(!createVersion->property("enabled").toBool());
+        QVERIFY(!restoreVersion->property("enabled").toBool());
+        QVERIFY(!revealFinder->property("enabled").toBool());
+        QVERIFY(!revealLibrary->property("enabled").toBool());
+
+        const QString source = QStringLiteral("**café** source");
+        editor->setProperty("text", source);
+        const QUrl saved = QUrl::fromLocalFile(directory.filePath("menu.md"));
+        backend.saveAs(saved);
+        QVERIFY(!backend.modified());
+        QTRY_VERIFY(duplicate->property("enabled").toBool());
+        QVERIFY(rename->property("enabled").toBool());
+        QVERIFY(move->property("enabled").toBool());
+        QVERIFY(createVersion->property("enabled").toBool());
+        QVERIFY(restoreVersion->property("enabled").toBool());
+        QVERIFY(revealFinder->property("enabled").toBool());
+        QVERIFY(revealLibrary->property("enabled").toBool());
+
+        auto *copyFormatted = action("editCopyFormatted");
+        auto *copyHtml = action("editCopyHtml");
+        auto *copyMarkdown = action("editCopyMarkdown");
+        QVERIFY(copyFormatted && copyHtml && copyMarkdown);
+        editor->setProperty("text", source);
+        QVERIFY(QMetaObject::invokeMethod(editor, "forceActiveFocus"));
+        QVERIFY(QMetaObject::invokeMethod(editor, "select", Q_ARG(int, 0), Q_ARG(int, 8)));
+        QTRY_VERIFY(copyFormatted->property("enabled").toBool());
+        QVERIFY(copyHtml->property("enabled").toBool());
+        QVERIFY(copyMarkdown->property("enabled").toBool());
+        const int revision = backend.documentRevision();
+        QVERIFY(QMetaObject::invokeMethod(copyMarkdown, "triggered"));
+        QCOMPARE(QGuiApplication::clipboard()->mimeData()->data("text/markdown"), QByteArray("**café**"));
+        QVERIFY(QMetaObject::invokeMethod(copyHtml, "triggered"));
+        QVERIFY(QGuiApplication::clipboard()->text().contains("<html"));
+        QVERIFY(QMetaObject::invokeMethod(copyFormatted, "triggered"));
+        QVERIFY(QGuiApplication::clipboard()->mimeData()->hasHtml());
+        QCOMPARE(editor->property("text").toString(), source);
+        QCOMPARE(backend.documentRevision(), revision);
+
+        auto *find = action("editFind");
+        QVERIFY(find);
+        QVERIFY(QMetaObject::invokeMethod(find, "triggered"));
+        auto *query = window->findChild<QObject *>("searchField");
+        QVERIFY(query);
+        QVERIFY(QMetaObject::invokeMethod(query, "forceActiveFocus"));
+        QTRY_VERIFY(!copyFormatted->property("enabled").toBool());
+        QVERIFY(!copyHtml->property("enabled").toBool());
+        QVERIFY(!copyMarkdown->property("enabled").toBool());
+
+        editor->setProperty("text", QStringLiteral("dirty but retained"));
+        auto *close = action("fileClose");
+        QVERIFY(close);
+        QVERIFY(QMetaObject::invokeMethod(close, "triggered"));
+        auto *prompt = window->findChild<QObject *>("unsavedChangesPrompt");
+        QVERIFY(prompt);
+        QTRY_VERIFY(prompt->property("opened").toBool());
+        QVERIFY(QMetaObject::invokeMethod(prompt, "cancelRequested"));
+        QCOMPARE(window->property("pendingAction").toString(), QString());
+        QCOMPARE(editor->property("text").toString(), QStringLiteral("dirty but retained"));
+        QVERIFY(backend.modified());
+        backend.discardRecovery();
+    }
+
     void workspacePresentationPreservesSourceAndUndo() {
         QTemporaryDir directory;
         QFile sample(directory.filePath("menu.md"));

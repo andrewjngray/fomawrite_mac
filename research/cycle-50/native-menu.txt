@@ -1,0 +1,11 @@
+Cycle 50 native verification, 2026-09-23, Omawrite Dev.app
+
+Opened sample/Menu-actions.md by path. File menu showed New in Library in Window, New in Library, New, Open, Open Recent, Close, Save, Duplicate, Rename, Move To, Versions, Show in Finder, Show in Library, Share, Export, Print, Page Setup, and Omawrite Extras. The submenu entries routed existing commands without claiming uncaptured iA children.
+
+Edit menu showed Undo/Redo, Cut/Copy, Copy Formatted/HTML/Markdown, Paste/Paste As, Delete, Select All, Find, Spelling and Grammar, Transformations, Speech, and authorship actions. Selecting "formatted text" in the sample enabled all three Copy format entries. The macOS-provided AutoFill, Dictation, and Emoji entries appeared. A redundant Omawrite Emoji entry was removed after this observation; the refreshed Dev build showed only the macOS entry.
+
+With a disposable sample edit, File > Close displayed Cancel, Discard, and Save. Cancel kept the draft visible. On normal Quit, Discard was chosen for this synthetic edit only. The sample on disk retained its original bytes. Other restored sample tabs were not edited. No export, share, or physical print action was sent.
+
+./bin/build and ./bin/test: 81 passed, 0 failed. Dev and ordinary bundles packaged and deep/strict signatures verified. The first ordinary packaging attempt failed when install_name_tool could not rewrite copied Qt plug-ins carrying provenance attributes; clearing xattrs on the freshly generated bundle made macdeployqt succeed, and bin/package-mac now performs that step.
+
+No screenshot was saved in this pass because the native accessibility menu transcript sufficed for hierarchy verification; screenshot evidence remains a Cycle 59 acceptance item.

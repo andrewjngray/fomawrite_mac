@@ -528,40 +528,59 @@ ApplicationWindow {
     Platform.MenuBar {
         Platform.Menu {
             title: "File"
-            Platform.MenuItem { objectName: "fileNew"; text: "New"; onTriggered: win.requestNewDocument() }
-            Platform.MenuItem { text: "New Window"; onTriggered: backend.newWindow() }
-            Platform.MenuItem { objectName: "fileNewLibrary"; text: "New in Library…"; enabled: backend.library.rootFolder.toString() !== ""; onTriggered: libraryPane.newDocument(false) }
             Platform.MenuItem { objectName: "fileNewLibraryWindow"; text: "New in Library in Window…"; enabled: backend.library.rootFolder.toString() !== ""; onTriggered: libraryPane.newDocument(true) }
-            Platform.MenuItem { objectName: "fileNewFolder"; text: "New Folder…"; enabled: backend.library.rootFolder.toString() !== ""; onTriggered: libraryPane.newFolder() }
+            Platform.MenuItem { objectName: "fileNewLibrary"; text: "New in Library…"; enabled: backend.library.rootFolder.toString() !== ""; onTriggered: libraryPane.newDocument(false) }
+            Platform.MenuItem { objectName: "fileNew"; text: "New"; onTriggered: win.requestNewDocument() }
             Platform.MenuSeparator {}
-            Platform.MenuItem { text: "Open…"; onTriggered: backend.openDialog() }
-            Platform.MenuItem { text: "Open by Path…"; shortcut: "Ctrl+Shift+O"; onTriggered: openPathDialog.open() }
+            Platform.MenuItem { objectName: "fileOpen"; text: "Open…"; onTriggered: backend.openDialog() }
             RecentFilesMenu { title: "Open Recent"; library: backend.library; onOpenRequested: function(url) { win.requestOpen(url); } }
             Platform.MenuSeparator {}
-            Platform.MenuItem { text: "Save"; onTriggered: backend.save() }
-            Platform.MenuItem { text: "Autosave Saved Files Every Minute"; checkable: true; checked: workspaceSettings.autosaveEnabled; onTriggered: workspaceSettings.autosaveEnabled = !workspaceSettings.autosaveEnabled }
-            Platform.MenuItem { text: "Keep Previous Version on Save"; visible: win.isMac; checkable: true; checked: workspaceSettings.automaticVersions; onTriggered: { workspaceSettings.automaticVersions = !workspaceSettings.automaticVersions; backend.setAutomaticVersions(workspaceSettings.automaticVersions); } }
-            Platform.MenuItem { text: "Create Version of Saved File"; visible: win.isMac; enabled: backend.fileUrl.toString() !== ""; onTriggered: backend.createVersion() }
-            Platform.MenuItem { text: "Restore Version in Editor…"; visible: win.isMac; enabled: backend.fileUrl.toString() !== ""; onTriggered: { versionsDialog.items = backend.versions(); versionsDialog.open(); } }
-            Platform.MenuItem { text: "Save As…"; onTriggered: backend.saveAsDialog() }
+            Platform.MenuItem { objectName: "fileClose"; text: "Close"; onTriggered: win.close() }
+            Platform.MenuSeparator {}
+            Platform.MenuItem { objectName: "fileSave"; text: "Save"; onTriggered: backend.save() }
             Platform.MenuItem { objectName: "fileDuplicate"; text: "Duplicate…"; enabled: backend.fileUrl.toString() !== ""; onTriggered: fileNameDialog.showFor(false) }
             Platform.MenuItem { objectName: "fileRename"; text: "Rename…"; enabled: backend.fileUrl.toString() !== ""; onTriggered: fileNameDialog.showFor(true) }
             Platform.MenuItem {
                 objectName: "fileMove"; text: "Move To…"; enabled: backend.fileUrl.toString() !== ""
                 onTriggered: { moveFolderDialog.currentFolder = backend.documentBaseUrl; moveFolderDialog.open(); }
             }
+            Platform.Menu {
+                title: "Versions"
+                Platform.MenuItem { objectName: "fileKeepVersions"; text: "Keep Previous Version on Save"; checkable: true; checked: workspaceSettings.automaticVersions; onTriggered: { workspaceSettings.automaticVersions = !workspaceSettings.automaticVersions; backend.setAutomaticVersions(workspaceSettings.automaticVersions); } }
+                Platform.MenuItem { objectName: "fileCreateVersion"; text: "Create Version of Saved File"; enabled: backend.fileUrl.toString() !== ""; onTriggered: backend.createVersion() }
+                Platform.MenuItem { objectName: "fileRestoreVersion"; text: "Restore Version in Editor…"; enabled: backend.fileUrl.toString() !== ""; onTriggered: { versionsDialog.items = backend.versions(); versionsDialog.open(); } }
+            }
             Platform.MenuSeparator {}
             Platform.MenuItem { objectName: "fileRevealFinder"; text: "Show in Finder"; enabled: backend.fileUrl.toString() !== ""; onTriggered: backend.showInFinder() }
             Platform.MenuItem { objectName: "fileRevealLibrary"; text: "Show in Library"; enabled: backend.fileUrl.toString() !== ""; onTriggered: win.showCurrentFileInLibrary() }
             Platform.MenuSeparator {}
-            Platform.MenuItem { text: "Export HTML…"; onTriggered: { exportDialog.outputFormat = "html"; exportDialog.nameFilters = ["HTML (*.html)"]; exportDialog.open(); } }
-            Platform.MenuItem { text: "Export PDF…"; onTriggered: { exportDialog.outputFormat = "pdf"; exportDialog.nameFilters = ["PDF (*.pdf)"]; exportDialog.open(); } }
-            Platform.MenuItem { text: "Paginated Preview…"; onTriggered: backend.printPreview() }
-            Platform.MenuItem { text: "Page Setup…"; onTriggered: backend.pageSetup() }
-            Platform.MenuItem { text: "Print Markdown Source…"; onTriggered: backend.printDocument(true) }
-            Platform.MenuItem { text: "Print…"; onTriggered: backend.printDocument(false) }
-            Platform.MenuItem { text: "Share Markdown…"; visible: win.isMac; onTriggered: backend.nativeWindowAction("share") }
-            Platform.MenuItem { text: "Close Window"; onTriggered: win.close() }
+            Platform.Menu {
+                title: "Share"
+                Platform.MenuItem { objectName: "fileShareMarkdown"; text: "Share Markdown…"; onTriggered: backend.nativeWindowAction("share") }
+            }
+            Platform.Menu {
+                title: "Export"
+                Platform.MenuItem { objectName: "fileExportHtml"; text: "Export HTML…"; onTriggered: { exportDialog.outputFormat = "html"; exportDialog.nameFilters = ["HTML (*.html)"]; exportDialog.open(); } }
+                Platform.MenuItem { objectName: "fileExportPdf"; text: "Export PDF…"; onTriggered: { exportDialog.outputFormat = "pdf"; exportDialog.nameFilters = ["PDF (*.pdf)"]; exportDialog.open(); } }
+            }
+            Platform.Menu {
+                title: "Print"
+                Platform.MenuItem { objectName: "filePrintRendered"; text: "Print Rendered Document…"; onTriggered: backend.printDocument(false) }
+                Platform.MenuItem { objectName: "filePrintSource"; text: "Print Markdown Source…"; onTriggered: backend.printDocument(true) }
+                Platform.MenuItem { objectName: "filePrintPreview"; text: "Paginated Preview…"; onTriggered: backend.printPreview() }
+            }
+            Platform.MenuItem { objectName: "filePageSetup"; text: "Page Setup…"; onTriggered: backend.pageSetup() }
+            Platform.MenuSeparator {}
+            Platform.Menu {
+                title: "Omawrite Extras"
+                Platform.MenuItem { objectName: "fileNewWindow"; text: "New Window"; onTriggered: backend.newWindow() }
+                Platform.MenuItem { objectName: "fileNewFolder"; text: "New Folder…"; enabled: backend.library.rootFolder.toString() !== ""; onTriggered: libraryPane.newFolder() }
+                Platform.MenuItem { objectName: "fileOpenPath"; text: "Open by Path…"; shortcut: "Ctrl+Shift+O"; onTriggered: openPathDialog.open() }
+                Platform.MenuItem { objectName: "fileSaveAs"; text: "Save As…"; onTriggered: backend.saveAsDialog() }
+                Platform.MenuSeparator {}
+                Platform.MenuItem { objectName: "fileAutosave"; text: "Autosave Saved Files Every Minute"; checkable: true; checked: workspaceSettings.autosaveEnabled; onTriggered: workspaceSettings.autosaveEnabled = !workspaceSettings.autosaveEnabled }
+            }
+            Platform.MenuSeparator {}
             Platform.MenuItem {
                 text: "Quit Omawrite"
                 role: Platform.MenuItem.QuitRole
@@ -570,30 +589,23 @@ ApplicationWindow {
         }
         Platform.Menu {
             title: "Edit"
-            Platform.MenuItem { text: "Export Authorship Metadata…"; onTriggered: authorshipExportDialog.open() }
-            Platform.MenuItem { text: "Authorship Annotations…"; onTriggered: { authorshipDialog.ranges = backend.authorshipRanges(); authorshipDialog.open(); } }
-            Platform.MenuItem { text: "Spelling and Grammar…"; visible: win.isMac; enabled: editor.length > 0; onTriggered: { spellingDialog.open(); } }
-            Platform.MenuItem { text: "Speak Selection"; visible: win.isMac; enabled: editor.selectedText.length > 0; onTriggered: backend.speakText(editor.selectedText) }
-            Platform.MenuItem { text: "Stop Speaking"; visible: win.isMac; onTriggered: backend.stopSpeaking() }
-            Platform.MenuItem { text: "Emoji & Symbols"; visible: win.isMac; onTriggered: backend.nativeWindowAction("emoji") }
             Platform.MenuItem { objectName: "editUndo"; text: "Undo"; enabled: win.editTarget.canUndo; onTriggered: win.editTarget.undo() }
             Platform.MenuItem { objectName: "editRedo"; text: "Redo"; enabled: win.editTarget.canRedo; onTriggered: win.editTarget.redo() }
+            Platform.MenuSeparator {}
             Platform.MenuItem { text: "Cut"; enabled: !win.editTarget.readOnly && win.editTarget.selectedText.length > 0; onTriggered: { if (win.editTarget === editor) { backend.copySelection(editor.selectionStart, editor.selectionEnd, "markdown"); editor.remove(editor.selectionStart, editor.selectionEnd); } else win.editTarget.cut(); } }
             Platform.MenuItem { text: "Copy"; enabled: win.editTarget.selectedText.length > 0; onTriggered: { if (win.editTarget === editor) backend.copySelection(editor.selectionStart, editor.selectionEnd, "markdown"); else win.editTarget.copy(); } }
+            Platform.MenuItem { objectName: "editCopyFormatted"; text: "Copy Formatted"; enabled: win.editTarget === editor && editor.selectedText.length > 0; onTriggered: backend.copySelection(editor.selectionStart, editor.selectionEnd, "formatted") }
+            Platform.MenuItem { objectName: "editCopyHtml"; text: "Copy HTML"; enabled: win.editTarget === editor && editor.selectedText.length > 0; onTriggered: backend.copySelection(editor.selectionStart, editor.selectionEnd, "html") }
+            Platform.MenuItem { objectName: "editCopyMarkdown"; text: "Copy Markdown"; enabled: win.editTarget === editor && editor.selectedText.length > 0; onTriggered: backend.copySelection(editor.selectionStart, editor.selectionEnd, "markdown") }
             Platform.MenuItem { text: "Paste"; enabled: !win.editTarget.readOnly && win.editTarget.canPaste; onTriggered: { if (win.editTarget === editor) editor.pasteClipboardAsPlainText(); else win.editTarget.paste(); } }
-            Platform.MenuItem { objectName: "editDelete"; text: "Delete"; enabled: !win.editTarget.readOnly && win.editTarget.selectedText.length > 0; onTriggered: win.editTarget.remove(win.editTarget.selectionStart, win.editTarget.selectionEnd) }
-            Platform.MenuItem { text: "Select All"; enabled: win.editTarget.length > 0; onTriggered: win.editTarget.selectAll() }
-            Platform.Menu {
-                title: "Copy As"
-                Platform.MenuItem { text: "Markdown"; enabled: editor.selectedText.length > 0; onTriggered: backend.copySelection(editor.selectionStart, editor.selectionEnd, "markdown") }
-                Platform.MenuItem { text: "HTML"; enabled: editor.selectedText.length > 0; onTriggered: backend.copySelection(editor.selectionStart, editor.selectionEnd, "html") }
-                Platform.MenuItem { text: "Formatted Text"; enabled: editor.selectedText.length > 0; onTriggered: backend.copySelection(editor.selectionStart, editor.selectionEnd, "formatted") }
-            }
             Platform.Menu {
                 title: "Paste As"
-                Platform.MenuItem { text: "Plain Text"; enabled: editor.canPaste; onTriggered: { editor.forceActiveFocus(); editor.replaceAtomic(editor.selectionStart, editor.selectionEnd, backend.clipboardText()); } }
-                Platform.MenuItem { text: "Markdown from HTML"; enabled: editor.canPaste; onTriggered: { editor.forceActiveFocus(); editor.replaceAtomic(editor.selectionStart, editor.selectionEnd, backend.clipboardMarkdown()); } }
+                Platform.MenuItem { objectName: "editPastePlain"; text: "Plain Text"; enabled: win.editTarget === editor && editor.canPaste; onTriggered: { editor.forceActiveFocus(); editor.replaceAtomic(editor.selectionStart, editor.selectionEnd, backend.clipboardText()); } }
+                Platform.MenuItem { objectName: "editPasteMarkdown"; text: "Markdown from HTML"; enabled: win.editTarget === editor && editor.canPaste; onTriggered: { editor.forceActiveFocus(); editor.replaceAtomic(editor.selectionStart, editor.selectionEnd, backend.clipboardMarkdown()); } }
             }
+            Platform.MenuSeparator {}
+            Platform.MenuItem { objectName: "editDelete"; text: "Delete"; enabled: !win.editTarget.readOnly && win.editTarget.selectedText.length > 0; onTriggered: win.editTarget.remove(win.editTarget.selectionStart, win.editTarget.selectionEnd) }
+            Platform.MenuItem { text: "Select All"; enabled: win.editTarget.length > 0; onTriggered: win.editTarget.selectAll() }
             Platform.MenuSeparator {}
             Platform.Menu {
                 title: "Find"
@@ -603,6 +615,21 @@ ApplicationWindow {
                 Platform.MenuItem { objectName: "editFindPrevious"; text: "Find Previous"; enabled: win.searchOpen && win.searchMatches.length > 0; onTriggered: win.moveSearch(-1) }
                 Platform.MenuItem { objectName: "editFindSelection"; text: "Use Selection for Find"; enabled: editor.selectedText.length > 0; onTriggered: win.openSearch(false, true) }
             }
+            Platform.MenuItem { objectName: "editSpelling"; text: "Spelling and Grammar…"; enabled: editor.length > 0; onTriggered: spellingDialog.open() }
+            Platform.Menu {
+                title: "Transformations"
+                Platform.MenuItem { objectName: "editUppercase"; text: "UPPERCASE"; enabled: win.editTarget === editor && editor.selectedText.length > 0; onTriggered: win.editMarkdown("uppercase") }
+                Platform.MenuItem { objectName: "editLowercase"; text: "lowercase"; enabled: win.editTarget === editor && editor.selectedText.length > 0; onTriggered: win.editMarkdown("lowercase") }
+                Platform.MenuItem { objectName: "editTitleCase"; text: "Title Case"; enabled: win.editTarget === editor && editor.selectedText.length > 0; onTriggered: win.editMarkdown("titlecase") }
+            }
+            Platform.Menu {
+                title: "Speech"
+                Platform.MenuItem { objectName: "editSpeakSelection"; text: "Speak Selection"; enabled: win.editTarget === editor && editor.selectedText.length > 0; onTriggered: backend.speakText(editor.selectedText) }
+                Platform.MenuItem { objectName: "editStopSpeaking"; text: "Stop Speaking"; onTriggered: backend.stopSpeaking() }
+            }
+            Platform.MenuSeparator {}
+            Platform.MenuItem { objectName: "editAuthorship"; text: "Authorship Annotations…"; onTriggered: { authorshipDialog.ranges = backend.authorshipRanges(); authorshipDialog.open(); } }
+            Platform.MenuItem { objectName: "editExportAuthorship"; text: "Export Authorship Metadata…"; onTriggered: authorshipExportDialog.open() }
         }
         Platform.Menu {
             title: "Format"
@@ -656,13 +683,6 @@ ApplicationWindow {
             Platform.MenuItem { text: "Add Page Break"; onTriggered: editor.replaceSelectionWith("\n\n<!-- pagebreak -->\n\n") }
             Platform.MenuSeparator {}
             Platform.MenuItem { text: "Clear Styles"; enabled: editor.selectedText.length > 0; onTriggered: win.editMarkdown("clearStyles") }
-            Platform.MenuSeparator {}
-            Platform.Menu {
-                title: "Change Case"
-                Platform.MenuItem { text: "UPPERCASE"; enabled: editor.selectedText.length > 0; onTriggered: win.editMarkdown("uppercase") }
-                Platform.MenuItem { text: "lowercase"; enabled: editor.selectedText.length > 0; onTriggered: win.editMarkdown("lowercase") }
-                Platform.MenuItem { text: "Title Case"; enabled: editor.selectedText.length > 0; onTriggered: win.editMarkdown("titlecase") }
-            }
         }
         Platform.Menu {
             title: "View"

@@ -835,3 +835,19 @@ Known gaps: Clear Styles deliberately supports a bounded subset; complex mixed o
 Runnable artifacts: `dist/Omawrite Dev.app` and `dist/Omawrite.app` from Cycle 49.
 
 Optional exercise: open `research/cycle-49/sample/Format-actions.md`, choose Ordered Task List on its two task lines, complete one item and Undo, then select `## **Styled sample**`, choose Clear Styles and Undo. Confirm the menu placement and plain Markdown result.
+
+## Cycle 50 — File and Edit menu hierarchy
+
+Planned scope: align the observed File and Edit top-level hierarchy and group existing local commands without changing their safety semantics. Keep uncaptured iA submenu children unimplemented rather than inferred.
+
+Changes: File now presents New-in-Library actions, Open/Recent, Close, Save, document operations, Versions, Finder/library reveal, Share, Export, Print and Page Setup in the captured groups. Omawrite-only file commands remain in an explicit Extras group. Edit now presents Undo/Redo, focused-field Cut/Copy/Paste/Delete/Select All, Copy Formatted/HTML/Markdown, Paste As, Find, Spelling and Grammar, Transformations, Speech and manual authorship actions. The macOS-injected Emoji & Symbols command remains at the end; Omawrite's duplicate entry was removed. Source-only copy formats require an editor selection; ordinary editing commands continue to follow the active editable field.
+
+Validation: `./bin/build` and `./bin/test` pass, **81 tests, zero failures**. The new native-menu regression covers saved versus untitled guards, editor-focus copy-format enablement, Markdown/HTML/formatted clipboard results without source mutation, Find-field disabling of source-only copies, and a dirty File → Close → Cancel path that retains the draft. The full suite retains document, recovery and file-operation coverage.
+
+Native Dev: the File/Edit hierarchy was inspected with `research/cycle-50/sample/Menu-actions.md`. Copy formats were enabled only for the selected editor text and did not change the sample. A disposable edit followed by File → Close → Cancel retained the draft; it was discarded through the normal unsaved-work prompt before quitting. No print, export or share job was sent. The QA app was closed normally.
+
+Known gaps: the iA screenshots still do not expose the children of Revert, Share, Print, Paste As, Paste Edits From, Mark As, Find, Spelling, Substitutions, Transformations, Speech or AutoFill, so their exact iA behavior remains unverified. AppKit injects AutoFill, Dictation and Emoji & Symbols; their availability depends on macOS. Cross-application clipboard, actual sharing/printing, and full keyboard, dark, narrow and VoiceOver matrices remain open.
+
+Runnable artifacts: `dist/Omawrite Dev.app` and `dist/Omawrite.app` from Cycle 50. The GitHub RC1 binary remains the earlier Cycle 42 checkpoint.
+
+Optional exercise: open `research/cycle-50/sample/Menu-actions.md`, select its bold phrase and try Copy Formatted, Copy HTML and Copy Markdown. Make a disposable edit, choose File → Close, then Cancel. Confirm the text remains and report any confusing order, name or disabled state.

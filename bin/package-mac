@@ -21,6 +21,9 @@ ditto "$ROOT/build/Omawrite.app" "$ROOT/dist/Omawrite.app"
 QML_CORE="$("$QMAKE" -query QT_INSTALL_QML)/QtQml"
 mkdir -p "$ROOT/dist/Omawrite.app/Contents/Resources/qml"
 cp -RL "$QML_CORE" "$ROOT/dist/Omawrite.app/Contents/Resources/qml/QtQml"
+# Copied Qt plug-ins can carry provenance xattrs that make install_name_tool
+# refuse its own temporary rewrite inside this freshly generated bundle.
+xattr -cr "$ROOT/dist/Omawrite.app"
 
 DYLD_FRAMEWORK_PATH="$("$QMAKE" -query QT_INSTALL_LIBS)" "$QT_BIN/macdeployqt" "$ROOT/dist/Omawrite.app" -qmldir="$ROOT/src" -libpath="$("$QMAKE" -query QT_INSTALL_LIBS)" -no-codesign -no-strip
 mkdir -p "$ROOT/dist/Omawrite.app/Contents/Resources/licenses"
