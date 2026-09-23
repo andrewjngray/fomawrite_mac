@@ -893,3 +893,13 @@ Validation so far: `./bin/build` passes. The full `./bin/test` suite passes with
 Known gaps: a full incremental content index and iA smart-folder semantics are outside this bounded pass. For a root over the watch cap, or when macOS rejects a watch, external edits can make counts stale until Refresh Hashtags; the menu states that limitation. The Go menu has not yet been inspected natively for dynamic order, checked/enabled states, keyboard access or narrow/dark layout.
 
 Runnable artifact: `dist/Omawrite.app` was packaged from Cycle 53 source and passed strict local-signature verification. The running `dist/Omawrite Dev.app` remains at Cycle 51 pending normal close, refresh and native QA. See the [Cycle 53 record](../research/cycle-53/README.md) and [usability checklist](../research/usability/cycle-53.md). Optional exercise after Dev refresh: open the sample root, use Go → Quick Search and New Smart Folder, save a query, then edit a sample tag externally and check its status and refresh behavior.
+
+## Cycle 54 — writing input (phase 54a source in progress)
+
+Planned scope: reproduce captured View → Show Completions and inspect the uncaptured Edit → Substitutions/AutoFill children before assigning automatic writing behavior. Preserve source, Undo, IME composition and recovery.
+
+Source checkpoint 54a: Show Completions is a manual action with current-document Unicode candidates in a small popup. Acceptance revalidates source/caret and replaces one prefix atomically; there is no automatic insertion. Code and URL contexts are excluded. Candidate discovery is bounded to the first 50,000 UTF-16 code units, at most 256 matching occurrences and 12 results.
+
+Validation: `./bin/build` and the full native-access `./bin/test` suite pass with **89 tests, zero failures and zero skips**. Focused tests cover candidate filtering, one-step Undo, stale-caret refusal and long-document bounds. Native popup/keyboard/dark/narrow/IME checks are pending because the Mac is locked. [Cycle 54 evidence and gaps](../research/cycle-54/README.md).
+
+Known gaps: candidates beyond the bounded window are omitted. The iA completion popup behavior and Edit submenu children have not been observed; substitutions and automatic correction remain unimplemented. The current `dist/Omawrite.app` is Cycle 53 source and the running Dev app is native-verified Cycle 51. [Optional sample exercise](../research/usability/cycle-54.md): request a completion for `lan`, accept, Undo, then try the code and link cases.

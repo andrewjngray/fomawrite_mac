@@ -54,6 +54,10 @@ ApplicationWindow {
     property bool awaitingPendingSave: false
     property string pendingFileName: ""
     property int pendingHistoryDirection: 0
+    property var completionItems: []
+    property int completionStart: -1
+    property int completionEnd: -1
+    property string completionPrefix: ""
     property var documentStatistics: ({ words: 0, characters: 0, charactersWithoutSpaces: 0,
                                         sentences: 0, readingMinutes: 0, speakingMinutes: 0,
                                         tasks: 0, humanWords: 0, aiWords: 0, referenceWords: 0 })
@@ -312,6 +316,48 @@ ApplicationWindow {
         }
     }
 
+    Popup {
+        id: completionPopup
+        objectName: "completionPopup"
+        width: 260
+        height: Math.min(240, completionList.contentHeight + 12)
+        padding: 6
+        modal: false
+        focus: true
+        closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
+        background: Rectangle {
+            color: backend.palette.panel
+            border.color: backend.palette.border
+            radius: 5
+        }
+        ListView {
+            id: completionList
+            objectName: "completionList"
+            anchors.fill: parent
+            clip: true
+            model: win.completionItems
+            currentIndex: 0
+            keyNavigationWraps: true
+            Keys.onReturnPressed: function(event) { event.accepted = win.acceptCompletion(currentIndex); }
+            Keys.onEnterPressed: function(event) { event.accepted = win.acceptCompletion(currentIndex); }
+            Keys.onEscapePressed: function(event) {
+                completionPopup.close();
+                editor.forceActiveFocus();
+                event.accepted = true;
+            }
+            delegate: ItemDelegate {
+                required property string modelData
+                required property int index
+                objectName: "completionItem_" + index
+                width: completionList.width
+                height: 30
+                text: modelData
+                highlighted: ListView.isCurrentItem
+                onClicked: win.acceptCompletion(index)
+            }
+        }
+    }
+
     Menu {
         id: formatPopover
         x: Math.max(0, editorPane.x + 12)
@@ -381,6 +427,43 @@ ApplicationWindow {
         var result = backend.editMarkdown(action, editor.selectionStart, editor.selectionEnd);
         editor.forceActiveFocus();
         if (result.start !== undefined) editor.select(result.start, result.end);
+    }
+
+    function showCompletions() {
+        completionPopup.close();
+        if (editor.inputMethodComposing || editor.selectionStart !== editor.selectionEnd) return false;
+        var result = backend.wordCompletions(editor.cursorPosition);
+        var items = result.items || [];
+        if (items.length === 0) return false;
+        completionStart = result.start;
+        completionEnd = result.end;
+        completionPrefix = result.prefix;
+        completionItems = items;
+        completionList.currentIndex = 0;
+        var point = editor.mapToItem(win.contentItem, editor.cursorRectangle.x,
+                                     editor.cursorRectangle.y + editor.cursorRectangle.height);
+        completionPopup.x = Math.max(8, Math.min(win.contentItem.width - completionPopup.width - 8, point.x));
+        completionPopup.y = Math.max(8, Math.min(win.contentItem.height - completionPopup.height - 8, point.y));
+        completionPopup.open();
+        Qt.callLater(function() { completionList.forceActiveFocus(); });
+        return true;
+    }
+
+    function acceptCompletion(index) {
+        if (index < 0 || index >= completionItems.length
+            || editor.inputMethodComposing
+            || editor.selectionStart !== editor.selectionEnd
+            || editor.cursorPosition !== completionEnd
+            || editor.text.slice(completionStart, completionEnd) !== completionPrefix) {
+            completionPopup.close();
+            editor.forceActiveFocus();
+            return false;
+        }
+        var completion = completionItems[index];
+        completionPopup.close();
+        editor.replaceAtomic(completionStart, completionEnd, completion);
+        editor.forceActiveFocus();
+        return true;
     }
 
     function requestHistory(direction) {
@@ -878,6 +961,12 @@ ApplicationWindow {
                 NativeCommand { commandId: "larger" }
                 NativeCommand { commandId: "smaller" }
                 NativeCommand { commandId: "resetSize" }
+            }
+            Platform.MenuItem {
+                objectName: "native_showCompletions"
+                text: "Show Completions"
+                enabled: win.editTarget === editor && editor.selectionStart === editor.selectionEnd
+                onTriggered: win.showCompletions()
             }
             NativeCommand { commandId: "markup" }
             Platform.MenuSeparator {}

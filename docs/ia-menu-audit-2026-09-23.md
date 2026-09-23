@@ -198,7 +198,7 @@ These menus were not opened in this folder. The older inspection recorded the st
 | Text excerpts | **Match** | Bounded source excerpts with a compact default. |
 | Tree/List navigation | **Partial (Cycle 51)** | Tree and current-folder List both reach nested files; List uses existing folder history and Show in Library. Tree expansion is session-only and resets on root changes. |
 | Text size | **Match** | Larger, smaller and reset equivalents. |
-| Show Completions | **Gap** | No completion UI or acceptance behavior. |
+| Show Completions | **Partial (Cycle 54a source; native pending)** | A manual current-document suggestion popup inserts only on explicit acceptance with Undo. iA candidate source, ranking, shortcuts and native popup behavior remain unverified. |
 | Reload Preview | **Match** | Forces Markdown reparse. |
 | Preview Full/Split/Web | **Partial (Cycle 51)** | View → Preview now routes Full/Split/Web to existing continuous preview layouts. Web is not a separate renderer; exact iA behavior remains unverified. |
 | PDF preview / fit controls | **Partial (Cycle 51)** | View → Preview → PDF → Paginated Preview opens the existing page/fit controls. iA's PDF submenu children were not captured, so exact structure and shortcut parity remain open. |

@@ -483,6 +483,118 @@ static const QRegularExpression &statisticsWordPattern() {
     return pattern;
 }
 
+static const QRegularExpression &completionWordPattern() {
+    static const QRegularExpression pattern(
+        QStringLiteral("[\\p{L}\\p{M}\\p{N}]+(?:['_-][\\p{L}\\p{M}\\p{N}]+)*"),
+        QRegularExpression::UseUnicodePropertiesOption);
+    return pattern;
+}
+
+static bool completionContextAllowed(const QString &markdown, int position) {
+    if (position < 0 || position > markdown.size()) return false;
+    const int lineStart = position == 0 ? 0 : markdown.lastIndexOf('\n', position - 1) + 1;
+    int lineEnd = markdown.indexOf('\n', position);
+    if (lineEnd < 0) lineEnd = markdown.size();
+
+    QChar fence;
+    int fenceLength = 0;
+    const QRegularExpression fencePattern(QStringLiteral("^ {0,3}(?:> ?)*(`{3,}|~{3,})(.*)$"));
+    int offset = 0;
+    while (offset <= lineStart) {
+        int end = markdown.indexOf('\n', offset);
+        if (end < 0) end = markdown.size();
+        const QString line = markdown.mid(offset, end - offset);
+        const auto marker = fencePattern.match(line);
+        if (marker.hasMatch()) {
+            const QString sequence = marker.captured(1);
+            if (fence.isNull()) {
+                fence = sequence.front();
+                fenceLength = sequence.size();
+            } else if (sequence.front() == fence && sequence.size() >= fenceLength
+                       && marker.captured(2).trimmed().isEmpty()) {
+                fence = QChar();
+            }
+        }
+        if (offset == lineStart || end == markdown.size()) break;
+        offset = end + 1;
+    }
+    if (!fence.isNull()) return false;
+
+    const QString line = markdown.mid(lineStart, lineEnd - lineStart);
+    if (line.startsWith(QStringLiteral("    ")) || line.startsWith('\t')) return false;
+    const QString before = markdown.mid(lineStart, position - lineStart);
+
+    int openBackticks = 0;
+    auto ticks = QRegularExpression(QStringLiteral("`+")).globalMatch(before);
+    while (ticks.hasNext()) {
+        const int length = ticks.next().capturedLength();
+        if (openBackticks == 0) openBackticks = length;
+        else if (length == openBackticks) openBackticks = 0;
+    }
+    if (openBackticks != 0) return false;
+
+    int tokenStart = before.size();
+    while (tokenStart > 0 && !before.at(tokenStart - 1).isSpace()
+           && !QStringLiteral("<>\"'").contains(before.at(tokenStart - 1))) --tokenStart;
+    const QString token = before.mid(tokenStart).toCaseFolded();
+    if (token.contains(QStringLiteral("://")) || token.startsWith(QStringLiteral("www."))
+        || token.startsWith(QStringLiteral("mailto:"))) return false;
+    if (before.lastIndexOf(QStringLiteral("](")) > before.lastIndexOf(')')) return false;
+    return true;
+}
+
+QVariantMap Backend::wordCompletions(int position) const {
+    if (!m_document) return {};
+    const QString text = currentDocumentText();
+    position = qBound(0, position, text.size());
+    if (position < text.size()) {
+        const QChar next = text.at(position);
+        if (next.isLetterOrNumber() || next.category() == QChar::Mark_NonSpacing
+            || next == '_' || next == '-' || next == '\'') return {};
+    }
+    if (!completionContextAllowed(text, position)) return {};
+
+    const int lineStart = position == 0 ? 0 : text.lastIndexOf('\n', position - 1) + 1;
+    const QString before = text.mid(lineStart, position - lineStart);
+    const QRegularExpression suffix(
+        QStringLiteral("[\\p{L}\\p{M}\\p{N}]+(?:['_-][\\p{L}\\p{M}\\p{N}]+)*$"),
+        QRegularExpression::UseUnicodePropertiesOption);
+    const auto prefixMatch = suffix.match(before);
+    if (!prefixMatch.hasMatch() || prefixMatch.capturedLength() < 2) return {};
+    const QString prefix = prefixMatch.captured();
+    const QString foldedPrefix = prefix.toCaseFolded();
+    const int start = lineStart + prefixMatch.capturedStart();
+
+    // Completion is explicit and local, so keep its synchronous work bounded.
+    // proseForReview preserves UTF-16 offsets while blanking fenced/inline code
+    // and URL destinations; inspect at most 256 matching occurrences from its
+    // existing 50,000-code-unit review window.
+    const QString searchable = proseForReview(text);
+    QMap<QString, QString> unique;
+    int matchingOccurrences = 0;
+    auto words = completionWordPattern().globalMatch(searchable);
+    while (words.hasNext()) {
+        const auto match = words.next();
+        const QString candidate = text.mid(match.capturedStart(), match.capturedLength());
+        const QString folded = candidate.toCaseFolded();
+        if (candidate.size() <= prefix.size() || !folded.startsWith(foldedPrefix)
+            || folded == foldedPrefix) continue;
+        if (++matchingOccurrences > 256) break;
+        if (!completionContextAllowed(text, match.capturedEnd())) continue;
+        if (!unique.contains(folded)) unique.insert(folded, candidate);
+    }
+
+    QStringList items = unique.values();
+    std::sort(items.begin(), items.end(), [](const QString &left, const QString &right) {
+        const int folded = QString::compare(left, right, Qt::CaseInsensitive);
+        return folded == 0 ? left < right : folded < 0;
+    });
+    if (items.size() > 12) items = items.mid(0, 12);
+    if (items.isEmpty()) return {};
+    return {{QStringLiteral("start"), start}, {QStringLiteral("end"), position},
+            {QStringLiteral("prefix"), prefix}, {QStringLiteral("items"), items}};
+}
+
 QVariantMap Backend::documentStatistics(const QString &markdown) const {
     QTextDocument rendered;
     rendered.setMarkdown(markdown);

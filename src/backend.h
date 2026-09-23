@@ -83,6 +83,7 @@ public:
 
     Q_INVOKABLE QVariantList documentOutline(const QString &markdown) const;
     Q_INVOKABLE QVariantMap documentStatistics(const QString &markdown) const;
+    Q_INVOKABLE QVariantMap wordCompletions(int position) const;
     Q_INVOKABLE QString previewMarkdown(const QString &source) const;
     Q_INVOKABLE int previewAnchorPosition(QObject *textDocument, const QString &anchor) const;
     Q_INVOKABLE QString tableOfContents(const QString &markdown) const;

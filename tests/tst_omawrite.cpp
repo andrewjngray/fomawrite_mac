@@ -1315,6 +1315,94 @@ private slots:
         backend.discardRecovery();
     }
 
+    void currentDocumentCompletionsAreExplicitAndMarkdownAware() {
+        Backend backend;
+        QQmlEngine engine;
+        engine.rootContext()->setContextProperty("backend", &backend);
+        QQmlComponent component(&engine, QUrl::fromLocalFile(QFINDTESTDATA("../src/Main.qml")));
+        QScopedPointer<QObject> window(component.create());
+        QVERIFY2(window, qPrintable(component.errorString()));
+        auto *editor = window->findChild<QObject *>("sourceEditor");
+        auto *menuItem = window->findChild<QObject *>("native_showCompletions");
+        auto *popup = window->findChild<QObject *>("completionPopup");
+        QVERIFY(editor && menuItem && popup);
+
+        const QString source = QStringLiteral("caféteria welcomes café.\nTry café");
+        editor->setProperty("text", source);
+        editor->setProperty("cursorPosition", source.size());
+        const QVariantMap unicode = backend.wordCompletions(source.size());
+        QCOMPARE(unicode.value("start").toInt(), source.size() - 4);
+        QVERIFY(unicode.value("items").toStringList().contains(QStringLiteral("caféteria")));
+        QVERIFY(menuItem->property("enabled").toBool());
+
+        QVariant shown;
+        QVERIFY(QMetaObject::invokeMethod(window.data(), "showCompletions",
+                                          Q_RETURN_ARG(QVariant, shown)));
+        QVERIFY(shown.toBool());
+        QCOMPARE(editor->property("text").toString(), source);
+        QTRY_VERIFY(popup->property("opened").toBool());
+        const QStringList items = window->property("completionItems").toStringList();
+        const int choice = items.indexOf(QStringLiteral("caféteria"));
+        QVERIFY(choice >= 0);
+        QVERIFY(QMetaObject::invokeMethod(editor, "select", Q_ARG(int, source.size() - 4),
+                                          Q_ARG(int, source.size())));
+        QVariant accepted;
+        QVERIFY(QMetaObject::invokeMethod(window.data(), "acceptCompletion",
+                                          Q_RETURN_ARG(QVariant, accepted),
+                                          Q_ARG(QVariant, choice)));
+        QVERIFY(!accepted.toBool());
+        QCOMPARE(editor->property("text").toString(), source);
+
+        editor->setProperty("cursorPosition", source.size());
+        QVERIFY(QMetaObject::invokeMethod(window.data(), "showCompletions",
+                                          Q_RETURN_ARG(QVariant, shown)));
+        QVERIFY(shown.toBool());
+        QVERIFY(QMetaObject::invokeMethod(window.data(), "acceptCompletion",
+                                          Q_RETURN_ARG(QVariant, accepted),
+                                          Q_ARG(QVariant, choice)));
+        QVERIFY(accepted.toBool());
+        QCOMPARE(editor->property("text").toString(), QStringLiteral("caféteria welcomes café.\nTry caféteria"));
+        QVERIFY(QMetaObject::invokeMethod(editor, "undo"));
+        QCOMPARE(editor->property("text").toString(), source);
+
+        const QString protectedSource = QStringLiteral(
+            "prose projection\n"
+            "`prohibited pro`\n"
+            "```\nprogramming pro\n```\n"
+            "https://example.com/project\n"
+            "[site](https://example.com/pro\n"
+            "pro");
+        editor->setProperty("text", protectedSource);
+        const int inlineCode = protectedSource.indexOf(QStringLiteral("pro`")) + 3;
+        QVERIFY(backend.wordCompletions(inlineCode).isEmpty());
+        const int fencedCode = protectedSource.indexOf(QStringLiteral("pro\n```")) + 3;
+        QVERIFY(backend.wordCompletions(fencedCode).isEmpty());
+        const int bareUrl = protectedSource.indexOf(QStringLiteral("project")) + 7;
+        QVERIFY(backend.wordCompletions(bareUrl).isEmpty());
+        const int linkUrl = protectedSource.indexOf(QStringLiteral("/pro\n")) + 4;
+        QVERIFY(backend.wordCompletions(linkUrl).isEmpty());
+        const QVariantMap prose = backend.wordCompletions(protectedSource.size());
+        const QStringList proseItems = prose.value("items").toStringList();
+        QVERIFY(proseItems.contains(QStringLiteral("prose")));
+        QVERIFY(proseItems.contains(QStringLiteral("projection")));
+        QVERIFY(!proseItems.contains(QStringLiteral("prohibited")));
+        QVERIFY(!proseItems.contains(QStringLiteral("programming")));
+        QVERIFY(!proseItems.contains(QStringLiteral("project")));
+
+        QString longDocument;
+        longDocument.reserve(60000);
+        for (int i = 0; i < 8000; ++i) longDocument += QStringLiteral("alpha ");
+        for (int i = 0; i < 300; ++i) longDocument += QStringLiteral("completion ");
+        longDocument += QStringLiteral("\nco");
+        editor->setProperty("text", longDocument);
+        QElapsedTimer completionTimer;
+        completionTimer.start();
+        const QVariantMap bounded = backend.wordCompletions(longDocument.size());
+        QVERIFY(bounded.value("items").toStringList().contains(QStringLiteral("completion")));
+        QVERIFY2(completionTimer.elapsed() < 2000, "Bounded completion lookup exceeded two seconds");
+        backend.discardRecovery();
+    }
+
     void inlineFormattingAndStructuralInsertionUndo() {
         Backend backend;
         QQmlEngine engine;
