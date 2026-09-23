@@ -1,6 +1,6 @@
 # Omawrite Mac: personal Markdown workspace
 
-**Current status — 23 September 2026:** Cycle 51 is the latest native-verified build. Cycle 52 source passes 84 tests and its ordinary app is packaged, but Dev native QA is pending. The Mac 0.2.0 RC1 download remains the Cycle 42 artifact. The [menu closeout plan](menu-closeout-plan.md) starts from the [screenshot audit](ia-menu-audit-2026-09-23.md); older cycle counts below are historical. Full iA Writer parity and hardware acceptance remain open.
+**Current status — 23 September 2026:** Cycle 51 is the latest native-verified build. Cycles 52–53 source pass 88 tests and the ordinary app is packaged from Cycle 53, but Dev native QA is pending. The Mac 0.2.0 RC1 download remains the Cycle 42 artifact. The [menu closeout plan](menu-closeout-plan.md) starts from the [screenshot audit](ia-menu-audit-2026-09-23.md); older cycle counts below are historical. Full iA Writer parity and hardware acceptance remain open.
 
 
 Owner: Andrew Gray. Working name: Omawrite Mac. Starting point: the MIT-licensed omacom/omawrite project; preserve its history and attribution.

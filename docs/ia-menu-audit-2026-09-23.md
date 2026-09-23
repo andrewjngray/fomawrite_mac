@@ -215,11 +215,11 @@ These menus were not opened in this folder. The older inspection recorded the st
 | Document Back/Forward | **Match** | Session history restores cursor and guards dirty navigation. |
 | Library Back/Forward / Enclosing Folder | **Match** | Separate library navigation history exists. |
 | Open Link | **Partial** | Opens a source link at the cursor and preview links. Complete fragments/non-Markdown/nearest-match semantics remain open. |
-| Quick Search | **Partial** | Quick Open searches bounded filenames, saved contents and hashtags. It rereads bounded files rather than maintaining an incremental index. |
+| Quick Search | **Partial (Cycle 53 source; native pending)** | Go now opens Quick Search. It rereads bounded saved files rather than maintaining an incremental index; native routing remains unverified. |
 | Command Palette | **Partial** | Searchable workspace command registry exists, but it does not yet contain every menu command. |
-| Locations / Add Location | **Match** | Dynamic local locations exist. Parent/child overlaps are rejected and child folders can be Favorites. Cloud folders are ordinary local paths. |
-| Recents / Smart folders | **Partial** | Recents plus persisted saved queries exist in the organizer/Quick Open. There is no direct Go → New Smart Folder command or full iA smart-folder model. |
-| Hashtags | **Partial** | Bounded saved-file tag counts and navigation exist in the organizer, not as dynamic Go menu items; no incremental watcher/index. |
+| Locations / Add Location | **Partial (Cycle 53 source; native pending)** | The Go submenu now uses saved local locations and exposes Add Location. Parent/child overlaps are rejected; cloud folders are ordinary local paths. Native order and unavailable-state checks remain. |
+| Recents / Smart folders | **Partial (Cycle 53 source; native pending)** | Go now lists recent files, saved queries and New Smart Folder. Its nested Recents submenu differs from the captured direct action; iA smart-folder semantics remain broader. |
+| Hashtags | **Partial (Cycle 53 source; native pending)** | Go now exposes current-root tags and explicit Refresh. Small complete roots use a bounded watcher and debounced rescan; large, inaccessible or rejected roots state that manual refresh is needed. Native behavior remains unverified. |
 
 ### Window, application and Help
 

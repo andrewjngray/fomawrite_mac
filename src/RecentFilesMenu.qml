@@ -9,8 +9,12 @@ Platform.Menu {
         model: root.library.recentFiles
         delegate: Platform.MenuItem {
             required property var modelData
+            required property int index
+            objectName: "recentFile_" + index
             // Paths distinguish documents with the same basename.
             text: modelData.name + " — " + modelData.url.toString().replace(/^file:\/\//, "")
+                + (modelData.available ? "" : " (Unavailable)")
+            enabled: modelData.available
             onTriggered: root.openRequested(modelData.url)
         }
         onObjectAdded: function(index, object) { root.insertItem(index, object); }

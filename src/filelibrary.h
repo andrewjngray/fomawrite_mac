@@ -102,10 +102,15 @@ signals:
     void errorChanged();
 
 private:
+    void clearTagWatching();
+    void scheduleAutomaticTagRefresh();
     QVariantList m_tagIndex;
     QString m_tagStatus = "Refresh to scan saved files";
     int m_tagGeneration = 0;
     std::shared_ptr<std::atomic_bool> m_tagCanceled;
+    QStringList m_tagWatchPaths;
+    QTimer m_tagRefreshTimer;
+    bool m_tagAutoRefresh = false;
     QList<QUrl> m_history;
     int m_historyIndex = -1;
     bool m_navigatingHistory = false;

@@ -169,7 +169,7 @@ ApplicationWindow {
             case "rename": fileNameDialog.showFor(true); break;
             case "move": moveFolderDialog.currentFolder=backend.documentBaseUrl; moveFolderDialog.open(); break;
             case "reveal": win.showCurrentFileInLibrary(); break;
-            case "quickOpen": quickOpenDialog.open(); break;
+            case "quickOpen": win.openQuickSearchState("", false, backend.library.rootFolder, false); break;
             case "refreshTags": backend.library.refreshTags(); break;
             case "exportHtml": exportDialog.outputFormat="html"; exportDialog.nameFilters=["HTML (*.html)"]; exportDialog.open(); break;
             case "printPreview": backend.printPreview(); break;
@@ -395,6 +395,33 @@ ApplicationWindow {
         var link = backend.sourceLinkAt(editor.cursorPosition);
         if (/^file:.*\.(md|markdown|mdown|txt|text)(#.*)?$/i.test(String(link))) requestOpen(link);
         else backend.openExternalUrl(link);
+    }
+
+    function openQuickSearchState(query, contents, requestedRoot, creating) {
+        var root = requestedRoot && requestedRoot.toString() !== "" ? requestedRoot : backend.library.rootFolder;
+        if (!root || root.toString() === "") return false;
+        backend.library.rootFolder = root;
+        // FileLibrary rejects missing/unreadable roots and either retains the
+        // previous folder or reports an error for a now-missing current root.
+        // Do not show a query against the wrong or unavailable library.
+        if (backend.library.rootFolder.toString() !== root.toString() || backend.library.error !== "") {
+            workspaceSettings.libraryVisible = true; // LibraryPane shows the concrete refusal.
+            return false;
+        }
+        quickOpenDialog.creationMode = creating;
+        savedSearchChoice.currentIndex = -1;
+        quickContents.checked = contents;
+        quickQuery.text = query;
+        quickOpenDialog.open();
+        return true;
+    }
+
+    function openSavedSearch(item) {
+        return item && openQuickSearchState(item.query, item.contents, item.root, false);
+    }
+
+    function openHashtag(tag) {
+        return openQuickSearchState("#" + tag, true, backend.library.rootFolder, false);
     }
 
     function requestOpen(url) {
@@ -926,14 +953,16 @@ ApplicationWindow {
         }
         Platform.Menu {
             title: "Go"
-            Platform.MenuItem { text: "Command Palette…"; shortcut: "Ctrl+Shift+P"; onTriggered: commandPalette.open() }
-            Platform.MenuItem { objectName: "documentBack"; text: "Back in Documents"; enabled: backend.canGoBack; onTriggered: win.requestHistory(-1) }
-            Platform.MenuItem { objectName: "documentForward"; text: "Forward in Documents"; enabled: backend.canGoForward; onTriggered: win.requestHistory(1) }
-            Platform.MenuItem { text: "Back in Library"; enabled: backend.library.canGoBack; onTriggered: backend.library.navigateHistory(-1) }
-            Platform.MenuItem { text: "Forward in Library"; enabled: backend.library.canGoForward; onTriggered: backend.library.navigateHistory(1) }
-            Platform.MenuItem { text: "Enclosing Library Folder"; enabled: backend.library.rootFolder.toString() !== ""; onTriggered: backend.library.enclosingFolder() }
-            Platform.MenuItem { text: "Open Link at Cursor"; enabled: { var text = editor.text; return backend.sourceLinkAt(editor.cursorPosition).toString() !== ""; } onTriggered: win.openSourceLink() }
-            Platform.MenuItem { text: "Quick Open…"; enabled: backend.library.rootFolder.toString() !== ""; onTriggered: quickOpenDialog.open() }
+            Platform.MenuItem { objectName: "goBack"; text: "Back"; enabled: backend.canGoBack; onTriggered: win.requestHistory(-1) }
+            Platform.MenuItem { objectName: "goForward"; text: "Forward"; enabled: backend.canGoForward; onTriggered: win.requestHistory(1) }
+            Platform.MenuSeparator {}
+            Platform.MenuItem { objectName: "goLibraryBack"; text: "Back in Library"; enabled: backend.library.canGoBack; onTriggered: backend.library.navigateHistory(-1) }
+            Platform.MenuItem { objectName: "goLibraryForward"; text: "Forward in Library"; enabled: backend.library.canGoForward; onTriggered: backend.library.navigateHistory(1) }
+            Platform.MenuItem { objectName: "goEnclosingFolder"; text: "Enclosing Folder"; enabled: backend.library.rootFolder.toString() !== ""; onTriggered: backend.library.enclosingFolder() }
+            Platform.MenuSeparator {}
+            Platform.MenuItem { objectName: "goOpenLink"; text: "Open Link"; enabled: backend.sourceLinkAt(editor.cursorPosition).toString() !== ""; onTriggered: win.openSourceLink() }
+            Platform.MenuItem { objectName: "goQuickSearch"; text: "Quick Search…"; enabled: backend.library.rootFolder.toString() !== ""; onTriggered: win.openQuickSearchState("", false, backend.library.rootFolder, false) }
+            Platform.MenuItem { objectName: "goCommandPalette"; text: "Command Palette…"; shortcut: "Ctrl+Shift+P"; onTriggered: commandPalette.open() }
             Platform.MenuSeparator {}
             Platform.Menu {
                 id: locationsMenu
@@ -942,16 +971,73 @@ ApplicationWindow {
                     model: backend.library.locations
                     delegate: Platform.MenuItem {
                         required property var modelData
+                        required property int index
+                        objectName: "goLocation_" + index
                         text: modelData.name + (modelData.available ? "" : " (Unavailable)")
+                        enabled: modelData.available
                         onTriggered: { backend.library.rootFolder = modelData.url; workspaceSettings.libraryVisible = true; }
                     }
                     onObjectAdded: function(index, object) { locationsMenu.insertItem(index, object); }
                     onObjectRemoved: function(index, object) { locationsMenu.removeItem(object); }
                 }
                 Platform.MenuSeparator {}
-                Platform.MenuItem { text: "Add Location…"; onTriggered: libraryPane.chooseFolder() }
+                Platform.MenuItem { objectName: "goAddLocation"; text: "Add Location…"; onTriggered: libraryPane.chooseFolder() }
             }
-            RecentFilesMenu { title: "Recent Files"; library: backend.library; onOpenRequested: function(url) { win.requestOpen(url); } }
+            Platform.Menu {
+                id: smartFoldersMenu
+                title: "Smart Folders"
+                RecentFilesMenu { title: "Recents"; library: backend.library; onOpenRequested: function(url) { win.requestOpen(url); } }
+                Platform.MenuItem {
+                    objectName: "goNewSmartFolder"
+                    text: "New Smart Folder…"
+                    enabled: backend.library.rootFolder.toString() !== ""
+                    onTriggered: win.openQuickSearchState("", false, backend.library.rootFolder, true)
+                }
+                Platform.MenuSeparator { visible: backend.library.savedSearches.length > 0 }
+                Instantiator {
+                    model: backend.library.savedSearches
+                    delegate: Platform.MenuItem {
+                        required property var modelData
+                        required property int index
+                        objectName: "goSavedSearch_" + index
+                        text: modelData.query + (modelData.contents ? " — contents" : " — filenames")
+                        onTriggered: win.openSavedSearch(modelData)
+                    }
+                    onObjectAdded: function(index, object) { smartFoldersMenu.insertItem(index + 3, object); }
+                    onObjectRemoved: function(index, object) { smartFoldersMenu.removeItem(object); }
+                }
+            }
+            Platform.Menu {
+                id: hashtagsMenu
+                title: "Hashtags"
+                Instantiator {
+                    model: backend.library.tagIndex
+                    delegate: Platform.MenuItem {
+                        required property var modelData
+                        required property int index
+                        objectName: "goHashtag_" + modelData.tag
+                        text: "#" + modelData.tag + " (" + modelData.count + ")"
+                        enabled: backend.library.rootFolder.toString() !== ""
+                        onTriggered: win.openHashtag(modelData.tag)
+                    }
+                    onObjectAdded: function(index, object) { hashtagsMenu.insertItem(index, object); }
+                    onObjectRemoved: function(index, object) { hashtagsMenu.removeItem(object); }
+                }
+                Platform.MenuItem {
+                    objectName: "goHashtagsEmpty"
+                    text: backend.library.tagStatus
+                    enabled: false
+                    visible: backend.library.tagIndex.length === 0
+                }
+                Platform.MenuSeparator {}
+                Platform.MenuItem {
+                    objectName: "goHashtagStatus"
+                    text: backend.library.tagStatus
+                    enabled: false
+                    visible: backend.library.tagIndex.length > 0
+                }
+                Platform.MenuItem { objectName: "goRefreshHashtags"; text: "Refresh Hashtags"; enabled: backend.library.rootFolder.toString() !== ""; onTriggered: backend.library.refreshTags() }
+            }
         }
         Platform.Menu {
             title: "Help"
@@ -1190,14 +1276,15 @@ ApplicationWindow {
     Dialog {
         id: quickOpenDialog
         objectName: "quickOpenDialog"
-        title: "Quick Open — current library"
+        property bool creationMode: false
+        title: creationMode ? "New Smart Folder — save this query" : "Quick Search — current library"
         modal: true
         anchors.centerIn: parent
         width: Math.min(620, win.width - 40)
         height: Math.min(460, win.height - 60)
         standardButtons: Dialog.Cancel
         onOpened: { quickQuery.forceActiveFocus(); quickQuery.selectAll(); quickSearchTimer.restart(); }
-        onClosed: { quickSearchTimer.stop(); backend.library.cancelQuickSearch(); }
+        onClosed: { creationMode = false; quickSearchTimer.stop(); backend.library.cancelQuickSearch(); }
         function choose(index) {
             var results = backend.library.quickResults;
             if (index < 0 || index >= results.length) return;
@@ -1223,22 +1310,20 @@ ApplicationWindow {
                 Layout.fillWidth: true
                 ComboBox {
                     id: savedSearchChoice
+                    objectName: "savedSearchChoice"
                     Layout.fillWidth: true
                     model: backend.library.savedSearches
                     textRole: "query"
                     displayText: currentIndex < 0 ? "Saved searches…" : currentText
                     onActivated: {
                         var item = backend.library.savedSearches[currentIndex];
-                        backend.library.rootFolder = item.root;
-                        quickContents.checked = item.contents;
-                        quickQuery.text = item.query;
-                        quickSearchTimer.restart();
+                        win.openSavedSearch(item);
                     }
                 }
-                Button { text: "Save query"; enabled: quickQuery.text.trim().length > 0; onClicked: backend.library.saveSearch(quickQuery.text, quickContents.checked) }
-                Button { text: "Remove query"; enabled: savedSearchChoice.currentIndex >= 0; onClicked: backend.library.removeSearch(savedSearchChoice.currentIndex) }
+                Button { objectName: "saveSmartFolder"; text: "Save query"; enabled: quickQuery.text.trim().length > 0; onClicked: backend.library.saveSearch(quickQuery.text, quickContents.checked) }
+                Button { objectName: "removeSmartFolder"; text: "Remove query"; enabled: savedSearchChoice.currentIndex >= 0; onClicked: backend.library.removeSearch(savedSearchChoice.currentIndex) }
             }
-            CheckBox { id: quickContents; text: "Search saved file contents too"; onToggled: { backend.library.cancelQuickSearch(); quickSearchTimer.restart(); } }
+            CheckBox { id: quickContents; objectName: "quickContents"; text: "Search saved file contents too"; onToggled: { backend.library.cancelQuickSearch(); quickSearchTimer.restart(); } }
             Label { Layout.fillWidth: true; text: backend.library.quickStatus; wrapMode: Text.Wrap }
             ListView {
                 id: quickList

@@ -15,6 +15,10 @@
 #include <QtConcurrent>
 #include <QFutureWatcher>
 
+namespace {
+constexpr int tagWatchPathLimit = 256;
+}
+
 FileLibrary::FileLibrary(QObject *parent) : QObject(parent) {
     QSettings settings;
     m_locationNames = settings.value("library/locationNames").toMap();
@@ -31,6 +35,13 @@ FileLibrary::FileLibrary(QObject *parent) : QObject(parent) {
     connect(&m_watcher, &QFileSystemWatcher::directoryChanged,
             this, [this] { m_refreshTimer.start(); });
     connect(&m_refreshTimer, &QTimer::timeout, this, &FileLibrary::refresh);
+    m_tagRefreshTimer.setSingleShot(true);
+    m_tagRefreshTimer.setInterval(400);
+    connect(&m_watcher, &QFileSystemWatcher::directoryChanged,
+            this, [this] { scheduleAutomaticTagRefresh(); });
+    connect(&m_watcher, &QFileSystemWatcher::fileChanged,
+            this, [this] { scheduleAutomaticTagRefresh(); });
+    connect(&m_tagRefreshTimer, &QTimer::timeout, this, &FileLibrary::refreshTags);
     const QUrl saved = QSettings().value(QStringLiteral("library/root")).toUrl();
     if (saved.isLocalFile() && QFileInfo(saved.toLocalFile()).isDir())
         setRootFolder(saved);
@@ -148,6 +159,12 @@ void FileLibrary::removeLocation(const QUrl &url) {
     m_locations.removeAll(url.toLocalFile());
     m_locationNames.remove(url.toLocalFile());
     if (url == m_rootFolder) {
+        clearTagWatching();
+        if (m_tagCanceled) m_tagCanceled->store(true);
+        ++m_tagGeneration;
+        m_tagIndex.clear();
+        m_tagStatus = QStringLiteral("No library folder; choose a folder before refreshing hashtags.");
+        emit tagIndexChanged();
         m_rootFolder = QUrl();
         QSettings().remove("library/root");
         m_expanded.clear();
@@ -271,8 +288,12 @@ void FileLibrary::setRootFolder(const QUrl &folder) {
     }
     if (normalized == m_rootFolder) { refresh(); return; }
     cancelQuickSearch();
+    clearTagWatching();
     if(m_tagCanceled) m_tagCanceled->store(true);
-    ++m_tagGeneration; m_tagIndex.clear(); m_tagStatus="Refresh to scan saved files"; emit tagIndexChanged();
+    ++m_tagGeneration;
+    m_tagIndex.clear();
+    m_tagStatus = QStringLiteral("Hashtags not refreshed for this folder; choose Refresh Hashtags.");
+    emit tagIndexChanged();
     m_rootFolder = normalized;
     if (!m_navigatingHistory) {
         while (m_history.size() > m_historyIndex + 1) m_history.removeLast();
@@ -361,9 +382,16 @@ void FileLibrary::refresh() {
             appendDirectory(m_rootFolder.toLocalFile(), 0, watched);
         }
     }
+    for (const QString &path : m_tagWatchPaths)
+        if (QFileInfo(path).isDir() && !watched.contains(path)) watched.append(path);
     const QStringList previous = m_watcher.directories();
     if (!previous.isEmpty()) m_watcher.removePaths(previous);
-    if (!watched.isEmpty()) m_watcher.addPaths(watched);
+    const QStringList watchedFiles = m_watcher.files();
+    const QSet<QString> alreadyWatched(watchedFiles.cbegin(), watchedFiles.cend());
+    QStringList missing;
+    for (const QString &path : watched)
+        if (!alreadyWatched.contains(path)) missing.append(path);
+    if (!missing.isEmpty()) m_watcher.addPaths(missing);
     emit entriesChanged();
 }
 
@@ -597,21 +625,84 @@ FileLibrary::~FileLibrary() {
     if(m_tagCanceled) m_tagCanceled->store(true);
 }
 
+void FileLibrary::clearTagWatching() {
+    m_tagRefreshTimer.stop();
+    m_tagAutoRefresh = false;
+    QStringList tagFiles;
+    for (const QString &path : m_tagWatchPaths)
+        if (m_watcher.files().contains(path)) tagFiles.append(path);
+    if (!tagFiles.isEmpty()) m_watcher.removePaths(tagFiles);
+    m_tagWatchPaths.clear();
+}
+
+void FileLibrary::scheduleAutomaticTagRefresh() {
+    if (!m_tagAutoRefresh) return;
+    m_tagStatus = QStringLiteral("Saved-file changes detected; refreshing hashtags…");
+    emit tagIndexChanged();
+    m_tagRefreshTimer.start();
+}
+
 void FileLibrary::refreshTags() {
+    clearTagWatching();
     if(m_tagCanceled) m_tagCanceled->store(true);
     const int generation=++m_tagGeneration; const auto root=m_rootFolder.toLocalFile();
+    if (root.isEmpty() || !QFileInfo(root).isDir()) {
+        m_tagIndex.clear();
+        m_tagStatus = root.isEmpty()
+            ? QStringLiteral("No library folder; choose a folder before refreshing hashtags.")
+            : QStringLiteral("Library folder unavailable; choose an available folder before refreshing hashtags.");
+        emit tagIndexChanged();
+        return;
+    }
     m_tagIndex.clear(); m_tagStatus="Scanning saved-file tags…"; emit tagIndexChanged();
     const auto canceled=std::make_shared<std::atomic_bool>(false); m_tagCanceled=canceled;
     auto *watcher=new QFutureWatcher<QVariantMap>(this);
     connect(watcher,&QFutureWatcher<QVariantMap>::finished,this,[this,watcher,generation] {
         const auto result=watcher->result(); watcher->deleteLater(); if(generation!=m_tagGeneration) return;
-        m_tagIndex=result["tags"].toList(); m_tagStatus=result["status"].toString(); emit tagIndexChanged();
+        m_tagIndex=result["tags"].toList();
+        m_tagStatus=result["status"].toString();
+        const bool complete = !result["limited"].toBool() && result["skipped"].toInt() == 0
+            && result["watchComplete"].toBool();
+        const QStringList paths = result["watchPaths"].toStringList();
+        if (complete && !paths.isEmpty()) {
+            const QStringList watched = m_watcher.directories() + m_watcher.files();
+            QStringList missing;
+            for (const QString &path : paths)
+                if (!watched.contains(path)) missing.append(path);
+            const QStringList failed = missing.isEmpty() ? QStringList{} : m_watcher.addPaths(missing);
+            if (failed.isEmpty()) {
+                m_tagWatchPaths = paths;
+                m_tagAutoRefresh = true;
+                m_tagStatus += QStringLiteral("; watching for changes");
+            } else {
+                QStringList newlyAdded;
+                for (const QString &path : missing)
+                    if (!failed.contains(path)) newlyAdded.append(path);
+                if (!newlyAdded.isEmpty()) m_watcher.removePaths(newlyAdded);
+                clearTagWatching();
+                m_tagStatus += QStringLiteral("; automatic refresh unavailable - use Refresh Hashtags");
+            }
+        } else {
+            m_tagStatus += QStringLiteral("; automatic refresh unavailable - use Refresh Hashtags");
+        }
+        emit tagIndexChanged();
     });
     watcher->setFuture(QtConcurrent::run([root,canceled] {
         QStringList folders; if(!root.isEmpty()) folders.append(root);
+        QStringList watchPaths;
+        QSet<QString> watchPathSet;
+        bool watchComplete = true;
+        const auto addWatchPath = [&](const QString &path) {
+            if (watchPathSet.contains(path)) return;
+            if (watchPaths.size() >= tagWatchPathLimit) { watchComplete = false; return; }
+            watchPathSet.insert(path);
+            watchPaths.append(path);
+        };
         QMap<QString,int> counts; int visited=0, skipped=0, files=0; qint64 bytes=0; bool limited=false;
         while(!folders.isEmpty() && !canceled->load() && !limited) {
-            QDirIterator entries(folders.takeLast(),QDir::AllEntries|QDir::NoDotAndDotDot|QDir::NoSymLinks);
+            const QString folder = folders.takeLast();
+            addWatchPath(folder);
+            QDirIterator entries(folder,QDir::AllEntries|QDir::NoDotAndDotDot|QDir::NoSymLinks);
             while(entries.hasNext() && !canceled->load()) {
                 entries.next(); const auto entry=entries.fileInfo();
                 if(++visited>20000) { limited=true; break; }
@@ -622,6 +713,7 @@ void FileLibrary::refreshTags() {
                 QFile file(entry.absoluteFilePath()); if(!file.open(QIODevice::ReadOnly)) { ++skipped; continue; }
                 const auto content=file.read(262145); if(content.size()>262144 || file.error()!=QFile::NoError) { ++skipped; continue; }
                 bytes+=content.size(); ++files;
+                addWatchPath(entry.absoluteFilePath());
                 for(const auto &tag:tagsIn(QString::fromUtf8(content))) {
                     if(!counts.contains(tag) && counts.size()>=2000) { limited=true; break; }
                     ++counts[tag];
@@ -631,6 +723,7 @@ void FileLibrary::refreshTags() {
         }
         QVariantList tags; for(auto it=counts.cbegin();it!=counts.cend();++it) tags.append(QVariantMap{{"tag",it.key()},{"count",it.value()}});
         const QString status=QString("%1 files scanned; %2 skipped%3").arg(files).arg(skipped).arg(limited?"; scan limit reached":"");
-        return QVariantMap{{"tags",tags},{"status",status}};
+        return QVariantMap{{"tags",tags},{"status",status},{"limited",limited},{"skipped",skipped},
+            {"watchComplete",watchComplete},{"watchPaths",watchPaths}};
     }));
 }

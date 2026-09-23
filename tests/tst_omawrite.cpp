@@ -522,6 +522,110 @@ private slots:
         QTRY_VERIFY_WITH_TIMEOUT(!library.tagStatus().startsWith("Scanning"),10000); QVERIFY(library.tagIndex().isEmpty());
     }
 
+    void tagIndexAutomaticallyRefreshesSmallRoots() {
+        QTemporaryDir directory;
+        QFile file(directory.filePath("note.md"));
+        QVERIFY(file.open(QIODevice::WriteOnly));
+        QCOMPARE(file.write("#first\n"), qint64(7));
+        file.close();
+
+        FileLibrary library;
+        library.setRootFolder(QUrl::fromLocalFile(directory.path()));
+        library.refreshTags();
+        QTRY_VERIFY_WITH_TIMEOUT(!library.tagStatus().startsWith("Scanning"), 10000);
+        QCOMPARE(library.tagIndex().size(), 1);
+        QCOMPARE(library.tagIndex().first().toMap().value("tag").toString(), QString("first"));
+        if (library.tagStatus().contains("automatic refresh unavailable"))
+            QSKIP("QFileSystemWatcher registration is unavailable in this test environment");
+        QVERIFY(library.tagStatus().contains("watching for changes"));
+
+        QVERIFY(file.open(QIODevice::WriteOnly | QIODevice::Truncate));
+        QCOMPARE(file.write("#second\n"), qint64(8));
+        file.close();
+        QTRY_VERIFY_WITH_TIMEOUT(library.tagStatus().startsWith("Saved-file changes detected")
+                                 || library.tagStatus().startsWith("Scanning"), 3000);
+
+        // A second write within the debounce window must be reflected by the one
+        // eventual rescan rather than leaving the intermediate tag behind.
+        QVERIFY(file.open(QIODevice::WriteOnly | QIODevice::Truncate));
+        QCOMPARE(file.write("#third\n"), qint64(7));
+        file.close();
+        QTRY_VERIFY_WITH_TIMEOUT(library.tagStatus().contains("watching for changes"), 10000);
+        QVERIFY(library.tagStatus().contains("watching for changes"));
+        QCOMPARE(library.tagIndex().size(), 1);
+        QCOMPARE(library.tagIndex().first().toMap().value("tag").toString(), QString("third"));
+    }
+
+    void tagIndexRootSwitchRejectsStaleScanAndWatchEvents() {
+        QTemporaryDir firstRoot;
+        QTemporaryDir secondRoot;
+        for (int i = 0; i < 180; ++i) {
+            QFile file(firstRoot.filePath(QString::number(i) + ".md"));
+            QVERIFY(file.open(QIODevice::WriteOnly));
+            file.write("#oldroot\n");
+        }
+        QFile current(secondRoot.filePath("current.md"));
+        QVERIFY(current.open(QIODevice::WriteOnly));
+        current.write("#current\n");
+        current.close();
+
+        FileLibrary library;
+        library.setRootFolder(QUrl::fromLocalFile(firstRoot.path()));
+        library.refreshTags();
+        library.setRootFolder(QUrl::fromLocalFile(secondRoot.path()));
+        QVERIFY(library.tagIndex().isEmpty());
+        QVERIFY(library.tagStatus().contains("not refreshed"));
+        QTest::qWait(500);
+        QVERIFY(library.tagIndex().isEmpty());
+        QVERIFY(library.tagStatus().contains("not refreshed"));
+
+        library.refreshTags();
+        QTRY_VERIFY_WITH_TIMEOUT(!library.tagStatus().startsWith("Scanning"), 10000);
+        QCOMPARE(library.tagIndex().first().toMap().value("tag").toString(), QString("current"));
+        if (library.tagStatus().contains("automatic refresh unavailable")) return;
+        QVERIFY(library.tagStatus().contains("watching for changes"));
+
+        QFile old(firstRoot.filePath("0.md"));
+        QVERIFY(old.open(QIODevice::WriteOnly | QIODevice::Truncate));
+        old.write("#shouldnotappear\n");
+        old.close();
+        QTest::qWait(700);
+        QCOMPARE(library.tagIndex().size(), 1);
+        QCOMPARE(library.tagIndex().first().toMap().value("tag").toString(), QString("current"));
+    }
+
+    void tagIndexWatchBudgetFallsBackToManualRefresh() {
+        QTemporaryDir directory;
+        for (int i = 0; i < 260; ++i) {
+            QFile file(directory.filePath(QString::number(i) + ".md"));
+            QVERIFY(file.open(QIODevice::WriteOnly));
+            file.write("#old\n");
+        }
+        FileLibrary library;
+        library.setRootFolder(QUrl::fromLocalFile(directory.path()));
+        library.refreshTags();
+        QTRY_VERIFY_WITH_TIMEOUT(!library.tagStatus().startsWith("Scanning"), 10000);
+        QVERIFY(library.tagStatus().contains("automatic refresh unavailable"));
+
+        QFile changed(directory.filePath("0.md"));
+        QVERIFY(changed.open(QIODevice::WriteOnly | QIODevice::Truncate));
+        changed.write("#new\n");
+        changed.close();
+        QTest::qWait(700);
+        QCOMPARE(library.tagIndex().size(), 1);
+        QCOMPARE(library.tagIndex().first().toMap().value("tag").toString(), QString("old"));
+        QCOMPARE(library.tagIndex().first().toMap().value("count").toInt(), 260);
+
+        library.refreshTags();
+        QTRY_VERIFY_WITH_TIMEOUT(!library.tagStatus().startsWith("Scanning"), 10000);
+        QMap<QString, int> counts;
+        for (const auto &value : library.tagIndex())
+            counts[value.toMap().value("tag").toString()] = value.toMap().value("count").toInt();
+        QCOMPARE(counts.value("old"), 259);
+        QCOMPARE(counts.value("new"), 1);
+        QVERIFY(library.tagStatus().contains("automatic refresh unavailable"));
+    }
+
     void templatesSharePreviewAndExportWithoutEditingSource() {
         QTemporaryDir dir;
         Backend backend;
@@ -938,6 +1042,128 @@ private slots:
         QCOMPARE(reopened.savedSearches().first().toMap()["query"].toString(), QString("#work"));
         reopened.removeSearch(0);
         QVERIFY(reopened.savedSearches().isEmpty());
+    }
+
+    void goMenuRoutesSavedQueriesHashtagsAndGuardedRecents() {
+        QSettings settings;
+        settings.beginGroup(QStringLiteral("library"));
+        QVariantMap original;
+        for (const QString &key : settings.allKeys()) original.insert(key, settings.value(key));
+        settings.remove(QString());
+        const auto restore = qScopeGuard([&] {
+            settings.remove(QString());
+            for (auto it = original.cbegin(); it != original.cend(); ++it)
+                settings.setValue(it.key(), it.value());
+        });
+
+        QTemporaryDir directory;
+        QVERIFY(QDir(directory.path()).mkpath(QStringLiteral("one")));
+        QVERIFY(QDir(directory.path()).mkpath(QStringLiteral("two")));
+        QVERIFY(QDir(directory.path()).mkpath(QStringLiteral("missing")));
+        const QUrl rootOne = QUrl::fromLocalFile(QFileInfo(directory.filePath("one")).canonicalFilePath());
+        const QUrl rootTwo = QUrl::fromLocalFile(QFileInfo(directory.filePath("two")).canonicalFilePath());
+        const QUrl missingRoot = QUrl::fromLocalFile(QFileInfo(directory.filePath("missing")).canonicalFilePath());
+        QFile tagged(directory.filePath("one/Tagged.md"));
+        QVERIFY(tagged.open(QIODevice::WriteOnly));
+        tagged.write("#work saved content");
+        tagged.close();
+        QFile available(directory.filePath("one/Available.md"));
+        QVERIFY(available.open(QIODevice::WriteOnly)); available.write("available"); available.close();
+        QFile unavailable(directory.filePath("one/Unavailable.md"));
+        QVERIFY(unavailable.open(QIODevice::WriteOnly)); unavailable.write("gone"); unavailable.close();
+
+        Backend backend;
+        auto *library = qobject_cast<FileLibrary *>(backend.library());
+        QVERIFY(library);
+        library->setRootFolder(rootOne);
+        library->saveSearch(QStringLiteral("#work"), true);
+        library->recordRecentFile(QUrl::fromLocalFile(available.fileName()));
+        library->recordRecentFile(QUrl::fromLocalFile(unavailable.fileName()));
+        QVERIFY(unavailable.remove());
+
+        QQmlEngine engine;
+        engine.rootContext()->setContextProperty("backend", &backend);
+        QQmlComponent component(&engine, QUrl::fromLocalFile(QFINDTESTDATA("../src/Main.qml")));
+        QVERIFY2(component.isReady(), qPrintable(component.errorString()));
+        QScopedPointer<QObject> window(component.create());
+        QVERIFY(window);
+        auto *dialog = window->findChild<QObject *>("quickOpenDialog");
+        auto *query = window->findChild<QObject *>("quickQuery");
+        auto *contents = window->findChild<QObject *>("quickContents");
+        auto *savedChoice = window->findChild<QObject *>("savedSearchChoice");
+        auto *saveSmartFolder = window->findChild<QObject *>("saveSmartFolder");
+        auto *removeSmartFolder = window->findChild<QObject *>("removeSmartFolder");
+        QVERIFY(dialog && query && contents && savedChoice && saveSmartFolder && removeSmartFolder);
+
+        library->setRootFolder(rootTwo);
+        auto *saved = window->findChild<QObject *>("goSavedSearch_0");
+        QVERIFY(saved);
+        QVERIFY(QMetaObject::invokeMethod(saved, "triggered"));
+        QTRY_VERIFY(dialog->property("opened").toBool());
+        QCOMPARE(library->rootFolder(), rootOne);
+        QCOMPARE(query->property("text").toString(), QStringLiteral("#work"));
+        QVERIFY(contents->property("checked").toBool());
+        QVERIFY(QMetaObject::invokeMethod(dialog, "close"));
+
+        query->setProperty("text", QStringLiteral("stale"));
+        contents->setProperty("checked", true);
+        const int searchCount = library->savedSearches().size();
+        auto *newSmartFolder = window->findChild<QObject *>("goNewSmartFolder");
+        QVERIFY(newSmartFolder);
+        QVERIFY(QMetaObject::invokeMethod(newSmartFolder, "triggered"));
+        QTRY_VERIFY(dialog->property("opened").toBool());
+        QVERIFY(dialog->property("creationMode").toBool());
+        QCOMPARE(query->property("text").toString(), QString());
+        QVERIFY(!contents->property("checked").toBool());
+        QCOMPARE(library->savedSearches().size(), searchCount);
+        query->setProperty("text", QStringLiteral("fresh query"));
+        QVERIFY(QMetaObject::invokeMethod(saveSmartFolder, "clicked"));
+        QTRY_COMPARE(library->savedSearches().size(), searchCount + 1);
+        QTRY_COMPARE(window->findChild<QObject *>("goSavedSearch_0")->property("text").toString(),
+                     QStringLiteral("fresh query — filenames"));
+        savedChoice->setProperty("currentIndex", 0);
+        QVERIFY(QMetaObject::invokeMethod(removeSmartFolder, "clicked"));
+        QTRY_COMPARE(library->savedSearches().size(), searchCount);
+        QTRY_COMPARE(window->findChild<QObject *>("goSavedSearch_0")->property("text").toString(),
+                     QStringLiteral("#work — contents"));
+        QVERIFY(QMetaObject::invokeMethod(dialog, "close"));
+
+        auto *refreshTags = window->findChild<QObject *>("goRefreshHashtags");
+        QVERIFY(refreshTags && refreshTags->property("enabled").toBool());
+        QVERIFY(QMetaObject::invokeMethod(refreshTags, "triggered"));
+        QTRY_VERIFY_WITH_TIMEOUT(!library->tagStatus().startsWith(QStringLiteral("Scanning")), 10000);
+        auto *hashtag = window->findChild<QObject *>("goHashtag_work");
+        QVERIFY(hashtag);
+        QVERIFY(QMetaObject::invokeMethod(hashtag, "triggered"));
+        QTRY_VERIFY(dialog->property("opened").toBool());
+        QCOMPARE(query->property("text").toString(), QStringLiteral("#work"));
+        QVERIFY(contents->property("checked").toBool());
+        QCOMPARE(library->rootFolder(), rootOne);
+        QVERIFY(QMetaObject::invokeMethod(dialog, "close"));
+        library->setRootFolder(rootTwo);
+        QCOMPARE(library->tagIndex().size(), 0);
+        QTRY_VERIFY(!window->findChild<QObject *>("goHashtag_work"));
+        QVERIFY(window->findChild<QObject *>("goHashtagsEmpty")->property("visible").toBool());
+
+        library->setRootFolder(missingRoot);
+        library->saveSearch(QStringLiteral("missing root"), false);
+        library->setRootFolder(rootTwo);
+        QVERIFY(QDir(missingRoot.toLocalFile()).removeRecursively());
+        QTRY_VERIFY(window->findChild<QObject *>("goSavedSearch_0"));
+        QVERIFY(QMetaObject::invokeMethod(window->findChild<QObject *>("goSavedSearch_0"), "triggered"));
+        QVERIFY(!dialog->property("opened").toBool());
+        QCOMPARE(library->rootFolder(), rootTwo);
+        QVERIFY(!library->error().isEmpty());
+
+        const auto unavailableItems = window->findChildren<QObject *>(QStringLiteral("recentFile_0"));
+        const auto availableItems = window->findChildren<QObject *>(QStringLiteral("recentFile_1"));
+        QCOMPARE(unavailableItems.size(), 2); // File → Open Recent and Go → Smart Folders → Recents.
+        QCOMPARE(availableItems.size(), 2);
+        for (QObject *item : unavailableItems) QVERIFY(!item->property("enabled").toBool());
+        for (QObject *item : availableItems) QVERIFY(item->property("enabled").toBool());
+        QVERIFY(QMetaObject::invokeMethod(availableItems.first(), "triggered"));
+        QCOMPARE(backend.fileUrl(), QUrl::fromLocalFile(QFileInfo(available.fileName()).canonicalFilePath()));
+        backend.discardRecovery();
     }
 
     void contentSearchReflectsSavedChanges() {
