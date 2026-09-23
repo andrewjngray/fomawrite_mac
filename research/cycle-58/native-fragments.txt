@@ -1,0 +1,25 @@
+Cycle 58a native fragment checkpoint — 24 September 2026
+
+Artifact
+- Refreshed stable dist/Omawrite Dev.app through Cycle 58a.
+- ./bin/build passed.
+- Full native-access ./bin/test: 98 passed, 0 failed, 0 skipped.
+
+Verified natively
+- Open by Path opened synthetic research/cycle-58/sample/Source.md.
+- The caret was placed inside the inline Target.md#same-1 link.
+- Go → Open Link opened synthetic Target.md.
+- Target.md showed clean status and the window title contained no # fragment.
+
+Automated only
+- Exact source-caret placement at the second Same heading.
+- Preview jump after the target Markdown parse.
+- Inline, [[wiki#fragment]] and same-file routes.
+- Unchanged source/Undo and dirty Cancel/failed-open caret and scroll retention.
+
+Not verified
+- Native visual scroll position and screenshot capture were unavailable.
+- Cross-window fragment transfer is not implemented.
+- A missing anchor has no dedicated feedback; the valid target opens without a jump.
+- Dark/narrow layout, keyboard-only traversal and VoiceOver were not checked.
+- This checkpoint does not establish complete Markdown parser or output parity.

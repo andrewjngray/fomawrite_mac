@@ -87,6 +87,7 @@ public:
     Q_INVOKABLE QString bundledHelp(const QString &page) const;
     Q_INVOKABLE QString previewMarkdown(const QString &source) const;
     Q_INVOKABLE int previewAnchorPosition(QObject *textDocument, const QString &anchor) const;
+    Q_INVOKABLE int markdownAnchorPosition(const QString &markdown, const QString &anchor) const;
     Q_INVOKABLE QString tableOfContents(const QString &markdown) const;
     Q_INVOKABLE void stylePreview(QObject *textDocument);
     Q_INVOKABLE QVariantMap wrapSelection(int start, int end, const QString &before, const QString &after);

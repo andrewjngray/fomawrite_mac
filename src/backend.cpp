@@ -1127,6 +1127,18 @@ int Backend::previewAnchorPosition(QObject *textDocument, const QString &anchor)
     return -1;
 }
 
+int Backend::markdownAnchorPosition(const QString &markdown, const QString &anchor) const {
+    QHash<QString, int> occurrences;
+    for (const auto &value : documentOutline(markdown)) {
+        const auto heading = value.toMap();
+        QString slug = headingSlug(heading["title"].toString());
+        const int count = occurrences[slug]++;
+        if (count) slug += "-" + QString::number(count);
+        if (slug == anchor) return heading["position"].toInt();
+    }
+    return -1;
+}
+
 void Backend::stylePreview(QObject *textDocument) {
     auto *quick = qobject_cast<QQuickTextDocument *>(textDocument);
     if (!quick || !quick->textDocument() || quick->textDocument() == m_document) return;
@@ -1168,6 +1180,13 @@ void Backend::setShowMarkup(bool show) {
 }
 
 QUrl Backend::resolveDocumentLink(const QString &link) const {
+    const QUrl target(link);
+    if (target.isRelative() && target.path().isEmpty() && !target.fragment().isEmpty()
+            && m_fileUrl.isLocalFile()) {
+        QUrl current = m_fileUrl;
+        current.setFragment(target.fragment());
+        return current;
+    }
     return documentBaseUrl().resolved(QUrl(link));
 }
 
@@ -1209,14 +1228,16 @@ void Backend::openDialog() {
 }
 
 bool Backend::open(const QUrl &url) {
-    if (focusExistingDocument && focusExistingDocument(url)) return false;
-    if (!url.isLocalFile()) {
+    QUrl documentUrl = url;
+    documentUrl.setFragment(QString());
+    if (focusExistingDocument && focusExistingDocument(documentUrl)) return false;
+    if (!documentUrl.isLocalFile()) {
         setStatus(QStringLiteral("Only local files can be opened."));
         return false;
     }
 
-    const QString targetName = QFileInfo(url.toLocalFile()).fileName();
-    QFile file(url.toLocalFile());
+    const QString targetName = QFileInfo(documentUrl.toLocalFile()).fileName();
+    QFile file(documentUrl.toLocalFile());
     if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
         setStatus(QStringLiteral("Could not open %1.").arg(targetName));
         return false;
@@ -1231,18 +1252,18 @@ bool Backend::open(const QUrl &url) {
     clearRecovery();
     m_lastKnownFileContents = contents;
     m_hasKnownFileContents = true;
-    setFileUrl(url);
-    loadAuthorship(url);
-    m_library.recordRecentFile(url);
+    setFileUrl(documentUrl);
+    loadAuthorship(documentUrl);
+    m_library.recordRecentFile(documentUrl);
     if (m_library.rootFolder().isEmpty())
-        m_library.setRootFolder(QUrl::fromLocalFile(QFileInfo(url.toLocalFile()).absolutePath()));
-    m_library.revealFile(url);
+        m_library.setRootFolder(QUrl::fromLocalFile(QFileInfo(documentUrl.toLocalFile()).absolutePath()));
+    m_library.revealFile(documentUrl);
     watchCurrentFile();
     setModified(false);
     setStatus(QStringLiteral("Opened %1").arg(fileName()));
-    if (!m_navigatingHistory && (m_historyIndex < 0 || m_history[m_historyIndex].first != url)) {
+    if (!m_navigatingHistory && (m_historyIndex < 0 || m_history[m_historyIndex].first != documentUrl)) {
         while (m_history.size() > m_historyIndex + 1) m_history.removeLast();
-        m_history.append({url, 0});
+        m_history.append({documentUrl, 0});
         m_historyIndex = m_history.size() - 1;
         emit historyChanged();
     }
@@ -1281,6 +1302,21 @@ QUrl Backend::sourceLinkAt(int position) const {
         if (destination.contains('(')) return {};
         const QUrl resolved = resolveDocumentLink(destination);
         if (resolved.isLocalFile() || resolved.scheme() == "http" || resolved.scheme() == "https" || resolved.scheme() == "mailto") return resolved;
+    }
+    const QRegularExpression wiki(QStringLiteral(R"wiki(\[\[([^\]\n]+)\]\])wiki"));
+    matches = wiki.globalMatch(text);
+    while (matches.hasNext()) {
+        const auto match = matches.next();
+        if (position < match.capturedStart() || position >= match.capturedEnd()) continue;
+        QString destination = match.captured(1).section('|', 0, 0).trimmed();
+        QUrl target(destination);
+        QString path = target.path();
+        if (!path.isEmpty() && QFileInfo(path).suffix().isEmpty()) {
+            path += QStringLiteral(".md");
+            target.setPath(path);
+        }
+        const QUrl resolved = resolveDocumentLink(target.toString());
+        return resolved.isLocalFile() ? resolved : QUrl{};
     }
     return {};
 }

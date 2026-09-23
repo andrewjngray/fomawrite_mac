@@ -12,6 +12,7 @@ Rectangle {
     property string typeface: "Helvetica Neue"
     property int textSize: 17
     property int layoutMode: 1
+    property string pendingAnchor: ""
     signal scrollFractionChanged(real fraction)
     function scrollToFraction(fraction) { previewScroll.contentY = Math.max(0, previewScroll.contentHeight - previewScroll.height) * fraction; }
     function jumpToAnchor(anchor) {
@@ -19,6 +20,10 @@ Rectangle {
         if (position < 0) return false;
         previewScroll.contentY = Math.max(0, Math.min(previewScroll.contentHeight - previewScroll.height, previewText.positionToRectangle(position).y));
         return true;
+    }
+    function navigateToAnchor(anchor) {
+        pendingAnchor = anchor;
+        reload();
     }
     signal layoutRequested(int mode)
     signal linkRequested(url link)
@@ -34,7 +39,14 @@ Rectangle {
         renderedMarkdown = "";
         Qt.callLater(function() {
             renderedMarkdown = renderer.previewMarkdown(markdown);
-            Qt.callLater(function() { root.renderer.stylePreview(previewText.textDocument); });
+            Qt.callLater(function() {
+                root.renderer.stylePreview(previewText.textDocument);
+                if (root.pendingAnchor !== "") {
+                    var anchor = root.pendingAnchor;
+                    root.pendingAnchor = "";
+                    root.jumpToAnchor(anchor);
+                }
+            });
         });
     }
     function reload() {

@@ -1,6 +1,6 @@
 # iA Writer menu map and Omawrite gap audit — 23 September 2026
 
-This is the planning baseline after Omawrite Cycle 47 (76 tests), updated through Cycle 57a source and partial native checks on 24 September. Current source passes 97 tests; Cycles 48–51 are complete and later cycles retain explicit acceptance gaps. It transcribes the menu screenshots in `screenshots/` and compares them with the source. It is an interface and behavior audit, not a claim that similarly named commands behave identically.
+This is the planning baseline after Omawrite Cycle 47 (76 tests), updated through Cycle 58a source and partial native checks on 24 September. Current source passes 98 tests; Cycles 48–51 are complete and later cycles retain explicit acceptance gaps. It transcribes the menu screenshots in `screenshots/` and compares them with the source. It is an interface and behavior audit, not a claim that similarly named commands behave identically.
 
 The screenshots contain personal filenames, locations and tags. This document records commands only. The images remain untracked reference material and should not be committed. Two files are empty duplicate captures: `3.48.34 PM(2)` and `3.49.37 PM(2)`. The duplicate `1.57.39 PM(2)` and `3.50.00 PM(2)` images add no distinct menu evidence.
 
@@ -170,7 +170,7 @@ These menus were not opened in the screenshot folder. The 24 September native in
 | Bold, Italic, Strikethrough, Highlight | **Match** | Portable `==highlight==` behavior depends on Omawrite’s renderer; delimiter edge cases remain bounded. |
 | Inline code / code block | **Match** | Backtick-safe inline code and fenced block insertion exist. |
 | Link | **Match** | Includes clipboard URL insertion. |
-| Wikilink | **Partial** | Insert/render/open works, but nearest-match library resolution and a complete cross-file fragment matrix are open. |
+| Wikilink | **Partial (Cycle 58a)** | Insert/render/open works, including explicit local heading fragments and duplicate suffixes. Nearest-match library resolution, cross-window fragment transfer and broader parser semantics remain open. |
 | Footnote | **Partial** | Multiline/repeated footnotes and navigation work; complete Markdown grammar and every return-link case are not claimed. |
 | Content Block | **Partial** | Bounded Markdown, CSV, code and local-image inclusions exist. Full rebasing, title syntax and cycle/grammar parity remain incomplete. |
 | Hashtag | **Match** | Insert plus bounded saved-file tag indexing/navigation exist. |
@@ -214,7 +214,7 @@ These menus were not opened in the screenshot folder. The 24 September native in
 |---|---|---|
 | Document Back/Forward | **Match** | Session history restores cursor and guards dirty navigation. |
 | Library Back/Forward / Enclosing Folder | **Match** | Separate library navigation history exists. |
-| Open Link | **Partial** | Opens a source link at the cursor and preview links. Complete fragments/non-Markdown/nearest-match semantics remain open. |
+| Open Link | **Partial (Cycle 58a)** | Explicit local `.md`, `.markdown`, `.mdown`, `.txt` and `.text` links, `[[wikilinks#fragments]]` and same-file heading fragments route from source, Go → Open Link and preview. Duplicate headings use suffixed slugs such as `#same-1`; fragments do not become part of file identity. Native Dev opened the synthetic target cleanly with no `#` in its title. Exact caret/preview scroll and dirty Cancel are automated only; cross-window fragment transfer, missing-anchor feedback and broader parser/output parity remain open. |
 | Quick Search | **Partial (Cycle 53; native menu checked)** | Go exposes Quick Search and New Smart Folder opened its blank dialog. It rereads bounded saved files rather than maintaining an incremental index; full search workflow remains unverified. |
 | Command Palette | **Partial** | Searchable workspace command registry exists, but it does not yet contain every menu command. |
 | Locations / Add Location | **Partial (Cycle 53; native menu checked)** | Go listed saved local locations and Add Location. Parent/child overlaps are rejected; cloud folders are ordinary local paths. Unavailable-state checks remain. |

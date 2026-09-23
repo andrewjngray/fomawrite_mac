@@ -3421,6 +3421,109 @@ private slots:
         library.setAscending(true);
     }
 
+    void localMarkdownFragmentsNavigateSafely() {
+        QTemporaryDir directory;
+        QVERIFY(directory.isValid());
+        const QString sourceText = QStringLiteral(
+            "# Source\n\n[inline](Target.md#same-1)\n\n[[Target#same-1]]\n");
+        QString targetText = QStringLiteral("# Same\n\nfirst\n\n[again](#same-1)\n\n");
+        for (int i = 0; i < 90; ++i) targetText += QStringLiteral("filler line %1\n\n").arg(i);
+        targetText += QStringLiteral("# Same\n\nsecond\n");
+        QFile sourceFile(directory.filePath("Source.md"));
+        QVERIFY(sourceFile.open(QIODevice::WriteOnly));
+        QCOMPARE(sourceFile.write(sourceText.toUtf8()), sourceText.toUtf8().size());
+        sourceFile.close();
+        QFile targetFile(directory.filePath("Target.md"));
+        QVERIFY(targetFile.open(QIODevice::WriteOnly));
+        QCOMPARE(targetFile.write(targetText.toUtf8()), targetText.toUtf8().size());
+        targetFile.close();
+
+        Backend backend;
+        QQmlEngine engine;
+        engine.rootContext()->setContextProperty("backend", &backend);
+        QQmlComponent component(&engine, QUrl::fromLocalFile(QFINDTESTDATA("../src/Main.qml")));
+        QVERIFY2(component.isReady(), qPrintable(component.errorString()));
+        QScopedPointer<QObject> window(component.create());
+        QVERIFY2(window, qPrintable(component.errorString()));
+        auto *editor = window->findChild<QObject *>("sourceEditor");
+        auto *preview = window->findChild<QObject *>("previewPane");
+        auto *scroll = window->findChild<QObject *>("editorScroll");
+        QVERIFY(editor && preview && scroll);
+
+        const QUrl sourceUrl = QUrl::fromLocalFile(sourceFile.fileName());
+        const QUrl targetUrl = QUrl::fromLocalFile(targetFile.fileName());
+        QVERIFY(backend.open(sourceUrl));
+        const int inlinePosition = sourceText.indexOf(QStringLiteral("inline"));
+        const int wikiPosition = sourceText.indexOf(QStringLiteral("Target#same-1"));
+        QCOMPARE(backend.sourceLinkAt(inlinePosition), backend.resolveDocumentLink("Target.md#same-1"));
+        QCOMPARE(backend.sourceLinkAt(wikiPosition), backend.resolveDocumentLink("Target.md#same-1"));
+        const int duplicateHeading = backend.markdownAnchorPosition(targetText, QStringLiteral("same-1"));
+        QCOMPARE(duplicateHeading, targetText.lastIndexOf(QStringLiteral("# Same")));
+
+        editor->setProperty("cursorPosition", inlinePosition);
+        QVERIFY(QMetaObject::invokeMethod(window.data(), "openSourceLink")); // Go -> Open Link route.
+        QCOMPARE(backend.fileUrl(), targetUrl);
+        QVERIFY(backend.fileUrl().fragment().isEmpty());
+        QTRY_COMPARE(editor->property("cursorPosition").toInt(), duplicateHeading);
+        QCOMPARE(editor->property("text").toString(), targetText);
+        QVERIFY(!backend.modified());
+        QVERIFY(!editor->property("canUndo").toBool());
+
+        QVERIFY(backend.open(sourceUrl));
+        editor->setProperty("cursorPosition", wikiPosition);
+        QVERIFY(QMetaObject::invokeMethod(window.data(), "openSourceLink"));
+        QCOMPARE(backend.fileUrl(), targetUrl);
+        QTRY_COMPARE(editor->property("cursorPosition").toInt(), duplicateHeading);
+
+        // Preview links use the same guarded open and wait for the new preview parse.
+        QVERIFY(backend.open(sourceUrl));
+        QVERIFY(QMetaObject::invokeMethod(preview, "linkRequested",
+                                         Q_ARG(QUrl, QUrl(QStringLiteral("Target.md#same-1")))));
+        QCOMPARE(backend.fileUrl(), targetUrl);
+        QTRY_COMPARE(editor->property("cursorPosition").toInt(), duplicateHeading);
+        QTRY_COMPARE(preview->property("pendingAnchor").toString(), QString());
+
+        // A same-file fragment is navigation only: it does not reload or add Undo state.
+        const int sameFileLink = targetText.indexOf(QStringLiteral("again"));
+        editor->setProperty("cursorPosition", sameFileLink);
+        QVERIFY(QMetaObject::invokeMethod(window.data(), "openSourceLink"));
+        QCOMPARE(backend.fileUrl(), targetUrl);
+        QCOMPARE(editor->property("text").toString(), targetText);
+        QVERIFY(!backend.modified());
+        QVERIFY(!editor->property("canUndo").toBool());
+        QTRY_COMPARE(editor->property("cursorPosition").toInt(), duplicateHeading);
+
+        // Cancel and failed opens must not apply the queued fragment or disturb the view.
+        editor->setProperty("text", targetText + QStringLiteral("dirty\n"));
+        editor->setProperty("cursorPosition", targetText.indexOf(QStringLiteral("filler line 70")));
+        scroll->setProperty("contentY", 120.0);
+        const int dirtyCursor = editor->property("cursorPosition").toInt();
+        const qreal dirtyScroll = scroll->property("contentY").toReal();
+        QUrl sourceFragment = sourceUrl;
+        sourceFragment.setFragment(QStringLiteral("source"));
+        QVERIFY(QMetaObject::invokeMethod(window.data(), "requestOpen", Q_ARG(QVariant, sourceFragment)));
+        QCOMPARE(window->property("pendingAction").toString(), QStringLiteral("open"));
+        QVERIFY(QMetaObject::invokeMethod(window->findChild<QObject *>("unsavedChangesPrompt"), "cancelRequested"));
+        QCOMPARE(backend.fileUrl(), targetUrl);
+        QCOMPARE(editor->property("text").toString(), targetText + QStringLiteral("dirty\n"));
+        QCOMPARE(editor->property("cursorPosition").toInt(), dirtyCursor);
+        QCOMPARE(scroll->property("contentY").toReal(), dirtyScroll);
+
+        QVERIFY(backend.open(targetUrl));
+        editor->setProperty("cursorPosition", dirtyCursor);
+        scroll->setProperty("contentY", 120.0);
+        const qreal cleanScroll = scroll->property("contentY").toReal();
+        QUrl missing = QUrl::fromLocalFile(directory.filePath("Missing.md"));
+        missing.setFragment(QStringLiteral("same-1"));
+        QVERIFY(QMetaObject::invokeMethod(window.data(), "requestOpen", Q_ARG(QVariant, missing)));
+        QCOMPARE(backend.fileUrl(), targetUrl);
+        QCOMPARE(editor->property("text").toString(), targetText);
+        QCOMPARE(editor->property("cursorPosition").toInt(), dirtyCursor);
+        QCOMPARE(scroll->property("contentY").toReal(), cleanScroll);
+        QVERIFY(backend.status().startsWith(QStringLiteral("Could not open")));
+        backend.discardRecovery();
+    }
+
     void headingAndFencePreviewMatchesSource() {
         Backend backend;
         QQmlEngine engine;

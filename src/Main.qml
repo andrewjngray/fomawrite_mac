@@ -49,6 +49,7 @@ ApplicationWindow {
     property var searchMatches: []
     property int searchMatchIndex: -1
     property url pendingOpenUrl
+    property string pendingOpenFragment: ""
     property string pendingAction: ""
     property bool replaceOpen: false
     property bool awaitingPendingSave: false
@@ -507,6 +508,34 @@ ApplicationWindow {
         else backend.openExternalUrl(link);
     }
 
+    function documentLinkParts(url) {
+        var value = String(url);
+        var hash = value.indexOf("#");
+        return { url: hash < 0 ? value : value.slice(0, hash),
+                 fragment: hash < 0 ? "" : value.slice(hash + 1) };
+    }
+
+    function navigateDocumentFragment(fragment) {
+        if (fragment === "") return false;
+        var decoded = fragment;
+        try { decoded = decodeURIComponent(fragment); } catch (error) { return false; }
+        var position = backend.markdownAnchorPosition(editor.text, decoded);
+        if (position < 0) return false;
+        Qt.callLater(function() {
+            editor.cursorPosition = position;
+            editor.forceActiveFocus();
+            editorFlick.ensureCursorVisible();
+        });
+        previewPane.navigateToAnchor(fragment);
+        return true;
+    }
+
+    function openDocumentTarget(url, fragment) {
+        var opened = backend.open(url);
+        if (opened && fragment !== "") navigateDocumentFragment(fragment);
+        return opened;
+    }
+
     function openQuickSearchState(query, contents, requestedRoot, creating) {
         var root = requestedRoot && requestedRoot.toString() !== "" ? requestedRoot : backend.library.rootFolder;
         if (!root || root.toString() === "") return false;
@@ -535,14 +564,18 @@ ApplicationWindow {
     }
 
     function requestOpen(url) {
+        var parts = documentLinkParts(url);
+        if (parts.fragment !== "" && (parts.url === "" || parts.url === String(backend.fileUrl)))
+            return navigateDocumentFragment(parts.fragment);
         backend.rememberCursor(editor.cursorPosition);
         if (!backend.modified) {
-            backend.open(url);
-            return;
+            return openDocumentTarget(parts.url, parts.fragment);
         }
-        pendingOpenUrl = url;
+        pendingOpenUrl = parts.url;
+        pendingOpenFragment = parts.fragment;
         pendingAction = "open";
         unsavedChangesDialog.open();
+        return false;
     }
 
     function requestNewDocument() {
@@ -578,7 +611,9 @@ ApplicationWindow {
             closeConfirmed = true;
             close();
         } else if (action === "open") {
-            backend.open(pendingOpenUrl);
+            var fragment = pendingOpenFragment;
+            pendingOpenFragment = "";
+            openDocumentTarget(pendingOpenUrl, fragment);
         } else if (action === "history") {
             var position = backend.navigateHistory(pendingHistoryDirection);
             if (position >= 0) Qt.callLater(function() { editor.cursorPosition = position; editor.forceActiveFocus(); editorFlick.ensureCursorVisible(); });
@@ -1735,7 +1770,7 @@ ApplicationWindow {
             win.awaitingPendingSave = true;
             backend.save();
         }
-        onCancelRequested: { win.pendingAction = ""; backend.cancelQuit(); }
+        onCancelRequested: { win.pendingAction = ""; win.pendingOpenFragment = ""; backend.cancelQuit(); }
     }
 
     ExternalChangeDialog {
