@@ -1155,6 +1155,107 @@ private slots:
         backend.discardRecovery();
     }
 
+    void orderedTaskListsPreserveStateAndUndo() {
+        Backend backend;
+        QQmlEngine engine;
+        engine.rootContext()->setContextProperty("backend", &backend);
+        QQmlComponent component(&engine, QUrl::fromLocalFile(QFINDTESTDATA("../src/Main.qml")));
+        QScopedPointer<QObject> window(component.create());
+        QVERIFY2(window, qPrintable(component.errorString()));
+        auto *editor = window->findChild<QObject *>("sourceEditor");
+        QVERIFY(editor);
+
+        const QString plain = QStringLiteral("first\nsecond");
+        editor->setProperty("text", plain);
+        backend.editMarkdown("orderedTask", 0, plain.size());
+        QCOMPARE(editor->property("text").toString(), QStringLiteral("1. [ ] first\n2. [ ] second"));
+        QVERIFY(QMetaObject::invokeMethod(editor, "undo"));
+        QCOMPARE(editor->property("text").toString(), plain);
+        QVERIFY(QMetaObject::invokeMethod(editor, "redo"));
+        QCOMPARE(editor->property("text").toString(), QStringLiteral("1. [ ] first\n2. [ ] second"));
+
+        const QString existing = QStringLiteral("  - [x] nested done\n- plain item");
+        editor->setProperty("text", existing);
+        backend.editMarkdown("orderedTask", 0, existing.size());
+        QCOMPARE(editor->property("text").toString(), QStringLiteral("  1. [x] nested done\n2. [ ] plain item"));
+        const int secondTask = editor->property("text").toString().indexOf(QStringLiteral("2. [ ]"));
+        QVERIFY(secondTask >= 0);
+        backend.editMarkdown("toggleTask", secondTask, secondTask);
+        QCOMPARE(editor->property("text").toString(), QStringLiteral("  1. [x] nested done\n2. [x] plain item"));
+
+        const QString fenced = QStringLiteral("before\n```\n- item\n```\nafter");
+        editor->setProperty("text", fenced);
+        QVERIFY(backend.editMarkdown("orderedTask", fenced.indexOf(QStringLiteral("- item")), fenced.indexOf(QStringLiteral("- item")) + 6).isEmpty());
+        QCOMPARE(editor->property("text").toString(), fenced);
+        backend.discardRecovery();
+    }
+
+    void clearStylesUsesAnExplicitSafeSelection() {
+        Backend backend;
+        QQmlEngine engine;
+        engine.rootContext()->setContextProperty("backend", &backend);
+        QQmlComponent component(&engine, QUrl::fromLocalFile(QFINDTESTDATA("../src/Main.qml")));
+        QScopedPointer<QObject> window(component.create());
+        QVERIFY2(window, qPrintable(component.errorString()));
+        auto *editor = window->findChild<QObject *>("sourceEditor");
+        QVERIFY(editor);
+
+        const QString styledHeading = QStringLiteral("## **Styled sample**");
+        editor->setProperty("text", styledHeading);
+        backend.editMarkdown("clearStyles", 0, styledHeading.size());
+        QCOMPARE(editor->property("text").toString(), QStringLiteral("Styled sample"));
+        QVERIFY(QMetaObject::invokeMethod(editor, "undo"));
+        QCOMPARE(editor->property("text").toString(), styledHeading);
+
+        const QString styled = QStringLiteral("  ## Heading");
+        editor->setProperty("text", styled);
+        backend.editMarkdown("clearStyles", 0, styled.size());
+        QCOMPARE(editor->property("text").toString(), QStringLiteral("  Heading"));
+        QVERIFY(QMetaObject::invokeMethod(editor, "undo"));
+        QCOMPARE(editor->property("text").toString(), styled);
+        QVERIFY(QMetaObject::invokeMethod(editor, "redo"));
+        QCOMPARE(editor->property("text").toString(), QStringLiteral("  Heading"));
+
+        const QList<QPair<QString, QString>> blocks = {
+            {QStringLiteral("> quoted"), QStringLiteral("quoted")},
+            {QStringLiteral("- bullet"), QStringLiteral("bullet")},
+            {QStringLiteral("- [x] task"), QStringLiteral("task")},
+            {QStringLiteral("2. [ ] numbered task"), QStringLiteral("numbered task")}
+        };
+        for (const auto &block : blocks) {
+            editor->setProperty("text", block.first);
+            backend.editMarkdown("clearStyles", 0, block.first.size());
+            QCOMPARE(editor->property("text").toString(), block.second);
+        }
+        const QList<QPair<QString, QString>> inlineStyles = {
+            {QStringLiteral("**bold**"), QStringLiteral("bold")},
+            {QStringLiteral("__strong__"), QStringLiteral("strong")},
+            {QStringLiteral("*italic*"), QStringLiteral("italic")},
+            {QStringLiteral("_emphasis_"), QStringLiteral("emphasis")},
+            {QStringLiteral("~~strike~~"), QStringLiteral("strike")},
+            {QStringLiteral("==highlight=="), QStringLiteral("highlight")}
+        };
+        for (const auto &inlineStyle : inlineStyles) {
+            editor->setProperty("text", inlineStyle.first);
+            backend.editMarkdown("clearStyles", 0, inlineStyle.first.size());
+            QCOMPARE(editor->property("text").toString(), inlineStyle.second);
+        }
+
+        const QString code = QStringLiteral("**`code`**");
+        editor->setProperty("text", code);
+        QVERIFY(backend.editMarkdown("clearStyles", 0, code.size()).isEmpty());
+        QCOMPARE(editor->property("text").toString(), code);
+        const QString link = QStringLiteral("**[label](https://example.com)**");
+        editor->setProperty("text", link);
+        QVERIFY(backend.editMarkdown("clearStyles", 0, link.size()).isEmpty());
+        QCOMPARE(editor->property("text").toString(), link);
+        const QString stacked = QStringLiteral("**==mixed==**");
+        editor->setProperty("text", stacked);
+        backend.editMarkdown("clearStyles", 0, stacked.size());
+        QCOMPARE(editor->property("text").toString(), QStringLiteral("mixed"));
+        backend.discardRecovery();
+    }
+
     void searchMenusWrapAndReplaceWithSingleUndo() {
         Backend backend;
         QQmlEngine engine;

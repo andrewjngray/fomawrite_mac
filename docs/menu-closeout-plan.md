@@ -25,7 +25,7 @@ Each cycle is separately buildable and reviewable: update `docs/build-cycles.md`
 | 58 | **Markdown/output depth:** close reproduced gaps in Clear Styles, links/fragments, wikilinks, content blocks, TOC, complex tables, PDF/HTML and cross-app clipboard. | Byte-for-byte Markdown/Undo fixtures; multi-page rendered output inspected; failures documented with exact inputs. | 49, 51, 56 |
 | 59 | **Integrated acceptance:** repeat the full menu matrix with sample saved/untitled/dirty windows, keyboard navigation, narrow/dark/VoiceOver and available hardware. Update guides and release ledger. | Every audit row has evidence or a specific residual; build/tests pass and native screenshots/logs correspond to current code. | 48–58 |
 
-The current plan has **12 cycles, 48–59**. Cycle 48 is complete; **11 planned cycles remain**. The count is provisional: newly captured submenus can reveal additional work. Public notarization and developer signing remain a separate distribution decision because they require credentials and another-machine acceptance.
+The current plan has **12 cycles, 48–59**. Cycle 48 is complete; Cycle 49 source and tests are integrated but its final native gate is pending, so **11 planned cycles remain**, including 49. The count is provisional: newly captured submenus can reveal additional work. Public notarization and developer signing remain a separate distribution decision because they require credentials and another-machine acceptance.
 
 ## Evidence needed before exact submenu work
 

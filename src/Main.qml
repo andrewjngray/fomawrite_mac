@@ -554,7 +554,6 @@ ApplicationWindow {
             Platform.MenuItem { objectName: "fileRevealFinder"; text: "Show in Finder"; enabled: backend.fileUrl.toString() !== ""; onTriggered: backend.showInFinder() }
             Platform.MenuItem { objectName: "fileRevealLibrary"; text: "Show in Library"; enabled: backend.fileUrl.toString() !== ""; onTriggered: win.showCurrentFileInLibrary() }
             Platform.MenuSeparator {}
-            Platform.MenuItem { text: "Insert Page Break"; onTriggered: editor.replaceSelectionWith("\n\n<!-- pagebreak -->\n\n") }
             Platform.MenuItem { text: "Export HTML…"; onTriggered: { exportDialog.outputFormat = "html"; exportDialog.nameFilters = ["HTML (*.html)"]; exportDialog.open(); } }
             Platform.MenuItem { text: "Export PDF…"; onTriggered: { exportDialog.outputFormat = "pdf"; exportDialog.nameFilters = ["PDF (*.pdf)"]; exportDialog.open(); } }
             Platform.MenuItem { text: "Paginated Preview…"; onTriggered: backend.printPreview() }
@@ -607,12 +606,6 @@ ApplicationWindow {
         }
         Platform.Menu {
             title: "Format"
-            Platform.MenuItem { text: "Highlight"; onTriggered: editor.wrapSelection("==", "==") }
-            Platform.MenuItem { text: "Wikilink"; onTriggered: editor.wrapSelection("[[", "]]") }
-            Platform.MenuItem { text: "Footnote"; onTriggered: editor.replaceAtomic(editor.selectionStart, editor.selectionEnd, "[^note]\n\n[^note]: Note text") }
-            Platform.MenuItem { text: "Content Block"; onTriggered: editor.replaceAtomic(editor.selectionStart, editor.selectionEnd, "\n/chapter.md\n") }
-            Platform.MenuItem { text: "Hashtag"; onTriggered: editor.replaceAtomic(editor.selectionStart, editor.selectionEnd, "#tag") }
-            Platform.MenuItem { text: "Insert Table of Contents"; onTriggered: editor.replaceAtomic(editor.selectionStart, editor.selectionEnd, backend.tableOfContents(editor.text)) }
             Platform.Menu {
                 title: "Headings"
                 Platform.MenuItem { text: "Heading 1"; onTriggered: win.editMarkdown("heading1") }
@@ -621,35 +614,49 @@ ApplicationWindow {
                 Platform.MenuItem { text: "Heading 4"; onTriggered: win.editMarkdown("heading4") }
                 Platform.MenuItem { text: "Heading 5"; onTriggered: win.editMarkdown("heading5") }
                 Platform.MenuItem { text: "Heading 6"; onTriggered: win.editMarkdown("heading6") }
-                Platform.MenuItem { text: "Body"; onTriggered: win.editMarkdown("body") }
             }
             Platform.Menu {
                 title: "Lists"
-                Platform.MenuItem { text: "Bulleted List"; onTriggered: win.editMarkdown("bullet") }
-                Platform.MenuItem { text: "Numbered List"; onTriggered: win.editMarkdown("ordered") }
+                Platform.MenuItem { text: "List"; onTriggered: win.editMarkdown("bullet") }
                 Platform.MenuItem { text: "Task List"; onTriggered: win.editMarkdown("task") }
-                Platform.MenuItem { text: "Toggle Task Completion"; onTriggered: win.editMarkdown("toggleTask") }
+                Platform.MenuItem { text: "Ordered List"; onTriggered: win.editMarkdown("ordered") }
+                Platform.MenuItem { text: "Ordered Task List"; onTriggered: win.editMarkdown("orderedTask") }
+                Platform.MenuSeparator {}
+                Platform.MenuItem { text: "Mark Task as Completed"; onTriggered: win.editMarkdown("toggleTask") }
             }
             Platform.MenuItem { text: "Blockquote"; onTriggered: win.editMarkdown("quote") }
+            Platform.MenuItem { text: "Body"; onTriggered: win.editMarkdown("body") }
             Platform.Menu {
                 title: "Structure"
                 Platform.MenuItem { text: "Indent"; onTriggered: win.editMarkdown("indent") }
                 Platform.MenuItem { text: "Outdent"; onTriggered: win.editMarkdown("outdent") }
-                Platform.MenuItem { text: "Move Lines Up"; onTriggered: win.editMarkdown("lineUp") }
-                Platform.MenuItem { text: "Move Lines Down"; onTriggered: win.editMarkdown("lineDown") }
+                Platform.MenuItem { text: "Move Line Up"; onTriggered: win.editMarkdown("lineUp") }
+                Platform.MenuItem { text: "Move Line Down"; onTriggered: win.editMarkdown("lineDown") }
             }
             Platform.MenuSeparator {}
             Platform.MenuItem { text: "Bold"; onTriggered: editor.wrapSelection("**", "**") }
             Platform.MenuItem { text: "Italic"; onTriggered: editor.wrapSelection("*", "*") }
-            Platform.MenuItem { text: "Link…"; onTriggered: editor.insertLink() }
-            Platform.MenuSeparator {}
             NativeCommand { commandId: "strike" }
-            NativeCommand { commandId: "inlineCode" }
+            Platform.MenuItem { text: "Highlight"; onTriggered: editor.wrapSelection("==", "==") }
+            Platform.MenuSeparator {}
+            NativeCommand { commandId: "inlineCode"; text: "Code" }
             Platform.MenuItem { text: "Code Block"; onTriggered: win.editMarkdown("codeBlock") }
-            Platform.MenuItem { text: "Horizontal Rule"; onTriggered: win.editMarkdown("rule") }
-            Platform.MenuItem { text: "Date"; onTriggered: win.editMarkdown("date") }
-            Platform.MenuItem { text: "Table"; onTriggered: win.editMarkdown("table") }
-            Platform.MenuItem { text: "Clear Surrounding Inline Styles"; enabled: editor.selectedText.length > 0; onTriggered: win.editMarkdown("clearInline") }
+            Platform.MenuSeparator {}
+            Platform.MenuItem { text: "Add Link"; onTriggered: editor.insertLink() }
+            Platform.MenuItem { text: "Add Wikilink"; onTriggered: editor.wrapSelection("[[", "]]") }
+            Platform.MenuItem { text: "Add Footnote"; onTriggered: editor.replaceAtomic(editor.selectionStart, editor.selectionEnd, "[^note]\n\n[^note]: Note text") }
+            Platform.MenuItem { text: "Add Content Block"; onTriggered: editor.replaceAtomic(editor.selectionStart, editor.selectionEnd, "\n/chapter.md\n") }
+            Platform.MenuItem { text: "Add Hashtag"; onTriggered: editor.replaceAtomic(editor.selectionStart, editor.selectionEnd, "#tag") }
+            Platform.MenuSeparator {}
+            Platform.MenuItem { text: "Add Date"; onTriggered: win.editMarkdown("date") }
+            Platform.MenuItem { text: "Add Table"; onTriggered: win.editMarkdown("table") }
+            Platform.MenuItem { text: "Add Table of Contents"; onTriggered: editor.replaceAtomic(editor.selectionStart, editor.selectionEnd, backend.tableOfContents(editor.text)) }
+            Platform.MenuSeparator {}
+            Platform.MenuItem { text: "Add Horizontal Rule"; onTriggered: win.editMarkdown("rule") }
+            Platform.MenuItem { text: "Add Page Break"; onTriggered: editor.replaceSelectionWith("\n\n<!-- pagebreak -->\n\n") }
+            Platform.MenuSeparator {}
+            Platform.MenuItem { text: "Clear Styles"; enabled: editor.selectedText.length > 0; onTriggered: win.editMarkdown("clearStyles") }
+            Platform.MenuSeparator {}
             Platform.Menu {
                 title: "Change Case"
                 Platform.MenuItem { text: "UPPERCASE"; enabled: editor.selectedText.length > 0; onTriggered: win.editMarkdown("uppercase") }

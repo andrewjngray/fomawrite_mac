@@ -561,6 +561,8 @@ QVariantMap Backend::editMarkdown(const QString &action, int start, int end) {
     const QString text = currentDocumentText();
     int first = qBound(0, qMin(start, end), int(text.size()));
     int last = qBound(first, qMax(start, end), int(text.size()));
+    const int selectionFirst = first;
+    const int selectionLast = last;
     if (action == "date") return replaceText(first, last, QDate::currentDate().toString(Qt::ISODate));
     if (action == "table") {
         QString label = text.mid(first, last - first);
@@ -647,6 +649,98 @@ QVariantMap Backend::editMarkdown(const QString &action, int start, int end) {
         }
         offset += line.size() + 1;
     }
+    if (action == "clearStyles") {
+        if (selectionFirst == selectionLast) {
+            setStatus(QStringLiteral("Select styled text or complete styled lines first."));
+            return {};
+        }
+        const QString selected = text.mid(selectionFirst, selectionLast - selectionFirst);
+        if (selected.contains('`') || selected.contains(QStringLiteral("]("))
+                || selected.contains(QStringLiteral("][")) || selected.contains(QStringLiteral("[["))
+                || selected.contains(QStringLiteral("]]")) || selected.contains(QStringLiteral("://"))) {
+            setStatus(QStringLiteral("Clear Styles does not change code or links."));
+            return {};
+        }
+
+        auto stripOuterInline = [](QString value, bool &changed, bool &ambiguous) {
+            changed = false;
+            ambiguous = false;
+            bool stripped = true;
+            while (stripped) {
+                stripped = false;
+                for (const QString &marker : {QStringLiteral("**"), QStringLiteral("__"),
+                                              QStringLiteral("~~"), QStringLiteral("=="),
+                                              QStringLiteral("*"), QStringLiteral("_")}) {
+                    if (value.size() <= marker.size() * 2 || !value.startsWith(marker)
+                            || !value.endsWith(marker)) continue;
+                    value = value.mid(marker.size(), value.size() - marker.size() * 2);
+                    changed = stripped = true;
+                    break;
+                }
+            }
+            ambiguous = value.contains('*') || value.contains('_') || value.contains(QStringLiteral("~~"))
+                || value.contains(QStringLiteral("=="));
+            return value;
+        };
+
+        // Fully enclosing supported wrappers are deterministic, including a
+        // stack such as **==text==**. Partial or interleaved markers are not.
+        if (!selected.contains('\n')) {
+            bool changed = false, ambiguous = false;
+            const QString inner = stripOuterInline(selected, changed, ambiguous);
+            if (ambiguous && (changed || selectionFirst != lineStart || selectionLast != lineEnd)) {
+                setStatus(QStringLiteral("Clear Styles does not change partial or mixed inline styles."));
+                return {};
+            }
+            if (changed) return replaceText(selectionFirst, selectionLast, inner);
+        }
+
+        // Block clearing requires a selection aligned to complete lines. Each
+        // line may use one supported, single-level prefix.
+        if (selectionFirst != lineStart || selectionLast != lineEnd) {
+            setStatus(QStringLiteral("Select complete styled lines to clear block styles."));
+            return {};
+        }
+        const QRegularExpression heading(QStringLiteral("^(\\s{0,3})#{1,6} +(.*)$"));
+        const QRegularExpression quote(QStringLiteral("^(\\s{0,3})> +(.*)$"));
+        const QRegularExpression bulletTask(QStringLiteral("^(\\s{0,3})[-+*] +\\[[ xX]\\] +(.*)$"));
+        const QRegularExpression orderedTask(QStringLiteral("^(\\s{0,3})[0-9]+[.)] +\\[[ xX]\\] +(.*)$"));
+        const QRegularExpression bullet(QStringLiteral("^(\\s{0,3})[-+*] +(.*)$"));
+        const QRegularExpression ordered(QStringLiteral("^(\\s{0,3})[0-9]+[.)] +(.*)$"));
+        const QList<QRegularExpression> prefixes{heading, quote, bulletTask, orderedTask, bullet, ordered};
+        QStringList cleared;
+        for (const QString &line : selected.split('\n')) {
+            if (line.isEmpty()) {
+                setStatus(QStringLiteral("Clear Styles requires one simple style on every selected line."));
+                return {};
+            }
+            QRegularExpressionMatch match;
+            int matchedKind = -1;
+            for (int index = 0; index < prefixes.size(); ++index) {
+                match = prefixes.at(index).match(line);
+                if (match.hasMatch()) { matchedKind = index; break; }
+            }
+            if (matchedKind < 0) {
+                setStatus(QStringLiteral("Clear Styles requires a supported style on every selected line."));
+                return {};
+            }
+            bool inlineChanged = false, ambiguous = false;
+            const QString body = stripOuterInline(match.captured(2), inlineChanged, ambiguous);
+            bool nested = body.isEmpty() || ambiguous || body.contains('`') || body.contains(QStringLiteral("]("))
+                || body.contains(QStringLiteral("][")) || body.contains(QStringLiteral("[["));
+            if (!nested) {
+                for (const auto &candidate : prefixes) {
+                    if (candidate.match(body).hasMatch()) { nested = true; break; }
+                }
+            }
+            if (nested) {
+                setStatus(QStringLiteral("Clear Styles does not change mixed or nested block styles."));
+                return {};
+            }
+            cleared.append(match.captured(1) + body);
+        }
+        return replaceText(selectionFirst, selectionLast, cleared.join('\n'));
+    }
     QStringList lines = text.mid(first, last - first).split('\n');
     QString replacement;
     int movedStart = -1, movedEnd = -1;
@@ -674,7 +768,7 @@ QVariantMap Backend::editMarkdown(const QString &action, int start, int end) {
         }
     } else {
         int number = 1;
-        const QRegularExpression prefix(QStringLiteral("^( {0,3})(?:#{1,6} +|> +|[-+*] +(?:\\[[ xX]\\] +)?|[0-9]+[.)] +)"));
+        const QRegularExpression prefix(QStringLiteral("^(?:#{1,6} +|> +|[-+*] +(?:\\[[ xX]\\] +)?|[0-9]+[.)] +(?:\\[[ xX]\\] +)?)"));
         for (QString &line : lines) {
             if (action == "indent") { line.prepend("    "); continue; }
             if (action == "outdent") {
@@ -687,7 +781,10 @@ QVariantMap Backend::editMarkdown(const QString &action, int start, int end) {
             while (indentation < line.size() && (line.at(indentation) == ' ' || line.at(indentation) == '\t')) ++indentation;
             const QString indent = line.left(indentation);
             QString body = line.mid(indentation);
+            const QString originalBody = body;
             body.remove(prefix);
+            const auto sourceTask = QRegularExpression(
+                QStringLiteral("^(?:[-+*]|[0-9]+[.)]) +\\[([ xX])\\] +")).match(originalBody);
             QString marker;
             if (action.startsWith("heading")) {
                 const int level = action.mid(7).toInt();
@@ -696,15 +793,24 @@ QVariantMap Backend::editMarkdown(const QString &action, int start, int end) {
             } else if (action == "bullet") marker = "- ";
             else if (action == "ordered") marker = QString::number(number++) + ". ";
             else if (action == "task") marker = "- [ ] ";
+            else if (action == "orderedTask") {
+                const QChar state = sourceTask.hasMatch() && sourceTask.captured(1) != QStringLiteral(" ") ? 'x' : ' ';
+                marker = QString::number(number++) + ". [" + state + "] ";
+            }
             else if (action == "quote") marker = "> ";
             else if (action == "toggleTask") {
-                const QRegularExpression task(QStringLiteral("^([-+*] +)\\[([ xX])\\]"));
-                const auto m = task.match(line.mid(indentation));
+                const QRegularExpression task(QStringLiteral("^((?:[-+*]|[0-9]+[.)]) +)\\[([ xX])\\]"));
+                const auto m = task.match(originalBody);
                 if (m.hasMatch()) {
                     line[indentation + m.capturedStart(2)] = m.captured(2) == " " ? 'x' : ' ';
                     continue;
                 }
-                marker = "- [ ] ";
+                const QRegularExpression list(QStringLiteral("^((?:[-+*]|[0-9]+[.)]) +)"));
+                const auto listMatch = list.match(originalBody);
+                if (listMatch.hasMatch()) {
+                    marker = listMatch.captured(1) + "[ ] ";
+                    body = originalBody.mid(listMatch.capturedLength(1));
+                } else marker = "- [ ] ";
             } else if (action != "body") return {};
             line = indent + marker + body;
         }

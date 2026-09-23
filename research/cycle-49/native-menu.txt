@@ -1,0 +1,25 @@
+Cycle 49 native menu inspection, locally packaged Omawrite.app before the final Clear Styles correction.
+Synthetic document: research/cycle-49/sample/Format-actions.md
+
+Format
+  Headings > Heading 1, Heading 2, Heading 3, Heading 4, Heading 5, Heading 6
+  Lists > List, Task List, Ordered List, Ordered Task List, Mark Task as Completed
+  Blockquote
+  Body
+  Structure > Indent, Outdent, Move Line Up, Move Line Down
+  Bold, Italic, Strikethrough, Highlight
+  Code, Code Block
+  Add Link, Add Wikilink, Add Footnote, Add Content Block, Add Hashtag
+  Add Date, Add Table, Add Table of Contents
+  Add Horizontal Rule, Add Page Break
+  Clear Styles (disabled without selection; enabled with selected heading)
+  Change Case > UPPERCASE, lowercase, Title Case (Omawrite extra)
+
+Live actions on synthetic document:
+  Ordered Task List on two lines: 1. [ ] First task / 2. [ ] Second task: PASS
+  Mark Task as Completed on second line: 2. [x] Second task: PASS
+  Undo completion: 2. [ ] Second task: PASS
+  Clear Styles on ## **Styled sample**: FAIL in this package; early ambiguity check refused it.
+  The refusal caused no source change. A targeted backend correction and regression test followed; ./bin/build and ./bin/test then passed with 80 tests. Final package/native recheck is pending safe closure of running apps.
+
+The Dev app also stopped responding to the UI inspection tool after closing a separate Cycle 48 QA window. The ordinary app's UI inspection likewise timed out after attempting to close the disposable Cycle 49 window through its unsaved-change prompt. No private writing was edited. Do not force-replace a running bundle.

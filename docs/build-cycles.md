@@ -821,3 +821,15 @@ Known gaps: native relaunch persistence, context-menu date choice, dark/narrow/V
 Runnable artifacts: `dist/Omawrite Dev.app` and `dist/Omawrite.app` from Cycle 48. The GitHub RC1 binary remains the earlier Cycle 42 checkpoint.
 
 Optional exercise: run `research/cycle-48/prepare-sample.sh`, open its `sample/First.md`, and switch View → View Options → Show Date among the three choices. The file list should show 2 Jan, 15 Jun, then no date, without changing the sort order.
+
+## Cycle 49 — Format menu closeout (integration pending)
+
+Planned scope: match the captured Format groups and order; put Body at top level and Page Break under Format; add Ordered Task List and a conservative Clear Styles action. Keep unobserved formatting semantics and Omawrite's Change Case extra distinct from claims of iA parity.
+
+Changes in the current integration: Format now follows the observed Headings, Lists, Blockquote/Body, Structure, inline formatting, code, additions, rule/page-break and Clear Styles order. Ordered tasks generate numbered checkboxes, normalize existing list prefixes, preserve completed task state and support completion toggling without changing the numeric marker. Clear Styles acts on an explicit selection: it removes supported outer inline emphasis/strike/highlight wrappers and simple whole-line heading/quote/list/task prefixes, or refuses ambiguous code, links and nested constructs without mutation. Each replacement uses one undoable edit.
+
+Validation to date: `./bin/build` and `./bin/test` pass, **80 tests, zero failures**. The added cases cover list conversion, completion, indentation, fenced refusal, nested supported styles and one-step Undo/Redo. The locally packaged ordinary app confirmed the native Format hierarchy, ordered-task creation, completion and Undo with a synthetic file. That native pass found a Clear Styles refusal for a bold heading; the source fix and regression pass, but the corrected bundle has not been rechecked natively.
+
+Blocked closeout: the Dev app remained running and stopped responding to UI inspection after a separate Cycle 48 QA window closed; `./bin/prepare-dev-app` safely refused replacement. The ordinary app also stopped responding to UI inspection after the disposable Cycle 49 window's close prompt. Their open documents were not force-closed or overwritten. Normal closure, Dev refresh, corrected Clear Styles native recheck, sample-only screenshot and ordinary package refresh are still required before this cycle is marked complete. See [research/cycle-49](../research/cycle-49/README.md). Do not start Cycle 50 until this gate is closed.
+
+Optional exercise after refresh: open `research/cycle-49/sample/Format-actions.md`, choose Ordered Task List on its two task lines, complete one item and Undo, then select `## **Styled sample**`, choose Clear Styles and Undo. Confirm the menu placement and plain Markdown result.
