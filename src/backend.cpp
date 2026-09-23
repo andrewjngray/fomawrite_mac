@@ -1295,6 +1295,27 @@ void Backend::saveTo(const QUrl &url, bool protectExternalChanges) {
     }
 
     const QString targetName = QFileInfo(url.toLocalFile()).fileName();
+#ifdef Q_OS_MACOS
+    // Keep the previous saved bytes before replacing them. Failure blocks this
+    // save rather than silently violating the requested history policy.
+    if (QSettings().value("safety/automaticVersions", false).toBool() && QFileInfo::exists(url.toLocalFile())) {
+        QFile prior(url.toLocalFile());
+        if (!prior.open(QIODevice::ReadOnly)) {
+            setStatus("Cannot read the previous file for version history.");
+            emit saveFailed(); emit quitCanceled(); return;
+        }
+        const auto bytes = prior.readAll();
+        if (prior.error() != QFile::NoError) { emit saveFailed(); emit quitCanceled(); return; }
+        if (bytes != currentDocumentText().toUtf8()) {
+            extern QString createMacVersion(const QString &);
+            const auto error = createMacVersion(url.toLocalFile());
+            if (!error.isEmpty()) {
+                setStatus("Save paused: could not preserve the previous version. " + error);
+                emit saveFailed(); emit quitCanceled(); return;
+            }
+        }
+    }
+#endif
     QSaveFile file(url.toLocalFile());
     if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
         m_closeAfterSave = false;
@@ -1707,6 +1728,8 @@ QStringList Backend::spellingIssues(const QString &text) {
     return {};
 #endif
 }
+
+void Backend::setAutomaticVersions(bool enabled) { QSettings().setValue("safety/automaticVersions", enabled); }
 
 bool Backend::createVersion() {
 #ifdef Q_OS_MACOS

@@ -116,6 +116,7 @@ public:
     Q_INVOKABLE void markAuthorship(int start, int end, const QString &category, const QString &author);
     Q_INVOKABLE QVariantList authorshipRanges() const;
     Q_INVOKABLE bool createVersion();
+    Q_INVOKABLE void setAutomaticVersions(bool enabled);
     Q_INVOKABLE QVariantList versions() const;
     Q_INVOKABLE bool restoreVersion(const QUrl &version);
     Q_INVOKABLE void autosave();

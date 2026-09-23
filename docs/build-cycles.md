@@ -622,3 +622,13 @@ Planned scope: searchable existing workspace commands with keyboard navigation a
 **Limits / remaining Cycle 34:** Native snapshots do not include sidecars; this cycle defines safe unlabelled restoration rather than claiming historical provenance. No automatic version capture on each save or native Versions-browser UI. Disk-full/device-removal, fullscreen/minimized/display restoration and OS shutdown matrix remain. The pause remains after Undo until manual Save, conservatively requiring an explicit decision. Full crash/relaunch of a version-restored draft was not separately exercised; recovery flag serialization is tested. Nine planned cycles remain, including unfinished Cycle 34.
 
 **Artifact / exercise:** `dist/Omawrite Dev.app` and `dist/Omawrite.app`. [Evidence](../research/cycle-34b/README.md). On a sample file create a saved version, edit, restore it, then Undo. Choose Save explicitly to accept restored text.
+
+## Cycle 34c — Automatic previous-version history
+
+**Scope / changes:** Opt-in File → Keep Previous Version on Save preserves changed existing saved bytes before replacement. Checkpoint failure blocks Save; unchanged saves avoid duplicate versions. Markdown-only version policy retained.
+
+**Tests:** Build and 62 tests pass, including native NSFileVersion previous-byte capture and deduplication. Native UI verification is part of the combined Cycles 34c–38 run.
+
+**Limits:** Not native Versions-browser UI or sidecar history. External non-cooperating-writer race, OS-shutdown, physical disk/device and display/window-state matrix remain open.
+
+**Artifact / exercise:** Stable Dev/ordinary bundles updated at the combined run. Enable Keep Previous Version on Save on a sample; change and Save, then restore its earlier version and Undo.

@@ -261,6 +261,25 @@ private slots:
         backend.discardRecovery();
     }
 
+    void automaticVersionsPreservePreviousSavedBytes() {
+#ifdef Q_OS_MACOS
+        QTemporaryDir directory; Backend backend;
+        const auto reset=qScopeGuard([&] { backend.setAutomaticVersions(false); });
+        QQmlEngine engine; engine.rootContext()->setContextProperty("backend", &backend);
+        QQmlComponent component(&engine, QUrl::fromLocalFile(QFINDTESTDATA("../src/Main.qml")));
+        QScopedPointer<QObject> window(component.create()); QVERIFY2(window, qPrintable(component.errorString()));
+        auto *editor=window->findChild<QObject *>("sourceEditor");
+        const auto url=QUrl::fromLocalFile(directory.filePath("history.md"));
+        editor->setProperty("text", "before"); backend.saveAs(url);
+        backend.setAutomaticVersions(true);
+        editor->setProperty("text", "after"); backend.save(); QVERIFY(!backend.modified());
+        bool found=false;
+        for (const auto &item : backend.versions()) { QFile file(item.toMap()["url"].toUrl().toLocalFile()); if (file.open(QIODevice::ReadOnly) && file.readAll()=="before") found=true; }
+        QVERIFY(found); const int count=backend.versions().size(); backend.save(); QCOMPARE(backend.versions().size(), count);
+        backend.discardRecovery();
+#endif
+    }
+
     void unavailableSaveDestinationPreservesDraftAndOriginal() {
         QTemporaryDir directory; QVERIFY(directory.isValid());
         Backend backend;

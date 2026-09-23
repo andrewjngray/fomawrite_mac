@@ -73,6 +73,7 @@ ApplicationWindow {
         onSentenceFocusChanged: backend.setFocusPosition(editor.cursorPosition, paragraphFocus, sentenceFocus)
         property bool paragraphFocus: false
         onParagraphFocusChanged: backend.setFocusPosition(editor.cursorPosition, paragraphFocus, sentenceFocus)
+        property bool automaticVersions: false
         property int previewStyle: 0
         onShowMarkupChanged: backend.setShowMarkup(showMarkup)
     }
@@ -513,6 +514,7 @@ ApplicationWindow {
             Platform.MenuSeparator {}
             Platform.MenuItem { text: "Save"; onTriggered: backend.save() }
             Platform.MenuItem { text: "Autosave Saved Files Every Minute"; checkable: true; checked: workspaceSettings.autosaveEnabled; onTriggered: workspaceSettings.autosaveEnabled = !workspaceSettings.autosaveEnabled }
+            Platform.MenuItem { text: "Keep Previous Version on Save"; visible: win.isMac; checkable: true; checked: workspaceSettings.automaticVersions; onTriggered: { workspaceSettings.automaticVersions = !workspaceSettings.automaticVersions; backend.setAutomaticVersions(workspaceSettings.automaticVersions); } }
             Platform.MenuItem { text: "Create Version of Saved File"; visible: win.isMac; enabled: backend.fileUrl.toString() !== ""; onTriggered: backend.createVersion() }
             Platform.MenuItem { text: "Restore Version in Editor…"; visible: win.isMac; enabled: backend.fileUrl.toString() !== ""; onTriggered: { versionsDialog.items = backend.versions(); versionsDialog.open(); } }
             Platform.MenuItem { text: "Save As…"; onTriggered: backend.saveAsDialog() }
