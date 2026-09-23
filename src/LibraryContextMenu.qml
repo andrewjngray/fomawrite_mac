@@ -111,6 +111,11 @@ CompactMenu {
             CompactMenuItem { text: "None"; checkable: true; checked: menu.commands.libraryPane.dateMode === 0; onTriggered: menu.commands.run("dateNone") }
         }
         CompactMenuItem { text: "Show Text Excerpts"; checkable: true; checked: menu.commands.libraryPane.showExcerpts; onTriggered: menu.commands.run("excerpts") }
+        CompactMenu {
+            title: "Navigation"
+            CompactMenuItem { text: "Tree"; checkable: true; checked: menu.library.navigationMode === 0; onTriggered: menu.commands.run("navigationTree") }
+            CompactMenuItem { text: "List"; checkable: true; checked: menu.library.navigationMode === 1; onTriggered: menu.commands.run("navigationList") }
+        }
         CompactMenuItem { text: "Show Sort Bar"; checkable: true; checked: menu.commands.libraryPane.showSortBar; onTriggered: menu.commands.run("sortBar") }
         CompactMenuItem { text: "Show Filter Bar"; checkable: true; checked: menu.commands.libraryPane.showFilterBar; onTriggered: menu.commands.run("filterBar") }
     }

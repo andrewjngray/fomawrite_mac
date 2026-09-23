@@ -1724,12 +1724,31 @@ private slots:
         QVERIFY(QMetaObject::invokeMethod(native("dateNone"), "triggered"));
         QCOMPARE(pane->property("dateMode").toInt(), 0);
         QVERIFY(native("dateNone")->property("checked").toBool());
+        backend.library()->setProperty("navigationMode", 0);
+        QVERIFY(native("navigationTree"));
+        QVERIFY(native("navigationList"));
+        QVERIFY(native("navigationTree")->property("checked").toBool());
+        QVERIFY(QMetaObject::invokeMethod(native("navigationList"), "triggered"));
+        QCOMPARE(backend.library()->property("navigationMode").toInt(), 1);
+        QVERIFY(native("navigationList")->property("checked").toBool());
+        settings->setProperty("layoutMode", 0);
+        QVERIFY(native("webPreview"));
+        QVERIFY(QMetaObject::invokeMethod(native("webPreview"), "triggered"));
+        QCOMPARE(settings->property("layoutMode").toInt(), 1);
+        QVERIFY(QMetaObject::invokeMethod(native("preview"), "triggered"));
+        QCOMPARE(settings->property("layoutMode").toInt(), 2);
+        QVERIFY(QMetaObject::invokeMethod(native("split"), "triggered"));
+        QCOMPARE(settings->property("layoutMode").toInt(), 1);
+        auto *pdfPreview = window->findChild<QObject *>("native_pdfPreview");
+        QVERIFY(pdfPreview);
+        QCOMPARE(pdfPreview->property("text").toString(), QStringLiteral("Paginated Preview…"));
         QVERIFY(QMetaObject::invokeMethod(native("descending"), "triggered"));
         QVERIFY(!backend.library()->property("ascending").toBool());
         QVERIFY(!native("ascending")->property("checked").toBool());
         // Restore the shared test preferences for following existing tests.
         pane->setProperty("dateMode", 0);
         pane->setProperty("showExcerpts", false);
+        backend.library()->setProperty("navigationMode", 0);
         backend.library()->setProperty("ascending", true);
     }
 
@@ -2015,6 +2034,73 @@ private slots:
         QCOMPARE(file.readAll(), source);
         QVERIFY(library.excerpt(QUrl::fromLocalFile(outside.filePath("sample.md"))).isEmpty());
         QVERIFY(library.excerpt(QUrl("https://example.com/sample.md")).isEmpty());
+    }
+
+    void libraryTreeAndListNavigationPreserveReachability() {
+        QSettings settings;
+        const QStringList keys = {QStringLiteral("library/navigationMode"), QStringLiteral("library/root"),
+                                  QStringLiteral("library/locations")};
+        QVariantMap previous;
+        QSet<QString> present;
+        for (const auto &key : keys) {
+            if (settings.contains(key)) present.insert(key);
+            previous.insert(key, settings.value(key));
+            settings.remove(key);
+        }
+        settings.setValue(QStringLiteral("library/navigationMode"), 0);
+        settings.sync();
+        const auto restore = qScopeGuard([&] {
+            for (const auto &key : keys) {
+                if (present.contains(key)) settings.setValue(key, previous.value(key));
+                else settings.remove(key);
+            }
+            settings.sync();
+        });
+
+        QTemporaryDir directory;
+        QVERIFY(QDir(directory.path()).mkpath(QStringLiteral("Notes/Deep")));
+        for (const QString &relative : {QStringLiteral("Top.md"), QStringLiteral("Notes/Nested.md"),
+                                        QStringLiteral("Notes/Deep/Deep.md")}) {
+            QFile file(directory.filePath(relative));
+            QVERIFY(file.open(QIODevice::WriteOnly));
+            QVERIFY(file.write(relative.toUtf8()) > 0);
+        }
+        const QUrl top = QUrl::fromLocalFile(QFileInfo(directory.path()).canonicalFilePath());
+        const QUrl notes = QUrl::fromLocalFile(QFileInfo(directory.filePath("Notes")).canonicalFilePath());
+        const QUrl deep = QUrl::fromLocalFile(QFileInfo(directory.filePath("Notes/Deep")).canonicalFilePath());
+
+        FileLibrary library;
+        QCOMPARE(library.navigationMode(), 0);
+        library.setRootFolder(top);
+        QCOMPARE(library.entries().size(), 2);
+        library.toggleFolder(notes);
+        QCOMPARE(library.entries().size(), 4);
+        library.setNavigationMode(1);
+        QCOMPARE(library.entries().size(), 2);
+        for (const auto &entry : library.entries()) QCOMPARE(entry.toMap().value("depth").toInt(), 0);
+        library.setNavigationMode(0);
+        QCOMPARE(library.entries().size(), 4); // Same-root expansion remains in memory.
+
+        library.setNavigationMode(1);
+        library.toggleFolder(notes);
+        QCOMPARE(library.rootFolder(), notes);
+        QCOMPARE(library.entries().size(), 2);
+        QVERIFY(library.canGoBack());
+        QVERIFY(library.navigateHistory(-1));
+        QCOMPARE(library.rootFolder(), top);
+
+        const QUrl deepFile = QUrl::fromLocalFile(directory.filePath("Notes/Deep/Deep.md"));
+        QVERIFY(library.showFile(deepFile) >= 0);
+        QCOMPARE(library.rootFolder(), deep);
+        QCOMPARE(library.entries().size(), 1);
+        library.setRootFolder(top);
+        library.revealFile(QUrl::fromLocalFile(directory.filePath("Notes/Nested.md")));
+        QCOMPARE(library.rootFolder(), notes);
+        QVERIFY(library.entries().size() == 2);
+
+        library.setNavigationMode(1);
+        FileLibrary reopened;
+        QCOMPARE(reopened.navigationMode(), 1);
     }
 
     void browsesAndCreatesLibraryFilesSafely() {

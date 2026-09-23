@@ -25,6 +25,7 @@ FileLibrary::FileLibrary(QObject *parent) : QObject(parent) {
     m_sortMode = qBound(0, settings.value("library/sortMode", 0).toInt(), 3);
     m_ascending = settings.value("library/ascending", true).toBool();
     m_foldersFirst = settings.value("library/foldersFirst", true).toBool();
+    m_navigationMode = qBound(0, settings.value("library/navigationMode", 0).toInt(), 1);
     m_refreshTimer.setSingleShot(true);
     m_refreshTimer.setInterval(100);
     connect(&m_watcher, &QFileSystemWatcher::directoryChanged,
@@ -231,6 +232,13 @@ void FileLibrary::saveSorting() {
 void FileLibrary::setSortMode(int mode) { if (mode < 0 || mode > 3 || mode == m_sortMode) return; m_sortMode = mode; saveSorting(); }
 void FileLibrary::setAscending(bool ascending) { if (ascending == m_ascending) return; m_ascending = ascending; saveSorting(); }
 void FileLibrary::setFoldersFirst(bool enabled) { if (enabled == m_foldersFirst) return; m_foldersFirst = enabled; saveSorting(); }
+void FileLibrary::setNavigationMode(int mode) {
+    if (mode < 0 || mode > 1 || mode == m_navigationMode) return;
+    m_navigationMode = mode;
+    QSettings().setValue(QStringLiteral("library/navigationMode"), mode);
+    emit navigationModeChanged();
+    refresh();
+}
 
 QString FileLibrary::rootName() const {
     const QString name = QFileInfo(m_rootFolder.toLocalFile()).fileName();
@@ -290,6 +298,10 @@ void FileLibrary::toggleFolder(const QUrl &folder) {
     if (!folder.isLocalFile()) return;
     const QString path = QFileInfo(folder.toLocalFile()).canonicalFilePath();
     if (!containsPath(path) || !QFileInfo(path).isDir()) return;
+    if (m_navigationMode == 1) {
+        setRootFolder(QUrl::fromLocalFile(path));
+        return;
+    }
     if (m_expanded.contains(path)) m_expanded.remove(path);
     else m_expanded.insert(path);
     refresh();
@@ -327,7 +339,7 @@ void FileLibrary::appendDirectory(const QString &path, int depth, QStringList &w
         if (!directory && !m_filter.isEmpty()
             && !info.fileName().contains(m_filter, Qt::CaseInsensitive)) continue;
         const QString childPath = info.absoluteFilePath();
-        const bool expanded = directory && m_expanded.contains(childPath);
+        const bool expanded = m_navigationMode == 0 && directory && m_expanded.contains(childPath);
         const QDateTime created = info.birthTime();
         m_entries.append(QVariantMap{{"name", info.fileName()},
             {"url", QUrl::fromLocalFile(childPath)}, {"directory", directory},
@@ -395,6 +407,12 @@ void FileLibrary::revealFile(const QUrl &url) {
     if (!url.isLocalFile()) return;
     const QString path = QFileInfo(url.toLocalFile()).canonicalFilePath();
     if (!containsPath(path)) return;
+    if (m_navigationMode == 1) {
+        const QUrl parent = QUrl::fromLocalFile(QFileInfo(path).absolutePath());
+        if (parent != m_rootFolder) setRootFolder(parent);
+        else refresh();
+        return;
+    }
     QDir parent = QFileInfo(path).absoluteDir();
     while (parent.absolutePath() != m_rootFolder.toLocalFile() && containsPath(parent.absolutePath())) {
         m_expanded.insert(parent.absolutePath());
@@ -410,7 +428,10 @@ int FileLibrary::showFile(const QUrl &url) {
         return -1;
     }
     const QString path = info.canonicalFilePath();
-    if (!containsPath(path))
+    if (m_navigationMode == 1) {
+        const QUrl parent = QUrl::fromLocalFile(info.absolutePath());
+        if (parent != m_rootFolder) setRootFolder(parent);
+    } else if (!containsPath(path))
         setRootFolder(QUrl::fromLocalFile(QFileInfo(path).absolutePath()));
     setFilter(QString());
     revealFile(QUrl::fromLocalFile(path));

@@ -18,6 +18,7 @@ class FileLibrary : public QObject {
     Q_PROPERTY(int sortMode READ sortMode WRITE setSortMode NOTIFY sortingChanged)
     Q_PROPERTY(bool ascending READ ascending WRITE setAscending NOTIFY sortingChanged)
     Q_PROPERTY(bool foldersFirst READ foldersFirst WRITE setFoldersFirst NOTIFY sortingChanged)
+    Q_PROPERTY(int navigationMode READ navigationMode WRITE setNavigationMode NOTIFY navigationModeChanged)
     Q_PROPERTY(QUrl rootFolder READ rootFolder WRITE setRootFolder NOTIFY rootFolderChanged)
     Q_PROPERTY(QString rootName READ rootName NOTIFY rootFolderChanged)
     Q_PROPERTY(QVariantList entries READ entries NOTIFY entriesChanged)
@@ -42,9 +43,11 @@ public:
     int sortMode() const { return m_sortMode; }
     bool ascending() const { return m_ascending; }
     bool foldersFirst() const { return m_foldersFirst; }
+    int navigationMode() const { return m_navigationMode; }
     void setSortMode(int mode);
     void setAscending(bool ascending);
     void setFoldersFirst(bool enabled);
+    void setNavigationMode(int mode);
     Q_INVOKABLE bool addLocation(const QUrl &url);
     Q_INVOKABLE bool addFavorite(const QUrl &url);
     Q_INVOKABLE bool renameLocation(const QUrl &url, const QString &name);
@@ -92,6 +95,7 @@ signals:
     void quickSearchChanged();
     void organizerChanged();
     void sortingChanged();
+    void navigationModeChanged();
     void rootFolderChanged();
     void entriesChanged();
     void filterChanged();
@@ -122,6 +126,7 @@ private:
     int m_sortMode = 0;
     bool m_ascending = true;
     bool m_foldersFirst = true;
+    int m_navigationMode = 0;
     QUrl m_rootFolder;
     QVariantList m_entries;
     QSet<QString> m_expanded;

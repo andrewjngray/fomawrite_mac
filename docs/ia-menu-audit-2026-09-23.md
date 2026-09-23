@@ -148,16 +148,16 @@ These menus were not opened in this folder. The older inspection recorded the st
 | iA capability | Omawrite status | Remaining difference |
 |---|---|---|
 | Undo/Redo; Cut/Copy/Paste/Delete/Select All | **Match** | Core native-menu actions track the focused field. |
-| Copy Formatted / HTML / Markdown | **Partial** | Working commands are nested under Omawrite's Copy As rather than top-level Edit; cross-application clipboard acceptance remains open. |
+| Copy Formatted / HTML / Markdown | **Partial (Cycle 50)** | Commands now appear directly in Edit and enable for an editor selection. Cross-application clipboard acceptance remains open. |
 | Paste As | **Partial** | Plain text and Markdown-from-HTML exist. The iA submenu was not captured, so exact conversions are unknown. |
 | Paste Edits From | **Gap** | No authorship-aware merge/paste workflow. |
 | Mark As | **Partial** | Manual Human/AI/Reference/Unknown range annotations exist in a dialog, with a sidecar and metadata export. They are assertions, not verified provenance, and are not exposed as iA-style menu commands. |
 | Find | **Partial** | Find, replace, next/previous and use selection exist. Library filtering/search is elsewhere; exact iA submenu parity is unverified. |
 | Spelling and Grammar | **Partial** | Explicit macOS dictionary/grammar review with suggestions, Replace and Undo exists. No inline-as-you-type spelling/grammar UI. |
 | Substitutions | **Gap** | No smart quotes/dashes, text replacements or automatic-correction controls. |
-| Transformations | **Partial** | Uppercase, lowercase and title case exist under Format → Change Case. Capitalize and exact native submenu parity are missing. |
+| Transformations | **Partial (Cycle 50)** | Uppercase, lowercase and title case now appear under Edit → Transformations. Capitalize and exact native submenu parity are missing. |
 | Speech | **Match** | Speak Selection and Stop Speaking use macOS speech; audible quality is not acceptance-tested. |
-| AutoFill / Dictation | **Gap** | No explicit integration. Dictation may still be available globally through macOS, but it is not an Omawrite command. |
+| AutoFill / Dictation | **Partial (Cycle 50)** | AppKit injects AutoFill and Start Dictation into Edit. Native availability depends on macOS; Omawrite does not provide a separate workflow. |
 | Emoji & Symbols | **Match** | Opens the macOS character palette. |
 
 ### Format
@@ -196,12 +196,12 @@ These menus were not opened in this folder. The older inspection recorded the st
 | Sort Files By | **Match** | Same four fields, direction and folders-first option. |
 | Show Date | **Match (Cycle 48)** | Native View → View Options → Show Date and library/context menus offer Date Modified, Date Created and None. A synthetic file displayed distinct dates; sorting remained independent. See [Cycle 48 evidence](../research/cycle-48/README.md). |
 | Text excerpts | **Match** | Bounded source excerpts with a compact default. |
-| Tree/List navigation | **Partial** | Expandable tree exists; flat List mode is missing. |
+| Tree/List navigation | **Partial (Cycle 51)** | Tree and current-folder List both reach nested files; List uses existing folder history and Show in Library. Tree expansion is session-only and resets on root changes. |
 | Text size | **Match** | Larger, smaller and reset equivalents. |
 | Show Completions | **Gap** | No completion UI or acceptance behavior. |
 | Reload Preview | **Match** | Forces Markdown reparse. |
-| Preview Full/Split/Web | **Partial** | Editor-only, split and preview-only layouts plus continuous web-style preview exist, but not under the captured Preview submenu hierarchy. |
-| PDF preview / fit controls | **Partial** | Paginated preview has page navigation, orientation, fit-page and fit-width. It lives under File/palette rather than View → Preview → PDF. |
+| Preview Full/Split/Web | **Partial (Cycle 51)** | View → Preview now routes Full/Split/Web to existing continuous preview layouts. Web is not a separate renderer; exact iA behavior remains unverified. |
+| PDF preview / fit controls | **Partial (Cycle 51)** | View → Preview → PDF → Paginated Preview opens the existing page/fit controls. iA's PDF submenu children were not captured, so exact structure and shortcut parity remain open. |
 | Templates | **Partial** | Shared preview/export presets: Modern Sans, Classic Serif, Manuscript Mono, GitHub, Helvetica, Palatino and MLA Draft, plus JSON Custom. Duo/Quattro are missing; MLA Draft is not complete MLA Style; iA template-package import is unsupported. |
 | Title bar modes | **Gap** | No Fade In/Out versus Always Show option. |
 | Toolbar modes and stats-only display | **Partial** | Omawrite has a fixed toolbar and statistics dialog. It lacks fade/show/hide modes and persistent Stats Only toolbar. |

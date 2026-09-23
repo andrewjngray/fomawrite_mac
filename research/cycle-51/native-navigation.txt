@@ -1,0 +1,11 @@
+Cycle 51 native verification, 2026-09-23, Omawrite Dev.app
+
+View menu: View Options > Navigation > Tree, List. Preview > Full, Split, Web, PDF > Paginated Preview. iA PDF children remain uncaptured; Omawrite labels its actual paginated action.
+
+Sample folder: Tree at sample root showed Child and Root-note.md. Expanding Child showed Grandchild and Nested-note.md. Switching to List at sample root showed only Child and Root-note.md. Clicking Child showed Grandchild and Nested-note.md. Go > Back in Library returned to Child and Root-note.md. Opening Deep-note.md by path revealed it as the sole visible row in the Grandchild folder's List view.
+
+Preview: selecting PDF > Paginated Preview opened the existing Omawrite print-preview dialog on Root-note.md. Fit Page was initially selected; clicking Fit Width selected Fit Width and deselected Fit Page. The dialog was closed without printing or exporting.
+
+Full build/test: 82 passed, zero failures. Both generated app bundles packaged and deep/strict signatures verified. Qt font alias/SplitView teardown warnings remain. No private document was edited.
+
+No screenshot was saved in this pass; the native accessibility transcript records menu and row states. Visual screenshot evidence remains part of integrated acceptance.

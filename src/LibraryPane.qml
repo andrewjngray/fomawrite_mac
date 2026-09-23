@@ -150,7 +150,7 @@ Rectangle {
                         }
                         Label { visible: !entry.modelData.directory && displaySettings.showExcerpts; text: visible ? root.library.excerpt(entry.modelData.url) : ""; elide: Text.ElideRight; font.pixelSize: 11; color: backend.palette.muted; Layout.fillWidth: true }
                     }
-                    LineIcon { visible: entry.modelData.directory; name: entry.modelData.expanded ? "down" : "right"; ink: "#92969e"; Layout.preferredWidth: 14; Layout.preferredHeight: 14 }
+                    LineIcon { visible: entry.modelData.directory; name: root.library.navigationMode === 0 && entry.modelData.expanded ? "down" : "right"; ink: "#92969e"; Layout.preferredWidth: 14; Layout.preferredHeight: 14 }
                 }
                 TapHandler {
                     acceptedButtons: Qt.RightButton
@@ -170,7 +170,9 @@ Rectangle {
                 wrapMode: Text.Wrap
                 horizontalAlignment: Text.AlignHCenter
                 visible: fileList.count === 0
-                text: root.library.rootFolder.toString() === "" ? "Choose a folder to begin.\nYour files stay on your Mac." : "No Markdown or text files here.\nExpand a folder or create a document."
+                text: root.library.rootFolder.toString() === "" ? "Choose a folder to begin.\nYour files stay on your Mac."
+                    : root.library.navigationMode === 0 ? "No Markdown or text files here.\nExpand a folder or create a document."
+                    : "No Markdown or text files here.\nOpen another folder or create a document."
                 color: backend.palette.muted
                 font.pixelSize: 13
             }
@@ -227,6 +229,12 @@ Rectangle {
             CompactMenuItem { text: "None"; checkable: true; checked: displaySettings.dateMode === 0; onTriggered: root.commands.run("dateNone") }
         }
         CompactMenuItem { text: "Show Text Excerpts"; checkable: true; checked: displaySettings.showExcerpts; onTriggered: root.commands.run("excerpts") }
+        CompactMenu {
+            title: "Navigation"
+            darkMode: root.darkMode
+            CompactMenuItem { text: "Tree"; checkable: true; checked: root.library.navigationMode === 0; onTriggered: root.commands.run("navigationTree") }
+            CompactMenuItem { text: "List"; checkable: true; checked: root.library.navigationMode === 1; onTriggered: root.commands.run("navigationList") }
+        }
     }
     LibrarySortMenu {
         id: sortMenu
@@ -253,6 +261,12 @@ Rectangle {
                 CompactMenuItem { text: "None"; checkable: true; checked: displaySettings.dateMode === 0; onTriggered: root.commands.run("dateNone") }
             }
             CompactMenuItem { text: "Show Text Excerpts"; checkable: true; checked: displaySettings.showExcerpts; onTriggered: root.commands.run("excerpts") }
+            CompactMenu {
+                title: "Navigation"
+                darkMode: root.darkMode
+                CompactMenuItem { text: "Tree"; checkable: true; checked: root.library.navigationMode === 0; onTriggered: root.commands.run("navigationTree") }
+                CompactMenuItem { text: "List"; checkable: true; checked: root.library.navigationMode === 1; onTriggered: root.commands.run("navigationList") }
+            }
         }
         MenuSeparator {}
         CompactMenuItem { objectName: "toggleSortBar"; iconName: "sort"; text: displaySettings.showSortBar ? "Hide Sort Bar" : "Show Sort Bar"; onTriggered: root.commands.run("sortBar") }

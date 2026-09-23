@@ -727,6 +727,11 @@ ApplicationWindow {
                     NativeCommand { commandId: "dateNone" }
                 }
                 NativeCommand { commandId: "excerpts" }
+                Platform.Menu {
+                    title: "Navigation"
+                    NativeCommand { commandId: "navigationTree" }
+                    NativeCommand { commandId: "navigationList" }
+                }
             }
             Platform.MenuSeparator {}
             Platform.Menu {
@@ -737,14 +742,19 @@ ApplicationWindow {
             }
             NativeCommand { commandId: "markup" }
             Platform.MenuSeparator {}
-            NativeCommand { commandId: "togglePreview" }
             NativeCommand { commandId: "reloadPreview" }
             Platform.Menu {
-                title: "Layout"
-                NativeCommand { commandId: "editor" }
-                NativeCommand { commandId: "split" }
-                NativeCommand { commandId: "preview" }
+                title: "Preview"
+                NativeCommand { commandId: "preview"; text: "Full" }
+                NativeCommand { commandId: "split"; text: "Split" }
+                Platform.MenuSeparator {}
+                NativeCommand { commandId: "webPreview" }
+                Platform.Menu {
+                    title: "PDF"
+                    Platform.MenuItem { objectName: "native_pdfPreview"; text: "Paginated Preview…"; onTriggered: backend.printPreview() }
+                }
             }
+            NativeCommand { commandId: "editor" }
             Platform.MenuSeparator {}
             NativeCommand { commandId: "outline" }
             NativeCommand { commandId: "statistics" }

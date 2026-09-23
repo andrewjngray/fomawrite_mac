@@ -56,6 +56,8 @@ QtObject {
         { id: "dateCreated", title: "Date Created", toggle: true },
         { id: "dateNone", title: "None", toggle: true },
         { id: "excerpts", title: "Show Text Excerpts", toggle: true },
+        { id: "navigationTree", title: "Tree", toggle: true },
+        { id: "navigationList", title: "List", toggle: true },
         { id: "larger", title: "Larger Text" },
         { id: "smaller", title: "Smaller Text" },
         { id: "resetSize", title: "Reset Text Size" },
@@ -64,6 +66,7 @@ QtObject {
         { id: "preview", title: "Preview Only", toggle: true },
         { id: "togglePreview", title: "Preview", toggle: true },
         { id: "reloadPreview", title: "Reload Preview" },
+        { id: "webPreview", title: "Web", toggle: true },
         { id: "sans", title: "Sans", toggle: true },
         { id: "serif", title: "Serif", toggle: true },
         { id: "mono", title: "Mono", toggle: true },
@@ -117,10 +120,13 @@ QtObject {
         case "dateCreated": return libraryPane.dateMode === 2;
         case "dateNone": return libraryPane.dateMode === 0;
         case "excerpts": return libraryPane.showExcerpts;
+        case "navigationTree": return library.navigationMode === 0;
+        case "navigationList": return library.navigationMode === 1;
         case "editor": return settings.layoutMode === 0;
         case "split": return settings.layoutMode === 1;
         case "preview": return settings.layoutMode === 2;
         case "togglePreview": return settings.layoutMode !== 0;
+        case "webPreview": return true;
         case "sans": return backend.outputStyle === 0;
         case "serif": return backend.outputStyle === 1;
         case "mono": return backend.outputStyle === 2;
@@ -150,6 +156,8 @@ QtObject {
         case "dateCreated": libraryPane.dateMode = 2; break;
         case "dateNone": libraryPane.dateMode = 0; break;
         case "excerpts": libraryPane.showExcerpts = !libraryPane.showExcerpts; break;
+        case "navigationTree": library.navigationMode = 0; break;
+        case "navigationList": library.navigationMode = 1; break;
         case "larger": settings.writingSize = Math.min(32, settings.writingSize + 2); break;
         case "smaller": settings.writingSize = Math.max(12, settings.writingSize - 2); break;
         case "resetSize": settings.writingSize = 16; break;
@@ -158,6 +166,7 @@ QtObject {
         case "preview": settings.layoutMode = 2; break;
         case "togglePreview": settings.layoutMode = settings.layoutMode === 0 ? 1 : 0; break;
         case "reloadPreview": preview.reload(); break;
+        case "webPreview": if (settings.layoutMode === 0) settings.layoutMode = 1; break;
         case "sans": backend.setOutputStyle(0); break;
         case "serif": backend.setOutputStyle(1); break;
         case "mono": backend.setOutputStyle(2); break;

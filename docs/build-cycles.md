@@ -851,3 +851,19 @@ Known gaps: the iA screenshots still do not expose the children of Revert, Share
 Runnable artifacts: `dist/Omawrite Dev.app` and `dist/Omawrite.app` from Cycle 50. The GitHub RC1 binary remains the earlier Cycle 42 checkpoint.
 
 Optional exercise: open `research/cycle-50/sample/Menu-actions.md`, select its bold phrase and try Copy Formatted, Copy HTML and Copy Markdown. Make a disposable edit, choose File → Close, then Cancel. Confirm the text remains and report any confusing order, name or disabled state.
+
+## Cycle 51 — Tree/List navigation and Preview menu
+
+Planned scope: add the captured View Options → Navigation → Tree/List choice and View → Preview hierarchy, using the existing continuous and paginated renderers. Keep iA's uncaptured PDF submenu children and distinct Web semantics as explicit gaps.
+
+Changes: the file library now persists Tree or current-folder List mode. List displays direct children; clicking a folder navigates into it with Back/Forward/Enclosing Folder history. Show in Library moves List to a nested document's containing folder. Switching modes at the same root retains the in-memory Tree expansion. Native View, library sort/options and file context menus share the mode and checked state. Preview Full/Split/Web uses the existing layout and continuous preview; PDF → Paginated Preview opens the existing page/fit controls. Editor Only remains a separate Omawrite action.
+
+Validation: `./bin/build` and `./bin/test` pass, **82 tests, zero failures**. The added regression covers direct-child List rows, Tree expansion, folder history, nested Show in Library/reveal, mode persistence and native menu state. The ordinary and Dev bundles were refreshed and deep/strict signatures verified.
+
+Native Dev: the synthetic three-note folder showed Child and Root-note in List; Tree expansion exposed Nested-note; clicking Child in List showed Nested-note and Grandchild, and Go → Back in Library returned to the root. Opening Deep-note by path revealed it in the List at Grandchild. The native View menu exposed Navigation → Tree/List and Preview → Full/Split/Web/PDF → Paginated Preview. Paginated Preview opened with Fit Page selected; Fit Width changed the checked fit control. No print job was sent. [Evidence](../research/cycle-51/README.md).
+
+Known gaps: Tree expansion resets when changing the library root and is not restored across launches. List mode is a current-folder browser, not an all-files flattened list; this retains predictable folder actions and bounded scans. Web uses the existing continuous renderer, and iA's PDF submenu children remain uncaptured. Native dark/narrow, VoiceOver, keyboard-only traversal, unavailable folders and full menu-state relaunch were not exercised in this pass; mode persistence and unavailable-folder safety have automated coverage. No private writing was used for QA.
+
+Runnable artifacts: `dist/Omawrite Dev.app` and `dist/Omawrite.app` from Cycle 51. GitHub RC1 binary remains the earlier Cycle 42 checkpoint.
+
+Optional exercise: open `research/cycle-51/sample` by path, use View → View Options → Navigation to switch Tree/List, open Child and use Go → Back in Library. Open `Child/Grandchild/Deep-note.md`, then use File → Show in Library. Compare View → Preview → Full/Split and PDF → Paginated Preview; report any confusing behavior.
