@@ -709,7 +709,7 @@ Final native check: after rebuilding, Command-S saved the active Workbench.md wi
 
 **Verification:** Build and 70 tests pass, including off-screen geometry, tag caps/oversized skip, actual Qt footnote anchors and command behavior. Native spelling Replace/Undo, grammar request, paginated preview, fullscreen two-tab restart and long-note forward jump passed. Speech commands invoked; audible quality not independently verified. Custom three-page PDF rendered and all pages reviewed. Synthetic screenshots only.
 
-**Limits:** Hardware shutdown/disks/displays, minimized matrix, VoiceOver/cross-app clipboard, native return-link click, exact hover timing and language breadth are not certified. A failed native resize attempt is excluded; automated width checks pass. No blanket accessibility/parity sign-off.
+**Limits:** Hardware shutdown/disks/displays, minimized matrix, VoiceOver/cross-app clipboard, exact hover timing and language breadth are not certified. A failed native resize attempt is excluded; automated width checks pass. No blanket accessibility/parity sign-off.
 
 **Artifact / exercise:** Both RC1 bundles; research/cycle-41 contains samples, screenshots and PDF evidence. Open Long-notes.md and follow/return from the note; try the spelling panel on Closeout.md.
 
@@ -722,3 +722,5 @@ Final native check: after rebuilding, Command-S saved the active Workbench.md wi
 **Limits / status:** RC1 is for personal use, Apple Silicon/macOS 14+, ad-hoc signed. Developer ID/notarization and other-machine install are not complete. All numbered areas now have implementation checkpoints, but outstanding software parity and hardware acceptance in release-acceptance.md remain open; this does not reset the strict remaining-work count to zero.
 
 **Artifact / exercise:** dist/Omawrite.app, dist/Omawrite Dev.app and GitHub mac-v0.2.0-rc1 prerelease archive. Use a copy of a document for a final personal acceptance session; report any issue against the candidate tag.
+
+Final RC1 native follow-up: modeless Writing Review stayed visible during input and updated its word classes. Long-note forward and return clicks both passed (preview scroll 100% → approximately 2% on return). Sample edit undone and saved normally.
