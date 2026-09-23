@@ -1609,7 +1609,7 @@ private slots:
         backend.discardRecovery();
     }
 
-    void capitalizeTransformationMatchesMenuAndPreservesUndo() {
+    void titleCaseTransformationIsDistinctAndPreservesUndo() {
         Backend backend;
         QQmlEngine engine;
         engine.rootContext()->setContextProperty("backend", &backend);
@@ -1642,7 +1642,33 @@ private slots:
         }
         QCOMPARE(labels, expectedLabels);
 
-        const QString source = QStringLiteral("tEST of THE wORLD — café STRAßE");
+        const QString source = QStringLiteral("tEST of THE wORLD");
+        editor->setProperty("text", source);
+        QVERIFY(QMetaObject::invokeMethod(editor, "select", Q_ARG(int, 0),
+                                          Q_ARG(int, source.size())));
+        auto *titleCase = transformations->findChild<QObject *>("editTitleCase");
+        QVERIFY(titleCase->property("enabled").toBool());
+        QVERIFY(QMetaObject::invokeMethod(titleCase, "triggered"));
+        QCOMPARE(editor->property("text").toString(), QStringLiteral("tEST of the wORLD"));
+        QCOMPARE(editor->property("selectedText").toString(), QStringLiteral("tEST of the wORLD"));
+        QVERIFY(QMetaObject::invokeMethod(editor, "undo"));
+        QCOMPARE(editor->property("text").toString(), source);
+
+        const QString lowerMajorWords = QStringLiteral("the QUICK BROWN fox and a DOG in new YORK");
+        editor->setProperty("text", lowerMajorWords);
+        QVERIFY(QMetaObject::invokeMethod(editor, "select", Q_ARG(int, 0),
+                                          Q_ARG(int, lowerMajorWords.size())));
+        QVERIFY(QMetaObject::invokeMethod(titleCase, "triggered"));
+        QCOMPARE(editor->property("text").toString(),
+                 QStringLiteral("The QUICK BROWN Fox and a DOG in New YORK"));
+        QVERIFY(QMetaObject::invokeMethod(editor, "undo"));
+        QCOMPARE(editor->property("text").toString(), lowerMajorWords);
+
+        const QString protectedLink = QStringLiteral("[Label](https://example.com)");
+        editor->setProperty("text", protectedLink);
+        QVERIFY(backend.editMarkdown("titlecase", 0, protectedLink.size()).isEmpty());
+        QCOMPARE(editor->property("text").toString(), protectedLink);
+
         editor->setProperty("text", source);
         QVERIFY(QMetaObject::invokeMethod(editor, "select", Q_ARG(int, 0),
                                           Q_ARG(int, source.size())));
@@ -1650,13 +1676,20 @@ private slots:
         QVERIFY(capitalize->property("enabled").toBool());
         QVERIFY(QMetaObject::invokeMethod(capitalize, "triggered"));
         QCOMPARE(editor->property("text").toString(),
-                 QStringLiteral("Test Of The World — Café Straße"));
+                 QStringLiteral("Test Of The World"));
         QCOMPARE(editor->property("selectedText").toString(),
-                 QStringLiteral("Test Of The World — Café Straße"));
+                 QStringLiteral("Test Of The World"));
         QVERIFY(QMetaObject::invokeMethod(editor, "undo"));
         QCOMPARE(editor->property("text").toString(), source);
 
-        const QString protectedLink = QStringLiteral("[Label](https://example.com)");
+        const QString unicodeSource = QStringLiteral("café STRAßE");
+        editor->setProperty("text", unicodeSource);
+        QVERIFY(QMetaObject::invokeMethod(editor, "select", Q_ARG(int, 0),
+                                          Q_ARG(int, unicodeSource.size())));
+        QVERIFY(QMetaObject::invokeMethod(capitalize, "triggered"));
+        QCOMPARE(editor->property("text").toString(), QStringLiteral("Café Straße"));
+        QVERIFY(QMetaObject::invokeMethod(editor, "undo"));
+        QCOMPARE(editor->property("text").toString(), unicodeSource);
         editor->setProperty("text", protectedLink);
         QVERIFY(backend.editMarkdown("capitalize", 0, protectedLink.size()).isEmpty());
         QCOMPARE(editor->property("text").toString(), protectedLink);

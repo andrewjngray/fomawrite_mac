@@ -827,7 +827,7 @@ QVariantMap Backend::editMarkdown(const QString &action, int start, int end) {
         }
         if (action == "uppercase") selected = selected.toUpper();
         else if (action == "lowercase") selected = selected.toLower();
-        else if (action == "capitalize" || action == "titlecase") {
+        else if (action == "capitalize") {
             selected = selected.toLower();
             const QRegularExpression word(QStringLiteral("\\b\\p{L}[\\p{L}\\p{M}]*"), QRegularExpression::UseUnicodePropertiesOption);
             QList<QRegularExpressionMatch> words;
@@ -837,6 +837,35 @@ QVariantMap Backend::editMarkdown(const QString &action, int start, int end) {
                 const int index = it->capturedStart();
                 const int length = selected.at(index).isHighSurrogate() ? 2 : 1;
                 selected.replace(index, length, selected.mid(index, length).toUpper());
+            }
+        } else if (action == "titlecase") {
+            // This intentionally covers only the observed English subset: title-case
+            // all-lowercase major words, lowercase interior minor words, and retain
+            // existing mixed or all-uppercase casing for other words.
+            const QSet<QString> minorWords = {QStringLiteral("a"), QStringLiteral("an"),
+                QStringLiteral("and"), QStringLiteral("as"), QStringLiteral("at"),
+                QStringLiteral("but"), QStringLiteral("by"), QStringLiteral("for"),
+                QStringLiteral("from"), QStringLiteral("in"), QStringLiteral("into"),
+                QStringLiteral("nor"), QStringLiteral("of"), QStringLiteral("on"),
+                QStringLiteral("or"), QStringLiteral("per"), QStringLiteral("the"),
+                QStringLiteral("to"), QStringLiteral("via"), QStringLiteral("vs"),
+                QStringLiteral("with")};
+            const QRegularExpression word(QStringLiteral("\\b\\p{L}[\\p{L}\\p{M}]*"), QRegularExpression::UseUnicodePropertiesOption);
+            QList<QRegularExpressionMatch> words;
+            auto matches = word.globalMatch(selected);
+            while (matches.hasNext()) words.append(matches.next());
+            for (int i = words.size() - 1; i >= 0; --i) {
+                const auto &match = words.at(i);
+                const QString original = match.captured();
+                const QString lower = original.toLower();
+                QString replacement = original;
+                if (minorWords.contains(lower) && i > 0 && i < words.size() - 1) {
+                    replacement = lower;
+                } else if (original == lower && !original.isEmpty()) {
+                    const int length = original.front().isHighSurrogate() ? 2 : 1;
+                    replacement.replace(0, length, replacement.left(length).toUpper());
+                }
+                selected.replace(match.capturedStart(), match.capturedLength(), replacement);
             }
         } else {
             // Deliberately limited to selected, surrounding emphasis/strike pairs.

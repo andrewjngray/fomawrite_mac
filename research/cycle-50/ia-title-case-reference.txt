@@ -1,0 +1,3 @@
+iA Writer Make Title Case reference — 24 September 2026
+
+In an isolated synthetic document, selecting `the QUICK BROWN fox and a DOG in new YORK` and choosing Edit → Transformations → Make Title Case produced `The QUICK BROWN Fox and a DOG in New YORK`. The earlier isolated sample `tEST of THE wORLD` produced `tEST of the wORLD`. This supports lowercasing interior minor words while preserving mixed/all-uppercase major words, but does not establish complete English style, punctuation or locale rules. Synthetic iA sample was moved to Trash through the recoverable UI action; the saved prior document was restored.

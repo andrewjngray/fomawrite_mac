@@ -1,0 +1,5 @@
+Omawrite Cycle 50c native verification — 24 September 2026
+
+Dev showed a clean saved Second.md before refresh. It was quit normally and refreshed using `./bin/prepare-dev-app` after the current build and 102/0/0 native-access test run. In a disposable Untitled draft, selecting `the QUICK BROWN fox and a DOG in new YORK` and choosing Edit → Transformations → Make Title Case produced `The QUICK BROWN Fox and a DOG in New YORK`; Command-Z restored the source. File → Close presented the unsaved prompt; Discard closed the draft. Dev reopened clean Second.md.
+
+The ordinary app showed clean README.md before normal quit, then was repackaged with `./bin/package-mac` and reopened the clean saved document. Both bundles passed `codesign --verify --deep --strict`. The ordinary app's Title Case menu was not separately exercised. No screenshot was persisted; no private writing was changed.
