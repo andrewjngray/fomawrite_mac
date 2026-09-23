@@ -1,6 +1,6 @@
 # iA Writer menu map and Omawrite gap audit — 23 September 2026
 
-This is the planning baseline after Omawrite Cycle 47 (76 tests), updated through combined Cycle 57b/58a source and partial native checks on 24 September. Current source passes 99 tests; Cycles 48–51 are complete and later cycles retain explicit acceptance gaps. It transcribes the menu screenshots in `screenshots/` and compares them with the source. It is an interface and behavior audit, not a claim that similarly named commands behave identically.
+This is the planning baseline after Omawrite Cycle 47 (76 tests), updated through the Cycle 59 implemented-subset checkpoint on 24 September. Current source passes 99 tests; Cycles 48–51 are complete and later cycles retain explicit acceptance gaps. It transcribes the menu screenshots in `screenshots/` and compares them with the source. It is an interface and behavior audit, not a claim that similarly named commands behave identically.
 
 The screenshots contain personal filenames, locations and tags. This document records commands only. The images remain untracked reference material and should not be committed. Two files are empty duplicate captures: `3.48.34 PM(2)` and `3.49.37 PM(2)`. The duplicate `1.57.39 PM(2)` and `3.50.00 PM(2)` images add no distinct menu evidence.
 
@@ -254,13 +254,13 @@ These are real differentiators or useful local-workflow additions, though some m
 
 ## Gap summary for the next planning pass
 
-The remaining work is not evenly distributed. File management and core Markdown formatting are close. The largest functional clusters are:
+Cycle 59 integrates the implemented subset at code commit `5f8d64b`: 99 tests pass, both local bundles are refreshed/signed, and accumulated native evidence has inspected every top-level menu family. It is not a full closeout. The largest remaining clusters are:
 
-1. **Live writing intelligence:** completions, substitutions/corrections, live parts-of-speech highlighting, real style-check categories and author visibility overlays.
-2. **Authorship semantics:** reusable authors, iA-style Mark As/Paste Edits workflows, category display controls and a clearer truth model for provenance.
-3. **Library presentation:** flat List navigation, selectable date field, native-menu smart folders/tags and incremental indexing/watching.
-4. **View chrome:** title/toolbar fade modes, stats-only toolbar and the missing statistics.
-5. **Platform integration:** current macOS Window actions, dynamic window list, complete application/Help menus and fresh enabled-state/accessibility QA.
-6. **Deep correctness:** full Clear Styles, ordered task lists, advanced wikilink/content-block/Markdown edge cases, cross-app clipboard checks and hardware acceptance.
+1. **Cycle 54 writing input:** substitutions, automatic correction and the remaining completion popup/IME/accessibility matrix.
+2. **Cycle 55 writing intelligence:** Clichés, Redundancies, live parts-of-speech Show Syntax, Hide Authors and the remaining Custom/focus visual matrix.
+3. **Cycle 56 authorship semantics:** post-setup iA behavior, reusable authors, Mark As/Paste Edits From, category display and a truthful provenance model.
+4. **Cycle 57 platform integration:** Zoom All, Fill, Move & Resize, tiling, move-to-display, window sets/dynamic list, application destinations, OS Help search and Online Support. Center geometry still needs real screen/multi-display acceptance.
+5. **Cycle 58 deep correctness:** cross-window/missing-anchor fragment behavior, complete Markdown/content-block grammar, parser/output parity, semantic scrolling and cross-application clipboard acceptance.
+6. **Integrated acceptance:** a systematic saved/untitled/dirty matrix, enabled-state transitions, VoiceOver/high contrast, dark/narrow/fullscreen, multiple displays, hardware failures and notarized distribution.
 
-Before claiming full parity, observe post-setup Authors/Paste Edits/Mark As behavior, substitution triggers and platform enabled states on safe samples. The 24 September native capture supplies many missing labels, but those behaviors are not implied by menu names.
+Show Date, Tree/List navigation, native Go access, title/toolbar modes and the expanded statistics set are implemented subsets and no longer belong in the missing-feature list. Their row-level limitations remain explicit above. Labels and representative workflows do not establish exact iA Writer parity.

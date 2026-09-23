@@ -1,0 +1,11 @@
+# Cycle 59: integrated acceptance checkpoint
+
+Cycle 59 consolidates the implemented menu subset at code commit `5f8d64b` on macOS 27.0. It is not a complete menu closeout or an exact iA Writer parity claim.
+
+Final `./bin/build` and the full native-access `./bin/test` suite pass with **99 tests, zero failures and zero skips**. [`build.log`](build.log) and [`test.log`](test.log) contain the final output. `./bin/package-mac` succeeded. Both `dist/Omawrite.app` and `dist/Omawrite Dev.app` were refreshed, locally ad-hoc signed and strict signature-verified.
+
+The running ordinary app was quit normally after the open README.md status was saved. The refreshed ordinary bundle reopened saved README.md and showed the Authors menu. Dev showed synthetic `research/cycle-55/sample/Fillers.md` with clean status before the disposable safety check, then returned to saved Second.md. Accumulated Cycles 48–58 evidence has inspected every top-level menu family and representative safe workflows. Recent checks include the Fillers visual/exclusion matrix, offline Help pages, fragment target caret and Window Center. No screenshot file was persisted.
+
+A disposable `/private/tmp/omawrite-cycle59-native.BqTAbc/Safety.md` safety pass started with SHA-256 `e1b1f555bc821da7942d3c43ea63945f6c118a5bab48ae8ff33e9d30365db2c2`. Dev opened it by path and typed ` Scratch edit.`; File → Close displayed Cancel, Discard and Save. Cancel retained `*Safety.md`, the dirty text and Unsaved status. A normal second Close → Discard closed only that disposable draft and returned to saved Second.md. Final disk SHA-256 was identical. No user writing was edited or discarded.
+
+The acceptance boundary remains explicit: there is no complete saved/untitled/dirty matrix across all ten menus, VoiceOver, multi-display, dark/narrow or exact iA parity sign-off. Missing behavior remains in Cycle 54 substitutions; Cycle 55 Clichés/Redundancies/Show Syntax; Cycle 56 post-setup Mark As/Paste Edits; Cycle 57 application/Window OS actions; and Cycle 58 parser/output/cross-app plus cross-window/missing-anchor navigation. The local apps are ad-hoc signed; GitHub RC1 remains the older Cycle 42 artifact. See [`native-qa.txt`](native-qa.txt), the [acceptance ledger](../../docs/release-acceptance.md) and the [optional usability checklist](../usability/cycle-59.md).

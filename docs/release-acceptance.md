@@ -1,31 +1,41 @@
-# Mac 0.2.0 RC1 acceptance ledger
+# Cycle 59 integrated acceptance ledger
 
-23 September 2026. This is a personal-use release candidate, not a declaration of full iA Writer parity. Cycles 39–42 have a build/checkpoint; the outstanding acceptance criteria below remain open. Earlier cycle notes are historical snapshots; this ledger is the current status.
+24 September 2026. This is an **implemented-subset integrated checkpoint**, not a declaration of complete iA Writer parity or a final menu closeout. The tested product code is commit `5f8d64b` on macOS 27.0.
 
-## Verified for this candidate
+## Current artifact and automated gate
 
-- Build and 70 automated tests pass. Tests cover UTF-8/undo/recovery, saved-file conflicts, version restore, clipboard annotations, source/preview operations, bounded library scans and command routing.
-- Native spelling suggestions found one prose typo and excluded its fenced-code twin; Replace and Undo passed. Grammar checkbox completed a check. Modeless Writing Review remained open during editor input and updated the displayed word class; the sample edit was undone. English dictionary suggestions automated; all installed languages are offered, but not all are acceptance-tested.
-- Palette launches Spelling and Grammar and Paginated Preview. Existing two-tab Command-S remains verified in the preceding checkpoint; document shortcuts are scoped to the active window.
-- Native paginated preview rendered both pages and exposed fit-page/fit-width, orientation and page-navigation controls. Custom PDF has three inspected pages: title page, page 2 header/image, page 3 header/body; counters are correct. Raster HTML embedding/failed-export preservation remain tested.
-- Native fullscreen Quit/relaunch restored both tabs in fullscreen. Display selection by saved name and geometry clamping are implemented; off-screen placement is unit-tested.
-- Long-document footnote forward jump reached the end (preview scroll 100%). Qt dropped empty anchors; generated-link fallback fixes this. Forward and both repeated return positions are regression-tested on the real rendered document. Final native return-arrow check passed: preview scroll moved from 100% to about 2%, placing the reference at the top.
-- Dark preview links use the theme focus color and underline. Source editor has a useful accessible name. Existing tests verify filter bounds/focus at widths 1100, 900 and 720. A native resize drag did not resize the window; it is not evidence of minimum-width acceptance.
-- Tag cap test: 2,001 tags yields 2,000 entries and an explicit limit status; oversized file is reported skipped. Measured synthetic scan: approximately 50 ms on this host, not a general large-library benchmark.
-- Speech Start/Stop commands invoked on sample text; audible quality was not independently verified.
-- Build scripts refuse to replace running ordinary/Dev bundles. Release archive is made from committed compiled inputs, includes source commit/build instructions/checksums, and preserves MIT/font licenses. Bundles are ad-hoc signed.
+- `./bin/build` passed and the full native-access `./bin/test` suite passed with **99 tests, zero failures and zero skips**. Logs: [build](../research/cycle-59/build.log) and [tests](../research/cycle-59/test.log).
+- `./bin/package-mac` succeeded. Both `dist/Omawrite.app` and `dist/Omawrite Dev.app` were refreshed and passed strict local signature verification.
+- Both bundles are local ad-hoc signed artifacts. They are not Developer ID signed or notarized. The GitHub Mac 0.2.0 RC1 remains the older Cycle 42 downloadable artifact.
+- The running ordinary app was quit normally after its open `README.md` status was saved. The refreshed ordinary bundle reopened that saved file and exposed the Authors menu. Dev showed the synthetic `research/cycle-55/sample/Fillers.md` fixture with clean status before the disposable safety check, then returned to saved Second.md.
 
-## Remaining acceptance work
+## Integrated native evidence
+
+Native checks across Cycles 48–58 inspected every top-level menu family: application, File, Edit, Format, Authors, View, Focus, Go, Window and Help. Representative evidence includes guarded file/edit flows, menu hierarchy, date/navigation/preview choices, fixture statistics, bounded tags and completions, Authors setup, Focus groups, live Fillers highlighting, bundled Help pages, local fragment navigation and Window → Center.
+
+The latest checks visibly confirmed yellow Fillers matches and exclusions without changing status, opened both offline Help routes, showed the source caret at the duplicate `# Same` heading after Go → Open Link, and invoked Window → Center without changing the target document status. No screenshot file was persisted. These checks do not constitute a complete saved/untitled/dirty state matrix for all ten menus.
+
+A scoped dirty-close check used disposable `/private/tmp/omawrite-cycle59-native.BqTAbc/Safety.md`, initial SHA-256 `e1b1f555bc821da7942d3c43ea63945f6c118a5bab48ae8ff33e9d30365db2c2`. After typing ` Scratch edit.`, File → Close offered Cancel, Discard and Save. Cancel retained the starred title, dirty text and Unsaved status; a later Close → Discard closed only the disposable draft and returned to saved Second.md. The final disk hash was identical. No user writing was edited or discarded.
+
+## Implemented subsets that remain partial
+
+| Cycle / area | Explicit remaining behavior |
+|---|---|
+| 54 — writing input | Edit → Substitutions and automatic correction behavior remain unimplemented. Completion popup arrow/Escape/IME and broader accessibility acceptance remain open. |
+| 55 — Focus/style | Clichés, Redundancies and parts-of-speech Show Syntax are absent. Hide Authors, full Custom visual/overlap acceptance and focus/typewriter feel remain open. |
+| 56 — Authors | Post-setup iA semantics remain unknown. There is no iA-style Mark As or Paste Edits From workflow, reusable author registry, automatic assignment or verified provenance. |
+| 57 — platform menus | Window Zoom All, Fill, Move & Resize, Full Screen Tile, explicit move-to-display, window sets and verified dynamic window list remain open. Application menu destinations/enabled states, OS Help search and Online Support remain incomplete or unverified. Center geometry is automated offscreen only. |
+| 58 — navigation/output | Cross-window fragment transfer and missing-anchor feedback remain open. Broader Markdown parser, preview/output parity and cross-application clipboard behavior are not established. |
+
+## Acceptance still required
 
 | Area | Still required |
 |---|---|
-| Safety / hardware | Physical disk-full/device removal, separate-volume move, external-display attach/detach and OS shutdown. Existing simulated failure/crash checks do not substitute for these. |
-| Window / accessibility | Native minimized/zoom restoration matrix, minimum-width keyboard traversal, VoiceOver/high-contrast review and multiple displays. Fullscreen representative check passed. |
-| Clipboard / annotations | Cross-application interoperability, immediate row-focus retest and full live attribution visualization. Manual labels are not verified provenance; other applications can strip metadata. |
-| Markdown | Cross-file fragment matrix, complete nested Markdown grammar, nearest-match wiki search and semantic scroll alignment. Current synchronization remains proportional. |
-| Writing tools | All-language grammar accuracy, audible speech, automatic substitutions/correction while typing, completions and full live syntax/style highlighting. Current review is explicit and bounded. |
-| Menus / interaction | Exact hover timing under rapid transitions, remaining reference submenu/context-menu audit, toolbar/title fading modes and all platform tab-action enabled states. Path tooltips now use per-control two-second timers; stopwatch/native timing not certified. |
-| Library | Incremental filesystem watching and performance across a representative large real library; the current explicit scan has documented bounds. |
-| Distribution | Developer ID signing/notarization and another-machine install. RC is Apple Silicon/macOS 14+, locally ad-hoc signed. |
+| State matrix | Systematic saved, untitled and dirty-document checks for all applicable menu actions, including enabled/disabled transitions. |
+| Accessibility and appearance | VoiceOver, high contrast, keyboard-only traversal, dark and narrow layouts, fullscreen and exact fade/hover behavior. |
+| Hardware and OS geometry | Multi-display Center/move behavior, attach/detach, minimized/zoom restoration, disk-full/device removal, separate-volume moves and OS shutdown. |
+| Interoperability | Cross-application formatted/HTML/Markdown clipboard, sharing targets, physical printing and other applications stripping authorship metadata. |
+| Scale and grammar | Large real-library indexing/watch behavior, complete nested Markdown/content-block grammar and semantic rather than proportional scroll alignment. |
+| Distribution | Developer ID signing, notarization and another-machine installation. |
 
-No zero-remaining-cycles claim is made. The usable implementation has advanced through the release-candidate checkpoint; outstanding feature scope and acceptance need follow-through before a final parity sign-off. Physical checks require suitable hardware and user-visible OS actions; notarization requires distribution credentials.
+The current local apps are useful integrated artifacts for the implemented subset. Exact iA Writer parity, complete ten-menu acceptance and hardware certification remain open.

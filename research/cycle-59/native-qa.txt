@@ -1,0 +1,38 @@
+Cycle 59 integrated native checkpoint — 24 September 2026
+
+Environment and code
+- Product code commit: 5f8d64b.
+- macOS 27.0.
+- ./bin/build passed; see build.log.
+- Full native-access ./bin/test: 99 passed, 0 failed, 0 skipped; see test.log.
+
+Artifacts
+- ./bin/package-mac succeeded.
+- dist/Omawrite.app and dist/Omawrite Dev.app were refreshed.
+- Both bundles passed strict local signature verification.
+- Both are ad-hoc signed local artifacts, not notarized distribution builds.
+
+Native integration state
+- The running ordinary dist app was quit normally after saving its open README.md status.
+- Refreshed ordinary Omawrite reopened saved README.md and showed the Authors menu.
+- Refreshed Dev remained on synthetic research/cycle-55/sample/Fillers.md with clean status.
+- Evidence accumulated across Cycles 48–58 inspected application, File, Edit, Format, Authors, View, Focus, Go, Window and Help menu families.
+- Latest evidence includes visible Fillers highlights/exclusions, both offline Help pages, fragment navigation to the second Same heading and Window Center invocation.
+- No screenshot file was persisted.
+
+Disposable dirty-close safety
+- Path: /private/tmp/omawrite-cycle59-native.BqTAbc/Safety.md.
+- Initial SHA-256: e1b1f555bc821da7942d3c43ea63945f6c118a5bab48ae8ff33e9d30365db2c2.
+- Dev opened the file by path and typed ` Scratch edit.`; status became Unsaved.
+- File → Close displayed Cancel, Discard and Save.
+- Cancel retained `*Safety.md`, the dirty text and Unsaved status.
+- A normal second Close → Discard closed only this disposable draft and returned to saved Second.md.
+- Final disk SHA-256 was identical to the initial value.
+- No user writing was edited or discarded.
+
+Acceptance boundary
+- This is an implemented-subset integrated checkpoint, not full closeout.
+- No complete saved/untitled/dirty matrix was run across all ten menus.
+- VoiceOver, multi-display, dark/narrow and exact iA parity remain unverified.
+- Cycle 54 substitutions; Cycle 55 Clichés/Redundancies/Show Syntax; Cycle 56 post-setup Mark As/Paste Edits; Cycle 57 incomplete application/Window OS actions; and Cycle 58 parser/output/cross-app and cross-window fragment gaps remain open.
+- The GitHub RC1 remains the older Cycle 42 downloadable artifact.
