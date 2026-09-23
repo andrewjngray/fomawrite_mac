@@ -261,6 +261,26 @@ private slots:
         backend.discardRecovery();
     }
 
+    void clipboardAuthorshipRoundTripsAndRejectsStaleMetadata() {
+        QTemporaryDir directory; Backend backend;
+        QQmlEngine engine; engine.rootContext()->setContextProperty("backend", &backend);
+        QQmlComponent component(&engine,QUrl::fromLocalFile(QFINDTESTDATA("../src/Main.qml")));
+        QScopedPointer<QObject> window(component.create()); QVERIFY2(window,qPrintable(component.errorString()));
+        auto *editor=window->findChild<QObject *>("sourceEditor"); editor->setProperty("text","alpha beta");
+        backend.markAuthorship(0,5,"Reference","Sample");
+        QVERIFY(backend.copySelection(1,5,"markdown")); QCOMPARE(QGuiApplication::clipboard()->text(),QString("lpha"));
+        QCOMPARE(backend.pasteWithAuthorship(10,10),14);
+        QCOMPARE(editor->property("text").toString(),QString("alpha betalpha"));
+        bool pasted=false; for (const auto &v : backend.authorshipRanges()) { const auto r=v.toMap(); if(r["start"].toInt()==10 && r["category"]=="Reference") pasted=true; } QVERIFY(pasted);
+        QVERIFY(QMetaObject::invokeMethod(editor,"undo")); QCOMPARE(editor->property("text").toString(),QString("alpha beta"));
+        auto *mime=new QMimeData; mime->setText("external"); mime->setData("application/x-omawrite-authorship+json",QGuiApplication::clipboard()->mimeData()->data("application/x-omawrite-authorship+json")); QGuiApplication::clipboard()->setMimeData(mime);
+        backend.pasteWithAuthorship(0,5); QVERIFY(backend.authorshipRanges().isEmpty());
+        QVERIFY(QMetaObject::invokeMethod(editor,"undo")); QVERIFY(!backend.authorshipRanges().isEmpty());
+        const auto output=QUrl::fromLocalFile(directory.filePath("metadata.json")); QVERIFY(backend.exportAuthorship(output));
+        QFile file(output.toLocalFile()); QVERIFY(file.open(QIODevice::ReadOnly)); const auto data=QJsonDocument::fromJson(file.readAll()).object(); QCOMPARE(data["ranges"].toArray().size(),1); QVERIFY(data["notice"].toString().contains("not verified"));
+        backend.discardRecovery();
+    }
+
     void automaticVersionsPreservePreviousSavedBytes() {
 #ifdef Q_OS_MACOS
         QTemporaryDir directory; Backend backend;

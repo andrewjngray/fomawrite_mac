@@ -632,3 +632,13 @@ Planned scope: searchable existing workspace commands with keyboard navigation a
 **Limits:** Not native Versions-browser UI or sidecar history. External non-cooperating-writer race, OS-shutdown, physical disk/device and display/window-state matrix remain open.
 
 **Artifact / exercise:** Stable Dev/ordinary bundles updated at the combined run. Enable Keep Previous Version on Save on a sample; change and Save, then restore its earlier version and Undo.
+
+## Cycle 35 — Authorship clipboard and inspection
+
+**Scope / changes:** Editor Markdown Copy/Cut carries custom hash-bound annotation metadata; Paste validates ranges and prevents external plain text inheriting labels. One Undo reverses pasted text and annotations. Annotation rows select their spans; explicit metadata JSON export includes provenance limitations.
+
+**Tests:** Build and 63 tests pass; range clipping, transfer, stale hash rejection, Undo and metadata export covered. Native routes checked in combined run.
+
+**Limits:** Assertions are not verified authorship. Other apps may strip custom MIME data. Exported HTML/PDF does not embed assertions; matching Markdown and metadata are separate artifacts. Collaborative merging/full live attribution visualization remain future work.
+
+**Artifact / exercise:** Combined stable bundles. Mark a sample Reference, copy/paste it within Omawrite, inspect its range, then Undo. Paste plain text from another app and confirm it is unlabelled.

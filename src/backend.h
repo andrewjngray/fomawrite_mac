@@ -130,6 +130,8 @@ public:
     Q_INVOKABLE bool moveDocument(const QUrl &folder);
     Q_INVOKABLE bool openInNewWindow(const QUrl &url);
     Q_INVOKABLE bool showInFinder();
+    Q_INVOKABLE int pasteWithAuthorship(int start, int end);
+    Q_INVOKABLE bool exportAuthorship(const QUrl &destination);
     Q_INVOKABLE bool copySelection(int start, int end, const QString &format);
     Q_INVOKABLE QString clipboardMarkdown() const;
     Q_INVOKABLE QString clipboardUrl() const;

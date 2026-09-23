@@ -543,13 +543,14 @@ ApplicationWindow {
         }
         Platform.Menu {
             title: "Edit"
+            Platform.MenuItem { text: "Export Authorship Metadata…"; onTriggered: authorshipExportDialog.open() }
             Platform.MenuItem { text: "Authorship Annotations…"; onTriggered: { authorshipDialog.ranges = backend.authorshipRanges(); authorshipDialog.open(); } }
             Platform.MenuItem { text: "Check Selection Spelling…"; visible: win.isMac; enabled: editor.selectedText.length > 0; onTriggered: { spellingDialog.issues = backend.spellingIssues(editor.selectedText); spellingDialog.open(); } }
             Platform.MenuItem { text: "Emoji & Symbols"; visible: win.isMac; onTriggered: backend.nativeWindowAction("emoji") }
             Platform.MenuItem { objectName: "editUndo"; text: "Undo"; enabled: win.editTarget.canUndo; onTriggered: win.editTarget.undo() }
             Platform.MenuItem { objectName: "editRedo"; text: "Redo"; enabled: win.editTarget.canRedo; onTriggered: win.editTarget.redo() }
-            Platform.MenuItem { text: "Cut"; enabled: !win.editTarget.readOnly && win.editTarget.selectedText.length > 0; onTriggered: win.editTarget.cut() }
-            Platform.MenuItem { text: "Copy"; enabled: win.editTarget.selectedText.length > 0; onTriggered: win.editTarget.copy() }
+            Platform.MenuItem { text: "Cut"; enabled: !win.editTarget.readOnly && win.editTarget.selectedText.length > 0; onTriggered: { if (win.editTarget === editor) { backend.copySelection(editor.selectionStart, editor.selectionEnd, "markdown"); editor.remove(editor.selectionStart, editor.selectionEnd); } else win.editTarget.cut(); } }
+            Platform.MenuItem { text: "Copy"; enabled: win.editTarget.selectedText.length > 0; onTriggered: { if (win.editTarget === editor) backend.copySelection(editor.selectionStart, editor.selectionEnd, "markdown"); else win.editTarget.copy(); } }
             Platform.MenuItem { text: "Paste"; enabled: !win.editTarget.readOnly && win.editTarget.canPaste; onTriggered: { if (win.editTarget === editor) editor.pasteClipboardAsPlainText(); else win.editTarget.paste(); } }
             Platform.MenuItem { objectName: "editDelete"; text: "Delete"; enabled: !win.editTarget.readOnly && win.editTarget.selectedText.length > 0; onTriggered: win.editTarget.remove(win.editTarget.selectionStart, win.editTarget.selectionEnd) }
             Platform.MenuItem { text: "Select All"; enabled: win.editTarget.length > 0; onTriggered: win.editTarget.selectAll() }
@@ -824,7 +825,7 @@ ApplicationWindow {
         standardButtons: Dialog.Close
         ColumnLayout {
             anchors.fill: parent
-            Label { Layout.fillWidth: true; wrapMode: Text.Wrap; text: "Manual labels, not verified provenance. Edits can inherit nearby labels. Save writes a hidden .omawrite-authors.json sidecar; keep it with the Markdown file. External edits invalidate labels. Clipboard/export do not preserve them." }
+            Label { Layout.fillWidth: true; wrapMode: Text.Wrap; text: "Manual labels, not verified provenance. Edits can inherit nearby labels. Save writes a hidden .omawrite-authors.json sidecar; keep it with the Markdown file. External edits invalidate labels. Copy/paste between Omawrite windows preserves labels; other apps may remove them. External plain text is unlabelled. Export metadata separately to keep manual assertions with matching Markdown." }
             TextField { id: authorName; Layout.fillWidth: true; placeholderText: "Author or source name (optional)" }
             RowLayout {
                 Repeater {
@@ -835,7 +836,7 @@ ApplicationWindow {
             ListView {
                 Layout.fillWidth: true; Layout.fillHeight: true; clip: true
                 model: authorshipDialog.ranges
-                delegate: Label { required property var modelData; width: ListView.view.width; height: 28; text: modelData.start + "–" + modelData.end + ": " + modelData.category + " " + modelData.author; elide: Text.ElideRight }
+                delegate: ItemDelegate { required property var modelData; width: ListView.view.width; text: modelData.start + "–" + modelData.end + ": " + modelData.category + " " + modelData.author; onClicked: { authorshipDialog.close(); editor.select(modelData.start, modelData.end); editor.forceActiveFocus(); } }
                 ScrollBar.vertical: ScrollBar {}
             }
         }
@@ -1008,6 +1009,7 @@ ApplicationWindow {
         }
     }
 
+    Dialogs.FileDialog { id: authorshipExportDialog; title: "Export Authorship Metadata"; fileMode: Dialogs.FileDialog.SaveFile; nameFilters: ["Metadata (*.json)"]; onAccepted: backend.exportAuthorship(selectedFile) }
     Dialogs.FileDialog {
         id: exportDialog
         property string outputFormat: "html"
@@ -1597,9 +1599,8 @@ ApplicationWindow {
                 }
 
                 function pasteClipboardAsPlainText() {
-                    var pastedText = backend.clipboardText();
-                    if (pastedText.length > 0)
-                        replaceSelectionWith(pastedText);
+                    var end = backend.pasteWithAuthorship(selectionStart, selectionEnd);
+                    if (end >= 0) cursorPosition = end;
                 }
 
                 function skipHiddenForward(position) {
@@ -1667,6 +1668,11 @@ ApplicationWindow {
 
                 Keys.priority: Keys.BeforeItem
                 Keys.onPressed: function(event) {
+                    if ((event.key === Qt.Key_C || event.key === Qt.Key_X) && (event.modifiers & Qt.ControlModifier)
+                        && !(event.modifiers & (Qt.AltModifier | Qt.MetaModifier | Qt.ShiftModifier))) {
+                        if (backend.copySelection(selectionStart, selectionEnd, "markdown") && event.key === Qt.Key_X) remove(selectionStart, selectionEnd);
+                        event.accepted = true; return;
+                    }
                     var pasteKey = (event.key === Qt.Key_V)
                         && (event.modifiers & Qt.ControlModifier)
                         && !(event.modifiers & (Qt.AltModifier | Qt.MetaModifier | Qt.ShiftModifier));

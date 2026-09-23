@@ -1097,6 +1097,15 @@ bool Backend::copySelection(int start, int end, const QString &format) {
     if (format == "markdown") {
         mime->setText(selected);
         mime->setData("text/markdown", selected.toUtf8());
+        QVariantList clipped;
+        for (const auto &item : authorshipRanges()) {
+            auto range=item.toMap();
+            const int left=qMax(first, range["start"].toInt()), right=qMin(last, range["end"].toInt());
+            if (left >= right) continue;
+            range["start"]=left-first; range["end"]=right-first; clipped.append(range);
+        }
+        const QJsonObject annotation{{"version",1}, {"sha256",QString::fromLatin1(QCryptographicHash::hash(selected.toUtf8(), QCryptographicHash::Sha256).toHex())}, {"ranges",QJsonArray::fromVariantList(clipped)}};
+        mime->setData("application/x-omawrite-authorship+json", QJsonDocument(annotation).toJson(QJsonDocument::Compact));
     } else if (format == "html" || format == "formatted") {
         QTextDocument rendered;
         rendered.setMarkdown(selected);
@@ -1878,4 +1887,47 @@ int Backend::nativeTabInset() const {
 #else
     return 0;
 #endif
+}
+
+int Backend::pasteWithAuthorship(int start, int end) {
+    if (!m_document) return -1;
+    const auto *mime=QGuiApplication::clipboard()->mimeData();
+    if (!mime || !mime->hasText()) return -1;
+    QString text=mime->text();
+    if (text.isEmpty()) return -1;
+    const QByteArray payload=mime->data("application/x-omawrite-authorship+json");
+    QJsonObject data;
+    if (payload.size() <= 1024*1024) data=QJsonDocument::fromJson(payload).object();
+    const bool valid=data["version"].toInt()==1 && data["sha256"].toString()==QString::fromLatin1(QCryptographicHash::hash(text.toUtf8(),QCryptographicHash::Sha256).toHex())
+        && data["ranges"].toArray().size() <= 10000 && !text.contains('\r');
+    text.replace("\r\n", "\n").replace('\r','\n');
+    const int first=qBound(0,qMin(start,end),currentDocumentText().size());
+    const int last=qBound(first,qMax(start,end),currentDocumentText().size());
+    QTextCursor cursor(m_document); cursor.beginEditBlock();
+    cursor.setPosition(first); cursor.setPosition(last,QTextCursor::KeepAnchor);
+    cursor.insertText(text,QTextCharFormat()); // external text must not inherit surrounding assertions
+    if (valid) for (const auto &value : data["ranges"].toArray()) {
+        const auto range=value.toObject(); const int left=range["start"].toInt(-1), right=range["end"].toInt(-1);
+        const auto category=range["category"].toString();
+        if (left<0 || right<=left || right>text.size() || !QStringList{"Human","AI","Reference"}.contains(category)) continue;
+        QTextCharFormat format; format.setProperty(authorProperty,category+"\n"+range["author"].toString().left(200));
+        cursor.setPosition(first+left); cursor.setPosition(first+right,QTextCursor::KeepAnchor); cursor.mergeCharFormat(format);
+    }
+    cursor.endEditBlock(); setModified(true); scheduleRecovery();
+    return first+text.size();
+}
+
+bool Backend::exportAuthorship(const QUrl &destination) {
+    const QFileInfo target(destination.toLocalFile()), source(m_fileUrl.toLocalFile());
+    if (!destination.isLocalFile() || target.isSymLink() || target.absoluteFilePath()==source.absoluteFilePath()
+        || (!target.canonicalFilePath().isEmpty() && target.canonicalFilePath()==source.canonicalFilePath())) {
+        setStatus("Choose a metadata export path other than the document."); return false;
+    }
+    QSaveFile file(destination.toLocalFile());
+    if (!file.open(QIODevice::WriteOnly)) { setStatus("Could not open authorship export."); return false; }
+    file.setPermissions(QFileDevice::ReadOwner|QFileDevice::WriteOwner);
+    auto data=authorshipData(); data["notice"]="Manual assertions, not verified provenance; ranges use UTF-16 offsets.";
+    const auto bytes=QJsonDocument(data).toJson();
+    if (file.write(bytes)!=bytes.size() || !file.commit()) { setStatus("Could not write authorship export."); return false; }
+    setStatus("Authorship metadata exported; keep it with the exact Markdown text."); return true;
 }
