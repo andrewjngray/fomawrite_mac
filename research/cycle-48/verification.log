@@ -1,0 +1,7 @@
+2026-09-23 Cycle 48
+./bin/build: PASS
+./bin/test: PASS, 78 tests, 0 failures
+./bin/prepare-dev-app: PASS, stable io.github.andrewjngray.omawrite.dev bundle, strict signature verification
+./bin/package-mac: PASS, dist/Omawrite.app locally ad-hoc signed
+Native Dev: PASS, new sample-only QA window; Created=2 Jan, Modified=15 Jun, None=hidden; sort remained Date Modified; library options Show Date contained same choices
+Not live-checked: relaunch persistence, context menu, dark/narrow/VoiceOver, unavailable creation time

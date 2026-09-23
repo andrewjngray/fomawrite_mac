@@ -693,7 +693,12 @@ ApplicationWindow {
             }
             Platform.Menu {
                 title: "View Options"
-                NativeCommand { commandId: "dates" }
+                Platform.Menu {
+                    title: "Show Date"
+                    NativeCommand { commandId: "dateModified" }
+                    NativeCommand { commandId: "dateCreated" }
+                    NativeCommand { commandId: "dateNone" }
+                }
                 NativeCommand { commandId: "excerpts" }
             }
             Platform.MenuSeparator {}

@@ -1,6 +1,6 @@
 # iA Writer menu map and Omawrite gap audit — 23 September 2026
 
-This is the planning baseline after Omawrite Cycle 47 (`3e52162`, 76 tests). It transcribes the menu screenshots in `screenshots/` and compares them with the current source. It is an interface and behavior audit, not a claim that similarly named commands behave identically.
+This is the planning baseline after Omawrite Cycle 47 (76 tests), with the Cycle 48 Show Date row updated. It transcribes the menu screenshots in `screenshots/` and compares them with the source. It is an interface and behavior audit, not a claim that similarly named commands behave identically.
 
 The screenshots contain personal filenames, locations and tags. This document records commands only. The images remain untracked reference material and should not be committed. Two files are empty duplicate captures: `3.48.34 PM(2)` and `3.49.37 PM(2)`. The duplicate `1.57.39 PM(2)` and `3.50.00 PM(2)` images add no distinct menu evidence.
 
@@ -139,7 +139,7 @@ These menus were not opened in this folder. The older inspection recorded the st
 | Duplicate / Rename / Move To | **Match** | Separate-volume Move To and physical failure cases still need hardware acceptance; relative assets are not relocated. |
 | Revert To / versions | **Partial** | Omawrite can create automatic/manual macOS versions and restore one into the editor with one-step Undo. It does not expose the native Browse All Versions interface, and authorship sidecars are not versioned. |
 | Show in Finder / Show in Library | **Match** | Implemented for the active saved file. |
-| Share | **Partial** | Uses the macOS sharing picker for Markdown/file content; exact iA targets and options were not captured. |
+| Share | **Partial** | File → Share Markdown sends current editor text; the library context action shares a saved file. Exact iA targets and options were not captured. |
 | Export | **Partial** | HTML and PDF plus portable raster HTML exist. iA format/options parity and broad complex-document export acceptance remain open. |
 | Print / Page Setup | **Match** | Rendered printing, Markdown-source printing, paginated preview and persistent page setup exist; physical printer acceptance remains open. |
 
@@ -148,7 +148,7 @@ These menus were not opened in this folder. The older inspection recorded the st
 | iA capability | Omawrite status | Remaining difference |
 |---|---|---|
 | Undo/Redo; Cut/Copy/Paste/Delete/Select All | **Match** | Core native-menu actions track the focused field. |
-| Copy Formatted / HTML / Markdown | **Match** | Exposed as Copy As; cross-application clipboard acceptance remains open. |
+| Copy Formatted / HTML / Markdown | **Partial** | Working commands are nested under Omawrite's Copy As rather than top-level Edit; cross-application clipboard acceptance remains open. |
 | Paste As | **Partial** | Plain text and Markdown-from-HTML exist. The iA submenu was not captured, so exact conversions are unknown. |
 | Paste Edits From | **Gap** | No authorship-aware merge/paste workflow. |
 | Mark As | **Partial** | Manual Human/AI/Reference/Unknown range annotations exist in a dialog, with a sidecar and metadata export. They are assertions, not verified provenance, and are not exposed as iA-style menu commands. |
@@ -164,7 +164,7 @@ These menus were not opened in this folder. The older inspection recorded the st
 
 | iA capability | Omawrite status | Remaining difference |
 |---|---|---|
-| Headings 1–6 and Body | **Match** | Omawrite places Body inside Headings. |
+| Headings 1–6 and Body | **Partial** | Working commands exist, but Omawrite places Body inside Headings rather than at top level. |
 | Lists and task completion | **Partial** | Bulleted, numbered, task and completion toggling exist. Ordered task-list creation is missing as a distinct command. Deep nested/fenced edge cases remain partial. |
 | Blockquote; Indent/Outdent; line movement | **Match** | Selection-aware operations use atomic undo. |
 | Bold, Italic, Strikethrough, Highlight | **Match** | Portable `==highlight==` behavior depends on Omawrite’s renderer; delimiter edge cases remain bounded. |
@@ -194,19 +194,19 @@ These menus were not opened in this folder. The older inspection recorded the st
 |---|---|---|
 | Library/organizer/sort/filter visibility | **Match** | State is shared with toolbar/sidebar controls. |
 | Sort Files By | **Match** | Same four fields, direction and folders-first option. |
-| Show Date | **Partial** | Omawrite toggles dates, currently using modified time. It lacks Date Modified/Date Created/None selection. |
+| Show Date | **Match (Cycle 48)** | Native View → View Options → Show Date and library/context menus offer Date Modified, Date Created and None. A synthetic file displayed distinct dates; sorting remained independent. See [Cycle 48 evidence](../research/cycle-48/README.md). |
 | Text excerpts | **Match** | Bounded source excerpts with a compact default. |
 | Tree/List navigation | **Partial** | Expandable tree exists; flat List mode is missing. |
 | Text size | **Match** | Larger, smaller and reset equivalents. |
 | Show Completions | **Gap** | No completion UI or acceptance behavior. |
 | Reload Preview | **Match** | Forces Markdown reparse. |
-| Preview Full/Split/Web | **Match** | Editor-only, split and preview-only layouts plus continuous web-style preview exist. Labels differ. |
-| PDF preview / fit controls | **Match** | Paginated preview has page navigation, orientation, fit-page and fit-width. It lives under File/palette rather than View → Preview → PDF. |
+| Preview Full/Split/Web | **Partial** | Editor-only, split and preview-only layouts plus continuous web-style preview exist, but not under the captured Preview submenu hierarchy. |
+| PDF preview / fit controls | **Partial** | Paginated preview has page navigation, orientation, fit-page and fit-width. It lives under File/palette rather than View → Preview → PDF. |
 | Templates | **Partial** | Shared preview/export presets: Modern Sans, Classic Serif, Manuscript Mono, GitHub, Helvetica, Palatino and MLA Draft, plus JSON Custom. Duo/Quattro are missing; MLA Draft is not complete MLA Style; iA template-package import is unsupported. |
 | Title bar modes | **Gap** | No Fade In/Out versus Always Show option. |
 | Toolbar modes and stats-only display | **Partial** | Omawrite has a fixed toolbar and statistics dialog. It lacks fade/show/hide modes and persistent Stats Only toolbar. |
 | Statistics set | **Partial** | Words, characters, characters excluding whitespace and reading time exist. Sentences, speaking time, tasks and Human/AI/Reference counts are missing from the statistics UI. |
-| Tab bar / all tabs / full screen | **Match** | Native tab controls, tab overview and fullscreen lifecycle exist; some platform action enabled states remain imperfect. |
+| Tab bar / all tabs / full screen | **Partial** | Native tab controls, tab overview and fullscreen lifecycle exist, but placement/labels differ and some platform action enabled states remain imperfect. |
 
 ### Go
 

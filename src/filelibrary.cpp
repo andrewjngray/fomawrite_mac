@@ -328,10 +328,12 @@ void FileLibrary::appendDirectory(const QString &path, int depth, QStringList &w
             && !info.fileName().contains(m_filter, Qt::CaseInsensitive)) continue;
         const QString childPath = info.absoluteFilePath();
         const bool expanded = directory && m_expanded.contains(childPath);
+        const QDateTime created = info.birthTime();
         m_entries.append(QVariantMap{{"name", info.fileName()},
             {"url", QUrl::fromLocalFile(childPath)}, {"directory", directory},
             {"depth", depth}, {"expanded", expanded},
-            {"modified", info.lastModified().toString("d MMM")}});
+            {"modified", info.lastModified().toString("d MMM")},
+            {"created", created.isValid() ? created.toString("d MMM") : QStringLiteral("Unavailable")}});
         if (expanded) appendDirectory(childPath, depth + 1, watched);
     }
 }

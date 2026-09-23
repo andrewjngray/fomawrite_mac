@@ -1,6 +1,6 @@
 # Omawrite Mac: personal Markdown workspace
 
-**Current status — 23 September 2026:** Cycle 42 / Mac 0.2.0 RC1, 70 tests passing. The [release acceptance ledger](release-acceptance.md) supersedes historical status/counts below. Numbered implementation checkpoints have reached the archive stage; unresolved software parity and hardware acceptance remain open.
+**Current status — 23 September 2026:** Cycle 48 is the latest completed local build, with 78 passing tests. The Mac 0.2.0 RC1 download remains the Cycle 42 artifact. The [menu closeout plan](menu-closeout-plan.md) starts from the [screenshot audit](ia-menu-audit-2026-09-23.md); older cycle counts below are historical. Full iA Writer parity and hardware acceptance remain open.
 
 
 Owner: Andrew Gray. Working name: Omawrite Mac. Starting point: the MIT-licensed omacom/omawrite project; preserve its history and attribution.
@@ -10,6 +10,8 @@ Owner: Andrew Gray. Working name: Omawrite Mac. Starting point: the MIT-licensed
 Make reading and writing local Markdown pleasant enough to use every day. Take the calm typography and focused writing experience Andrew likes in iA Writer, and the direct Markdown editing experience he likes in Typora. Add capabilities when they address a real workflow. These are design goals, not a claim of feature parity or shared proprietary code.
 
 ## Current implementation sequence
+
+Andrew's current request is to close the observed iA Writer menu gaps one cycle at a time. [Cycles 48–59](menu-closeout-plan.md) supersede the older 14–28 sequence for future work. The older plan and checkpoints remain as implementation history.
 
 The [17 September staged development plan](development-plan.md) turns the [iA menu parity log](ia-menu-parity-2026-09-17.md) into proposed Cycles 14–28: menu access, safe file/editing commands, navigation, richer documents/output, native lifecycle, then advanced writing tools. Codex remains the visual reference. Full functional parity includes explicit validation of hidden submenu behavior and is not claimed by matching labels.
 

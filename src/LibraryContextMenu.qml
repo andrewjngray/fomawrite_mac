@@ -104,7 +104,12 @@ CompactMenu {
     }
     CompactMenu {
         title: "View Options"; property bool contextAllowed: !menu.location
-        CompactMenuItem { text: "Show Date"; checkable: true; checked: menu.commands.libraryPane.showDates; onTriggered: menu.commands.run("dates") }
+        CompactMenu {
+            title: "Show Date"
+            CompactMenuItem { text: "Date Modified"; checkable: true; checked: menu.commands.libraryPane.dateMode === 1; onTriggered: menu.commands.run("dateModified") }
+            CompactMenuItem { text: "Date Created"; checkable: true; checked: menu.commands.libraryPane.dateMode === 2; onTriggered: menu.commands.run("dateCreated") }
+            CompactMenuItem { text: "None"; checkable: true; checked: menu.commands.libraryPane.dateMode === 0; onTriggered: menu.commands.run("dateNone") }
+        }
         CompactMenuItem { text: "Show Text Excerpts"; checkable: true; checked: menu.commands.libraryPane.showExcerpts; onTriggered: menu.commands.run("excerpts") }
         CompactMenuItem { text: "Show Sort Bar"; checkable: true; checked: menu.commands.libraryPane.showSortBar; onTriggered: menu.commands.run("sortBar") }
         CompactMenuItem { text: "Show Filter Bar"; checkable: true; checked: menu.commands.libraryPane.showFilterBar; onTriggered: menu.commands.run("filterBar") }

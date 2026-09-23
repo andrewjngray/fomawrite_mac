@@ -11,7 +11,7 @@ Rectangle {
     required property var commands
     property alias showSortBar: displaySettings.showSortBar
     property alias showFilterBar: displaySettings.showFilterBar
-    property alias showDates: displaySettings.showDates
+    property alias dateMode: displaySettings.dateMode
     property alias showExcerpts: displaySettings.showExcerpts
     property url currentFile
     property bool darkMode: false
@@ -20,7 +20,11 @@ Rectangle {
         category: "libraryDisplay"
         property bool showSortBar: true
         property bool showFilterBar: true
+        // Retained for one migration only. New code persists dateMode:
+        // 0 = none, 1 = modified, 2 = created.
         property bool showDates: false
+        property int dateMode: 0
+        property int dateModeRevision: 0
         property bool showExcerpts: false
         property int compactListRevision: 0
         Component.onCompleted: {
@@ -28,6 +32,10 @@ Rectangle {
                 showDates = false
                 showExcerpts = false
                 compactListRevision = 1
+            }
+            if (dateModeRevision < 1) {
+                dateMode = showDates ? 1 : 0
+                dateModeRevision = 1
             }
         }
     }
@@ -133,7 +141,12 @@ Rectangle {
                         RowLayout {
                             Layout.fillWidth: true
                             Label { text: entry.modelData.name; font.pixelSize: 14; color: backend.palette.text; elide: Text.ElideMiddle; Layout.fillWidth: true }
-                            Label { visible: !entry.modelData.directory && displaySettings.showDates; text: entry.modelData.modified; font.pixelSize: 10; color: backend.palette.muted }
+                            Label {
+                                visible: !entry.modelData.directory && displaySettings.dateMode !== 0
+                                text: displaySettings.dateMode === 2 ? entry.modelData.created : entry.modelData.modified
+                                font.pixelSize: 10
+                                color: backend.palette.muted
+                            }
                         }
                         Label { visible: !entry.modelData.directory && displaySettings.showExcerpts; text: visible ? root.library.excerpt(entry.modelData.url) : ""; elide: Text.ElideRight; font.pixelSize: 11; color: backend.palette.muted; Layout.fillWidth: true }
                     }
@@ -206,7 +219,13 @@ Rectangle {
         MenuSeparator { padding: 4; implicitHeight: 9; contentItem: Rectangle { implicitHeight: 1; color: backend.palette.border } }
         CompactMenuItem { text: "Pin Folders to Top"; checkable: true; checked: root.library.foldersFirst; onTriggered: root.commands.run("foldersFirst") }
         MenuSeparator { padding: 4; implicitHeight: 9; contentItem: Rectangle { implicitHeight: 1; color: backend.palette.border } }
-        CompactMenuItem { text: "Show Date"; checkable: true; checked: displaySettings.showDates; onTriggered: root.commands.run("dates") }
+        CompactMenu {
+            title: "Show Date"
+            darkMode: root.darkMode
+            CompactMenuItem { text: "Date Modified"; checkable: true; checked: displaySettings.dateMode === 1; onTriggered: root.commands.run("dateModified") }
+            CompactMenuItem { text: "Date Created"; checkable: true; checked: displaySettings.dateMode === 2; onTriggered: root.commands.run("dateCreated") }
+            CompactMenuItem { text: "None"; checkable: true; checked: displaySettings.dateMode === 0; onTriggered: root.commands.run("dateNone") }
+        }
         CompactMenuItem { text: "Show Text Excerpts"; checkable: true; checked: displaySettings.showExcerpts; onTriggered: root.commands.run("excerpts") }
     }
     LibrarySortMenu {
@@ -226,7 +245,13 @@ Rectangle {
         CompactMenu {
             title: "View Options"
             darkMode: root.darkMode
-            CompactMenuItem { text: "Show Date"; checkable: true; checked: displaySettings.showDates; onTriggered: root.commands.run("dates") }
+            CompactMenu {
+                title: "Show Date"
+                darkMode: root.darkMode
+                CompactMenuItem { text: "Date Modified"; checkable: true; checked: displaySettings.dateMode === 1; onTriggered: root.commands.run("dateModified") }
+                CompactMenuItem { text: "Date Created"; checkable: true; checked: displaySettings.dateMode === 2; onTriggered: root.commands.run("dateCreated") }
+                CompactMenuItem { text: "None"; checkable: true; checked: displaySettings.dateMode === 0; onTriggered: root.commands.run("dateNone") }
+            }
             CompactMenuItem { text: "Show Text Excerpts"; checkable: true; checked: displaySettings.showExcerpts; onTriggered: root.commands.run("excerpts") }
         }
         MenuSeparator {}

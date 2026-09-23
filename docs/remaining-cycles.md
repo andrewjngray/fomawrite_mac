@@ -1,6 +1,6 @@
 # Remaining build plan — 23 September 2026
 
-The implementation has reached **Cycle 42 / Mac 0.2.0 RC1**: native writing review, expanded command access, paginated preview, fullscreen/display restoration and QA fixes are added. Final build and 70 tests pass. All numbered areas now have a checkpoint; **the full plan is not signed off**. The [current acceptance ledger](release-acceptance.md) lists unresolved software parity and hardware checks. Earlier nine-area/four-untouched counts below are historical, not a new promise of zero remaining work. The next work should close named acceptance items rather than invent another run of numbered cycles.
+The implementation reached **Cycle 42 / Mac 0.2.0 RC1** and subsequently Cycle 47 locally. The older counts and instruction below were historical. Andrew has now explicitly requested a fresh sequential [menu closeout plan for Cycles 48–59](menu-closeout-plan.md), based on the [23 September screenshot audit](ia-menu-audit-2026-09-23.md). The [release acceptance ledger](release-acceptance.md) still lists unresolved software parity and hardware checks.
 
 | Cycle | Deliverable | Completion criteria |
 |---|---|---|

@@ -805,3 +805,19 @@ Known gaps: Duo/Quattro, full MLA compliance, iA template-package import, physic
 Artifacts: dist/Omawrite Dev.app and dist/Omawrite.app. GitHub RC1 binary remains the older Cycle 42 download.
 
 Optional exercise: open research/cycle-47/sample/Templates.md and use View → Template to compare Classic, GitHub and Palatino. Export or use Paginated Preview; report the preferred reading style and spacing.
+
+## Cycle 48 — Selectable library date display
+
+Planned scope: begin the screenshot-backed [menu closeout sequence](menu-closeout-plan.md) with View → View Options → Show Date. Make Date Modified, Date Created and None exclusive, expose the same choice through library menus, and migrate the old date visibility setting without changing sort order.
+
+Changes: the library model now exposes separate created and modified date labels; an unavailable creation time is shown honestly. Native View, toolbar library options, sort popover and file context View Options share the one persisted date mode. The former `showDates` bool migrates to Modified or None on first use. None hides the row date; all three choices leave file sorting unchanged.
+
+Validation: `./bin/build` and `./bin/test` pass, **78 tests, zero failures**. Added independent filesystem date and preference-migration cases; existing native command-state checks include the three choices. Dev bundle was prepared at the stable bundle ID and the ordinary app was packaged with a local ad-hoc signature. Logs and synthetic sample are in [research/cycle-48](../research/cycle-48/README.md).
+
+Native Dev: opened `research/cycle-48/sample/First.md` in a new QA window, leaving the previously open documents untouched. View → View Options → Show Date presented all three entries. With the sample file's birth time at 2 January 2025 and modified time at 15 June 2026, the library row showed **2 Jan** and **15 Jun** respectively. None removed the date. The sort bar stayed **Sort by Date Modified** through the switches. The toolbar library menu exposed the same nested choices. Cropped sample-only screenshots show the two visible states.
+
+Known gaps: native relaunch persistence, context-menu date choice, dark/narrow/VoiceOver and creation-time-unavailable volumes were not exercised in this live pass; persistence and invalid creation time are covered by tests. The creation-time sample needs `research/cycle-48/prepare-sample.sh` after a fresh checkout because Git does not retain birth/modified timestamps. Other View menu gaps remain on the audit.
+
+Runnable artifacts: `dist/Omawrite Dev.app` and `dist/Omawrite.app` from Cycle 48. The GitHub RC1 binary remains the earlier Cycle 42 checkpoint.
+
+Optional exercise: run `research/cycle-48/prepare-sample.sh`, open its `sample/First.md`, and switch View → View Options → Show Date among the three choices. The file list should show 2 Jan, 15 Jun, then no date, without changing the sort order.

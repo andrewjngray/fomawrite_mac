@@ -52,7 +52,9 @@ QtObject {
         { id: "ascending", title: "A to Z", toggle: true },
         { id: "descending", title: "Z to A", toggle: true },
         { id: "foldersFirst", title: "Pin Folders to Top", toggle: true },
-        { id: "dates", title: "Show Date", toggle: true },
+        { id: "dateModified", title: "Date Modified", toggle: true },
+        { id: "dateCreated", title: "Date Created", toggle: true },
+        { id: "dateNone", title: "None", toggle: true },
         { id: "excerpts", title: "Show Text Excerpts", toggle: true },
         { id: "larger", title: "Larger Text" },
         { id: "smaller", title: "Smaller Text" },
@@ -111,7 +113,9 @@ QtObject {
         case "ascending": return library.ascending;
         case "descending": return !library.ascending;
         case "foldersFirst": return library.foldersFirst;
-        case "dates": return libraryPane.showDates;
+        case "dateModified": return libraryPane.dateMode === 1;
+        case "dateCreated": return libraryPane.dateMode === 2;
+        case "dateNone": return libraryPane.dateMode === 0;
         case "excerpts": return libraryPane.showExcerpts;
         case "editor": return settings.layoutMode === 0;
         case "split": return settings.layoutMode === 1;
@@ -142,7 +146,9 @@ QtObject {
         case "ascending": library.ascending = true; break;
         case "descending": library.ascending = false; break;
         case "foldersFirst": library.foldersFirst = !library.foldersFirst; break;
-        case "dates": libraryPane.showDates = !libraryPane.showDates; break;
+        case "dateModified": libraryPane.dateMode = 1; break;
+        case "dateCreated": libraryPane.dateMode = 2; break;
+        case "dateNone": libraryPane.dateMode = 0; break;
         case "excerpts": libraryPane.showExcerpts = !libraryPane.showExcerpts; break;
         case "larger": settings.writingSize = Math.min(32, settings.writingSize + 2); break;
         case "smaller": settings.writingSize = Math.max(12, settings.writingSize - 2); break;

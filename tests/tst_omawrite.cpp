@@ -1384,13 +1384,37 @@ private slots:
         int row = library.showFile(QUrl::fromLocalFile(inside.fileName()));
         QVERIFY(row >= 0);
         QVERIFY(library.filter().isEmpty());
-        QCOMPARE(library.entries().at(row).toMap().value("name").toString(), QStringLiteral("Note.md"));
+        const auto entry = library.entries().at(row).toMap();
+        QCOMPARE(entry.value("name").toString(), QStringLiteral("Note.md"));
+        QVERIFY(entry.contains("modified"));
+        QVERIFY(entry.contains("created"));
         row = library.showFile(QUrl::fromLocalFile(outside.fileName()));
         QVERIFY(row >= 0);
         QCOMPARE(library.rootFolder(), QUrl::fromLocalFile(QFileInfo(second.path()).canonicalFilePath()));
         QCOMPARE(library.showFile(QUrl::fromLocalFile(second.filePath("missing.md"))), -1);
         QVERIFY(!library.error().isEmpty());
         QCOMPARE(library.showFile(QUrl("https://example.com/note.md")), -1);
+    }
+
+    void libraryEntriesExposeCreatedAndModifiedDatesIndependently() {
+        QTemporaryDir directory;
+        QFile file(directory.filePath("dated.md"));
+        QVERIFY(file.open(QIODevice::ReadWrite));
+        QVERIFY(file.write("dated") > 0);
+        const QDateTime oldModification(QDate(2001, 1, 2), QTime(12, 0));
+        QVERIFY(file.setFileTime(oldModification, QFileDevice::FileModificationTime));
+        file.close();
+
+        const QFileInfo info(file.fileName());
+        FileLibrary library;
+        library.setRootFolder(QUrl::fromLocalFile(directory.path()));
+        QCOMPARE(library.entries().size(), 1);
+        const auto entry = library.entries().constFirst().toMap();
+        QCOMPARE(entry.value("modified").toString(), info.lastModified().toString("d MMM"));
+        QCOMPARE(entry.value("created").toString(), info.birthTime().isValid()
+                     ? info.birthTime().toString("d MMM") : QStringLiteral("Unavailable"));
+        // Some filesystems move birth time when an earlier modification time is set.
+        // The live macOS fixture below exercises visibly distinct values.
     }
 
     void newAndCreateRespectUnsavedCancellation() {
@@ -1491,6 +1515,55 @@ private slots:
         QVERIFY(library->recentFiles().isEmpty());
     }
 
+    void dateDisplayMigratesLegacyPreference() {
+        QSettings settings;
+        const QStringList keys = {
+            QStringLiteral("libraryDisplay/showDates"),
+            QStringLiteral("libraryDisplay/dateMode"),
+            QStringLiteral("libraryDisplay/dateModeRevision"),
+            QStringLiteral("libraryDisplay/compactListRevision")};
+        QVariantMap previous;
+        QSet<QString> present;
+        for (const auto &key : keys) {
+            if (settings.contains(key)) present.insert(key);
+            previous.insert(key, settings.value(key));
+        }
+        const auto restore = qScopeGuard([&] {
+            for (const auto &key : keys) {
+                if (present.contains(key)) settings.setValue(key, previous.value(key));
+                else settings.remove(key);
+            }
+            settings.sync();
+        });
+        settings.setValue(QStringLiteral("libraryDisplay/showDates"), true);
+        settings.setValue(QStringLiteral("libraryDisplay/compactListRevision"), 1);
+        settings.remove(QStringLiteral("libraryDisplay/dateMode"));
+        settings.remove(QStringLiteral("libraryDisplay/dateModeRevision"));
+        settings.sync();
+
+        Backend backend;
+        QQmlEngine engine;
+        engine.rootContext()->setContextProperty("backend", &backend);
+        QQmlComponent component(&engine, QUrl::fromLocalFile(QFINDTESTDATA("../src/Main.qml")));
+        QVERIFY2(component.isReady(), qPrintable(component.errorString()));
+        QScopedPointer<QObject> window(component.create());
+        QVERIFY(window);
+        auto *pane = window->findChild<QObject *>("libraryPane");
+        QVERIFY(pane);
+        QCOMPARE(pane->property("dateMode").toInt(), 1);
+        auto *commands = window->findChild<QObject *>("workspaceCommands");
+        QVERIFY(commands);
+        QVERIFY(QMetaObject::invokeMethod(commands, "run", Q_ARG(QVariant, QStringLiteral("dateCreated"))));
+        QCOMPARE(pane->property("dateMode").toInt(), 2);
+        window.reset();
+        QCoreApplication::processEvents();
+        QScopedPointer<QObject> reopened(component.create());
+        QVERIFY(reopened);
+        auto *reopenedPane = reopened->findChild<QObject *>("libraryPane");
+        QVERIFY(reopenedPane);
+        QCOMPARE(reopenedPane->property("dateMode").toInt(), 2);
+    }
+
     void nativeWorkspaceMenusShareState() {
         Backend backend;
         QQmlEngine engine;
@@ -1522,7 +1595,7 @@ private slots:
         window->setProperty("width", 1280);
         QTRY_VERIFY(native("organizer")->property("enabled").toBool());
         for (const auto &pair : {qMakePair("sortBar", "showSortBar"), qMakePair("filterBar", "showFilterBar"),
-                                qMakePair("dates", "showDates"), qMakePair("excerpts", "showExcerpts")}) {
+                                qMakePair("excerpts", "showExcerpts")}) {
             auto *action = native(pair.first);
             QVERIFY(action);
             pane->setProperty(pair.second, false);
@@ -1540,11 +1613,21 @@ private slots:
         backend.library()->setProperty("sortMode", 0);
         QVERIFY(!native("sortCreated")->property("checked").toBool());
         QVERIFY(native("sortName")->property("checked").toBool());
+        pane->setProperty("dateMode", 0);
+        backend.library()->setProperty("sortMode", 1);
+        QVERIFY(QMetaObject::invokeMethod(native("dateCreated"), "triggered"));
+        QCOMPARE(pane->property("dateMode").toInt(), 2);
+        QCOMPARE(backend.library()->property("sortMode").toInt(), 1);
+        QVERIFY(native("dateCreated")->property("checked").toBool());
+        QVERIFY(!native("dateModified")->property("checked").toBool());
+        QVERIFY(QMetaObject::invokeMethod(native("dateNone"), "triggered"));
+        QCOMPARE(pane->property("dateMode").toInt(), 0);
+        QVERIFY(native("dateNone")->property("checked").toBool());
         QVERIFY(QMetaObject::invokeMethod(native("descending"), "triggered"));
         QVERIFY(!backend.library()->property("ascending").toBool());
         QVERIFY(!native("ascending")->property("checked").toBool());
         // Restore the shared test preferences for following existing tests.
-        pane->setProperty("showDates", false);
+        pane->setProperty("dateMode", 0);
         pane->setProperty("showExcerpts", false);
         backend.library()->setProperty("ascending", true);
     }

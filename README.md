@@ -44,9 +44,9 @@ On macOS use **Command-S/O/N/P/F/B/I/K**, **Shift-Command-S** for Save As, **Opt
 
 Try `./bin/run examples/Workspace-tour.md`. Use the sidebar toggles to show/hide the library and organizer, the outline icon to jump to headings, and **Aa** for writing options, and the word count for statistics. Files remain ordinary UTF-8 Markdown. The library filter currently covers files in expanded folders. Preview uses Qt Markdown; it does not yet offer iA Writer's complete extensions, web/PDF template system or publishing integrations.
 
-## Latest local build: Cycle 47 (after Mac 0.2.0 RC1)
+## Latest local build: Cycle 48 (after Mac 0.2.0 RC1)
 
-File and folder right-click menus now include open/tab/window, info, favorites, duplicate/rename/Trash, Finder/sharing, output/clipboard, creation, sorting and view options. **76 tests pass**; both local app bundles are refreshed. Locations now rename the actual folder and update saved paths. Overlapping Locations are prevented, with child folders available through Favorites. View → Template now shares named presets across preview and export. See Cycle 47 in the [build records](docs/build-cycles.md) for native checks and limitations. The GitHub RC1 download remains the earlier Cycle 42 binary.
+File and folder right-click menus include open/tab/window, info, favorites, duplicate/rename/Trash, Finder/sharing, output/clipboard, creation, sorting and view options. View → Template shares named presets across preview and export. View → View Options → Show Date now offers Date Modified, Date Created and None, shared with library menus and independent of sorting. **78 tests pass**; both local app bundles are refreshed. See Cycle 48 in the [build records](docs/build-cycles.md) and the [menu closeout plan](docs/menu-closeout-plan.md). The GitHub RC1 download remains the earlier Cycle 42 binary.
 
 ## Archived release: Mac 0.2.0 RC1, Cycle 42
 
@@ -56,7 +56,7 @@ Native spelling suggestions/grammar review and speech; code-aware writing analys
 
 ## Build cycles and feedback
 
-See [the cycle log and short usability exercises](docs/build-cycles.md) for each working checkpoint. The [current screenshot-backed iA menu audit](docs/ia-menu-audit-2026-09-23.md) maps the observed menus to Omawrite's implemented, partial and missing behavior; the [reference inventory](docs/ia-writer-inventory.md) retains the earlier inspection history. Tell Codex what to keep, change or add; the next cycle will incorporate that feedback.
+See [the cycle log and short usability exercises](docs/build-cycles.md) for each working checkpoint. The [current screenshot-backed iA menu audit](docs/ia-menu-audit-2026-09-23.md) maps observed menus to Omawrite's implemented, partial and missing behavior. The [sequential closeout plan](docs/menu-closeout-plan.md) starts at Cycle 48; the [reference inventory](docs/ia-writer-inventory.md) retains earlier inspection history. Tell Codex what to keep, change or add; the next cycle will incorporate that feedback.
 
 ## Project map
 
