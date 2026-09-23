@@ -1,6 +1,6 @@
 # iA Writer menu map and Omawrite gap audit — 23 September 2026
 
-This is the planning baseline after Omawrite Cycle 47 (76 tests), updated through the Cycle 59 implemented-subset checkpoint on 24 September. Current source passes 99 tests; Cycles 48–51 are complete and later cycles retain explicit acceptance gaps. It transcribes the menu screenshots in `screenshots/` and compares them with the source. It is an interface and behavior audit, not a claim that similarly named commands behave identically.
+This is the planning baseline after Omawrite Cycle 47 (76 tests), updated through the Cycle 59 implemented-subset checkpoint and Cycles 54b–54c/50b–50c follow-ups on 24 September. Current source passes 102 tests; Cycles 48–51 are complete and later cycles retain explicit acceptance gaps. It transcribes the menu screenshots in `screenshots/` and compares them with the source. It is an interface and behavior audit, not a claim that similarly named commands behave identically.
 
 The screenshots contain personal filenames, locations and tags. This document records commands only. The images remain untracked reference material and should not be committed. Two files are empty duplicate captures: `3.48.34 PM(2)` and `3.49.37 PM(2)`. The duplicate `1.57.39 PM(2)` and `3.50.00 PM(2)` images add no distinct menu evidence.
 
@@ -55,8 +55,8 @@ The screenshot folder does not contain the application, Authors or Help menus, s
 - Delete; Select All
 - Find → *(children not captured)*
 - Spelling and Grammar → *(children not captured)*
-- Substitutions → *(children not captured)*
-- Transformations → *(children not captured)*
+- Substitutions → Show Substitutions, Smart Copy/Paste, Smart Quotes, Smart Dashes, Text Replacement *(children captured on 24 September)*
+- Transformations → Make Upper Case, Make Lower Case, Capitalize, Make Title Case *(children captured on 24 September)*
 - Speech → *(children not captured)*
 - AutoFill → *(children not captured)*
 - Start Dictation; Emoji & Symbols
