@@ -1035,10 +1035,15 @@ ApplicationWindow {
         }
         Platform.Menu {
             title: "Focus"
-            Platform.MenuItem { text: "Writing Review…"; onTriggered: analysisDialog.open() }
-            NativeCommand { commandId: "paragraph" }
-            NativeCommand { commandId: "sentence" }
-            NativeCommand { commandId: "typewriter" }
+            Platform.Menu {
+                objectName: "focusModeMenu"
+                title: "Enable Focus Mode"
+                NativeCommand { commandId: "sentence"; text: "Sentence" }
+                NativeCommand { commandId: "paragraph"; text: "Paragraph" }
+                NativeCommand { commandId: "typewriter"; text: "Typewriter" }
+            }
+            Platform.MenuSeparator {}
+            Platform.MenuItem { objectName: "focusWritingReview"; text: "Writing Review…"; onTriggered: analysisDialog.open() }
         }
         Platform.Menu {
             title: "Go"

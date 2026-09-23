@@ -2192,6 +2192,81 @@ private slots:
         settings->setProperty("showMarkup", true);
     }
 
+    void focusMenuKeepsModesExclusiveAndTypewriterIndependent() {
+        Backend backend;
+        QQmlEngine engine;
+        engine.rootContext()->setContextProperty("backend", &backend);
+        QQmlComponent component(&engine, QUrl::fromLocalFile(QFINDTESTDATA("../src/Main.qml")));
+        QScopedPointer<QObject> window(component.create());
+        QVERIFY2(window, qPrintable(component.errorString()));
+        auto *commands = window->findChild<QObject *>("workspaceCommands");
+        auto *settings = window->findChild<QObject *>("workspaceSettings");
+        auto *editor = window->findChild<QObject *>("sourceEditor");
+        auto *focusMenu = window->findChild<QObject *>("focusModeMenu");
+        auto *sentence = window->findChild<QObject *>("native_sentence");
+        auto *paragraph = window->findChild<QObject *>("native_paragraph");
+        auto *typewriter = window->findChild<QObject *>("native_typewriter");
+        auto *review = window->findChild<QObject *>("focusWritingReview");
+        auto *reviewDialog = window->findChild<QObject *>("writingReviewDialog");
+        QVERIFY(commands && settings && editor && focusMenu && sentence && paragraph
+                && typewriter && review && reviewDialog);
+
+        const bool originalSentence = settings->property("sentenceFocus").toBool();
+        const bool originalParagraph = settings->property("paragraphFocus").toBool();
+        const bool originalTypewriter = settings->property("typewriter").toBool();
+        const auto restore = qScopeGuard([&] {
+            settings->setProperty("sentenceFocus", originalSentence);
+            settings->setProperty("paragraphFocus", originalParagraph);
+            settings->setProperty("typewriter", originalTypewriter);
+        });
+        settings->setProperty("sentenceFocus", false);
+        settings->setProperty("paragraphFocus", false);
+        settings->setProperty("typewriter", false);
+        editor->setProperty("text", QStringLiteral("Focus modes keep this source unchanged."));
+        const QString source = editor->property("text").toString();
+
+        QCOMPARE(focusMenu->property("title").toString(), QStringLiteral("Enable Focus Mode"));
+        QCOMPARE(sentence->property("text").toString(), QStringLiteral("Sentence"));
+        QCOMPARE(paragraph->property("text").toString(), QStringLiteral("Paragraph"));
+        QCOMPARE(typewriter->property("text").toString(), QStringLiteral("Typewriter"));
+        QVERIFY(sentence->property("checkable").toBool());
+        QVERIFY(paragraph->property("checkable").toBool());
+        QVERIFY(typewriter->property("checkable").toBool());
+
+        auto run = [&](const QString &id) {
+            return QMetaObject::invokeMethod(commands, "run", Q_ARG(QVariant, id));
+        };
+        QVERIFY(run(QStringLiteral("sentence")));
+        QVERIFY(settings->property("sentenceFocus").toBool());
+        QVERIFY(!settings->property("paragraphFocus").toBool());
+        QVERIFY(!settings->property("typewriter").toBool());
+        QVERIFY(sentence->property("checked").toBool());
+
+        QVERIFY(run(QStringLiteral("typewriter")));
+        QVERIFY(settings->property("sentenceFocus").toBool());
+        QVERIFY(settings->property("typewriter").toBool());
+        QVERIFY(typewriter->property("checked").toBool());
+
+        QVERIFY(run(QStringLiteral("paragraph")));
+        QVERIFY(!settings->property("sentenceFocus").toBool());
+        QVERIFY(settings->property("paragraphFocus").toBool());
+        QVERIFY(settings->property("typewriter").toBool());
+        QVERIFY(paragraph->property("checked").toBool());
+        QVERIFY(!sentence->property("checked").toBool());
+
+        QVERIFY(run(QStringLiteral("paragraph")));
+        QVERIFY(!settings->property("sentenceFocus").toBool());
+        QVERIFY(!settings->property("paragraphFocus").toBool());
+        QVERIFY(settings->property("typewriter").toBool());
+        QCOMPARE(editor->property("text").toString(), source);
+
+        QCOMPARE(review->property("text").toString(), QStringLiteral("Writing Review…"));
+        QVERIFY(QMetaObject::invokeMethod(review, "triggered"));
+        QTRY_VERIFY(reviewDialog->property("opened").toBool());
+        QVERIFY(QMetaObject::invokeMethod(reviewDialog, "close"));
+        backend.discardRecovery();
+    }
+
     void sharedFormattingCommandsPreserveUndo() {
         QTemporaryDir directory;
         QFile sample(directory.filePath("format.md"));

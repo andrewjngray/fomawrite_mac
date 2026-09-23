@@ -29,7 +29,7 @@ Menu availability in iA depends on selection and document state. Disabled comman
 | 23 Sep 15.50.04 | Go top-level menu |
 | 23 Sep 15.50.11–15.50.17 | Window → Move & Resize and Full Screen Tile |
 
-No image opens the iA Writer application menu, Authors menu, Help menu, Edit submenus, File Revert/Share/Print submenus, View → Preview → PDF, or the Help search field. Those details remain unverified by this folder. The older 10 September inspection found **Set Up Authorship** under Authors and standard Help destinations, but that is older evidence.
+The screenshot folder does not contain the application, Authors or Help menus, several Edit and File children, or View → Preview → PDF. A read-only [native accessibility follow-up on 24 September](../research/menu-audit-2026-09-24/native-submenus.md) captured those menu labels without changing iA Writer. Post-authorship setup items, substitution triggers, dynamic OS states and exact behavior remain unverified.
 
 ## iA Writer menu tree from the screenshots
 
@@ -76,7 +76,7 @@ No image opens the iA Writer application menu, Authors menu, Help menu, Edit sub
 
 ### Authors
 
-- Not opened in this screenshot set. The older inspection saw **Set Up Authorship**. Author identities and Human/AI/Reference categories were observed in Settings, but the current submenu must be recaptured before exact parity work.
+- Not opened in this screenshot set. The 24 September native inspection showed **Set Up Authorship…** only before setup. Its sheet has required Name and optional Identifier; post-setup items remain unknown. Human/AI/Reference categories were observed earlier in Settings.
 
 ### View
 
@@ -87,7 +87,7 @@ No image opens the iA Writer application menu, Authors menu, Help menu, Edit sub
 - Text Size → Make Text Bigger, Make Text Normal Size, Make Text Smaller
 - Show Completions
 - Reload Preview
-- Preview → Full, Split; Web; PDF → *(children not captured; older inspection indicates fit modes)*
+- Preview → Full, Split; Web; PDF → Fit Page, Fit Width (PDF children confirmed in the 24 September native inspection)
 - Template → Modern (Sans), Classic (Serif), Manuscript (Mono), Manuscript (Duo), Manuscript (Quattro), GitHub, Helvetica, MLA Style, Palatino
 - Title Bar → Fade In/Out, Always Show
 - Toolbar → Fade In/Out, Always Show, Hide; Default; Stats Only → Characters, Characters Without Spaces, Words, Sentences, Reading Time, Speaking Time, Tasks, Human, AI, Reference
@@ -126,7 +126,7 @@ Personal location and hashtag names are deliberately omitted.
 
 ### iA Writer application menu and Help
 
-These menus were not opened in this folder. The older inspection recorded the standard About, Check for Updates, Settings, Services, Hide and Quit family in the application menu, and Help search, iA Writer Help, What's New and online support in Help. Treat those labels as older evidence until recaptured.
+These menus were not opened in the screenshot folder. The 24 September native inspection confirmed About, Check for Updates, Settings, Services, Hide and Quit/Quit and Close All Windows in the application menu; Help search, iA Writer Help, What's New and online support in Help. Their destinations and enabled-state behavior were not exercised.
 
 ## Current parity map
 
@@ -139,7 +139,7 @@ These menus were not opened in this folder. The older inspection recorded the st
 | Duplicate / Rename / Move To | **Match** | Separate-volume Move To and physical failure cases still need hardware acceptance; relative assets are not relocated. |
 | Revert To / versions | **Partial** | Omawrite can create automatic/manual macOS versions and restore one into the editor with one-step Undo. It does not expose the native Browse All Versions interface, and authorship sidecars are not versioned. |
 | Show in Finder / Show in Library | **Match** | Implemented for the active saved file. |
-| Share | **Partial** | File → Share Markdown sends current editor text; the library context action shares a saved file. Exact iA targets and options were not captured. |
+| Share | **Partial** | File → Share Markdown sends current editor text; iA's native menu exposes system share targets including AirDrop/Mail/Messages/Notes and extensions. Target availability is dynamic; equivalent cross-app delivery is unverified. |
 | Export | **Partial** | HTML and PDF plus portable raster HTML exist. iA format/options parity and broad complex-document export acceptance remain open. |
 | Print / Page Setup | **Match** | Rendered printing, Markdown-source printing, paginated preview and persistent page setup exist; physical printer acceptance remains open. |
 
@@ -149,15 +149,15 @@ These menus were not opened in this folder. The older inspection recorded the st
 |---|---|---|
 | Undo/Redo; Cut/Copy/Paste/Delete/Select All | **Match** | Core native-menu actions track the focused field. |
 | Copy Formatted / HTML / Markdown | **Partial (Cycle 50)** | Commands now appear directly in Edit and enable for an editor selection. Cross-application clipboard acceptance remains open. |
-| Paste As | **Partial** | Plain text and Markdown-from-HTML exist. The iA submenu was not captured, so exact conversions are unknown. |
+| Paste As | **Partial** | Plain text and Markdown-from-HTML exist. Before authorship setup, iA showed only Set Up Authorship…; post-setup conversions are unknown. |
 | Paste Edits From | **Gap** | No authorship-aware merge/paste workflow. |
 | Mark As | **Partial** | Manual Human/AI/Reference/Unknown range annotations exist in a dialog, with a sidecar and metadata export. They are assertions, not verified provenance, and are not exposed as iA-style menu commands. |
-| Find | **Partial** | Find, replace, next/previous and use selection exist. Library filtering/search is elsewhere; exact iA submenu parity is unverified. |
-| Spelling and Grammar | **Partial** | Explicit macOS dictionary/grammar review with suggestions, Replace and Undo exists. No inline-as-you-type spelling/grammar UI. |
-| Substitutions | **Gap** | No smart quotes/dashes, text replacements or automatic-correction controls. |
-| Transformations | **Partial (Cycle 50)** | Uppercase, lowercase and title case now appear under Edit → Transformations. Capitalize and exact native submenu parity are missing. |
+| Find | **Partial** | Find, replace, next/previous and use selection exist. iA also has Filter Library… in Find; Omawrite routes library filtering/search elsewhere. |
+| Spelling and Grammar | **Partial** | Explicit macOS dictionary/grammar review with suggestions, Replace and Undo exists. iA's menu also exposes while-typing spelling/grammar and automatic correction; Omawrite has no equivalent inline controls. |
+| Substitutions | **Gap** | iA exposes Show Substitutions, Smart Copy/Paste, Smart Quotes, Smart Dashes and Text Replacement. Omawrite has no matching controls or source-safe behavior yet; trigger and Undo semantics still need sample observation. |
+| Transformations | **Partial (Cycle 50)** | Uppercase, lowercase and title case appear under Edit → Transformations. iA's Make Upper Case/Lower Case/Capitalize/Make Title Case hierarchy is now captured; Capitalize remains missing. |
 | Speech | **Match** | Speak Selection and Stop Speaking use macOS speech; audible quality is not acceptance-tested. |
-| AutoFill / Dictation | **Partial (Cycle 50)** | AppKit injects AutoFill and Start Dictation into Edit. Native availability depends on macOS; Omawrite does not provide a separate workflow. |
+| AutoFill / Dictation | **Partial (Cycle 50)** | iA's AutoFill shows Contact/Passwords/Credit Card and AppKit exposes Dictation. Omawrite relies on platform injection; availability depends on macOS and focused control. |
 | Emoji & Symbols | **Match** | Opens the macOS character palette. |
 
 ### Format
@@ -182,8 +182,8 @@ These menus were not opened in this folder. The older inspection recorded the st
 | iA capability | Omawrite status | Remaining difference |
 |---|---|---|
 | Set up authors / categories | **Partial** | Manual author name and Human/AI/Reference range labels exist. No dedicated Authors menu, reusable author registry or verified provenance. |
-| Enable Focus Mode | **Partial** | Sentence, paragraph and typewriter controls exist individually; there is no iA-style master Focus switch/state model. |
-| Sentence / Paragraph / Typewriter | **Match** | Useful native-menu equivalents exist. Sentence boundaries use bounded heuristics rather than a full language grammar. |
+| Enable Focus Mode | **Partial (Cycle 55a)** | Native Focus menu now nests Sentence, Paragraph and Typewriter under this label. There is no separate master Focus switch; exact iA activation semantics remain unobserved. |
+| Sentence / Paragraph / Typewriter | **Partial (Cycle 55a)** | Existing controls are grouped in the captured order. Sentence/Paragraph are exclusive, Typewriter remains independent; visual dimming/scroll and checked-state native acceptance remain open. |
 | Syntax: parts of speech | **Partial** | Writing Review lists macOS lexical classes while open. It does not color words live in the editor or provide per-class visibility toggles. |
 | Style Check | **Partial** | Writing Review supports custom words plus a small built-in watch-word list. It is not iA’s live Fillers/Clichés/Redundancies rule set. |
 | Hide Authors by category | **Gap** | Annotations can be listed and selected, but there is no live category overlay or visibility filtering. |
@@ -201,7 +201,7 @@ These menus were not opened in this folder. The older inspection recorded the st
 | Show Completions | **Partial (Cycle 54a; native sample checked)** | A manual current-document popup offered two candidates; Return accepted one and one Undo restored the prefix. iA candidate source/ranking and remaining popup/IME/accessibility behavior remain unverified. |
 | Reload Preview | **Match** | Forces Markdown reparse. |
 | Preview Full/Split/Web | **Partial (Cycle 51)** | View → Preview now routes Full/Split/Web to existing continuous preview layouts. Web is not a separate renderer; exact iA behavior remains unverified. |
-| PDF preview / fit controls | **Partial (Cycle 51)** | View → Preview → PDF → Paginated Preview opens the existing page/fit controls. iA's PDF submenu children were not captured, so exact structure and shortcut parity remain open. |
+| PDF preview / fit controls | **Partial (Cycle 51)** | iA's PDF submenu has Fit Page and Fit Width. Omawrite routes through Paginated Preview to existing fit controls, so hierarchy differs; output/shortcut acceptance remains open. |
 | Templates | **Partial** | Shared preview/export presets: Modern Sans, Classic Serif, Manuscript Mono, GitHub, Helvetica, Palatino and MLA Draft, plus JSON Custom. Duo/Quattro are missing; MLA Draft is not complete MLA Style; iA template-package import is unsupported. |
 | Title bar modes | **Partial (Cycle 52; menu checked)** | Native View menu exposes Fade In/Out and Always Show for the QML filename in the 44 px top strip; exact fade feel, window controls and accessibility remain unverified. |
 | Toolbar modes and stats-only display | **Partial (Cycle 52; menu checked)** | Native menu exposes Fade/Always/Hide and ten independent Stats Only metrics; one metric changed the footer and Default restored it. Stats Only appears in Omawrite's footer, unlike iA's top toolbar. Visual and keyboard acceptance remain open. |
@@ -231,8 +231,8 @@ These menus were not opened in this folder. The older inspection recorded the st
 | Move to display | **Partial** | Saved display selection/restoration exists for sessions, but there is no Window-menu move-to-display command. Multi-display hardware acceptance remains open. |
 | Previous/Next tab, detach, merge, tab overview | **Match** | Native actions exist; labels differ and state-dependent enablement needs polish. |
 | Dynamic open-window list | **Unverified** | Multi-window ownership exists, but the source does not define a dynamic Window-menu document list. Check what AppKit injects in the packaged app. |
-| Application menu | **Partial** | Native lifecycle, Quit and standard macOS integration exist. About/Settings/Updates/Services coverage needs a fresh packaged-app audit. |
-| Help | **Gap** | Only Keyboard Shortcuts is currently exposed. There is no in-app guide, What's New, support destination or searchable help menu. |
+| Application menu | **Partial** | iA's About/Updates/Settings/Services/Hide/Quit/Quit and Close All Windows are now captured. Omawrite has native lifecycle and Quit; remaining destinations/actions need a packaged-app audit. |
+| Help | **Gap** | iA exposes Help search, iA Writer Help, What's New and online support. Omawrite currently offers Keyboard Shortcuts only; it lacks equivalent guide, release notes and support destinations. |
 
 ## Omawrite capabilities beyond the captured iA menus
 
@@ -263,4 +263,4 @@ The remaining work is not evenly distributed. File management and core Markdown 
 5. **Platform integration:** current macOS Window actions, dynamic window list, complete application/Help menus and fresh enabled-state/accessibility QA.
 6. **Deep correctness:** full Clear Styles, ordered task lists, advanced wikilink/content-block/Markdown edge cases, cross-app clipboard checks and hardware acceptance.
 
-Before implementation planning, recapture the still-hidden iA submenus and the Authors/Application/Help menus. Their labels and behaviors should not be invented from the parent arrows.
+Before claiming full parity, observe post-setup Authors/Paste Edits/Mark As behavior, substitution triggers and platform enabled states on safe samples. The 24 September native capture supplies many missing labels, but those behaviors are not implied by menu names.

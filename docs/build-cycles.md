@@ -896,10 +896,20 @@ Runnable artifact: `dist/Omawrite.app` was packaged from Cycle 53 source and pas
 
 ## Cycle 54 — writing input (phase 54a source in progress)
 
-Planned scope: reproduce captured View → Show Completions and inspect the uncaptured Edit → Substitutions/AutoFill children before assigning automatic writing behavior. Preserve source, Undo, IME composition and recovery.
+Planned scope: reproduce captured View → Show Completions and inspect Edit → Substitutions/AutoFill children before assigning automatic writing behavior. Preserve source, Undo, IME composition and recovery. The 24 September iA native menu capture now supplies child labels but not substitution triggers or Undo rules.
 
 Source checkpoint 54a: Show Completions is a manual action with current-document Unicode candidates in a small popup. Acceptance revalidates source/caret and replaces one prefix atomically; there is no automatic insertion. Code and URL contexts are excluded. Candidate discovery is bounded to the first 50,000 UTF-16 code units, at most 256 matching occurrences and 12 results.
 
 Validation: `./bin/build` and the full native-access `./bin/test` suite pass with **89 tests, zero failures and zero skips**. Focused tests cover candidate filtering, one-step Undo, stale-caret refusal and long-document bounds. The refreshed Dev app displayed two local suggestions for `lan`; Return accepted one and Command-Z restored the prefix. [Native evidence](../research/cycle-54/native-menu.txt) and [cycle gaps](../research/cycle-54/README.md) remain explicit.
 
-Known gaps: candidates beyond the bounded window are omitted. The iA completion popup behavior and Edit submenu children have not been observed; substitutions and automatic correction remain unimplemented. Popup visuals, arrow keys, Escape, IME, code/URL contexts, narrow/dark and accessibility remain pending. The current `dist/Omawrite.app` is Cycle 53 source; Dev is refreshed through 54a but not yet fully signed off. [Optional sample exercise](../research/usability/cycle-54.md): request a completion for `lan`, accept, Undo, then try the code and link cases.
+Known gaps: candidates beyond the bounded window are omitted. iA's Edit submenu labels are captured but their substitution/automatic-correction behavior has not been observed; those features remain unimplemented. Popup visuals, arrow keys, Escape, IME, code/URL contexts, narrow/dark and accessibility remain pending. The current `dist/Omawrite.app` is Cycle 53 source; Dev is refreshed through 55a but earlier cycles are not yet fully signed off. [Optional sample exercise](../research/usability/cycle-54.md): request a completion for `lan`, accept, Undo, then try the code and link cases.
+
+## Cycle 55 — Focus and review (phase 55a partial)
+
+Planned scope: align captured Focus menu hierarchy without changing the existing focus/highlighter behavior, then separately add live lexical/style review overlays with source and performance safeguards.
+
+Source checkpoint 55a: Focus → Enable Focus Mode now contains Sentence, Paragraph and Typewriter in captured order. Sentence and Paragraph remain exclusive; Typewriter scrolling stays independent. Writing Review… follows as an Omawrite-specific action. No master toggle or Markdown/highlighter mutation was added.
+
+Validation: `./bin/build` and the full native-access `./bin/test` suite pass with **90 tests, zero failures and zero skips**. Focused tests cover menu order/state, persistence and nonmutation. The refreshed Dev app exposed the nested Focus menu; toggling Sentence on and off left the synthetic document source and saved status unchanged. [Cycle 55 record](../research/cycle-55/README.md).
+
+Known gaps: native checked marks, dimming/scroll feel, keyboard traversal, narrow/dark/fullscreen and VoiceOver remain unverified because screenshot capture was unavailable. iA's exact Focus interaction and live Show Syntax/Style Check categories are not implemented. Runnable artifact: refreshed `dist/Omawrite Dev.app` through 55a; ordinary `dist/Omawrite.app` still contains Cycle 53 source. [Optional usability exercise](../research/usability/cycle-55.md).

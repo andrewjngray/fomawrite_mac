@@ -25,11 +25,11 @@ Each cycle is separately buildable and reviewable: update `docs/build-cycles.md`
 | 58 | **Markdown/output depth:** close reproduced gaps in Clear Styles, links/fragments, wikilinks, content blocks, TOC, complex tables, PDF/HTML and cross-app clipboard. | Byte-for-byte Markdown/Undo fixtures; multi-page rendered output inspected; failures documented with exact inputs. | 49, 51, 56 |
 | 59 | **Integrated acceptance:** repeat the full menu matrix with sample saved/untitled/dirty windows, keyboard navigation, narrow/dark/VoiceOver and available hardware. Update guides and release ledger. | Every audit row has evidence or a specific residual; build/tests pass and native screenshots/logs correspond to current code. | 48–58 |
 
-The current plan has **12 cycles, 48–59**. Cycles 48–51 are complete and native-verified. Cycles 52–53 and phase 54a have passing source checkpoints and partial native Dev checks; **8 cycles remain open**, beginning with Cycle 52. The count is provisional: newly captured submenus can reveal additional work. Public notarization and developer signing remain a separate distribution decision because they require credentials and another-machine acceptance.
+The current plan has **12 cycles, 48–59**. Cycles 48–51 are complete and native-verified. Cycles 52–53 and phases 54a/55a have passing source checkpoints and partial native Dev checks; **8 cycles remain open**, beginning with Cycle 52. The count is provisional: newly captured submenus can reveal additional work. Public notarization and developer signing remain a separate distribution decision because they require credentials and another-machine acceptance.
 
 ## Evidence needed before exact submenu work
 
-The current screenshots do not show File → Revert/Share/Print children; Edit → Paste As/Paste Edits From/Mark As/Find/Spelling/Substitutions/Transformations/Speech/AutoFill; View → Preview → PDF; the Authors, application and Help menus; or the dynamic Window document list. Capture them using a sample document and record state-dependent disabled items, menu order and shortcuts. This can happen while Cycle 48 proceeds, but an uncaptured child is not invented as part of a later cycle.
+The [24 September native iA menu capture](../research/menu-audit-2026-09-24/native-submenus.md) now supplies labels for File → Revert/Share/Print, Edit → Find/Spelling/Substitutions/Transformations/Speech/AutoFill, View → Preview → PDF, pre-setup Authors, application, Help and Window. Post-setup Authors/Paste Edits From/Mark As children, actual substitution/completion triggers, and platform enabled states still need sample-based observation. No behavior is inferred from a label alone.
 
 ## Parallel work within one sequential cycle
 
