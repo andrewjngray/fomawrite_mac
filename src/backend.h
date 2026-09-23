@@ -134,6 +134,10 @@ public:
     Q_INVOKABLE int nativeTabInset() const;
     Q_INVOKABLE void nativeWindowAction(const QString &action);
     Q_INVOKABLE QVariantList writingAnalysis(const QString &text, const QString &customWords);
+    // Comma-separated current-document terms: first 32 unique entries, each at
+    // most 64 UTF-16 units; returns up to 1000 ordered, non-overlapping spans.
+    Q_INVOKABLE QVariantList customReviewSpans(const QString &customWords) const;
+    Q_INVOKABLE void setCustomReviewWords(const QString &customWords);
     Q_INVOKABLE QStringList writingLanguages() const;
     Q_INVOKABLE QVariantList writingIssues(const QString &text, const QString &language, bool grammar);
     Q_INVOKABLE bool correctWriting(int start, int end, const QString &expected, const QString &replacement);

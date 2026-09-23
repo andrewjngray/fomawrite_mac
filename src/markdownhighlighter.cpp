@@ -5,6 +5,7 @@
 #include <QFontMetricsF>
 #include <QTextDocument>
 #include <QTextBlock>
+#include <algorithm>
 
 MarkdownHighlighter::MarkdownHighlighter(QTextDocument *document)
     : QSyntaxHighlighter(document) {
@@ -38,6 +39,24 @@ void MarkdownHighlighter::setSearch(const QString &query, int currentMatchStart)
         return;
     m_searchQuery = query;
     m_currentMatchStart = currentMatchStart;
+    rehighlight();
+}
+
+void MarkdownHighlighter::setReviewSpans(const QList<Span> &spans) {
+    QList<Span> normalized;
+    const int documentLength = document() ? qMax(0, document()->characterCount() - 1) : 0;
+    for (const Span &span : spans) {
+        const int start = qBound(0, span.start, documentLength);
+        const qint64 requestedEnd = qint64(span.start) + qMax(0, span.length);
+        const int end = int(qBound(qint64(start), requestedEnd, qint64(documentLength)));
+        if (end > start) normalized.append({start, end - start});
+    }
+    std::sort(normalized.begin(), normalized.end(), [](const Span &left, const Span &right) {
+        return left.start == right.start ? left.length < right.length : left.start < right.start;
+    });
+    if (normalized.size() > 1000) normalized = normalized.mid(0, 1000);
+    if (m_reviewSpans == normalized) return;
+    m_reviewSpans = normalized;
     rehighlight();
 }
 
@@ -95,6 +114,10 @@ void MarkdownHighlighter::rebuildFormats() {
     m_linkFormat = QTextCharFormat();
     m_linkFormat.setForeground(link);
     m_linkFormat.setFontUnderline(true);
+
+    m_reviewFormat = QTextCharFormat();
+    m_reviewFormat.setBackground(m_darkMode ? QColor(QStringLiteral("#554315"))
+                                            : QColor(QStringLiteral("#fff1b8")));
 
     m_searchFormat = QTextCharFormat();
     m_searchFormat.setBackground(m_darkMode ? QColor(QStringLiteral("#725b18"))
@@ -155,7 +178,30 @@ void MarkdownHighlighter::highlightBlock(const QString &text) {
             setFormat(i, 1, dimmed);
         }
     }
+    if (!literal) highlightReviewSpans(text);
     highlightSearch(text);
+}
+
+void MarkdownHighlighter::highlightReviewSpans(const QString &text) {
+    if (m_reviewSpans.isEmpty() || text.isEmpty()) return;
+    const int blockStart = currentBlock().position();
+    const int blockEnd = blockStart + text.size();
+    for (const Span &span : m_reviewSpans) {
+        const int spanEnd = span.start + span.length;
+        if (spanEnd <= blockStart) continue;
+        if (span.start >= blockEnd) break;
+        const int first = qMax(span.start, blockStart) - blockStart;
+        const int last = qMin(spanEnd, blockEnd) - blockStart;
+        for (int i = first; i < last; ++i) {
+            QTextCharFormat composed = format(i);
+            // Backend spans exclude code and markers. These guards keep the
+            // setter conservative if a caller supplies an overlapping span.
+            if (composed.fontPointSize() == 1.0
+                || composed.background() == m_codeFormat.background()) continue;
+            composed.setBackground(m_reviewFormat.background());
+            setFormat(i, 1, composed);
+        }
+    }
 }
 
 void MarkdownHighlighter::highlightSearch(const QString &text) {

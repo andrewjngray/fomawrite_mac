@@ -20,7 +20,12 @@ public:
     struct Span {
         int start;
         int length;
+        bool operator==(const Span &other) const {
+            return start == other.start && length == other.length;
+        }
     };
+
+    void setReviewSpans(const QList<Span> &spans);
 
     enum class InlineKind { Bold, Italic, Link };
 
@@ -42,6 +47,7 @@ private:
     void rebuildFormats();
     void highlightMarkers(const QString &text);
     void highlightInline(const QString &text);
+    void highlightReviewSpans(const QString &text);
     void highlightSearch(const QString &text);
 
     int m_focusBlock = -1;
@@ -60,6 +66,8 @@ private:
     QTextCharFormat m_codeFormat;
     QTextCharFormat m_quoteFormat;
     QTextCharFormat m_linkFormat;
+    QList<Span> m_reviewSpans;
+    QTextCharFormat m_reviewFormat;
     QString m_searchQuery;
     int m_currentMatchStart = -1;
     QTextCharFormat m_searchFormat;

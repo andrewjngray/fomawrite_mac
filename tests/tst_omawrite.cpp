@@ -293,6 +293,123 @@ private slots:
         backend.discardRecovery();
     }
 
+    void customReviewSpansAreUnicodeSafeBoundedAndReadOnly() {
+        Backend backend;
+        QQmlEngine engine;
+        engine.rootContext()->setContextProperty("backend", &backend);
+        QQmlComponent component(&engine, QUrl::fromLocalFile(QFINDTESTDATA("../src/Main.qml")));
+        QScopedPointer<QObject> window(component.create());
+        QVERIFY2(window, qPrintable(component.errorString()));
+        auto *editor = window->findChild<QObject *>("sourceEditor");
+        QVERIFY(editor);
+
+        const QString source = QStringLiteral(
+            "😀 Café caféine café. C++\n"
+            "`café`\n"
+            "```\ncafé C++\n```\n"
+            "[visible](https://example.com/café)\n");
+        editor->setProperty("text", source);
+        const bool undoBefore = editor->property("canUndo").toBool();
+        const QVariantList spans = backend.customReviewSpans(QStringLiteral(" café, C++, CAFÉ "));
+        QCOMPARE(spans.size(), 3);
+        QCOMPARE(spans.at(0).toMap().value("start").toInt(), 3);
+        QCOMPARE(spans.at(0).toMap().value("word").toString(), QStringLiteral("Café"));
+        QCOMPARE(spans.at(1).toMap().value("word").toString(), QStringLiteral("café"));
+        QCOMPARE(spans.at(2).toMap().value("word").toString(), QStringLiteral("C++"));
+        for (const QVariant &entry : spans) {
+            const QVariantMap span = entry.toMap();
+            QCOMPARE(span.value("label").toString(), QStringLiteral("Custom"));
+            QCOMPARE(source.mid(span.value("start").toInt(),
+                                span.value("end").toInt() - span.value("start").toInt()),
+                     span.value("word").toString());
+        }
+        QCOMPARE(editor->property("text").toString(), source);
+        QCOMPARE(editor->property("canUndo").toBool(), undoBefore);
+
+        QString repeated;
+        repeated.reserve(5500);
+        for (int i = 0; i < 1100; ++i) repeated += QStringLiteral("word ");
+        editor->setProperty("text", repeated);
+        const QVariantList capped = backend.customReviewSpans(QStringLiteral("word"));
+        QCOMPARE(capped.size(), 1000);
+        QCOMPARE(capped.last().toMap().value("start").toInt(), 4995);
+
+        editor->setProperty("text", QStringLiteral("very good"));
+        const QVariantList overlapping = backend.customReviewSpans(
+            QStringLiteral("very, very good, good"));
+        QCOMPARE(overlapping.size(), 1);
+        QCOMPARE(overlapping.first().toMap().value("start").toInt(), 0);
+        QCOMPARE(overlapping.first().toMap().value("end").toInt(), 9);
+        QCOMPARE(overlapping.first().toMap().value("word").toString(),
+                 QStringLiteral("very good"));
+
+        QStringList terms;
+        for (int i = 0; i < 32; ++i) terms.append(QStringLiteral("unused%1").arg(i));
+        terms.append(QStringLiteral("target"));
+        editor->setProperty("text", QStringLiteral("target"));
+        QVERIFY(backend.customReviewSpans(terms.join(QLatin1Char(','))).isEmpty());
+
+        const QString tooLong(65, QLatin1Char('z'));
+        editor->setProperty("text", tooLong);
+        QVERIFY(backend.customReviewSpans(tooLong).isEmpty());
+
+        editor->setProperty("text", QString(50000, QLatin1Char('x')) + QStringLiteral(" target"));
+        QVERIFY(backend.customReviewSpans(QStringLiteral("target")).isEmpty());
+        backend.discardRecovery();
+    }
+
+    void customReviewOverlayComposesWithMarkdownFocusAndSearch() {
+        const QString source = QStringLiteral("**custom** [custom](url) `custom`\nplain custom");
+        QTextDocument document;
+        document.setPlainText(source);
+        MarkdownHighlighter highlighter(&document);
+        highlighter.setShowMarkup(false);
+        const int boldStart = source.indexOf(QStringLiteral("custom"));
+        const int linkStart = source.indexOf(QStringLiteral("custom"), boldStart + 1);
+        const int codeStart = source.indexOf(QStringLiteral("custom"), linkStart + 1);
+        const int plainStart = source.lastIndexOf(QStringLiteral("custom"));
+        highlighter.setFocusRange(plainStart, plainStart + 6);
+        highlighter.setReviewSpans({{0, 2}, {boldStart, 6}, {linkStart, 6},
+                                    {codeStart, 6}, {plainStart, 6}});
+        highlighter.rehighlight();
+
+        const auto formatAt = [&](int position) {
+            const QTextBlock block = document.findBlock(position);
+            const int local = position - block.position();
+            QTextCharFormat result;
+            for (const auto &range : block.layout()->formats())
+                if (local >= range.start && local < range.start + range.length) result = range.format;
+            return result;
+        };
+        const QTextCharFormat marker = formatAt(0);
+        const QTextCharFormat bold = formatAt(boldStart);
+        const QTextCharFormat link = formatAt(linkStart);
+        const QTextCharFormat code = formatAt(codeStart);
+        const QTextCharFormat plain = formatAt(plainStart);
+        QCOMPARE(marker.fontPointSize(), qreal(1));
+        QCOMPARE(bold.fontWeight(), int(QFont::Bold));
+        QVERIFY(link.fontUnderline());
+        QVERIFY(bold.background().style() != Qt::NoBrush);
+        QCOMPARE(link.background(), bold.background());
+        QCOMPARE(plain.background(), bold.background());
+        QVERIFY(code.background() != bold.background());
+        QVERIFY(bold.foreground() != plain.foreground());
+
+        const QBrush reviewBackground = plain.background();
+        highlighter.setSearch(QStringLiteral("custom"), plainStart);
+        highlighter.rehighlight();
+        const QTextCharFormat searchedBold = formatAt(boldStart);
+        const QTextCharFormat searchedLink = formatAt(linkStart);
+        const QTextCharFormat currentSearch = formatAt(plainStart);
+        QCOMPARE(searchedBold.fontWeight(), int(QFont::Bold));
+        QVERIFY(searchedLink.fontUnderline());
+        QVERIFY(searchedBold.background() != reviewBackground);
+        QVERIFY(currentSearch.background() != reviewBackground);
+        QVERIFY(currentSearch.background() != searchedBold.background());
+        QCOMPARE(document.toPlainText(), source);
+        QVERIFY(!document.isUndoAvailable());
+    }
+
     void themesPersistWithoutEditingDocuments() {
         Backend backend;
         QQmlEngine engine; engine.rootContext()->setContextProperty("backend", &backend);
@@ -2264,6 +2381,88 @@ private slots:
         QVERIFY(QMetaObject::invokeMethod(review, "triggered"));
         QTRY_VERIFY(reviewDialog->property("opened").toBool());
         QVERIFY(QMetaObject::invokeMethod(reviewDialog, "close"));
+        backend.discardRecovery();
+    }
+
+    void customStyleCheckPersistsAndRefreshesWithoutEditing() {
+        Backend backend;
+        QQmlEngine engine;
+        engine.rootContext()->setContextProperty("backend", &backend);
+        QQmlComponent component(&engine, QUrl::fromLocalFile(QFINDTESTDATA("../src/Main.qml")));
+        QScopedPointer<QObject> window(component.create());
+        QVERIFY2(window, qPrintable(component.errorString()));
+        auto *commands = window->findChild<QObject *>("workspaceCommands");
+        auto *settings = window->findChild<QObject *>("workspaceSettings");
+        auto *editor = window->findChild<QObject *>("sourceEditor");
+        auto *styleMenu = window->findChild<QObject *>("focusStyleCheckMenu");
+        auto *custom = window->findChild<QObject *>("native_customStyleCheck");
+        QVERIFY(commands && settings && editor && styleMenu && custom);
+
+        const bool originalEnabled = settings->property("styleCheckCustom").toBool();
+        const QString originalWords = settings->property("reviewWords").toString();
+        settings->setProperty("styleCheckCustom", false);
+        settings->setProperty("reviewWords", QStringLiteral("custom"));
+        editor->setProperty("text", QStringLiteral("**custom** other"));
+        QVERIFY(QMetaObject::invokeMethod(editor, "select", Q_ARG(int, 4), Q_ARG(int, 4)));
+        const QString source = editor->property("text").toString();
+        const bool canUndo = editor->property("canUndo").toBool();
+
+        QCOMPARE(styleMenu->property("title").toString(), QStringLiteral("Enable Style Check"));
+        QCOMPARE(custom->property("text").toString(), QStringLiteral("Custom"));
+        QVERIFY(custom->property("checkable").toBool());
+        QVERIFY(!custom->property("checked").toBool());
+        QVERIFY(QMetaObject::invokeMethod(commands, "run",
+                                          Q_ARG(QVariant, QStringLiteral("customStyleCheck"))));
+        QVERIFY(settings->property("styleCheckCustom").toBool());
+        QVERIFY(custom->property("checked").toBool());
+
+        auto *quick = qvariant_cast<QQuickTextDocument *>(editor->property("textDocument"));
+        QVERIFY(quick);
+        auto backgroundAt = [&](int position) {
+            const QTextBlock block = quick->textDocument()->findBlock(position);
+            const int local = position - block.position();
+            QBrush background;
+            for (const auto &range : block.layout()->formats())
+                if (local >= range.start && local < range.start + range.length)
+                    background = range.format.background();
+            return background;
+        };
+        QTRY_VERIFY_WITH_TIMEOUT(backgroundAt(2).style() != Qt::NoBrush, 1000);
+        QCOMPARE(editor->property("text").toString(), source);
+        QCOMPARE(editor->property("cursorPosition").toInt(), 4);
+        QCOMPARE(editor->property("canUndo").toBool(), canUndo);
+
+        editor->setProperty("text", QStringLiteral("other custom"));
+        QTRY_VERIFY_WITH_TIMEOUT(backgroundAt(6).style() != Qt::NoBrush, 1000);
+        settings->setProperty("reviewWords", QStringLiteral("other"));
+        QTRY_VERIFY_WITH_TIMEOUT(backgroundAt(0).style() != Qt::NoBrush, 1000);
+        QCOMPARE(backgroundAt(6).style(), Qt::NoBrush);
+        settings->setProperty("reviewWords", QStringLiteral("custom"));
+        QTRY_VERIFY_WITH_TIMEOUT(backgroundAt(6).style() != Qt::NoBrush, 1000);
+        QCOMPARE(backgroundAt(0).style(), Qt::NoBrush);
+        QVERIFY(QMetaObject::invokeMethod(commands, "run",
+                                          Q_ARG(QVariant, QStringLiteral("customStyleCheck"))));
+        QVERIFY(!settings->property("styleCheckCustom").toBool());
+        QCOMPARE(backgroundAt(6).style(), Qt::NoBrush);
+        QCOMPARE(editor->property("text").toString(), QStringLiteral("other custom"));
+
+        QVERIFY(QMetaObject::invokeMethod(commands, "run",
+                                          Q_ARG(QVariant, QStringLiteral("customStyleCheck"))));
+        QVERIFY(QMetaObject::invokeMethod(settings, "sync"));
+        window.reset();
+
+        QScopedPointer<QObject> reopened(component.create());
+        QVERIFY2(reopened, qPrintable(component.errorString()));
+        auto *reopenedSettings = reopened->findChild<QObject *>("workspaceSettings");
+        auto *reopenedCustom = reopened->findChild<QObject *>("native_customStyleCheck");
+        QVERIFY(reopenedSettings && reopenedCustom);
+        QCOMPARE(reopenedSettings->property("styleCheckCustom").toBool(), true);
+        QCOMPARE(reopenedSettings->property("reviewWords").toString(), QStringLiteral("custom"));
+        QVERIFY(reopenedCustom->property("checked").toBool());
+
+        reopenedSettings->setProperty("reviewWords", originalWords);
+        reopenedSettings->setProperty("styleCheckCustom", originalEnabled);
+        QVERIFY(QMetaObject::invokeMethod(reopenedSettings, "sync"));
         backend.discardRecovery();
     }
 

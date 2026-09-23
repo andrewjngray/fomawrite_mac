@@ -2412,6 +2412,88 @@ QString Backend::proseForReview(const QString &markdown) {
     while(matches.hasNext()) { const auto match=matches.next(); blank(match.capturedStart(),match.capturedLength()); }
     return result;
 }
+
+QVariantList Backend::customReviewSpans(const QString &customWords) const {
+    QVariantList spans;
+    if (!m_document) return spans;
+    const QString source = currentDocumentText();
+    const QString prose = proseForReview(source); // Offset-preserving, first 50k UTF-16 units.
+
+    QMap<QString, QString> uniqueWords;
+    int from = 0;
+    while (from <= customWords.size() && uniqueWords.size() < 32) {
+        const int comma = customWords.indexOf(',', from);
+        const int end = comma < 0 ? customWords.size() : comma;
+        const QString word = customWords.mid(from, end - from).trimmed();
+        from = comma < 0 ? customWords.size() + 1 : comma + 1;
+        if (word.isEmpty() || word.size() > 64) continue;
+        const QString folded = word.toCaseFolded();
+        if (!uniqueWords.contains(folded)) uniqueWords.insert(folded, word);
+    }
+
+    struct MatchCursor {
+        QString word;
+        QRegularExpressionMatchIterator iterator;
+        QRegularExpressionMatch match;
+    };
+    QList<MatchCursor> cursors;
+    const QString boundary = QStringLiteral("[\\p{L}\\p{M}\\p{N}_]");
+    for (const QString &word : uniqueWords) {
+        const QRegularExpression pattern(
+            QStringLiteral("(?<!%1)%2(?!%1)").arg(boundary, QRegularExpression::escape(word)),
+            QRegularExpression::CaseInsensitiveOption | QRegularExpression::UseUnicodePropertiesOption);
+        auto iterator = pattern.globalMatch(prose);
+        if (iterator.hasNext()) {
+            const auto match = iterator.next();
+            cursors.append({word, iterator, match});
+        }
+    }
+
+    // Merge each term's ordered iterator so the global 1000-result cap always
+    // keeps the earliest source spans, independent of the custom-word order.
+    int acceptedEnd = -1;
+    while (!cursors.isEmpty() && spans.size() < 1000) {
+        int best = 0;
+        for (int i = 1; i < cursors.size(); ++i) {
+            const auto &candidate = cursors.at(i);
+            const auto &current = cursors.at(best);
+            if (candidate.match.capturedStart() < current.match.capturedStart()
+                || (candidate.match.capturedStart() == current.match.capturedStart()
+                    && candidate.match.capturedLength() > current.match.capturedLength())
+                || (candidate.match.capturedStart() == current.match.capturedStart()
+                    && candidate.match.capturedLength() == current.match.capturedLength()
+                    && candidate.word.toCaseFolded() < current.word.toCaseFolded())) best = i;
+        }
+        auto &cursor = cursors[best];
+        const int matchStart = cursor.match.capturedStart();
+        const int matchEnd = cursor.match.capturedEnd();
+        const QString matchedWord = source.mid(matchStart, cursor.match.capturedLength());
+        if (cursor.iterator.hasNext()) cursor.match = cursor.iterator.next();
+        else cursors.removeAt(best);
+        if (matchStart < acceptedEnd) continue;
+        spans.append(QVariantMap{{QStringLiteral("start"), matchStart},
+                                 {QStringLiteral("end"), matchEnd},
+                                 {QStringLiteral("label"), QStringLiteral("Custom")},
+                                 {QStringLiteral("word"), matchedWord}});
+        acceptedEnd = matchEnd;
+    }
+    return spans;
+}
+
+void Backend::setCustomReviewWords(const QString &customWords) {
+    if (!m_highlighter) return;
+    QList<MarkdownHighlighter::Span> spans;
+    const QVariantList reviewSpans = customReviewSpans(customWords);
+    spans.reserve(reviewSpans.size());
+    for (const QVariant &entry : reviewSpans) {
+        const QVariantMap span = entry.toMap();
+        const int start = span.value(QStringLiteral("start")).toInt();
+        const int end = span.value(QStringLiteral("end")).toInt();
+        if (end > start) spans.append({start, end - start});
+    }
+    m_highlighter->setReviewSpans(spans);
+}
+
 QStringList Backend::writingLanguages() const {
 #ifdef Q_OS_MACOS
     extern QStringList macWritingLanguages(); return macWritingLanguages();

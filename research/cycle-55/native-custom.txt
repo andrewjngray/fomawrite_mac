@@ -1,0 +1,23 @@
+Cycle 55b native Custom style-check checkpoint — 24 September 2026
+
+Artifact
+- Refreshed stable dist/Omawrite Dev.app through Cycle 55b.
+- Full native-access ./bin/test: 93 passed, 0 failed, 0 skipped.
+
+Observed
+- Focus → Enable Style Check → Custom was present in the native menu.
+- Opened the synthetic research/cycle-55/sample/Custom-review.md fixture.
+- Entered the review word `paragraph` through Writing Review.
+- Document source and saved status remained unchanged.
+
+Not verified
+- Screenshot capture was unavailable, so the live Custom highlight was not visually verified.
+- Checked-state appearance, overlay color, code/URL exclusion in the rendered editor, keyboard traversal, dark/narrow/fullscreen behavior and VoiceOver remain open.
+- Fillers, Clichés, Redundancies and parts-of-speech syntax categories are not implemented.
+
+Implementation bounds
+- First 50,000 UTF-16 document units.
+- First 32 unique comma-separated terms, each at most 64 UTF-16 units.
+- At most 1,000 ordered, non-overlapping matches.
+- Fenced, indented and inline code plus URL syntax are excluded by the offset-preserving prose mask.
+- Text and term changes debounce by about 200 ms; disabling Custom clears the overlay immediately.

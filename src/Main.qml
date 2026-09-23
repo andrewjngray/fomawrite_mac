@@ -100,6 +100,13 @@ ApplicationWindow {
         interval: 120
         onTriggered: win.refreshDocumentStatistics()
     }
+
+    Timer {
+        id: customReviewRefreshTimer
+        interval: 200
+        onTriggered: backend.setCustomReviewWords(
+                         workspaceSettings.styleCheckCustom ? workspaceSettings.reviewWords : "")
+    }
     Connections {
         target: backend
         function onDocumentStatisticsChanged() { statisticsRefreshTimer.restart(); }
@@ -126,6 +133,15 @@ ApplicationWindow {
         property int appearanceRevision: 0
         property bool showMarkup: true
         property string reviewWords: ""
+        onReviewWordsChanged: if (styleCheckCustom) customReviewRefreshTimer.restart()
+        property bool styleCheckCustom: false
+        onStyleCheckCustomChanged: {
+            if (styleCheckCustom) customReviewRefreshTimer.restart();
+            else {
+                customReviewRefreshTimer.stop();
+                backend.setCustomReviewWords("");
+            }
+        }
         property bool autosaveEnabled: false
         property bool synchronizedScroll: false
         property bool typewriter: false
@@ -1041,6 +1057,11 @@ ApplicationWindow {
                 NativeCommand { commandId: "sentence"; text: "Sentence" }
                 NativeCommand { commandId: "paragraph"; text: "Paragraph" }
                 NativeCommand { commandId: "typewriter"; text: "Typewriter" }
+            }
+            Platform.Menu {
+                objectName: "focusStyleCheckMenu"
+                title: "Enable Style Check"
+                NativeCommand { commandId: "customStyleCheck"; text: "Custom" }
             }
             Platform.MenuSeparator {}
             Platform.MenuItem { objectName: "focusWritingReview"; text: "Writing Review…"; onTriggered: analysisDialog.open() }
@@ -2148,6 +2169,8 @@ ApplicationWindow {
                 }
 
                 onTextChanged: {
+                    if (workspaceSettings.styleCheckCustom)
+                        customReviewRefreshTimer.restart();
                     if (win.searchUpdating)
                         return;
                     var contentChanged = backend.editorTextChanged();
@@ -2170,6 +2193,8 @@ ApplicationWindow {
                     backend.setShowMarkup(workspaceSettings.showMarkup);
                     backend.attachDocument(textDocument);
                     backend.setFocusPosition(cursorPosition, workspaceSettings.paragraphFocus, workspaceSettings.sentenceFocus);
+                    if (workspaceSettings.styleCheckCustom)
+                        customReviewRefreshTimer.restart();
                     forceActiveFocus();
                 }
             }
