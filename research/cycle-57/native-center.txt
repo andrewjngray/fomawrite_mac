@@ -1,0 +1,22 @@
+Cycle 57b native Window Center checkpoint — 24 September 2026
+
+Artifact
+- Refreshed stable dist/Omawrite Dev.app with combined Cycle 57b/58a source.
+- ./bin/build passed.
+- Full native-access ./bin/test: 99 passed, 0 failed, 0 skipped.
+
+Verified natively
+- Window → Center was visible after Zoom and enabled for a normal window.
+- Center was invoked on synthetic research/cycle-58/sample/Target.md.
+- Target.md retained its clean status.
+- An app-only live capture showed the target source and rendered preview.
+
+Evidence boundary
+- The capture was cropped to the app, so it did not establish the window’s position relative to the screen.
+- No screenshot file was persisted.
+- Available-screen centering, unchanged size/other-window geometry and unchanged source/Undo/modified state are covered by the automated two-window test.
+
+Not verified
+- Exact AppKit on-screen geometry and multi-display behavior.
+- Center enablement transitions while minimized, maximized or full screen.
+- Zoom All, Fill, tiling, move-to-display and dynamic window-list behavior remain outside this phase.

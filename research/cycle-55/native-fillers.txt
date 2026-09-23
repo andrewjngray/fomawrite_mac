@@ -9,9 +9,14 @@ Observed
 - Focus → Enable Style Check contained Fillers and Custom.
 - Fillers was toggled on the synthetic research/cycle-47/sample/Templates.md document.
 - Document source and saved status remained unchanged.
+- A later live CUA view opened synthetic research/cycle-55/sample/Fillers.md with Fillers on.
+- Yellow highlights were visibly present on prose really, very, QUITE, just and link-label quite.
+- veryish, the URL destination, inline/fenced/indented code and raw tag attributes had no yellow.
+- Document status remained Opened Fillers.md.
+- The live image could not be persisted as a screenshot file.
 
 Not verified
-- Screenshot capture was unavailable, so pixel styling, highlight color and checked-state appearance were not verified.
+- Checked-state appearance, Custom color/overlap appearance and other themes were not verified.
 - Keyboard traversal, dark/narrow/fullscreen behavior and VoiceOver remain open.
 
 Boundaries

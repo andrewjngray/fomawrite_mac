@@ -239,6 +239,57 @@ private slots:
         QCOMPARE(WorkspaceStore::visibleGeometry(QRect(1500,100,800,600),screen,QSize(720,520)),QRect(1500,100,800,600));
     }
 
+    void nativeWindowCenterMovesOnlyTargetAndPreservesDocument() {
+        QTemporaryDir directory;
+        QFile file(directory.filePath("Center.md"));
+        QVERIFY(file.open(QIODevice::WriteOnly));
+        file.write("# Center test\n\nSynthetic text.\n");
+        file.close();
+
+        Backend backend;
+        QQmlEngine engine;
+        engine.rootContext()->setContextProperty("backend", &backend);
+        QQmlComponent component(&engine, QUrl::fromLocalFile(QFINDTESTDATA("../src/Main.qml")));
+        QVERIFY2(component.isReady(), qPrintable(component.errorString()));
+        QScopedPointer<QObject> root(component.create());
+        QVERIFY2(root, qPrintable(component.errorString()));
+        auto *target = qobject_cast<QWindow *>(root.data());
+        auto *editor = root->findChild<QObject *>("sourceEditor");
+        auto *centerAction = root->findChild<QObject *>("windowCenterAction");
+        QVERIFY(target && editor && centerAction);
+        backend.setParentWindow(target);
+        QVERIFY(backend.open(QUrl::fromLocalFile(file.fileName())));
+        QVERIFY(QMetaObject::invokeMethod(editor, "insert", Q_ARG(int, editor->property("length").toInt()),
+                                          Q_ARG(QString, QStringLiteral("dirty"))));
+        const QString source = editor->property("text").toString();
+        const bool modified = backend.modified();
+        const bool canUndo = editor->property("canUndo").toBool();
+
+        QWindow other;
+        other.setGeometry(17, 29, 360, 280);
+        other.show();
+        QCoreApplication::processEvents();
+        const QRect otherGeometry = other.geometry();
+
+        target->setGeometry(4, 7, 720, 520);
+        QCoreApplication::processEvents();
+        QCOMPARE(centerAction->property("enabled").toBool(), true);
+        const QSize targetSize = target->size();
+        const QRect available = target->screen()->availableGeometry();
+        backend.nativeWindowAction(QStringLiteral("center"));
+        QCoreApplication::processEvents();
+
+        const QPoint expected = available.center() - QPoint(targetSize.width() / 2, targetSize.height() / 2);
+        QVERIFY(qAbs(target->position().x() - expected.x()) <= 2);
+        QVERIFY(qAbs(target->position().y() - expected.y()) <= 2);
+        QCOMPARE(target->size(), targetSize);
+        QCOMPARE(other.geometry(), otherGeometry);
+        QCOMPARE(editor->property("text").toString(), source);
+        QCOMPARE(backend.modified(), modified);
+        QCOMPARE(editor->property("canUndo").toBool(), canUndo);
+        backend.discardRecovery();
+    }
+
     void tagIndexReportsBoundsAndSkipsOversizedFiles() {
         QTemporaryDir dir;
         QFile tags(dir.filePath("tags.md")); QVERIFY(tags.open(QIODevice::WriteOnly));

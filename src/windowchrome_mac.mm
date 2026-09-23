@@ -1,4 +1,6 @@
 #include <QVariantMap>
+#include <QGuiApplication>
+#include <QScreen>
 #include <QWindow>
 #import <AppKit/AppKit.h>
 
@@ -28,10 +30,23 @@ void configureMacWindowChrome(QWindow *window) {
 
 void performMacWindowAction(QWindow *window, const QString &action, const QString &text) {
     if (!window) return;
+    // Tests use Qt's offscreen platform, which has no NSView. Keep the same
+    // available-screen geometry contract there while production delegates to
+    // AppKit's native centering behavior.
+    if (action == "center" && QGuiApplication::platformName() != "cocoa") {
+        QScreen *screen = window->screen();
+        if (!screen || window->visibility() != QWindow::Windowed) return;
+        const QRect available = screen->availableGeometry();
+        window->setPosition(available.center() - QPoint(window->width() / 2, window->height() / 2));
+        return;
+    }
     NSView *view = reinterpret_cast<NSView *>(window->winId());
     NSWindow *native = view.window;
     if (action == "minimize") [native miniaturize:nil];
     else if (action == "zoom") [native zoom:nil];
+    else if (action == "center") {
+        if (!native.isMiniaturized && !(native.styleMask & NSWindowStyleMaskFullScreen)) [native center];
+    }
     else if (action == "front") [NSApp arrangeInFront:nil];
     else if (action == "merge") {
         for (NSWindow *other in NSApp.windows) {

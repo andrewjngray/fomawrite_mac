@@ -17,3 +17,8 @@ Not verified
 - Dark/narrow layout, link and scroll behavior, VoiceOver and OS Help search were not checked.
 - Online Support is absent because no destination was verified.
 - Remaining Window and application-menu AppKit behavior is open.
+
+Later Cycle 57b checkpoint
+- The combined 57b/58a build and full test suite pass 99/0/0, and stable Dev was refreshed.
+- Window → Center is recorded separately in native-center.txt.
+- A live app capture became available during 57b, but it showed Target.md rather than the Help pages and no screenshot file was saved. The earlier Help pixel-styling gap therefore remains.

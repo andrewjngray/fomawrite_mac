@@ -1096,6 +1096,12 @@ ApplicationWindow {
             visible: win.isMac
             Platform.MenuItem { text: "Minimize"; onTriggered: backend.nativeWindowAction("minimize") }
             Platform.MenuItem { text: "Zoom"; onTriggered: backend.nativeWindowAction("zoom") }
+            Platform.MenuItem {
+                objectName: "windowCenterAction"
+                text: "Center"
+                enabled: win.visibility === Window.Windowed
+                onTriggered: backend.nativeWindowAction("center")
+            }
             Platform.MenuItem { text: "Bring All to Front"; onTriggered: backend.nativeWindowAction("front") }
             Platform.MenuSeparator {}
             Platform.MenuItem { text: "Merge All Windows"; onTriggered: backend.nativeWindowAction("merge") }
