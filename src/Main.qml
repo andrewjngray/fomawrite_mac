@@ -1293,6 +1293,7 @@ ApplicationWindow {
             color: SplitHandle.hovered || SplitHandle.pressed ? "#426da7" : (backend.palette.border)
         }
         OrganizerPane {
+            commands: workspaceCommands
             id: organizerPane
             onSearchRequested: function(query, contents, folder) {
                 backend.library.rootFolder = folder;

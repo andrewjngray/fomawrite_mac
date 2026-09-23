@@ -1,3 +1,5 @@
+#include <QTemporaryDir>
+#include <QDirIterator>
 #include <QPainter>
 #include <QAbstractTextDocumentLayout>
 #include <QPagedPaintDevice>
@@ -97,6 +99,144 @@ private:
     bool created = false;
 };
 
+// Context operations always resolve the clicked path, never the active editor by accident.
+static QSet<Backend *> liveBackends;
+static bool pathWithin(const QString &path, const QString &folder) {
+    return path == folder || path.startsWith(folder + QDir::separator());
+}
+
+QVariantMap Backend::libraryItemInfo(const QUrl &url) const {
+    QFileInfo info(url.toLocalFile());
+    if (!url.isLocalFile() || !info.exists()) return {{"error", "This item is no longer available."}};
+    bool favorite = false;
+    for (const auto &entry : m_library.favorites())
+        if (entry.toMap().value("url").toUrl() == url) favorite = true;
+    return {{"name", info.fileName()}, {"url", url}, {"path", info.absoluteFilePath()},
+        {"directory", info.isDir()}, {"available", true}, {"favorite", favorite},
+        {"bytes", info.size()}, {"modified", info.lastModified().toString(Qt::ISODate)},
+        {"created", info.birthTime().toString(Qt::ISODate)}, {"writable", info.isWritable()}};
+}
+
+bool Backend::libraryItemAction(const QUrl &url, const QString &action, const QString &argument) {
+    const QFileInfo info(url.toLocalFile());
+    auto fail = [&](const QString &message) { setStatus(message); return false; };
+    if (!url.isLocalFile() || !info.exists() || info.isSymLink())
+        return fail("The item is unavailable or is a symbolic link.");
+    const QString path = info.canonicalFilePath();
+    if (info.isDir() && QDir(path).isRoot() && (action == "rename" || action == "trash" || action == "duplicate"))
+        return fail("A filesystem root cannot be renamed, duplicated or moved to Trash.");
+    Backend *owner = nullptr;
+    for (auto *candidate : liveBackends) {
+        const QString openPath = QFileInfo(candidate->fileUrl().toLocalFile()).canonicalFilePath();
+        if (openPath == path) owner = candidate;
+        if (info.isDir() && (action == "rename" || action == "trash" || action == "duplicate")
+            && !openPath.isEmpty() && pathWithin(openPath, path))
+            return fail("Close documents inside this folder before renaming, duplicating or moving it to Trash.");
+    }
+    if (action == "favorite") { m_library.toggleFavorite(url); return true; }
+    if (action == "share") {
+#ifdef Q_OS_MACOS
+        extern void shareMacFile(QWindow *, const QString &);
+        shareMacFile(m_parentWindow, path); return true;
+#else
+        return fail("System sharing is available on macOS.");
+#endif
+    }
+    if (action == "trash") {
+        if (owner && owner->modified()) return fail("Save or close this document before moving it to Trash. Unsaved edits are unchanged.");
+        QString trashedPath;
+        if (!QFile::moveToTrash(path, &trashedPath)) return fail("Could not move this item to Trash. Nothing was permanently deleted.");
+        // Keep a clean open document as an untitled draft; Save must choose a new path.
+        if (owner) { owner->setFileUrl(QUrl()); owner->setModified(true); owner->writeRecovery(); }
+        const QString metadata = authorshipPath(url);
+        const bool metadataMoved = info.isDir() || !QFileInfo::exists(metadata) || QFile::moveToTrash(metadata);
+        for (auto *candidate : liveBackends) candidate->m_library.refresh();
+        setStatus(metadataMoved ? "Moved to Trash. Restore it with Finder if needed." : "Moved to Trash; the authorship sidecar could not be moved and remains in the original folder."); return true;
+    }
+    if (action == "newFile" || action == "newFolder" || action == "rename" || action == "duplicate") {
+        if (argument.isEmpty() || argument.trimmed() != argument || argument == "." || argument == ".."
+            || argument.contains('/') || argument.contains('\\') || argument.contains(QChar::Null))
+            return fail("Enter a name without slashes or surrounding spaces.");
+        const QString parent = (action == "newFile" || action == "newFolder") && info.isDir() ? path : QFileInfo(path).absolutePath();
+        const QString destination = QDir(parent).filePath(argument);
+        if (QFileInfo::exists(destination) || QFileInfo(destination).isSymLink()) return fail("That name is already in use.");
+        if (action == "newFile") {
+            if (!FileLibrary::isTextFile(argument)) return fail("Use a Markdown or .txt filename.");
+            QFile file(destination);
+            if (!file.open(QIODevice::WriteOnly | QIODevice::NewOnly)) return fail("Could not create the file.");
+        } else if (action == "newFolder") {
+            if (!QDir(parent).mkdir(argument)) return fail("Could not create the folder.");
+        } else if (!info.isDir()) {
+            if (!FileLibrary::isTextFile(argument)) return fail("Use a Markdown or .txt filename.");
+            if (owner) {
+                const bool ok = action == "rename" ? owner->renameDocument(argument) : owner->duplicateDocument(argument);
+                setStatus(owner->status());
+                if (!ok) return false;
+            } else {
+                StagedAuthorship metadata;
+                if (!metadata.prepare(url, QUrl::fromLocalFile(destination))) return fail("Could not preserve the file's authorship metadata.");
+                bool ok = action == "rename" ? QFile::rename(path, destination) : QFile::copy(path, destination);
+                if (!ok) return fail("Could not change the file. Check permissions and available space.");
+                metadata.finish(action == "rename");
+            }
+        } else if (action == "rename") {
+            if (!QDir().rename(path, destination)) return fail("Could not rename the folder.");
+        } else {
+            // Stage a bounded recursive copy beside the destination; publish only on success.
+            QTemporaryDir staging(QDir(parent).filePath(".omawrite-copy-XXXXXX"));
+            if (!staging.isValid()) return fail("Could not create the temporary copy.");
+            QDirIterator scan(path, QDir::AllEntries | QDir::Hidden | QDir::System | QDir::NoDotAndDotDot, QDirIterator::Subdirectories);
+            qint64 bytes = 0; int count = 0;
+            while (scan.hasNext()) {
+                scan.next(); const QFileInfo child = scan.fileInfo();
+                bytes += child.isFile() ? child.size() : 0;
+                if (++count > 20000 || bytes > 1024LL * 1024 * 1024 || child.isSymLink() || (!child.isFile() && !child.isDir()))
+                    return fail("Use Finder to duplicate folders with links, special files, more than 20,000 items or over 1 GB.");
+                const QString copy = QDir(staging.path()).filePath(QDir(path).relativeFilePath(child.filePath()));
+                if (child.isDir() ? !QDir().mkpath(copy) : !QFile::copy(child.filePath(), copy))
+                    return fail("Could not finish the folder copy; the original is unchanged.");
+            }
+            if (!QDir().rename(staging.path(), destination)) return fail("Could not publish the copied folder.");
+            staging.setAutoRemove(false);
+        }
+        for (auto *candidate : liveBackends) {
+            if (action == "rename") candidate->m_library.relocatedPath(QUrl::fromLocalFile(path), QUrl::fromLocalFile(destination));
+            candidate->m_library.refresh();
+        }
+        setStatus((action == "rename" ? "Renamed to " : action == "duplicate" ? "Duplicated as " : "Created ") + argument); return true;
+    }
+    if (info.isDir()) return fail("This action requires a document.");
+    // Output and clipboard operations use live unsaved text if the file is already open.
+    // Otherwise create an isolated, recovery-free output backend without changing any window.
+    QTextDocument document;
+    std::unique_ptr<Backend> snapshot;
+    if (!owner) {
+        QFile file(path);
+        if (!file.open(QIODevice::ReadOnly) || file.size() > 32 * 1024 * 1024) return fail("Cannot read this document (32 MB limit).");
+        const QByteArray bytes = file.readAll();
+        if (file.error() != QFileDevice::NoError) return fail("Could not read the complete document.");
+        snapshot = std::make_unique<Backend>(nullptr, true);
+        document.setPlainText(QString::fromUtf8(bytes));
+        snapshot->m_document = &document; snapshot->m_fileUrl = url; snapshot->m_parentWindow = m_parentWindow;
+        owner = snapshot.get();
+    }
+    if (action == "exportHtml" || action == "exportPdf") {
+        bool ok = owner->exportDocument(QUrl(argument), action == "exportHtml" ? "html" : "pdf");
+        setStatus(owner->status()); return ok;
+    }
+    if (action == "print") { owner->printDocument(false); return true; }
+    if (action == "printSource") { owner->printDocument(true); return true; }
+    if (action == "printPreview") { owner->printPreview(); return true; }
+    if (action == "copyMarkdown") { QGuiApplication::clipboard()->setText(owner->currentDocumentText()); return true; }
+    if (action == "copyText" || action == "copyHtml") {
+        QTextDocument rendered; rendered.setMarkdown(owner->previewMarkdown(owner->currentDocumentText()));
+        auto *mime = new QMimeData; mime->setText(rendered.toPlainText());
+        if (action == "copyHtml") mime->setHtml(rendered.toHtml());
+        QGuiApplication::clipboard()->setMimeData(mime); return true;
+    }
+    return fail("Unknown library action.");
+}
+
 QVariantMap Backend::resolveOpenPath(const QString &input) const {
     const auto error = [](const QString &message) { return QVariantMap{{"error", message}}; };
     QString path = input.trimmed();
@@ -160,13 +300,14 @@ QString Backend::normalizedLinkUrl(const QString &clipboardText) {
     return url.toString();
 }
 
-Backend::Backend(QObject *parent) : QObject(parent), m_library(this) {
+Backend::Backend(QObject *parent, bool outputOnly) : QObject(parent), m_library(this) {
+    if (!outputOnly) liveBackends.insert(this);
     connect(&m_library, &FileLibrary::rootFolderChanged, this, &Backend::fileUrlChanged);
     const QString stateDirectory = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
     QDir().mkpath(stateDirectory);
     // Claim an orphaned snapshot before taking an empty slot. This ensures a
     // crash in window 2 is still recovered even if window 1 exited normally.
-    for (int pass = 0; pass < 2 && !m_recoveryLock; ++pass) {
+    for (int pass = 0; !outputOnly && pass < 2 && !m_recoveryLock; ++pass) {
         for (int slot = 0; slot < 100; ++slot) {
             const QString base = QDir(stateDirectory).filePath(
                 QStringLiteral("recovery-%1").arg(slot));
@@ -227,7 +368,7 @@ Backend::Backend(QObject *parent) : QObject(parent), m_library(this) {
     });
 }
 
-Backend::~Backend() = default;
+Backend::~Backend() { liveBackends.remove(this); }
 
 int Backend::documentRevision() const { return m_document ? m_document->revision() : 0; }
 

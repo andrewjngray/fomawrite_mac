@@ -205,3 +205,7 @@ Cycle 34b defines native-version authorship behavior: snapshots are Markdown-onl
 ### Cycle 43 — Screenshot-backed context actions
 
 Locations now support Rename in Locations (persistent sidebar alias), Remove from Locations (shortcut only), Copy Library Path and Show in Finder. File/folder rows plus favorites/recents support Copy Path and Show in Finder. iA's protected built-in iCloud location has no equivalent here: our locations are user-added local folders. This implements the supplied screenshot's relevant actions; it does not claim the full iA file context menu or cloud integration.
+
+### Cycle 44 — File and folder context-menu screenshots
+
+All visible top-level actions in Andrew's two new screenshots now have implementations. File: new tab/window, info, favorite, duplicate, rename, Trash, Finder, sharing, export, print, copy, creation, sorting, view options. Folder: open, info, favorite, duplicate, rename, Trash, Finder, sharing, library path, creation, sorting, view options. Get Info is an Omawrite metadata dialog; Share uses the macOS saved-file picker; export offers HTML/PDF; Copy offers path/Markdown/plain text/HTML; Print offers rendered/source/paginated preview. These submenu choices are not claims of unseen iA submenu parity. File actions preserve live buffers; folder mutations require contained documents to be closed. See Cycle 44 for bounded-copy and QA limitations.

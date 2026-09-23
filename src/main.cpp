@@ -199,7 +199,25 @@ int main(int argc, char *argv[]) {
         backend->focusExistingDocument = [&, backend](const QUrl &target) { return focusExisting(target, backend); };
         QObject::connect(&systemTheme, &SystemTheme::darkModeChanged, backend, &Backend::setDarkMode);
         QObject::connect(&systemTheme, &SystemTheme::textScaleChanged, backend, &Backend::setTextScale);
-        QObject::connect(backend, &Backend::newWindowRequested, &app, createWindow);
+        QObject::connect(backend, &Backend::newWindowRequested, &app, [&, backend](const QUrl &url) {
+            const int count = sessions.size();
+            createWindow(url);
+            if (sessions.size() > count)
+                sessions.last()->backend->library()->setProperty("rootFolder", backend->library()->property("rootFolder"));
+        });
+        QObject::connect(backend, &Backend::newTabRequested, &app, [&, backend](const QUrl &url) {
+            QPointer<QWindow> source;
+            for (const auto &item : sessions) if (item->backend == backend) source = item->window;
+            const int count = sessions.size();
+            createWindow(url);
+            if (sessions.size() > count)
+                sessions.last()->backend->library()->setProperty("rootFolder", backend->library()->property("rootFolder"));
+#ifdef Q_OS_MACOS
+            for (const auto &item : sessions)
+                if (source && item->window && item->window != source && item->backend
+                    && item->backend->fileUrl() == url) restoreMacWorkspaceTabs({source, item->window});
+#endif
+        });
         QObject::connect(backend, &Backend::quitReady, &app, [&, backend] {
             if (!quitting) return;
             preparedForQuit[backend] = backend->documentRevision();

@@ -44,7 +44,11 @@ On macOS use **Command-S/O/N/P/F/B/I/K**, **Shift-Command-S** for Save As, **Opt
 
 Try `./bin/run examples/Workspace-tour.md`. Use the sidebar toggles to show/hide the library and organizer, the outline icon to jump to headings, and **Aa** for writing options, and the word count for statistics. Files remain ordinary UTF-8 Markdown. The library filter currently covers files in expanded folders. Preview uses Qt Markdown; it does not yet offer iA Writer's complete extensions, web/PDF template system or publishing integrations.
 
-## Latest build: Mac 0.2.0 RC1, Cycle 42
+## Latest local build: Cycle 44 (after Mac 0.2.0 RC1)
+
+File and folder right-click menus now include open/tab/window, info, favorites, duplicate/rename/Trash, Finder/sharing, output/clipboard, creation, sorting and view options. **73 tests pass**; both local app bundles are refreshed. See Cycle 44 in the [build records](docs/build-cycles.md) for native checks and limitations. The GitHub RC1 download remains the earlier Cycle 42 binary.
+
+## Archived release: Mac 0.2.0 RC1, Cycle 42
 
 Native spelling suggestions/grammar review and speech; code-aware writing analysis; expanded command palette; paginated preview with fit controls; improved dark links; fullscreen/display restoration and long-footnote navigation fixes. Earlier checkpoints include themes, safe history/recovery, authorship clipboard, portable output and organizer queries/tags.
 

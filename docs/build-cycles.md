@@ -736,3 +736,24 @@ Validation: ./bin/build and ./bin/test: 71 passed, zero failures. New coverage c
 Runnable artifacts: dist/Omawrite Dev.app and dist/Omawrite.app (same current source; GitHub RC1 archive remains the previous checkpoint).
 
 Optional exercise: right-click a location and give it a shorter label; right-click a file, copy its path, and reveal it in Finder. Confirm the folder's real name has stayed unchanged.
+
+## Cycle 44 — Full file and folder context action sets
+
+Scope: implement Andrew's two supplied iA screenshots for editable Markdown/text files and folders, retaining the separate Cycle 43 location-shortcut menu. Hidden submenu contents were not supplied; Omawrite uses its supported output formats.
+
+Changes:
+- Files: Open in New Tab / Window, Get Info, Favorite toggle, Duplicate, Rename, Move to Trash, Show in Finder, native Share picker, Export HTML/PDF, Print rendered/source/preview, Copy path/Markdown/plain text/HTML, New File/Folder, Sort By and View Options.
+- Folders: Open as library root, Get Info, Favorite toggle, recursive Duplicate, Rename, Trash, Finder, native Share, Copy Library Path, New File/Folder inside that folder, Sort By and View Options.
+- File output/duplication uses the live buffer when already open; closed-file output uses an isolated backend without claiming recovery slots or replacing an editor document. Existing documents retain one editing owner; opening an already-open file focuses it. Tabs use native AppKit groups; new windows/tabs inherit the originating library root.
+- Filesystem rename relocates library roots, location labels, favorites, recents and folder navigation paths. Location rename remains a sidebar alias.
+- Trash asks before moving to the system Trash, never permanently deleting. Dirty open files must be saved/closed first. A clean open file becomes an unsaved untitled draft after Trash, preserving its content for Save As. Folder rename/duplicate/Trash requires documents inside it to be closed. Folder copies stage before publication, refuse links/special files, and cap at 20,000 entries / 1 GB; larger copies can use Finder. Filesystem roots cannot be renamed, duplicated or trashed. Sharing sends the saved file/folder through the system picker, not unsaved buffer text.
+
+Validation: ./bin/build and ./bin/test pass, 73 tests, zero failures. New tests cover clicked-file output/clipboard, refusal to export over the source, duplicate collisions, traversal rejection, recursive copying and symlink refusal, folder rename remapping, unsaved-buffer duplication/rename, dirty Trash and open-descendant folder guards. A canonical /var → /private/var rename mismatch was found and fixed.
+
+Native Dev QA on synthetic samples: complete file/folder menus; duplicate then Trash of the created copy; New File in the clicked folder; native new-tab grouping; Get Info; correct clicked-document paginated preview while another document is active; Copy Markdown pasted into the filter then cleared; native file sharing picker displayed and cancelled without transmission. Submenu popup visibility and action-after-dismissal bugs found and fixed. Sample screenshots in research/cycle-44/screenshots. Existing documents were preserved through normal app quits.
+
+Known gaps: no physical print job or actual sharing transmission; dark/VoiceOver/keyboard-only context traversal, unavailable volumes and cross-process editing in the separate Dev/everyday identities were not exercised. Saved smart-search roots are not migrated by folder rename. Folder copy is a bounded synchronous operation and does not preserve every macOS extended attribute/ACL. Unseen iA submenu parity remains unverified.
+
+Artifacts: dist/Omawrite Dev.app and dist/Omawrite.app. Versioned RC1 GitHub release remains the older checkpoint; this cycle is recorded in source history and local bundles.
+
+Optional exercise: right-click an unopened note, duplicate it, rename the copy, export/preview it and move the copy to Trash. Right-click a folder and create a file inside it; try the sorting and date/excerpt controls. Report whether the menu order feels natural.

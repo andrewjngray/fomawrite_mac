@@ -42,7 +42,7 @@ class Backend : public QObject {
     Q_PROPERTY(bool canGoBack READ canGoBack NOTIFY historyChanged)
     Q_PROPERTY(bool canGoForward READ canGoForward NOTIFY historyChanged)
 public:
-    explicit Backend(QObject *parent = nullptr);
+    explicit Backend(QObject *parent = nullptr, bool outputOnly = false);
     ~Backend() override;
 
     QObject *library() { return &m_library; }
@@ -138,6 +138,9 @@ public:
     Q_INVOKABLE bool duplicateDocument(const QString &name);
     Q_INVOKABLE bool renameDocument(const QString &name);
     Q_INVOKABLE bool moveDocument(const QUrl &folder);
+    Q_INVOKABLE QVariantMap libraryItemInfo(const QUrl &url) const;
+    Q_INVOKABLE bool libraryItemAction(const QUrl &url, const QString &action, const QString &argument = QString());
+    Q_INVOKABLE void openInNewTab(const QUrl &url) { emit newTabRequested(url); }
     Q_INVOKABLE bool openInNewWindow(const QUrl &url);
     Q_INVOKABLE bool showInFinder();
     Q_INVOKABLE int pasteWithAuthorship(int start, int end);
@@ -154,6 +157,7 @@ public:
     Q_INVOKABLE void saveWindowGeometry(int x, int y, int width, int height, bool maximized);
 
 signals:
+    void newTabRequested(const QUrl &url);
     void newWindowRequested(const QUrl &url);
     void quitRequested();
     void quitReady();

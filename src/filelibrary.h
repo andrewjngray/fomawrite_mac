@@ -52,6 +52,7 @@ public:
     Q_INVOKABLE void toggleFavorite(const QUrl &url);
     Q_INVOKABLE void clearRecentFiles();
     void recordRecentFile(const QUrl &url);
+    void relocatedPath(const QUrl &oldUrl, const QUrl &newUrl);
     void renamedFile(const QUrl &oldUrl, const QUrl &newUrl);
     QUrl rootFolder() const { return m_rootFolder; }
     QString rootName() const;

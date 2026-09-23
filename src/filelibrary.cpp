@@ -115,6 +115,28 @@ void FileLibrary::recordRecentFile(const QUrl &url) {
     while (m_recentFiles.size() > 20) m_recentFiles.removeLast();
     saveOrganizer();
 }
+void FileLibrary::relocatedPath(const QUrl &oldUrl, const QUrl &newUrl) {
+    const QString oldPath = oldUrl.toLocalFile(), newPath = newUrl.toLocalFile();
+    auto relocate = [&](const QString &path) {
+        return path == oldPath || path.startsWith(oldPath + "/") ? newPath + path.mid(oldPath.size()) : path;
+    };
+    for (auto *paths : {&m_locations, &m_favorites, &m_recentFiles})
+        for (auto &path : *paths) path = relocate(path);
+    QVariantMap labels;
+    for (auto it = m_locationNames.cbegin(); it != m_locationNames.cend(); ++it) labels[relocate(it.key())] = it.value();
+    m_locationNames = labels;
+    for (auto &entry : m_history) entry = QUrl::fromLocalFile(relocate(entry.toLocalFile()));
+    QSet<QString> expanded;
+    for (const auto &path : m_expanded) expanded.insert(relocate(path));
+    m_expanded = expanded;
+    if (!m_rootFolder.isEmpty()) {
+        m_rootFolder = QUrl::fromLocalFile(relocate(m_rootFolder.toLocalFile()));
+        QSettings().setValue("library/root", m_rootFolder);
+        emit rootFolderChanged();
+    }
+    saveOrganizer(); refresh();
+}
+
 void FileLibrary::renamedFile(const QUrl &oldUrl, const QUrl &newUrl) {
     const QString oldPath = QDir::cleanPath(oldUrl.toLocalFile());
     const QString newPath = QFileInfo(newUrl.toLocalFile()).canonicalFilePath();

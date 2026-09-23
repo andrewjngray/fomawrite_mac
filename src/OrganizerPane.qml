@@ -7,6 +7,7 @@ import QtQuick.Dialogs as Dialogs
 Rectangle {
     id: root
     objectName: "organizerPane"
+    required property var commands
     required property var library
     property url currentFile
     property bool darkMode: false
@@ -23,7 +24,7 @@ Rectangle {
         if (entry.directory) library.rootFolder = entry.url;
         else openRequested(entry.url);
     }
-    LibraryContextMenu { id: contextMenu; library: root.library; darkMode: root.darkMode }
+    LibraryContextMenu { id: contextMenu; library: root.library; commands: root.commands; darkMode: root.darkMode }
     ScrollView {
         anchors.fill: parent
         id: organizerScroll

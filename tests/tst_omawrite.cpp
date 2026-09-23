@@ -43,6 +43,63 @@ private slots:
                            m_settingsDirectory.path());
     }
 
+    void contextFileAndFolderActionsUseClickedPath() {
+        QTemporaryDir dir;
+        const QUrl root = QUrl::fromLocalFile(dir.path());
+        Backend backend;
+        QVERIFY(backend.libraryItemAction(root, "newFolder", "Notes"));
+        const QUrl folder = QUrl::fromLocalFile(dir.filePath("Notes"));
+        QVERIFY(backend.libraryItemAction(folder, "newFile", "Target.md"));
+        const QUrl file = QUrl::fromLocalFile(dir.filePath("Notes/Target.md"));
+        QFile source(file.toLocalFile()); QVERIFY(source.open(QIODevice::WriteOnly));
+        source.write("# Clicked target\n\n**Bold** text.\n"); source.close();
+        QVERIFY(backend.libraryItemAction(file, "copyMarkdown"));
+        QVERIFY(QGuiApplication::clipboard()->text().startsWith("# Clicked target"));
+        QVERIFY(backend.fileUrl().isEmpty());
+        QVERIFY(backend.libraryItemAction(file, "copyText"));
+        QVERIFY(!QGuiApplication::clipboard()->text().contains("**"));
+        QVERIFY(backend.libraryItemAction(file, "exportHtml", QUrl::fromLocalFile(dir.filePath("target.html")).toString()));
+        QVERIFY(QFileInfo::exists(dir.filePath("target.html")));
+        QVERIFY(!backend.libraryItemAction(file, "exportHtml", file.toString()));
+        QVERIFY(backend.libraryItemAction(file, "duplicate", "Copy.md"));
+        QVERIFY(!backend.libraryItemAction(file, "duplicate", "Copy.md"));
+        QVERIFY(!backend.libraryItemAction(file, "rename", "../Escape.md"));
+        QVERIFY(backend.libraryItemAction(file, "rename", "Renamed.md"));
+        QVERIFY(QFileInfo::exists(dir.filePath("Notes/Renamed.md")));
+        QVERIFY(!QFileInfo::exists(file.toLocalFile()));
+        QVERIFY(backend.libraryItemAction(folder, "duplicate", "Notes copy"));
+        QVERIFY(QFileInfo::exists(dir.filePath("Notes copy/Renamed.md")));
+        auto *library = qobject_cast<FileLibrary *>(backend.library());
+        library->setRootFolder(folder); library->toggleFavorite(QUrl::fromLocalFile(dir.filePath("Notes/Renamed.md")));
+        QVERIFY(backend.libraryItemAction(folder, "rename", "Archive"));
+        QCOMPARE(library->rootFolder(), QUrl::fromLocalFile(QFileInfo(dir.filePath("Archive")).canonicalFilePath()));
+        QVERIFY(library->favorites().last().toMap().value("url").toUrl().toLocalFile().endsWith("Archive/Renamed.md"));
+        QVERIFY(QFile::link(dir.filePath("Archive"), dir.filePath("Notes copy/link")));
+        QVERIFY(!backend.libraryItemAction(QUrl::fromLocalFile(dir.filePath("Notes copy")), "duplicate", "Rejected"));
+        QVERIFY(!QFileInfo::exists(dir.filePath("Rejected")));
+    }
+
+    void contextOperationsPreserveOpenUnsavedDocument() {
+        QTemporaryDir dir;
+        Backend backend;
+        QQmlEngine engine;
+        engine.rootContext()->setContextProperty("backend", &backend);
+        QQmlComponent component(&engine, QUrl::fromLocalFile(QFINDTESTDATA("../src/Main.qml")));
+        QVERIFY2(component.isReady(), qPrintable(component.errorString()));
+        QScopedPointer<QObject> window(component.create()); QVERIFY(window);
+        auto *editor = window->findChild<QObject *>("sourceEditor"); QVERIFY(editor);
+        const QUrl file=QUrl::fromLocalFile(dir.filePath("Open.md"));
+        editor->setProperty("text", "Saved"); backend.saveAs(file);
+        editor->setProperty("text", "Unsaved text"); QVERIFY(backend.modified());
+        QVERIFY(backend.libraryItemAction(file, "duplicate", "Copy.md"));
+        QFile copy(dir.filePath("Copy.md")); QVERIFY(copy.open(QIODevice::ReadOnly)); QCOMPARE(copy.readAll(), QByteArray("Unsaved text"));
+        QVERIFY(!backend.libraryItemAction(file, "trash"));
+        QVERIFY(!backend.libraryItemAction(QUrl::fromLocalFile(dir.path()), "rename", "Nope"));
+        QVERIFY(backend.libraryItemAction(file, "rename", "Renamed.md"));
+        QCOMPARE(editor->property("text").toString(), QString("Unsaved text"));
+        QVERIFY(backend.modified()); backend.discardRecovery();
+    }
+
     void locationContextActionsPreserveFiles() {
         QTemporaryDir dir;
         FileLibrary library;
