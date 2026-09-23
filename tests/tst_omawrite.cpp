@@ -100,6 +100,68 @@ private slots:
         QVERIFY(backend.modified()); backend.discardRecovery();
     }
 
+    void locationsRejectOverlapAndMigrateChildrenToFavorites() {
+        QSettings settings;
+        settings.beginGroup("library");
+        QVariantMap original;
+        for (const auto &key : settings.allKeys()) original[key] = settings.value(key);
+        settings.remove("");
+        const auto restore = qScopeGuard([&] {
+            settings.remove("");
+            for (auto it = original.cbegin(); it != original.cend(); ++it) settings.setValue(it.key(), it.value());
+        });
+        QTemporaryDir dir;
+        QVERIFY(QDir(dir.path()).mkpath("Parent/Child"));
+        QVERIFY(QDir(dir.path()).mkdir("Parent-other"));
+        const QUrl parent = QUrl::fromLocalFile(QFileInfo(dir.filePath("Parent")).canonicalFilePath());
+        const QUrl child = QUrl::fromLocalFile(parent.toLocalFile() + "/Child");
+        const QUrl sibling = QUrl::fromLocalFile(QFileInfo(dir.filePath("Parent-other")).canonicalFilePath());
+        {
+            FileLibrary library;
+            QSignalSpy rejected(&library, &FileLibrary::locationRejected);
+            QVERIFY(library.addLocation(parent));
+            QVERIFY(!library.addLocation(child));
+            QVERIFY(!library.addLocation(parent));
+            QCOMPARE(rejected.count(), 2);
+            QCOMPARE(library.rootFolder(), parent);
+            QCOMPARE(library.locations().size(), 1);
+            QVERIFY(library.addFavorite(child));
+            QVERIFY(library.addFavorite(child));
+            QCOMPARE(library.favorites().size(), 1);
+            library.setRootFolder(child);
+            QCOMPARE(library.rootFolder(), child);
+            QCOMPARE(library.locations().size(), 1);
+            library.enclosingFolder();
+            QCOMPARE(library.rootFolder(), parent);
+            QVERIFY(library.navigateHistory(-1));
+            QCOMPARE(library.rootFolder(), child);
+            QCOMPARE(library.locations().size(), 1);
+            QVERIFY(library.addLocation(sibling));
+            QCOMPARE(library.locations().size(), 2);
+            library.removeLocation(parent);
+            QVERIFY(library.addLocation(child));
+            QVERIFY(!library.addLocation(parent));
+            QVERIFY(QFileInfo(child.toLocalFile()).isDir());
+            QVERIFY(!library.addLocation(QUrl("https://example.com")));
+            QVERIFY(QFile::link(parent.toLocalFile(), dir.filePath("Alias")));
+            QVERIFY(!library.addLocation(QUrl::fromLocalFile(dir.filePath("Alias"))));
+        }
+        settings.setValue("locations", QStringList{child.toLocalFile(), parent.toLocalFile(), child.toLocalFile()});
+        settings.setValue("favorites", QStringList{});
+        settings.setValue("root", child);
+        {
+            FileLibrary migrated;
+            QCOMPARE(migrated.locations().size(), 1);
+            QCOMPARE(migrated.locations().first().toMap().value("url").toUrl(), parent);
+            QCOMPARE(migrated.favorites().size(), 1);
+            QCOMPARE(migrated.favorites().first().toMap().value("url").toUrl(), child);
+            QCOMPARE(migrated.rootFolder(), child);
+        }
+        FileLibrary reopened;
+        QCOMPARE(reopened.locations().size(), 1);
+        QCOMPARE(reopened.favorites().size(), 1);
+    }
+
     void locationPhysicalRenameReplacesLegacyAlias() {
         const QVariant searchesBefore = QSettings().value("library/savedSearches");
         const auto restoreSearches = qScopeGuard([&] { QSettings().setValue("library/savedSearches", searchesBefore); });

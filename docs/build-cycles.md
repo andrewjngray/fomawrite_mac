@@ -773,3 +773,19 @@ Known limits: documents inside a folder must be closed before rename; cross-proc
 Artifacts: dist/Omawrite Dev.app and dist/Omawrite.app. GitHub RC1 downloadable binary remains Cycle 42; source history records this fix.
 
 Optional exercise: close documents inside the location, right-click it → Rename Folder, then Show in Finder. Confirm the new name and contents in both places. An old alias such as sample_b needs this real rename once.
+
+## Cycle 46 — Non-overlapping Locations and child Favorites
+
+Scope: implement Andrew's approved Locations/Favorites distinction and preserve the reasoning. Locations represent independent directory trees. Favorites provide shortcuts into those trees.
+
+Changes: explicit Locations + rejects parent/child overlap in either direction and exact duplicates, identifies the conflicting Location, and offers Add to Favorites instead. Paths are canonicalized and compared on component boundaries. Favorite addition is idempotent. Navigation/open-by-path can browse overlapping folders without creating Locations. On startup, existing overlaps are normalized to outermost Locations and nested entries are retained as Favorites; no files are moved. See [decision record](location-design.md) for migration and evidence versus inference about iA.
+
+Validation: ./bin/build and ./bin/test pass, 75 tests, zero failures. New coverage checks child-first/parent-first rejection, exact duplicates, similarly named independent folders, symbolic links, invalid URLs, Favorite idempotence, navigation/back, and persisted order-independent migration. Both app bundles refreshed and deep/strict signatures verified.
+
+Native Dev: three existing sample tabs survived normal quit/restart. Existing nested Locations migrated under Favorites with repo retained as the outer Location. Locations + selecting cycle-46/sample/Parent/Child produced the expected overlap dialog identifying repo. Add to Favorites instead created Child; clicking it showed Note.md and left Locations unchanged. Dialog and resulting sidebar screenshots use synthetic writing. Everyday app reopened with its prior document and migrated organizer. Logs/screenshots in research/cycle-46/.
+
+Known limits: parent-first and child-first backend paths are tested, but only the child-add case was checked through the native picker. Dark appearance, VoiceOver, unavailable-volume aliases and cross-process concurrent settings changes were not certified. This does not implement a global library index. Existing alias names on migrated child shortcuts become their actual folder names in Favorites.
+
+Artifacts: dist/Omawrite Dev.app and dist/Omawrite.app. GitHub RC1 archive remains Cycle 42.
+
+Optional exercise: use Locations + on a folder inside repo, choose Add to Favorites instead, then click its Favorite. Verify the folder opens without adding another Location and no files move.

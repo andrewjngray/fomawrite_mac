@@ -213,3 +213,7 @@ All visible top-level actions in Andrew's two new screenshots now have implement
 ### Cycle 45 — Physical rename from Locations
 
 User feedback supersedes the Cycle 43 alias-only behavior: Locations now use Rename Folder to rename on disk, clear the renamed folder's old alias, and migrate saved paths including smart-search roots. Finder reveal verified against a synthetic renamed folder. Removing a Location still only removes its shortcut. Documents inside the folder must first be closed. Inline renaming as pictured in iA is not implemented; the operation uses a dialog.
+
+### Cycle 46 — Location overlap restriction
+
+Implemented the supplied iA warning's parent/child exclusion rule, plus an Omawrite convenience: Add to Favorites instead. Existing nested Locations migrate to Favorites without disk changes. Folder navigation remains independent of Location registration. See location-design.md for rationale and limits; iA's internal technical reason remains an inference.

@@ -183,6 +183,38 @@ Rectangle {
     Dialogs.FolderDialog {
         id: locationDialog
         title: "Add writing location"
-        onAccepted: root.library.rootFolder = selectedFolder
+        onAccepted: root.library.addLocation(selectedFolder)
     }
+    Connections {
+        target: root.library
+        function onLocationRejected(url, message, canFavorite) {
+            overlapDialog.canFavorite = canFavorite;
+            overlapDialog.folder = url;
+            overlapMessage.text = message;
+            overlapDialog.open();
+        }
+    }
+    Dialog {
+        id: overlapDialog
+        property url folder
+        property bool canFavorite: false
+        title: "Cannot add Location"
+        parent: Overlay.overlay
+        anchors.centerIn: parent
+        width: Math.min(440, parent.width - 32)
+        modal: true
+        Label { id: overlapMessage; width: parent.width; wrapMode: Text.Wrap; textFormat: Text.PlainText }
+        footer: DialogButtonBox {
+            Button { text: "Cancel"; DialogButtonBox.buttonRole: DialogButtonBox.RejectRole }
+            Button {
+                text: "Add to Favorites instead"
+                visible: overlapDialog.canFavorite
+                onClicked: {
+                    if (root.library.addFavorite(overlapDialog.folder)) overlapDialog.close();
+                }
+            }
+            onRejected: overlapDialog.close()
+        }
+    }
+
 }

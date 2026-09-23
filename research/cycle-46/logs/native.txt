@@ -1,0 +1,7 @@
+Dev and everyday app closed normally; no unsaved prompt occurred.
+Dev reopened three sample tabs. Locations retained repo; nested shortcuts appeared under Favorites.
+Locations + -> native picker -> cycle-46/sample/Parent/Child.
+Cannot add Location dialog identified /Users/andrewgray/repo.
+Add to Favorites instead -> Child Favorite created.
+Click Child -> header Child, file list Note.md, Locations still only repo.
+Everyday packaged app reopened prior document with migrated organizer.

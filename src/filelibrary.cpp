@@ -21,6 +21,7 @@ FileLibrary::FileLibrary(QObject *parent) : QObject(parent) {
     m_locations = settings.value("library/locations").toStringList();
     m_favorites = settings.value("library/favorites").toStringList();
     m_recentFiles = settings.value("library/recents").toStringList();
+    normalizeLocations();
     m_sortMode = qBound(0, settings.value("library/sortMode", 0).toInt(), 3);
     m_ascending = settings.value("library/ascending", true).toBool();
     m_foldersFirst = settings.value("library/foldersFirst", true).toBool();
@@ -53,6 +54,63 @@ QVariantList FileLibrary::locations() const {
         entry = map;
     }
     return entries;
+}
+// Compare complete path components; /Notes and /Notes-old are independent.
+static bool folderContains(const QString &parent, const QString &child) {
+    return parent == child || child.startsWith(parent.endsWith('/') ? parent : parent + '/');
+}
+static QString locationPath(const QString &path) {
+    const QFileInfo info(path);
+    const QString canonical = info.canonicalFilePath();
+    return canonical.isEmpty() ? QDir::cleanPath(info.absoluteFilePath()) : canonical;
+}
+QString FileLibrary::overlappingLocation(const QString &path) const {
+    for (const auto &location : m_locations) {
+        const QString existing = locationPath(location);
+        if (folderContains(existing, path) || folderContains(path, existing)) return location;
+    }
+    return {};
+}
+void FileLibrary::normalizeLocations() {
+    const auto previous = m_locations;
+    QStringList normalized;
+    for (const auto &path : previous) {
+        const QString candidate = locationPath(path);
+        bool child = false;
+        for (const auto &other : previous) {
+            const QString parent = locationPath(other);
+            if (parent != candidate && folderContains(parent, candidate)) { child = true; break; }
+        }
+        if (child) {
+            if (!m_favorites.contains(candidate)) m_favorites.append(candidate);
+        } else if (!normalized.contains(candidate)) normalized.append(candidate);
+    }
+    m_locations = normalized;
+    if (previous != normalized) saveOrganizer();
+}
+bool FileLibrary::addFavorite(const QUrl &url) {
+    if (!url.isLocalFile() || !QFileInfo(url.toLocalFile()).exists()) return false;
+    const QString path = locationPath(url.toLocalFile());
+    if (!m_favorites.contains(path)) { m_favorites.append(path); saveOrganizer(); }
+    return true;
+}
+bool FileLibrary::addLocation(const QUrl &url) {
+    const QFileInfo info(url.toLocalFile());
+    if (!url.isLocalFile() || !info.isDir() || !info.isReadable()) {
+        emit locationRejected(url, QStringLiteral("Choose a readable local folder."), false);
+        return false;
+    }
+    const QString path = info.canonicalFilePath();
+    const QString overlap = overlappingLocation(path);
+    if (!overlap.isEmpty()) {
+        emit locationRejected(QUrl::fromLocalFile(path),
+            QStringLiteral("This folder overlaps an existing Location:\n%1\n\nLocations cover their entire folder tree. Use Favorites for quick access, or remove the existing Location before adding this folder.").arg(overlap), true);
+        return false;
+    }
+    m_locations.append(path);
+    saveOrganizer();
+    setRootFolder(QUrl::fromLocalFile(path));
+    return true;
 }
 bool FileLibrary::renameLocation(const QUrl &url, const QString &name) {
     const QString label = name.trimmed();
@@ -198,7 +256,8 @@ void FileLibrary::setRootFolder(const QUrl &folder) {
         return;
     }
     const QUrl normalized = QUrl::fromLocalFile(info.canonicalFilePath());
-    if (!m_locations.contains(normalized.toLocalFile())) {
+    // Browsing overlapping folders must not create another Location.
+    if (overlappingLocation(normalized.toLocalFile()).isEmpty()) {
         m_locations.append(normalized.toLocalFile());
         saveOrganizer();
     }

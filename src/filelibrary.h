@@ -45,6 +45,8 @@ public:
     void setSortMode(int mode);
     void setAscending(bool ascending);
     void setFoldersFirst(bool enabled);
+    Q_INVOKABLE bool addLocation(const QUrl &url);
+    Q_INVOKABLE bool addFavorite(const QUrl &url);
     Q_INVOKABLE bool renameLocation(const QUrl &url, const QString &name);
     Q_INVOKABLE bool copyPath(const QUrl &url);
     Q_INVOKABLE bool showInFileManager(const QUrl &url);
@@ -83,6 +85,7 @@ public:
     static bool isTextFile(const QString &path);
 
 signals:
+    void locationRejected(const QUrl &url, const QString &message, bool canFavorite);
     void tagIndexChanged();
     void savedSearchesChanged();
     void historyChanged();
@@ -110,6 +113,8 @@ private:
     void appendDirectory(const QString &path, int depth, QStringList &watched);
     void setError(const QString &error);
     bool containsPath(const QString &path) const;
+    QString overlappingLocation(const QString &path) const;
+    void normalizeLocations();
     void saveOrganizer();
     void saveSorting();
     QVariantMap m_locationNames;
