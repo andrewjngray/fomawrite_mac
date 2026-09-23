@@ -56,7 +56,7 @@ Native spelling suggestions/grammar review and speech; code-aware writing analys
 
 ## Build cycles and feedback
 
-See [the cycle log and short usability exercises](docs/build-cycles.md) for each working checkpoint. The [iA Writer menu inventory](docs/ia-writer-inventory.md) records observed features and remaining gaps. Tell Codex what to keep, change or add; the next cycle will incorporate that feedback.
+See [the cycle log and short usability exercises](docs/build-cycles.md) for each working checkpoint. The [current screenshot-backed iA menu audit](docs/ia-menu-audit-2026-09-23.md) maps the observed menus to Omawrite's implemented, partial and missing behavior; the [reference inventory](docs/ia-writer-inventory.md) retains the earlier inspection history. Tell Codex what to keep, change or add; the next cycle will incorporate that feedback.
 
 ## Project map
 

@@ -1,5 +1,7 @@
 # iA Writer reference inventory
 
+**Current menu audit — 23 September 2026:** The 30 files in `screenshots/` have now been reviewed against Omawrite Cycle 47 (`3e52162`). The consolidated [screenshot-backed menu map and current gap audit](ia-menu-audit-2026-09-23.md) supersedes the dated command-status descriptions below. It records the expanded Format, View, Focus, Go and Window evidence, current implemented/partial/gap status, and Omawrite-only additions. Hidden iA submenus and the uncaptured Authors/Application/Help menus remain explicitly unverified.
+
 **Current status — 23 September 2026:** Cycle 42 / Mac 0.2.0 RC1, 70 tests passing. The [release acceptance ledger](release-acceptance.md) supersedes historical status/counts below. Numbered implementation checkpoints have reached the archive stage; unresolved software parity and hardware acceptance remain open.
 
 
