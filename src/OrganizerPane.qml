@@ -16,6 +16,7 @@ Rectangle {
         property bool favoritesExpanded: true
         property bool recentsExpanded: true
     }
+    signal searchRequested(string query, bool contents, url folder)
     signal openRequested(url file)
     color: backend.palette.panel
     function activate(entry) {
@@ -94,6 +95,31 @@ Rectangle {
                 }
                 ChromeButton { text: "Favorite folder"; iconName: "plus"; alignLeft: true; darkMode: root.darkMode; Layout.fillWidth: true; onClicked: root.library.toggleFavorite(root.library.rootFolder) }
                 ChromeButton { text: "Favorite document"; iconName: "plus"; alignLeft: true; darkMode: root.darkMode; Layout.fillWidth: true; enabled: root.currentFile.toString() !== ""; onClicked: root.library.toggleFavorite(root.currentFile) }
+            }
+            Label { text: "Smart folders"; color: backend.palette.muted; Layout.topMargin: 14 }
+            Repeater {
+                model: root.library.savedSearches
+                delegate: ChromeButton {
+                    required property var modelData
+                    Layout.fillWidth: true; alignLeft: true; iconName: "search"; darkMode: root.darkMode
+                    text: modelData.query; hint: "Search saved files: " + modelData.query
+                    onClicked: root.searchRequested(modelData.query, modelData.contents, modelData.root)
+                }
+            }
+            Label { text: "Save queries in Quick Open to add smart folders."; visible: root.library.savedSearches.length === 0; wrapMode: Text.Wrap; Layout.fillWidth: true; color: backend.palette.muted; font.pixelSize: 11 }
+            RowLayout {
+                Label { text: "Tags"; color: backend.palette.muted; Layout.fillWidth: true }
+                ChromeButton { text: "Refresh"; hint: "Scan saved files for tags"; darkMode: root.darkMode; onClicked: root.library.refreshTags() }
+            }
+            Label { text: root.library.tagStatus; wrapMode: Text.Wrap; Layout.fillWidth: true; color: backend.palette.muted; font.pixelSize: 10 }
+            Repeater {
+                model: root.library.tagIndex
+                delegate: ChromeButton {
+                    required property var modelData
+                    Layout.fillWidth: true; alignLeft: true; darkMode: root.darkMode
+                    text: "#" + modelData.tag + " (" + modelData.count + ")"
+                    onClicked: root.searchRequested("#" + modelData.tag,true,root.library.rootFolder)
+                }
             }
             RowLayout {
                 Layout.topMargin: 14

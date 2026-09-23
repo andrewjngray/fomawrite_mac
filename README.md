@@ -85,3 +85,8 @@ Aa → Theme now offers Follow system, Light, Dark and Warm paper across the wor
 ### Cycle 34b checkpoint
 
 Restoring a saved version now pauses autosave until explicit Save and clears unverified historical authorship; one Undo restores the previous text and labels. Build and 61 tests pass, including native file-version and failed-save checks. Native Restore/Undo verified. Cycle 34 remains open for its remaining safety/history and display checks.
+
+
+### Cycles 34c–38 checkpoint
+
+Added opt-in previous-save history, authorship-aware Markdown clipboard and metadata export, richer footnotes/local content blocks, persisted paginated output with portable HTML images, and organizer saved queries/browsable tags. Build and 66 tests pass; representative native sample checks and rendered PDF review completed. Four untouched feature/release cycles remain (39–42), plus documented acceptance gaps in 34–38. See [the remaining plan](docs/remaining-cycles.md).

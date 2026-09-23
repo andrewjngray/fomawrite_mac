@@ -392,13 +392,13 @@ ApplicationWindow {
 
     Shortcut {
         sequence: "Ctrl+S"
-        context: Qt.ApplicationShortcut
+        context: Qt.WindowShortcut
         onActivated: backend.save()
     }
 
     Shortcut {
         sequence: win.isMac ? "Ctrl+Alt+F" : "Ctrl+H"
-        context: Qt.ApplicationShortcut
+        context: Qt.WindowShortcut
         onActivated: {
             win.openSearch(true, false);
         }
@@ -424,37 +424,37 @@ ApplicationWindow {
 
     Shortcut {
         sequence: "Ctrl+?"
-        context: Qt.ApplicationShortcut
+        context: Qt.WindowShortcut
         onActivated: shortcutsDialog.open()
     }
 
     Shortcut {
         sequence: "Ctrl+O"
-        context: Qt.ApplicationShortcut
+        context: Qt.WindowShortcut
         onActivated: backend.openDialog()
     }
 
     Shortcut {
         sequence: "Ctrl+N"
-        context: Qt.ApplicationShortcut
+        context: Qt.WindowShortcut
         onActivated: backend.newWindow()
     }
 
     Shortcut {
         sequence: "Ctrl+Shift+S"
-        context: Qt.ApplicationShortcut
+        context: Qt.WindowShortcut
         onActivated: backend.saveAsDialog()
     }
 
     Shortcut {
         sequence: "Ctrl+P"
-        context: Qt.ApplicationShortcut
+        context: Qt.WindowShortcut
         onActivated: backend.printDocument()
     }
 
     Shortcut {
         sequences: win.isMac ? ["Ctrl+Meta+F"] : ["Meta+F", "F11"]
-        context: Qt.ApplicationShortcut
+        context: Qt.WindowShortcut
         onActivated: toggleFullScreen()
     }
 
@@ -472,7 +472,7 @@ ApplicationWindow {
 
     Shortcut {
         sequence: "Ctrl+F"
-        context: Qt.ApplicationShortcut
+        context: Qt.WindowShortcut
         onActivated: {
             win.openSearch(false, false);
         }
@@ -486,7 +486,7 @@ ApplicationWindow {
 
     Shortcut {
         sequence: "Ctrl+G"
-        context: Qt.ApplicationShortcut
+        context: Qt.WindowShortcut
         enabled: win.searchOpen
         onActivated: win.moveSearch(1)
     }
@@ -1227,6 +1227,10 @@ ApplicationWindow {
         }
         OrganizerPane {
             id: organizerPane
+            onSearchRequested: function(query, contents, folder) {
+                backend.library.rootFolder = folder;
+                quickQuery.text = query; quickContents.checked = contents; quickOpenDialog.open();
+            }
             library: backend.library
             currentFile: backend.fileUrl
             darkMode: win.darkMode

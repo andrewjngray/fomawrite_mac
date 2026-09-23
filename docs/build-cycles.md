@@ -662,3 +662,22 @@ Planned scope: searchable existing workspace commands with keyboard navigation a
 **Limits:** No in-app paginated/fit-page preview; document hyperlinks may remain external. Full title-page/custom template and physical printer matrix remains open.
 
 **Artifact / exercise:** Combined stable bundles. Select Reading Serif, insert a page break, export a two-page PDF and HTML with a local PNG. Move the HTML and confirm the image remains embedded.
+
+
+## Cycle 38 — Organizer searches and browsable tags
+
+**Scope / changes:** Saved queries appear as organizer smart folders and reopen their saved root/query/content setting. Explicit Refresh scans saved Markdown/text tags asynchronously, counts documents, and opens tag queries. Quote/list-contained fences are excluded. Independent cancellation/generation guards discard stale root results. Document shortcuts now target the active window: native two-tab QA exposed ambiguous application-wide Command-S.
+
+**Tests:** Build and 66 tests pass. New 110-document fixture verifies counts, repeated-tag deduplication, nested code exclusion and root-reset behavior. Native sample tag scan shows two writing documents, tag click returns both files, and Save query creates a sidebar smart folder. Sample screenshots reviewed.
+
+**Limits:** Manual refresh, saved files only; no filesystem watcher/incremental index. Bounds: 20,000 directory entries, 256 KiB/file, 32 MiB total, 2,000 tags; hidden/symlink/build/dependency paths excluded. Very large-library latency/memory and full Markdown-container grammar remain acceptance work. Quick Open results have their own limits, so counts can exceed visible results.
+
+**Artifact / exercise:** `dist/Omawrite Dev.app` and `dist/Omawrite.app`. Open research/cycle-38/sample/Workbench.md, Show in Library, show organizer, Refresh Tags, click #writing and save the query. See [combined evidence](../research/cycle-38/README.md).
+
+### Combined native verification — Cycles 34c–38
+
+Native Dev opened the synthetic workbench without changing existing writing. Preview displayed the nested chapter, quoted CSV, literal code and multiline/repeated footnote. Tag counts and tag-to-Quick-Open passed; saved query appeared in organizer. Reference Copy/Paste retained both annotation ranges, and one Undo removed pasted text. Optional previous-version capture produced a native restore entry after File → Save; history preference returned to off. PDF save picker opened and Cancel returned to the saved document. PDF pages were separately rendered and inspected under cycle-37/output-final. All committed screenshots contain synthetic writing; Recents was collapsed.
+
+Outstanding: full cross-app clipboard matrix, annotation-row focus timing, footnote click/long-scroll matrix, title-page/custom-template/printer checks, external-display and OS-shutdown/device-failure tests. These five checkpoints advance the plan; they do not close every acceptance criterion in Cycles 34–38.
+
+Final native check: after rebuilding, Command-S saved the active Workbench.md with two tabs restored. The persisted #writing smart folder returned both sample documents after restart. QA app quit normally with saved documents.

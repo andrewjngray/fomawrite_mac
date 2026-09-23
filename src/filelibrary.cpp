@@ -1,3 +1,5 @@
+#include <QDirIterator>
+#include <QMap>
 #include "filelibrary.h"
 #include <QDir>
 #include <QDateTime>
@@ -131,6 +133,8 @@ void FileLibrary::setRootFolder(const QUrl &folder) {
     }
     if (normalized == m_rootFolder) { refresh(); return; }
     cancelQuickSearch();
+    if(m_tagCanceled) m_tagCanceled->store(true);
+    ++m_tagGeneration; m_tagIndex.clear(); m_tagStatus="Refresh to scan saved files"; emit tagIndexChanged();
     m_rootFolder = normalized;
     if (!m_navigatingHistory) {
         while (m_history.size() > m_historyIndex + 1) m_history.removeLast();
@@ -414,8 +418,11 @@ QStringList FileLibrary::tagsIn(const QString &markdown) {
     const QRegularExpression fenceRe("^ {0,3}(`{3,}|~{3,})(.*)$");
     const QRegularExpression tagRe(QStringLiteral("(?:^|\\s)#([\\p{L}\\p{N}_-]+)"));
     const QRegularExpression inlineCode("(`+).*?\\1");
-    for (const QString &line : markdown.split('\n')) {
-        const auto match = fenceRe.match(line);
+    for (const QString &rawLine : markdown.split('\n')) {
+        QString line=rawLine;
+        line.remove(QRegularExpression("^ {0,3}(?:> ?)+"));
+        QString fenceLine=line; fenceLine.remove(QRegularExpression("^ {0,3}(?:[-+*]|[0-9]+[.)]) +"));
+        const auto match = fenceRe.match(fenceLine);
         if (match.hasMatch()) {
             const auto marker = match.captured(1);
             if (fence.isNull()) { fence = marker.at(0); fenceLength = marker.size(); }
@@ -430,4 +437,47 @@ QStringList FileLibrary::tagsIn(const QString &markdown) {
     }
     tags.removeDuplicates();
     return tags;
+}
+
+FileLibrary::~FileLibrary() {
+    if(m_searchCanceled) m_searchCanceled->store(true);
+    if(m_tagCanceled) m_tagCanceled->store(true);
+}
+
+void FileLibrary::refreshTags() {
+    if(m_tagCanceled) m_tagCanceled->store(true);
+    const int generation=++m_tagGeneration; const auto root=m_rootFolder.toLocalFile();
+    m_tagIndex.clear(); m_tagStatus="Scanning saved-file tags…"; emit tagIndexChanged();
+    const auto canceled=std::make_shared<std::atomic_bool>(false); m_tagCanceled=canceled;
+    auto *watcher=new QFutureWatcher<QVariantMap>(this);
+    connect(watcher,&QFutureWatcher<QVariantMap>::finished,this,[this,watcher,generation] {
+        const auto result=watcher->result(); watcher->deleteLater(); if(generation!=m_tagGeneration) return;
+        m_tagIndex=result["tags"].toList(); m_tagStatus=result["status"].toString(); emit tagIndexChanged();
+    });
+    watcher->setFuture(QtConcurrent::run([root,canceled] {
+        QStringList folders; if(!root.isEmpty()) folders.append(root);
+        QMap<QString,int> counts; int visited=0, skipped=0, files=0; qint64 bytes=0; bool limited=false;
+        while(!folders.isEmpty() && !canceled->load() && !limited) {
+            QDirIterator entries(folders.takeLast(),QDir::AllEntries|QDir::NoDotAndDotDot|QDir::NoSymLinks);
+            while(entries.hasNext() && !canceled->load()) {
+                entries.next(); const auto entry=entries.fileInfo();
+                if(++visited>20000) { limited=true; break; }
+                if(entry.isDir()) { if(!QStringList{"node_modules","build","build-tests","dist"}.contains(entry.fileName())) folders.append(entry.absoluteFilePath()); continue; }
+                if(!isTextFile(entry.fileName())) continue;
+                if(entry.size()>262144) { ++skipped; continue; }
+                if(bytes+entry.size()>32*1024*1024) { limited=true; break; }
+                QFile file(entry.absoluteFilePath()); if(!file.open(QIODevice::ReadOnly)) { ++skipped; continue; }
+                const auto content=file.read(262145); if(content.size()>262144 || file.error()!=QFile::NoError) { ++skipped; continue; }
+                bytes+=content.size(); ++files;
+                for(const auto &tag:tagsIn(QString::fromUtf8(content))) {
+                    if(!counts.contains(tag) && counts.size()>=2000) { limited=true; break; }
+                    ++counts[tag];
+                }
+                if(limited) break;
+            }
+        }
+        QVariantList tags; for(auto it=counts.cbegin();it!=counts.cend();++it) tags.append(QVariantMap{{"tag",it.key()},{"count",it.value()}});
+        const QString status=QString("%1 files scanned; %2 skipped%3").arg(files).arg(skipped).arg(limited?"; scan limit reached":"");
+        return QVariantMap{{"tags",tags},{"status",status}};
+    }));
 }

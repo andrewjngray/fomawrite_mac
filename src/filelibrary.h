@@ -25,11 +25,17 @@ class FileLibrary : public QObject {
     Q_PROPERTY(QString error READ error NOTIFY errorChanged)
     Q_PROPERTY(bool canGoBack READ canGoBack NOTIFY historyChanged)
     Q_PROPERTY(bool canGoForward READ canGoForward NOTIFY historyChanged)
+    Q_PROPERTY(QVariantList tagIndex READ tagIndex NOTIFY tagIndexChanged)
+    Q_PROPERTY(QString tagStatus READ tagStatus NOTIFY tagIndexChanged)
     Q_PROPERTY(QVariantList savedSearches READ savedSearches NOTIFY savedSearchesChanged)
     Q_PROPERTY(QVariantList quickResults READ quickResults NOTIFY quickSearchChanged)
     Q_PROPERTY(QString quickStatus READ quickStatus NOTIFY quickSearchChanged)
 public:
     explicit FileLibrary(QObject *parent = nullptr);
+    ~FileLibrary() override;
+    Q_INVOKABLE void refreshTags();
+    QVariantList tagIndex() const { return m_tagIndex; }
+    QString tagStatus() const { return m_tagStatus; }
     QVariantList locations() const;
     QVariantList favorites() const;
     QVariantList recentFiles() const;
@@ -73,6 +79,7 @@ public:
     static bool isTextFile(const QString &path);
 
 signals:
+    void tagIndexChanged();
     void savedSearchesChanged();
     void historyChanged();
     void quickSearchChanged();
@@ -84,6 +91,10 @@ signals:
     void errorChanged();
 
 private:
+    QVariantList m_tagIndex;
+    QString m_tagStatus = "Refresh to scan saved files";
+    int m_tagGeneration = 0;
+    std::shared_ptr<std::atomic_bool> m_tagCanceled;
     QList<QUrl> m_history;
     int m_historyIndex = -1;
     bool m_navigatingHistory = false;

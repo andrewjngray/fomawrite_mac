@@ -261,6 +261,17 @@ private slots:
         backend.discardRecovery();
     }
 
+    void tagIndexCountsDocumentsAndExcludesContainerCode() {
+        QTemporaryDir directory;
+        for(int i=0;i<110;++i) { QFile file(directory.filePath(QString::number(i)+".md")); QVERIFY(file.open(QIODevice::WriteOnly)); file.write("#shared #shared\n> ```\n> #hidden\n> ```\n- ~~~\n#alsohidden\n  ~~~\n#visible"); }
+        FileLibrary library; library.setRootFolder(QUrl::fromLocalFile(directory.path())); library.refreshTags();
+        QTRY_VERIFY_WITH_TIMEOUT(!library.tagStatus().startsWith("Scanning"),10000);
+        QMap<QString,int> counts; for(const auto &value:library.tagIndex()) counts[value.toMap()["tag"].toString()]=value.toMap()["count"].toInt();
+        QCOMPARE(counts["shared"],110); QCOMPARE(counts["visible"],110); QVERIFY(!counts.contains("hidden")); QVERIFY(!counts.contains("alsohidden"));
+        QTemporaryDir empty; library.setRootFolder(QUrl::fromLocalFile(empty.path())); QVERIFY(library.tagIndex().isEmpty()); library.refreshTags();
+        QTRY_VERIFY_WITH_TIMEOUT(!library.tagStatus().startsWith("Scanning"),10000); QVERIFY(library.tagIndex().isEmpty());
+    }
+
     void outputStylesPersistAndHtmlEmbedsLocalImages() {
         QTemporaryDir directory; Backend backend;
         const auto reset=qScopeGuard([&] { backend.setOutputStyle(0); });

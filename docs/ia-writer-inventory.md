@@ -1,5 +1,10 @@
 # iA Writer reference inventory
 
+## Current overlay — Cycles 34c–38, 23 September 2026
+
+This overlay supersedes historical Planned labels below. 66 tests pass. Implemented subsets: optional previous-save history; validated annotation clipboard and separate metadata export; multiline/repeated footnotes and bounded local CSV/code/image inclusions; persisted output templates, page breaks, headers/footers and embedded raster HTML assets; organizer saved queries and refreshable tag counts. Representative native workflows and rendered PDF pages checked. Full provenance, complete parser/link semantics, native Versions browser, paginated preview, incremental indexing and hardware/performance acceptance remain partial. See [remaining work](remaining-cycles.md) and [build records](build-cycles.md).
+
+
 ## Closeout implementation overlay — 21 September 2026
 
 Cycles 20b–27 now have working subsets; final build and 48 tests pass. This does **not** close the baseline parity rows wholesale. See the [closeout audit](closeout-audit.md) for per-cycle implemented behavior, native evidence and unfinished acceptance criteria. In particular, basic output fonts are not full templates; manual annotations are not author-aware paste/provenance; saved queries are not full organizer smart folders; selection review is not complete live linguistic services. Older tables/overlays remain historical snapshots.

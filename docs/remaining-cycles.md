@@ -1,6 +1,6 @@
 # Remaining build plan — 23 September 2026
 
-Cycle 33 themes is complete. Cycle 34a closes recovery-baseline and cancellable-Quit defects, but the remainder of Cycle 34 is still open. There are **9 planned cycles remaining (34–42)**, counting the unfinished part of 34. This is an estimate for the agreed personal-editor scope, not a guarantee of complete iA Writer parity. Larger features or failures can require another increment. The inventory and closeout audit remain the acceptance backlog.
+Five additional build checkpoints are delivered: 34c automatic previous versions, 35 authorship clipboard, 36 richer Markdown, 37 output templates/portability and 38 organizer queries/tags. Build and 66 tests pass, with representative native sample checks. **Four untouched planned cycles remain (39–42), plus acceptance gaps in 34–38.** Under the strict counting rule below, nine cycle areas still contain open work; it would be misleading to say only four fully verified cycles remain. The next feature area is Cycle 39. Full iA Writer parity is not claimed.
 
 | Cycle | Deliverable | Completion criteria |
 |---|---|---|
@@ -28,3 +28,16 @@ Close a cycle only when its agreed behavior, automated checks, native verificati
 ## Cycle 34b progress
 
 Safe version restoration is implemented: unlabelled historical text, one-step Undo of text/authorship, explicit Save before autosave resumes, and persisted recovery pause. Failed Save As preservation is regression-tested. 61 tests pass. Cycle 34 remains open for automatic history, disk/device failures and native display/OS-shutdown acceptance; the remaining count stays nine.
+
+
+## Five-checkpoint follow-through — 23 September
+
+| Area | Delivered | Remaining acceptance / limits |
+|---|---|---|
+| 34 | Previous-version-on-save opt-in, safe explicit-save restoration | Physical disks/devices, OS shutdown, fullscreen/minimized/display matrix; native Versions browser and historical sidecars outside delivered subset |
+| 35 | Validated labelled clipboard, range selection, metadata export | Cross-app loss/stripping matrix, row-focus timing, full live attribution visualization |
+| 36 | Multiline/repeated footnotes, bounded CSV/code/image blocks, nested relative assets | Long-document/anchor clicks, complex link/container syntax and nearest wiki resolution |
+| 37 | Persisted styles, headers/footers, page breaks, portable HTML raster assets | Custom title-page/printer matrix, paginated/fit-page preview; native PDF Cancel passed |
+| 38 | Sidebar queries, explicit asynchronous tag index, active-window shortcuts | Large-library performance at limits, incremental refresh/full container grammar |
+
+Hardware-dependent checks should be grouped into Cycle 41's acceptance session. Deferred product capabilities still need explicit acceptance or scope decisions at Cycle 42; they are not silently counted as complete.
