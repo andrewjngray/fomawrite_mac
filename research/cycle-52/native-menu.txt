@@ -1,0 +1,5 @@
+24 September 2026 — refreshed stable Omawrite Dev.app, synthetic Statistics.md.
+
+Native View menu exposed Title Bar Fade In/Out and Always Show; Toolbar Fade In/Out, Always Show, Hide, Default and Stats Only with all ten independent metric choices. Statistics dialog showed 34 words, 213 characters, 177 without whitespace, 4 sentences, 2 tasks, 1 min reading/speaking and 0 manual Human/AI/Reference words for the fixture. Selecting the Sentences metric switched the footer to Stats Only; Default restored the ordinary toolbar. No source edit was saved.
+
+Screenshot capture was unavailable from the current computer-use surface. Native fade timing, traffic-light appearance, fullscreen, narrow/dark, high contrast, VoiceOver, restart persistence and live counts after edit/annotation remain unchecked.

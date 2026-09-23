@@ -1,6 +1,6 @@
 # iA Writer menu map and Omawrite gap audit — 23 September 2026
 
-This is the planning baseline after Omawrite Cycle 47 (76 tests), with completed Cycle 48–51 rows and the unverified Cycle 52 source checkpoint updated. It transcribes the menu screenshots in `screenshots/` and compares them with the source. It is an interface and behavior audit, not a claim that similarly named commands behave identically.
+This is the planning baseline after Omawrite Cycle 47 (76 tests), updated through Cycle 54a source and partial native checks on 24 September. Cycles 48–51 are complete. It transcribes the menu screenshots in `screenshots/` and compares them with the source. It is an interface and behavior audit, not a claim that similarly named commands behave identically.
 
 The screenshots contain personal filenames, locations and tags. This document records commands only. The images remain untracked reference material and should not be committed. Two files are empty duplicate captures: `3.48.34 PM(2)` and `3.49.37 PM(2)`. The duplicate `1.57.39 PM(2)` and `3.50.00 PM(2)` images add no distinct menu evidence.
 
@@ -198,14 +198,14 @@ These menus were not opened in this folder. The older inspection recorded the st
 | Text excerpts | **Match** | Bounded source excerpts with a compact default. |
 | Tree/List navigation | **Partial (Cycle 51)** | Tree and current-folder List both reach nested files; List uses existing folder history and Show in Library. Tree expansion is session-only and resets on root changes. |
 | Text size | **Match** | Larger, smaller and reset equivalents. |
-| Show Completions | **Partial (Cycle 54a source; native pending)** | A manual current-document suggestion popup inserts only on explicit acceptance with Undo. iA candidate source, ranking, shortcuts and native popup behavior remain unverified. |
+| Show Completions | **Partial (Cycle 54a; native sample checked)** | A manual current-document popup offered two candidates; Return accepted one and one Undo restored the prefix. iA candidate source/ranking and remaining popup/IME/accessibility behavior remain unverified. |
 | Reload Preview | **Match** | Forces Markdown reparse. |
 | Preview Full/Split/Web | **Partial (Cycle 51)** | View → Preview now routes Full/Split/Web to existing continuous preview layouts. Web is not a separate renderer; exact iA behavior remains unverified. |
 | PDF preview / fit controls | **Partial (Cycle 51)** | View → Preview → PDF → Paginated Preview opens the existing page/fit controls. iA's PDF submenu children were not captured, so exact structure and shortcut parity remain open. |
 | Templates | **Partial** | Shared preview/export presets: Modern Sans, Classic Serif, Manuscript Mono, GitHub, Helvetica, Palatino and MLA Draft, plus JSON Custom. Duo/Quattro are missing; MLA Draft is not complete MLA Style; iA template-package import is unsupported. |
-| Title bar modes | **Partial (Cycle 52 source; native pending)** | Persisted Fade In/Out and Always Show affect the QML filename in the 44 px top strip; exact iA fade feel and native accessibility remain unverified. |
-| Toolbar modes and stats-only display | **Partial (Cycle 52 source; native pending)** | Fade/Always/Hide affect QML top controls; Default/Stats Only and ten independent metric toggles persist. Stats Only appears in Omawrite's footer, unlike iA's top toolbar. Native visual and keyboard acceptance remain open. |
-| Statistics set | **Partial (Cycle 52 source; native pending)** | Sentence, speaking, task and manual Human/AI/Reference counts join the earlier metrics. Deterministic heuristic/annotation rules have tests, but placement and native live updates remain unverified. |
+| Title bar modes | **Partial (Cycle 52; menu checked)** | Native View menu exposes Fade In/Out and Always Show for the QML filename in the 44 px top strip; exact fade feel, window controls and accessibility remain unverified. |
+| Toolbar modes and stats-only display | **Partial (Cycle 52; menu checked)** | Native menu exposes Fade/Always/Hide and ten independent Stats Only metrics; one metric changed the footer and Default restored it. Stats Only appears in Omawrite's footer, unlike iA's top toolbar. Visual and keyboard acceptance remain open. |
+| Statistics set | **Partial (Cycle 52; fixture checked)** | Native dialog reported sentence, speaking, task and manual Human/AI/Reference counts for a synthetic fixture. Live updates after edits/annotations and visual placement remain unverified. |
 | Tab bar / all tabs / full screen | **Partial** | Native tab controls, tab overview and fullscreen lifecycle exist, but placement/labels differ and some platform action enabled states remain imperfect. |
 
 ### Go
@@ -215,11 +215,11 @@ These menus were not opened in this folder. The older inspection recorded the st
 | Document Back/Forward | **Match** | Session history restores cursor and guards dirty navigation. |
 | Library Back/Forward / Enclosing Folder | **Match** | Separate library navigation history exists. |
 | Open Link | **Partial** | Opens a source link at the cursor and preview links. Complete fragments/non-Markdown/nearest-match semantics remain open. |
-| Quick Search | **Partial (Cycle 53 source; native pending)** | Go now opens Quick Search. It rereads bounded saved files rather than maintaining an incremental index; native routing remains unverified. |
+| Quick Search | **Partial (Cycle 53; native menu checked)** | Go exposes Quick Search and New Smart Folder opened its blank dialog. It rereads bounded saved files rather than maintaining an incremental index; full search workflow remains unverified. |
 | Command Palette | **Partial** | Searchable workspace command registry exists, but it does not yet contain every menu command. |
-| Locations / Add Location | **Partial (Cycle 53 source; native pending)** | The Go submenu now uses saved local locations and exposes Add Location. Parent/child overlaps are rejected; cloud folders are ordinary local paths. Native order and unavailable-state checks remain. |
-| Recents / Smart folders | **Partial (Cycle 53 source; native pending)** | Go now lists recent files, saved queries and New Smart Folder. Its nested Recents submenu differs from the captured direct action; iA smart-folder semantics remain broader. |
-| Hashtags | **Partial (Cycle 53 source; native pending)** | Go now exposes current-root tags and explicit Refresh. Small complete roots use a bounded watcher and debounced rescan; large, inaccessible or rejected roots state that manual refresh is needed. Native behavior remains unverified. |
+| Locations / Add Location | **Partial (Cycle 53; native menu checked)** | Go listed saved local locations and Add Location. Parent/child overlaps are rejected; cloud folders are ordinary local paths. Unavailable-state checks remain. |
+| Recents / Smart folders | **Partial (Cycle 53; native menu checked)** | Go listed recent files, saved queries and New Smart Folder; the latter opened a blank search. Its nested Recents submenu differs from the captured direct action; iA smart-folder semantics remain broader. |
+| Hashtags | **Partial (Cycle 53; native small-root checked)** | A one-file root showed #alpha and added #beta automatically after an external edit; Go listed both. Large, inaccessible or rejected roots state that manual refresh is needed, but those cases remain unverified natively. |
 
 ### Window, application and Help
 

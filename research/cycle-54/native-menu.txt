@@ -1,0 +1,5 @@
+24 September 2026 — refreshed stable Omawrite Dev.app, disposable file in /private/tmp.
+
+View → Show Completions displayed local "landscape" and "lantern" for the prefix "lan". Return accepted "landscape" and one Command-Z restored "lan". The test edit was discarded using the unsaved-change prompt when closing the temporary document; its disk bytes remained unchanged.
+
+Screenshot capture was unavailable. Popup placement/visuals, keyboard arrow navigation, Escape, IME preedit, code/URL contexts, narrow/dark and accessibility remain unchecked. Edit → Substitutions children have not been captured from iA Writer.

@@ -1,0 +1,5 @@
+24 September 2026 — refreshed stable Omawrite Dev.app, synthetic temporary folder only.
+
+Go menu exposed Back/Forward, library history, Enclosing Folder, Open Link, Quick Search, Command Palette, dynamic Locations, Smart Folders with Recents/New Smart Folder/saved queries, and Hashtags. New Smart Folder opened a blank Quick Search with Save query disabled until text is entered. On a temporary one-file root, Refresh Hashtags reported "1 files scanned; 0 skipped; watching for changes" and #alpha (1). Externally adding #beta to the same saved file produced #beta (1) automatically without manual Refresh; Go → Hashtags listed both tags. The library was returned to repo and the temporary QA location shortcut removed. Existing user files were not edited.
+
+Screenshot capture was unavailable. Saved-query roundtrip, unavailable-root UI, atomic replacement, large-root watcher fallback, keyboard/narrow/dark and inaccessible-volume behavior remain unchecked. The captured iA Recents action is still structurally different from Omawrite's nested submenu.
