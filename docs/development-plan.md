@@ -1,5 +1,7 @@
 # Staged development plan — iA functional parity
 
+**Historical plan:** For post-Cycle-61 planning, see [the proposed Cycles 62–69](next-development-phases.md). This iA sequence remains an implementation record and does not represent the current next cycle.
+
 Proposed 17 September 2026 from Andrew’s seven menu screenshots and current source. The command-level acceptance log is [ia-menu-parity-2026-09-17.md](ia-menu-parity-2026-09-17.md). The standing functional backlog remains [ia-writer-inventory.md](ia-writer-inventory.md). Codex remains the visual reference.
 
 This supersedes the old speculative cycle numbers in the inventory and “Upcoming cycles” table. Cycles 0–13 are historical; 14 onward below are proposed. Larger stages may be split into lettered increments (for example 16a/16b), each independently runnable. These are scope and dependency estimates, not delivery-date promises.
