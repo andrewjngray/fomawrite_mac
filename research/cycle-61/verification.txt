@@ -1,0 +1,14 @@
+Cycle 61 — 25 September 2026
+
+Preflight: Git worktree and uncommitted files identified; checkout target did not exist. A checkout-launched Fomawrite instance was quit normally before moving the folder. The separately installed ordinary app was quit normally before saved settings were changed; both had clean saved document status.
+
+Move: physical checkout directory renamed from omawrite_mac to fomawrite_mac. `git rev-parse --show-toplevel` and `git worktree list` resolved the new path. The old directory is absent; a trial compatibility symlink was removed because the Codex executor rejects a symlinked writable root.
+
+Saved state: exact old checkout prefix rebased in ordinary Fomawrite preferences, including favorites, recents, saved searches, location labels and last-save directory, and one workspace JSON snapshot. Original preference and workspace files were backed up in /private/tmp. Dev preferences contained no old prefix. Post-change preference and workspace checks found zero occurrences of the old path.
+
+Build: ./bin/build passed from the new checkout; qmake regenerated both generated Makefiles without old-path references.
+Tests: ./bin/test passed, 102 passed / 0 failed / 0 skipped.
+Bundles: codesign --verify --deep --strict passed for both local Fomawrite.app and Fomawrite Dev.app.
+Native: Fomawrite Dev launched from the new checkout path with an empty clean draft and the updated checkout favorite. The installed ordinary app reopened its clean saved document and displayed the new fomawrite_mac favorite. No writing was modified.
+
+Remaining: Codex desktop's saved project registration still points at omawrite_mac, and this running task's sandbox remains tied to that path. The project must be relinked at the new folder in Codex for future tasks. Other external applications with saved absolute paths were not exhaustively audited.
