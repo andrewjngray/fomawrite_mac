@@ -1,0 +1,2 @@
+Before fix: QIcon::fromTheme("fomawrite") was null on macOS.
+After fix: QIcon(":/app/FomawriteIcon.png") was non-null and rendered a non-null 64 px pixmap from the compiled Qt resource.

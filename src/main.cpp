@@ -98,7 +98,14 @@ int main(int argc, char *argv[]) {
     WriterApplication app(argc, argv);
     app.setApplicationName(QStringLiteral("fomawrite"));
     app.setDesktopFileName(QStringLiteral("fomawrite"));
+#ifdef Q_OS_MACOS
+    // The freedesktop theme lookup is empty on macOS; give running windows the
+    // same mark as the bundled .icns instead of replacing it with an empty icon.
+    const QIcon appIcon(QStringLiteral(":/app/FomawriteIcon.png"));
+    app.setWindowIcon(appIcon);
+#else
     app.setWindowIcon(QIcon::fromTheme(QStringLiteral("fomawrite")));
+#endif
 
     QFontDatabase::addApplicationFont(QStringLiteral(":/fonts/iAWriterMonoS-Regular.ttf"));
     QFontDatabase::addApplicationFont(QStringLiteral(":/fonts/iAWriterMonoS-Italic.ttf"));
@@ -277,6 +284,7 @@ int main(int argc, char *argv[]) {
         session->window = qobject_cast<QWindow *>(session->engine->rootObjects().constFirst());
         backend->setParentWindow(session->window);
 #ifdef Q_OS_MACOS
+        session->window->setIcon(appIcon);
         configureMacWindowChrome(session->window);
         const auto applyWindowTheme = [session] {
             if (session->window && session->backend)

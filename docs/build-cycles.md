@@ -1080,3 +1080,15 @@ Validation: the 1024 px and 64 px renders were inspected. `./bin/build` passed a
 Known gaps: Dock/Finder rendering can be cached by macOS and has not been inspected across every scale and appearance. These are local ad-hoc bundles, not a notarized public release. The installed `/Applications/Fomawrite.app` was not replaced.
 
 Runnable artifacts: `dist/Fomawrite.app` and `dist/Fomawrite Dev.app`. [Optional exercise](../research/usability/cycle-72.md): glance at the Dev Dock icon at your usual Dock size and check that the short connector reads clearly.
+
+## Cycle 73 — restore the running macOS Dock icon
+
+Planned scope: address Andrew's screenshots showing a generic Dock placeholder after the final icon was installed. Keep the approved short-connector artwork and the existing product/bundle identities.
+
+Changes: the macOS runtime no longer overrides its icon with an empty `QIcon::fromTheme("fomawrite")`. The icon generator now writes a matching PNG from the approved SVG, the Qt resource bundle embeds it, and the application and every QML window set it explicitly. Linux retains the themed icon path.
+
+Tests and native verification: `./bin/build` passed and `./bin/test` passed **111 tests, zero failures and zero skips**. The old theme lookup was confirmed null; the compiled Qt resource rendered a non-null 64 px icon. `./bin/package-mac` and `./bin/prepare-dev-app` passed, with strict signature verification. Both refreshed apps launched to clean Untitled windows. The old installed app was closed normally, and `/Applications/Fomawrite.app` was updated and verified to match the generated executable and `.icns`. See [Cycle 73 evidence](../research/cycle-73/README.md).
+
+Known gaps: the Dock itself was not captured through the UI tool. A pinned tile may retain macOS icon-cache state until refreshed; Andrew should check both ordinary and Dev tiles. This remains a local ad-hoc build, not a notarized public release.
+
+Runnable artifacts: `/Applications/Fomawrite.app`, `dist/Fomawrite.app` and `dist/Fomawrite Dev.app`. [Optional exercise](../research/usability/cycle-73.md): glance at both Dock tiles and confirm the writing icon replaces the generic grid.
