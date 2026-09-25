@@ -1092,3 +1092,15 @@ Tests and native verification: `./bin/build` passed and `./bin/test` passed **11
 Known gaps: the Dock itself was not captured through the UI tool. A pinned tile may retain macOS icon-cache state until refreshed; Andrew should check both ordinary and Dev tiles. This remains a local ad-hoc build, not a notarized public release.
 
 Runnable artifacts: `/Applications/Fomawrite.app`, `dist/Fomawrite.app` and `dist/Fomawrite Dev.app`. [Optional exercise](../research/usability/cycle-73.md): glance at both Dock tiles and confirm the writing icon replaces the generic grid.
+
+## Cycle 74 — rounded macOS app tile
+
+Planned scope: address Andrew's Dock screenshots showing the short-connector mark on a small white card inside an oversized white square. Make the icon read as a distinct rounded app tile comparable in scale to Outlook, preserving the selected writing mark.
+
+Changes: the SVG now has a transparent canvas with one large cool-gray rounded tile, subtle border and shadow, and larger writing lines and blue caret. Regenerated the PNG and multiresolution `.icns` from the same vector source.
+
+Tests and native verification: `./bin/build` passed and `./bin/test` passed **111 tests, zero failures and zero skips**. `./bin/package-mac` and `./bin/prepare-dev-app` succeeded. The old ordinary and Dev windows were clean and closed normally before replacement. Both refreshed apps launched to clean Untitled windows; the installed executable and icon match `dist/Fomawrite.app`, and strict signature verification passed. macOS's `NSWorkspace` initially returned its cached old icon; after Launch Services registration and a Dock restart it returned the new rounded tile. See [Cycle 74 evidence](../research/cycle-74/README.md).
+
+Known gaps: the Dock itself was not captured through the UI tool, so Andrew should judge the result at his own Dock size and desktop appearance. This remains a local ad-hoc build, not a notarized release.
+
+Runnable artifacts: `/Applications/Fomawrite.app`, `dist/Fomawrite.app` and `dist/Fomawrite Dev.app`. [Optional exercise](../research/usability/cycle-74.md): compare both Dock tiles with Outlook against light and dark backgrounds.

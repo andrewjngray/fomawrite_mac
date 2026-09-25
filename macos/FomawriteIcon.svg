@@ -1,10 +1,16 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
   <title>Fomawrite — writing lines and insertion caret</title>
-  <rect width="1024" height="1024" fill="#f6f8fa"/>
-  <rect x="168" y="198" width="688" height="682" rx="100" fill="#e1e5e9"/>
-  <rect x="168" y="180" width="688" height="682" rx="100" fill="#ffffff" stroke="#e3e7ea" stroke-width="5"/>
-  <rect x="266" y="335" width="32" height="146" rx="16" fill="#aab1b6"/>
-  <rect x="255" y="305" width="455" height="62" rx="31" fill="#555b60"/>
-  <rect x="255" y="450" width="285" height="62" rx="31" fill="#555b60"/>
-  <rect x="594" y="430" width="30" height="144" rx="10" fill="#079fe0"/>
+  <defs>
+    <linearGradient id="tile" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#e2e8ec"/>
+      <stop offset="1" stop-color="#c3cdd4"/>
+    </linearGradient>
+  </defs>
+  <rect x="48" y="62" width="928" height="928" rx="222" fill="#8e9aa3" fill-opacity="0.28"/>
+  <rect x="48" y="40" width="928" height="928" rx="222" fill="url(#tile)" stroke="#aab5bd" stroke-width="8"/>
+  <rect x="68" y="60" width="888" height="888" rx="202" fill="none" stroke="#ffffff" stroke-opacity="0.58" stroke-width="5"/>
+  <rect x="246" y="352" width="32" height="184" rx="16" fill="#9ca7af"/>
+  <rect x="230" y="334" width="564" height="68" rx="34" fill="#51595f"/>
+  <rect x="230" y="502" width="340" height="68" rx="34" fill="#51595f"/>
+  <rect x="650" y="480" width="30" height="148" rx="10" fill="#079fe0"/>
 </svg>
