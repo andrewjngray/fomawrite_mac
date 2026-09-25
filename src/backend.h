@@ -15,6 +15,7 @@
 #include "filelibrary.h"
 
 class MarkdownHighlighter;
+class VisualTextHighlighter;
 class QTextDocument;
 class QWindow;
 class QPagedPaintDevice;
@@ -92,8 +93,16 @@ public:
     Q_INVOKABLE int markdownAnchorPosition(const QString &markdown, const QString &anchor) const;
     Q_INVOKABLE QString tableOfContents(const QString &markdown) const;
     Q_INVOKABLE void stylePreview(QObject *textDocument);
+    Q_INVOKABLE void styleVisualEditor(QObject *textDocument, int textSize);
     Q_INVOKABLE QVariantMap wrapSelection(int start, int end, const QString &before, const QString &after);
     Q_INVOKABLE QVariantMap replaceText(int start, int end, const QString &replacement);
+    // A conservative snapshot for the visual editor. `source` is the exact
+    // canonical Markdown that callers must return to applyVisualEdit().
+    Q_INVOKABLE QVariantMap visualProjection() const;
+    // Applies one inline visual replacement only when expectedSource is still
+    // the current canonical source and the mapping can produce one source edit.
+    Q_INVOKABLE bool applyVisualEdit(int start, int length, const QString &replacement,
+                                     const QString &expectedSource);
     Q_INVOKABLE QVariantMap editMarkdown(const QString &action, int start, int end);
     Q_INVOKABLE QVariantList searchPositions(const QString &query) const;
     Q_INVOKABLE int replaceMatches(const QString &query, const QString &replacement, int position);
@@ -125,6 +134,27 @@ public:
     QString outputFont() const;
     int outputPointSize() const;
     QString outputTemplateName() const;
+    // Stable, lowercase identifiers for the export hub. Invalid requests leave
+    // the active layout unchanged, so QML can safely pass untrusted selections.
+    Q_INVOKABLE QString exportPaperSize() const;
+    Q_INVOKABLE bool setExportPaperSize(const QString &paperSize);
+    Q_INVOKABLE QString exportOrientation() const;
+    Q_INVOKABLE bool setExportOrientation(const QString &orientation);
+    // Maps contain id, name, and font. Custom is deliberately excluded because
+    // it is loaded from a user file rather than bundled with Fomawrite.
+    Q_INVOKABLE QVariantList builtInOutputStyles() const;
+    // Optional user-selected CSS affects portable HTML exports only.
+    Q_INVOKABLE QString outputCssName() const;
+    Q_INVOKABLE bool loadOutputCss(const QUrl &file);
+    Q_INVOKABLE void clearOutputCss();
+    // Local, Fomawrite-owned export styles. Selecting one copies it into the
+    // existing Custom output slot (ID 3); it never changes document source.
+    Q_INVOKABLE QVariantList userOutputStyles() const;
+    Q_INVOKABLE QString selectedUserOutputStyleId() const;
+    Q_INVOKABLE QVariantMap createUserOutputStyleFromCurrent(const QString &name);
+    Q_INVOKABLE bool updateUserOutputStyle(const QString &id, const QVariantMap &changes);
+    Q_INVOKABLE bool selectUserOutputStyle(const QString &id);
+    Q_INVOKABLE bool deleteUserOutputStyle(const QString &id);
     Q_INVOKABLE void setOutputStyle(int style);
     Q_INVOKABLE bool loadOutputStyle(const QUrl &file);
     Q_INVOKABLE void newWindow();
@@ -193,6 +223,8 @@ signals:
     void wordCountChanged();
     void documentStatisticsChanged();
     void outputStyleChanged();
+    void outputPageLayoutChanged();
+    void outputCssChanged();
     void themePresetChanged();
     void darkModeChanged();
     void textScaleChanged();
@@ -218,12 +250,23 @@ private:
     void paintOutput(QPagedPaintDevice &device, QTextDocument &document) const;
     void applyTemplate(QTextDocument &document, bool preview) const;
     void prepareOutput(QTextDocument &document, bool plain = false) const;
+    QPageLayout effectiveOutputPageLayout() const;
+    void restoreOutputPageLayout();
+    void persistOutputPageLayout();
+    void loadUserOutputStyles();
+    bool saveUserOutputStyles();
+    bool applyUserOutputStyle(const QVariantMap &style);
     int m_outputStyle = 0;
     QString m_customOutputFont;
     int m_customOutputSize = 12;
     QString m_outputHeader, m_outputFooter;
     bool m_outputTitlePage = false;
+    bool m_customPageFurniture = true;
+    QVariantList m_userOutputStyles;
+    QString m_selectedUserOutputStyleId;
+    bool m_userOutputStylesLoadFailed = false;
     QPageLayout m_pageLayout;
+    QUrl m_outputCssFile;
     void saveTo(const QUrl &url, bool protectExternalChanges = false);
     QUrl suggestedSaveUrl() const;
     QString currentDocumentText() const;
@@ -263,6 +306,10 @@ private:
     QPointer<QTextDocument> m_document;
     QPointer<QWindow> m_parentWindow;
     QPointer<MarkdownHighlighter> m_highlighter;
+    QPointer<VisualTextHighlighter> m_visualHighlighter;
+    QString m_lastVisualResultSource;
+    qint64 m_lastVisualEditAt = 0;
+    int m_lastVisualEditEnd = -1;
     QString m_lastDocumentText;
     QByteArray m_lastKnownFileContents;
     bool m_requiresExplicitSave = false;

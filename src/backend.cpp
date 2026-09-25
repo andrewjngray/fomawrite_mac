@@ -12,15 +12,18 @@
 #include <QJsonArray>
 #include <QPdfWriter>
 #include <QPageSetupDialog>
+#include <QPageSize>
 #include "markdownextensions.h"
+#include "outputcss.h"
 #include <QTextBoundaryFinder>
 #include "backend.h"
-
+#include "sourcevisualmapping.h"
 #include <QClipboard>
 #include <QColor>
 #include <QCoreApplication>
 #include <QDir>
 #include <QDate>
+#include <QDateTime>
 #include <QFile>
 #include <QFileInfo>
 #include <QDesktopServices>
@@ -33,6 +36,7 @@
 #include <QQuickTextDocument>
 #include <QRegularExpression>
 #include <QSettings>
+#include <QSet>
 #include <QStandardPaths>
 #include <QJsonDocument>
 #include <QJsonObject>
@@ -44,15 +48,100 @@
 #include <QTextDocument>
 #include <QTextStream>
 #include <QUrl>
+#include <QUuid>
 #include <QVariantMap>
 #include <QWindow>
 
 #include <algorithm>
 
 #include "markdownhighlighter.h"
+#include "visualtexthighlighter.h"
 
 constexpr qreal typoraLineHeightPercent = 140;
 const QString lastSaveDirectorySetting = QStringLiteral("file/lastSaveDirectory");
+
+namespace {
+
+struct OutputPaper {
+    const char *id;
+    QPageSize::PageSizeId size;
+};
+
+constexpr OutputPaper outputPapers[] = {
+    {"a4", QPageSize::A4},
+    {"letter", QPageSize::Letter},
+    {"legal", QPageSize::Legal},
+    {"a5", QPageSize::A5},
+};
+
+const OutputPaper *outputPaper(const QString &id) {
+    const QString normalized = id.trimmed().toLower();
+    for (const auto &paper : outputPapers) {
+        if (normalized == QLatin1String(paper.id))
+            return &paper;
+    }
+    return nullptr;
+}
+
+const OutputPaper *outputPaper(QPageSize::PageSizeId size) {
+    for (const auto &paper : outputPapers) {
+        if (size == paper.size)
+            return &paper;
+    }
+    return nullptr;
+}
+
+QString outputStyleCatalogPath() {
+    return QDir(QStandardPaths::writableLocation(QStandardPaths::AppDataLocation))
+        .filePath(QStringLiteral("output-user-styles.json"));
+}
+
+constexpr int maxUserOutputStyles = 64;
+constexpr qint64 maxUserOutputStyleCatalogBytes = 64 * 1024;
+
+bool isSafeOutputStyleText(const QString &value, int maximum) {
+    if (value.isEmpty() || value.size() > maximum)
+        return false;
+    for (const QChar character : value) {
+        if (character.isNull() || character.category() == QChar::Other_Control)
+            return false;
+    }
+    return true;
+}
+
+bool parseUserOutputStyle(const QJsonObject &object, QVariantMap *style) {
+    static const QRegularExpression idPattern(
+        QStringLiteral("^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"));
+    const QString id = object.value(QStringLiteral("id")).toString();
+    const QString name = object.value(QStringLiteral("name")).toString().trimmed();
+    const QString font = object.value(QStringLiteral("fontFamily")).toString().trimmed();
+    const QJsonValue sizeValue = object.value(QStringLiteral("pointSize"));
+    const QJsonValue headerValue = object.value(QStringLiteral("header"));
+    const QJsonValue footerValue = object.value(QStringLiteral("footer"));
+    const QString header = headerValue.toString();
+    const QString footer = footerValue.toString();
+    const QJsonValue titlePage = object.value(QStringLiteral("titlePage"));
+    const QJsonValue pageFurniture = object.value(QStringLiteral("pageFurniture"));
+    if (!idPattern.match(id).hasMatch() || !isSafeOutputStyleText(name, 80)
+        || !isSafeOutputStyleText(font, 128) || !sizeValue.isDouble()
+        || sizeValue.toDouble() != sizeValue.toInt()
+        || sizeValue.toInt() < 8 || sizeValue.toInt() > 32
+        || !headerValue.isString() || !footerValue.isString()
+        || header.size() > 200 || footer.size() > 200
+        || !isSafeOutputStyleText(header.isEmpty() ? QStringLiteral(" ") : header, 200)
+        || !isSafeOutputStyleText(footer.isEmpty() ? QStringLiteral(" ") : footer, 200)
+        || !titlePage.isBool()
+        || (!pageFurniture.isUndefined() && !pageFurniture.isBool()))
+        return false;
+    *style = {{QStringLiteral("id"), id}, {QStringLiteral("name"), name},
+              {QStringLiteral("fontFamily"), font}, {QStringLiteral("pointSize"), sizeValue.toInt()},
+              {QStringLiteral("header"), header}, {QStringLiteral("footer"), footer},
+              {QStringLiteral("titlePage"), titlePage.toBool()},
+              {QStringLiteral("pageFurniture"), pageFurniture.isUndefined() ? true : pageFurniture.toBool()}};
+    return true;
+}
+
+} // namespace
 
 static QString authorshipPath(const QUrl &url) {
     const QFileInfo info(url.toLocalFile());
@@ -355,6 +444,11 @@ Backend::Backend(QObject *parent, bool outputOnly) : QObject(parent), m_library(
     m_outputHeader=QSettings().value("output/header").toString().left(200);
     m_outputFooter=QSettings().value("output/footer","{page} / {pages}").toString().left(200);
     m_outputTitlePage=QSettings().value("output/titlePage",false).toBool();
+    m_customPageFurniture=QSettings().value("output/pageFurniture",true).toBool();
+    restoreOutputPageLayout();
+    const QString cssPath = QSettings().value(QStringLiteral("output/cssFile")).toString();
+    if (!cssPath.isEmpty()) m_outputCssFile = QUrl::fromLocalFile(cssPath);
+    loadUserOutputStyles();
     const auto preset = QSettings().value("appearance/theme", "system").toString();
     if (QStringList{"system", "light", "dark", "paper"}.contains(preset)) m_themePreset = preset;
     loadOmarchyTheme();
@@ -748,6 +842,56 @@ QVariantMap Backend::replaceText(int start, int end, const QString &replacement)
     cursor.insertText(normalized);
     cursor.endEditBlock();
     return {{"start", first}, {"end", first + normalized.size()}};
+}
+
+QVariantMap Backend::visualProjection() const {
+    const QString source = currentDocumentText();
+    const SourceVisualMapping mapping = SourceVisualMapping::create(source);
+    QVariantList blocks;
+    const auto kindName = [](SourceVisualMapping::BlockKind kind) {
+        switch (kind) {
+        case SourceVisualMapping::BlockKind::Paragraph: return QStringLiteral("paragraph");
+        case SourceVisualMapping::BlockKind::Heading: return QStringLiteral("heading");
+        case SourceVisualMapping::BlockKind::ListItem: return QStringLiteral("listItem");
+        case SourceVisualMapping::BlockKind::SourceOnly: return QStringLiteral("sourceOnly");
+        }
+        return QStringLiteral("sourceOnly");
+    };
+    for (const SourceVisualMapping::Block &block : mapping.blocks()) {
+        blocks.append(QVariantMap{{"kind", kindName(block.kind)},
+                                  {"sourceStart", block.source.start},
+                                  {"sourceLength", block.source.length},
+                                  {"visualStart", block.visual.start},
+                                  {"visualLength", block.visual.length},
+                                  {"editable", block.editable}});
+    }
+    return {{"source", source}, {"visualText", mapping.visualText()}, {"blocks", blocks}};
+}
+
+bool Backend::applyVisualEdit(int start, int length, const QString &replacement,
+                              const QString &expectedSource) {
+    if (!m_document || expectedSource != currentDocumentText() || start < 0 || length < 0
+            || replacement.contains(QRegularExpression(QStringLiteral("[\\\\`*_\\[\\]<>\\r\\n]"))))
+        return false;
+    const SourceVisualMapping mapping = SourceVisualMapping::create(expectedSource);
+    const auto edit = mapping.sourceEditForVisualReplacement({start, length}, replacement);
+    if (!edit.has_value()) return false;
+    const qint64 now = QDateTime::currentMSecsSinceEpoch();
+    const bool continueTyping = length == 0 && !replacement.isEmpty()
+        && expectedSource == m_lastVisualResultSource
+        && edit->source.start == m_lastVisualEditEnd
+        && now >= m_lastVisualEditAt && now - m_lastVisualEditAt < 1500;
+    QTextCursor cursor(m_document);
+    cursor.setPosition(edit->source.start);
+    cursor.setPosition(edit->source.end(), QTextCursor::KeepAnchor);
+    if (continueTyping) cursor.joinPreviousEditBlock();
+    else cursor.beginEditBlock();
+    cursor.insertText(edit->replacement);
+    cursor.endEditBlock();
+    m_lastVisualResultSource = currentDocumentText();
+    m_lastVisualEditAt = now;
+    m_lastVisualEditEnd = edit->source.start + edit->replacement.size();
+    return true;
 }
 
 QVariantMap Backend::wrapSelection(int start, int end, const QString &before, const QString &after) {
@@ -1199,6 +1343,24 @@ int Backend::markdownAnchorPosition(const QString &markdown, const QString &anch
         if (slug == anchor) return heading["position"].toInt();
     }
     return -1;
+}
+
+void Backend::styleVisualEditor(QObject *textDocument, int textSize) {
+    auto *quick = qobject_cast<QQuickTextDocument *>(textDocument);
+    if (!quick || !quick->textDocument() || quick->textDocument() == m_document) return;
+    QTextDocument *visual = quick->textDocument();
+    if (m_visualHighlighter && m_visualHighlighter->document() != visual)
+        delete m_visualHighlighter.data();
+    if (!m_visualHighlighter)
+        m_visualHighlighter = new VisualTextHighlighter(visual);
+    VisualTextHighlighter::Style style;
+    style.font.setPointSizeF(qMax(9, textSize) * 0.75);
+    style.textColor = QColor(m_themeForeground);
+    style.linkColor = QColor(m_themeAccent);
+    style.sourceOnlyColor = QColor(m_darkMode ? QStringLiteral("#a4a7aa") : QStringLiteral("#60666a"));
+    style.sourceOnlyBackground = QColor(m_darkMode ? QStringLiteral("#35383a") : QStringLiteral("#f0f1f2"));
+    m_visualHighlighter->setStyle(style);
+    m_visualHighlighter->setMapping(SourceVisualMapping::create(currentDocumentText()));
 }
 
 void Backend::stylePreview(QObject *textDocument) {
@@ -2248,8 +2410,360 @@ QString Backend::outputTemplateName() const {
     return QStringList{"Modern (Sans)", "Classic (Serif)", "Manuscript (Mono)", "Custom",
                        "GitHub", "Helvetica", "Palatino", "MLA Draft"}.value(m_outputStyle);
 }
+QPageLayout Backend::effectiveOutputPageLayout() const {
+    if (m_pageLayout.isValid())
+        return m_pageLayout;
+    // Keep the long-standing PDF default until a user chooses a page layout.
+    return QPageLayout(QPageSize(QPageSize::A4), QPageLayout::Portrait,
+                       QMarginsF(18, 18, 18, 18), QPageLayout::Millimeter);
+}
+
+void Backend::restoreOutputPageLayout() {
+    QSettings settings;
+    if (!settings.contains("output/pageSizeId"))
+        return;
+    QPageSize pageSize(static_cast<QPageSize::PageSizeId>(
+        settings.value("output/pageSizeId").toInt()));
+    if (!pageSize.isValid()) {
+        bool widthOk = false, heightOk = false;
+        const qreal width = settings.value("output/pageWidth").toDouble(&widthOk);
+        const qreal height = settings.value("output/pageHeight").toDouble(&heightOk);
+        if (!widthOk || !heightOk || width < 10 || width > 2000 || height < 10 || height > 2000)
+            return;
+        pageSize = QPageSize(QSizeF(width, height), QPageSize::Millimeter,
+                             settings.value("output/pageName").toString());
+    }
+    const QString orientation = settings.value("output/pageOrientation", "portrait").toString();
+    const auto layoutOrientation = orientation == "landscape"
+        ? QPageLayout::Landscape : QPageLayout::Portrait;
+    const QMarginsF defaults(18, 18, 18, 18);
+    auto margin = [&settings](const char *key, qreal fallback) {
+        bool ok = false;
+        const qreal value = settings.value(key, fallback).toDouble(&ok);
+        return ok && value >= 0 && value <= 200 ? value : fallback;
+    };
+    const QMarginsF margins(margin("output/pageMarginLeft", defaults.left()),
+                            margin("output/pageMarginTop", defaults.top()),
+                            margin("output/pageMarginRight", defaults.right()),
+                            margin("output/pageMarginBottom", defaults.bottom()));
+    QPageLayout restored(pageSize, layoutOrientation, margins, QPageLayout::Millimeter);
+    if (restored.isValid())
+        m_pageLayout = restored;
+}
+
+void Backend::persistOutputPageLayout() {
+    if (!m_pageLayout.isValid())
+        return;
+    QSettings settings;
+    const QPageSize pageSize = m_pageLayout.pageSize();
+    settings.setValue("output/pageSizeId", static_cast<int>(pageSize.id()));
+    const QSizeF size = pageSize.size(QPageSize::Millimeter);
+    settings.setValue("output/pageWidth", size.width());
+    settings.setValue("output/pageHeight", size.height());
+    settings.setValue("output/pageName", pageSize.name());
+    settings.setValue("output/pageOrientation", m_pageLayout.orientation() == QPageLayout::Landscape
+                      ? "landscape" : "portrait");
+    const QMarginsF margins = m_pageLayout.margins(QPageLayout::Millimeter);
+    settings.setValue("output/pageMarginLeft", margins.left());
+    settings.setValue("output/pageMarginTop", margins.top());
+    settings.setValue("output/pageMarginRight", margins.right());
+    settings.setValue("output/pageMarginBottom", margins.bottom());
+}
+
+QString Backend::exportPaperSize() const {
+    const auto *paper = outputPaper(effectiveOutputPageLayout().pageSize().id());
+    return paper ? QLatin1String(paper->id) : QStringLiteral("custom");
+}
+
+bool Backend::setExportPaperSize(const QString &paperSize) {
+    const auto *paper = outputPaper(paperSize);
+    if (!paper)
+        return false;
+    QPageLayout layout = effectiveOutputPageLayout();
+    layout.setPageSize(QPageSize(paper->size));
+    if (!layout.isValid())
+        return false;
+    m_pageLayout = layout;
+    persistOutputPageLayout();
+    emit outputPageLayoutChanged();
+    return true;
+}
+
+QString Backend::exportOrientation() const {
+    return effectiveOutputPageLayout().orientation() == QPageLayout::Landscape
+        ? QStringLiteral("landscape") : QStringLiteral("portrait");
+}
+
+bool Backend::setExportOrientation(const QString &orientation) {
+    const QString normalized = orientation.trimmed().toLower();
+    if (normalized != "portrait" && normalized != "landscape")
+        return false;
+    QPageLayout layout = effectiveOutputPageLayout();
+    layout.setOrientation(normalized == "landscape" ? QPageLayout::Landscape : QPageLayout::Portrait);
+    if (!layout.isValid())
+        return false;
+    m_pageLayout = layout;
+    persistOutputPageLayout();
+    emit outputPageLayoutChanged();
+    return true;
+}
+
+QString Backend::outputCssName() const {
+    return m_outputCssFile.isLocalFile()
+        ? QFileInfo(m_outputCssFile.toLocalFile()).fileName() : QStringLiteral("None");
+}
+
+bool Backend::loadOutputCss(const QUrl &file) {
+    QString error;
+    if (!OutputCss::load(file, &error)) { setStatus(error); return false; }
+    m_outputCssFile = file;
+    QSettings().setValue(QStringLiteral("output/cssFile"), file.toLocalFile());
+    emit outputCssChanged();
+    setStatus(QStringLiteral("HTML export CSS selected."));
+    return true;
+}
+
+void Backend::clearOutputCss() {
+    if (m_outputCssFile.isEmpty()) return;
+    m_outputCssFile = QUrl{};
+    QSettings().remove(QStringLiteral("output/cssFile"));
+    emit outputCssChanged();
+    setStatus(QStringLiteral("HTML export CSS cleared."));
+}
+
+QVariantList Backend::builtInOutputStyles() const {
+    QVariantList styles;
+    const auto addStyle = [&styles](int id, const char *name, const char *font) {
+        styles.append(QVariantMap{{"id", id}, {"name", QLatin1String(name)},
+                                  {"font", QLatin1String(font)}});
+    };
+    addStyle(0, "Modern (Sans)", "Helvetica Neue");
+    addStyle(1, "Classic (Serif)", "Georgia");
+    addStyle(2, "Manuscript (Mono)", "iA Writer Mono S");
+    addStyle(4, "GitHub", "Helvetica Neue");
+    addStyle(5, "Helvetica", "Helvetica");
+    addStyle(6, "Palatino", "Palatino");
+    addStyle(7, "MLA Draft", "Times New Roman");
+    return styles;
+}
+
+QVariantList Backend::userOutputStyles() const { return m_userOutputStyles; }
+
+QString Backend::selectedUserOutputStyleId() const { return m_selectedUserOutputStyleId; }
+
+bool Backend::applyUserOutputStyle(const QVariantMap &style) {
+    const QString family = style.value(QStringLiteral("fontFamily")).toString();
+    const int size = style.value(QStringLiteral("pointSize")).toInt();
+    if (family.isEmpty() || size < 8 || size > 32)
+        return false;
+    m_customOutputFont = family;
+    m_customOutputSize = size;
+    m_outputHeader = style.value(QStringLiteral("header")).toString();
+    m_outputFooter = style.value(QStringLiteral("footer")).toString();
+    m_outputTitlePage = style.value(QStringLiteral("titlePage")).toBool();
+    m_customPageFurniture = style.value(QStringLiteral("pageFurniture"), true).toBool();
+    QSettings settings;
+    settings.setValue(QStringLiteral("output/font"), m_customOutputFont);
+    settings.setValue(QStringLiteral("output/size"), m_customOutputSize);
+    settings.setValue(QStringLiteral("output/header"), m_outputHeader);
+    settings.setValue(QStringLiteral("output/footer"), m_outputFooter);
+    settings.setValue(QStringLiteral("output/titlePage"), m_outputTitlePage);
+    settings.setValue(QStringLiteral("output/pageFurniture"), m_customPageFurniture);
+    return true;
+}
+
+void Backend::loadUserOutputStyles() {
+    m_userOutputStyles.clear();
+    m_userOutputStylesLoadFailed = false;
+    const QString path = outputStyleCatalogPath();
+    QFile file(path);
+    if (!file.exists())
+        return;
+    if (!file.open(QIODevice::ReadOnly) || file.size() < 0
+        || file.size() > maxUserOutputStyleCatalogBytes) {
+        m_userOutputStylesLoadFailed = true;
+        return;
+    }
+    QJsonParseError parseError;
+    const QJsonDocument document = QJsonDocument::fromJson(file.read(maxUserOutputStyleCatalogBytes + 1), &parseError);
+    if (parseError.error != QJsonParseError::NoError || !document.isObject()) {
+        m_userOutputStylesLoadFailed = true;
+        return;
+    }
+    const QJsonObject root = document.object();
+    if (root.value(QStringLiteral("version")).toInt() != 1
+        || !root.value(QStringLiteral("styles")).isArray()) {
+        m_userOutputStylesLoadFailed = true;
+        return;
+    }
+    const QJsonArray styles = root.value(QStringLiteral("styles")).toArray();
+    if (styles.size() > maxUserOutputStyles) {
+        m_userOutputStylesLoadFailed = true;
+        return;
+    }
+    QSet<QString> ids;
+    for (const QJsonValue &value : styles) {
+        QVariantMap style;
+        if (!value.isObject() || !parseUserOutputStyle(value.toObject(), &style)
+            || ids.contains(style.value(QStringLiteral("id")).toString())) {
+            m_userOutputStyles.clear();
+            m_userOutputStylesLoadFailed = true;
+            return;
+        }
+        ids.insert(style.value(QStringLiteral("id")).toString());
+        m_userOutputStyles.append(style);
+    }
+    const QString selected = QSettings().value(QStringLiteral("output/userStyleId")).toString();
+    for (const QVariant &entry : m_userOutputStyles) {
+        const QVariantMap style = entry.toMap();
+        if (style.value(QStringLiteral("id")).toString() == selected) {
+            m_selectedUserOutputStyleId = selected;
+            applyUserOutputStyle(style);
+            m_outputStyle = 3;
+            return;
+        }
+    }
+    if (!selected.isEmpty())
+        QSettings().remove(QStringLiteral("output/userStyleId"));
+}
+
+bool Backend::saveUserOutputStyles() {
+    if (m_userOutputStylesLoadFailed || m_userOutputStyles.size() > maxUserOutputStyles)
+        return false;
+    const QJsonObject root{{QStringLiteral("version"), 1},
+                           {QStringLiteral("styles"), QJsonArray::fromVariantList(m_userOutputStyles)}};
+    const QByteArray bytes = QJsonDocument(root).toJson(QJsonDocument::Compact);
+    if (bytes.size() > maxUserOutputStyleCatalogBytes)
+        return false;
+    const QString path = outputStyleCatalogPath();
+    if (!QDir().mkpath(QFileInfo(path).absolutePath()))
+        return false;
+    QSaveFile file(path);
+    if (!file.open(QIODevice::WriteOnly))
+        return false;
+    file.setPermissions(QFileDevice::ReadOwner | QFileDevice::WriteOwner);
+    return file.write(bytes) == bytes.size() && file.commit();
+}
+
+QVariantMap Backend::createUserOutputStyleFromCurrent(const QString &name) {
+    QVariantMap style{{QStringLiteral("id"), QUuid::createUuid().toString(QUuid::WithoutBraces).toLower()},
+                      {QStringLiteral("name"), name.trimmed()},
+                      {QStringLiteral("fontFamily"), outputFont().trimmed()},
+                      {QStringLiteral("pointSize"), outputPointSize()},
+                      {QStringLiteral("header"), m_outputStyle == 3 ? m_outputHeader : (m_outputStyle == 0 ? QString() : QStringLiteral("{title}"))},
+                      {QStringLiteral("footer"), m_outputStyle == 3 ? m_outputFooter : (m_outputStyle == 0 ? QString() : QStringLiteral("{page} / {pages}"))},
+                      {QStringLiteral("titlePage"), m_outputStyle == 3 && m_outputTitlePage},
+                      {QStringLiteral("pageFurniture"), m_outputStyle == 3 ? m_customPageFurniture : m_outputStyle != 0}};
+    QVariantMap checked;
+    if (m_userOutputStylesLoadFailed) {
+        setStatus(QStringLiteral("User output style catalog could not be read; leave it unchanged."));
+        return {{QStringLiteral("error"), m_status}};
+    }
+    if (m_userOutputStyles.size() >= maxUserOutputStyles
+        || !parseUserOutputStyle(QJsonObject::fromVariantMap(style), &checked)) {
+        setStatus(QStringLiteral("Style needs a name, a font, and a point size between 8 and 32."));
+        return {{QStringLiteral("error"), m_status}};
+    }
+    m_userOutputStyles.append(checked);
+    if (!saveUserOutputStyles()) {
+        m_userOutputStyles.removeLast();
+        setStatus(QStringLiteral("Could not save user output styles."));
+        return {{QStringLiteral("error"), m_status}};
+    }
+    setStatus(QStringLiteral("User output style created."));
+    return checked;
+}
+
+bool Backend::updateUserOutputStyle(const QString &id, const QVariantMap &changes) {
+    if (m_userOutputStylesLoadFailed) {
+        setStatus(QStringLiteral("User output style catalog could not be read; leave it unchanged."));
+        return false;
+    }
+    for (int index = 0; index < m_userOutputStyles.size(); ++index) {
+        const QVariantMap existing = m_userOutputStyles.at(index).toMap();
+        if (existing.value(QStringLiteral("id")).toString() != id)
+            continue;
+        QVariantMap merged = existing;
+        for (const QString &key : {QStringLiteral("name"), QStringLiteral("fontFamily"),
+                                  QStringLiteral("pointSize"), QStringLiteral("header"),
+                                  QStringLiteral("footer"), QStringLiteral("titlePage"),
+                                  QStringLiteral("pageFurniture")}) {
+            if (changes.contains(key))
+                merged.insert(key, changes.value(key));
+        }
+        QVariantMap checked;
+        if (!parseUserOutputStyle(QJsonObject::fromVariantMap(merged), &checked)) {
+            setStatus(QStringLiteral("Style has an invalid name, font, size, header, footer, or title-page setting."));
+            return false;
+        }
+        m_userOutputStyles[index] = checked;
+        if (!saveUserOutputStyles()) {
+            m_userOutputStyles[index] = existing;
+            setStatus(QStringLiteral("Could not save user output styles."));
+            return false;
+        }
+        if (m_selectedUserOutputStyleId == id) {
+            applyUserOutputStyle(checked);
+            setOutputStyle(3);
+        }
+        setStatus(QStringLiteral("User output style updated."));
+        return true;
+    }
+    setStatus(QStringLiteral("User output style was not found."));
+    return false;
+}
+
+bool Backend::selectUserOutputStyle(const QString &id) {
+    for (const QVariant &entry : m_userOutputStyles) {
+        const QVariantMap style = entry.toMap();
+        if (style.value(QStringLiteral("id")).toString() != id)
+            continue;
+        if (!applyUserOutputStyle(style)) {
+            setStatus(QStringLiteral("User output style is invalid."));
+            return false;
+        }
+        m_selectedUserOutputStyleId = id;
+        QSettings().setValue(QStringLiteral("output/userStyleId"), id);
+        setOutputStyle(3);
+        setStatus(QStringLiteral("User output style selected."));
+        return true;
+    }
+    setStatus(QStringLiteral("User output style was not found."));
+    return false;
+}
+
+bool Backend::deleteUserOutputStyle(const QString &id) {
+    if (m_userOutputStylesLoadFailed) {
+        setStatus(QStringLiteral("User output style catalog could not be read; leave it unchanged."));
+        return false;
+    }
+    for (int index = 0; index < m_userOutputStyles.size(); ++index) {
+        if (m_userOutputStyles.at(index).toMap().value(QStringLiteral("id")).toString() != id)
+            continue;
+        const QVariant removed = m_userOutputStyles.takeAt(index);
+        if (!saveUserOutputStyles()) {
+            m_userOutputStyles.insert(index, removed);
+            setStatus(QStringLiteral("Could not save user output styles."));
+            return false;
+        }
+        if (m_selectedUserOutputStyleId == id) {
+            m_selectedUserOutputStyleId.clear();
+            QSettings().remove(QStringLiteral("output/userStyleId"));
+            setOutputStyle(0);
+        }
+        setStatus(QStringLiteral("User output style deleted."));
+        return true;
+    }
+    setStatus(QStringLiteral("User output style was not found."));
+    return false;
+}
+
 void Backend::setOutputStyle(int style) {
     if (style < 0 || style > 7) return;
+    if (style != 3 && !m_selectedUserOutputStyleId.isEmpty()) {
+        m_selectedUserOutputStyleId.clear();
+        QSettings().remove(QStringLiteral("output/userStyleId"));
+    }
     m_outputStyle = style;
     QSettings().setValue("output/style", style);
     emit outputStyleChanged();
@@ -2337,12 +2851,15 @@ bool Backend::loadOutputStyle(const QUrl &url) {
     const QString family = object.value("fontFamily").toString();
     const int size = object.value("pointSize").toInt();
     if (family.isEmpty() || size < 8 || size > 32) { setStatus("Style needs fontFamily and pointSize between 8 and 32."); return false; }
+    m_selectedUserOutputStyleId.clear();
+    QSettings().remove(QStringLiteral("output/userStyleId"));
     m_customOutputFont = family; m_customOutputSize = size;
     m_outputHeader=object.value("header").toString().left(200);
     m_outputFooter=object.value("footer").toString("{page} / {pages}").left(200);
     m_outputTitlePage=object.value("titlePage").toBool(false);
+    m_customPageFurniture=object.value("pageFurniture").toBool(true);
     QSettings settings; settings.setValue("output/font",family); settings.setValue("output/size",size);
-    settings.setValue("output/header",m_outputHeader); settings.setValue("output/footer",m_outputFooter); settings.setValue("output/titlePage",m_outputTitlePage);
+    settings.setValue("output/header",m_outputHeader); settings.setValue("output/footer",m_outputFooter); settings.setValue("output/titlePage",m_outputTitlePage); settings.setValue("output/pageFurniture",m_customPageFurniture);
     setOutputStyle(3);
     setStatus("Custom output style loaded."); return true;
 }
@@ -2379,7 +2896,11 @@ void Backend::pageSetup() {
     QPrinter printer;
     if (m_pageLayout.isValid()) printer.setPageLayout(m_pageLayout);
     QPageSetupDialog dialog(&printer);
-    if (dialog.exec() == QDialog::Accepted) m_pageLayout = printer.pageLayout();
+    if (dialog.exec() == QDialog::Accepted) {
+        m_pageLayout = printer.pageLayout();
+        persistOutputPageLayout();
+        emit outputPageLayoutChanged();
+    }
 }
 
 bool Backend::exportDocument(const QUrl &destination, const QString &format) {
@@ -2408,6 +2929,14 @@ bool Backend::exportDocument(const QUrl &destination, const QString &format) {
             substitutions.append({{match.capturedStart(1),match.capturedLength(1)},uri});
         }
         for(auto it=substitutions.crbegin();it!=substitutions.crend();++it) html.replace(it->first.first,it->first.second,it->second);
+        if (!m_outputCssFile.isEmpty()) {
+            QString error;
+            const auto css = OutputCss::load(m_outputCssFile, &error);
+            if (!css) { setStatus(error); return false; }
+            const auto styled = OutputCss::embed(html, *css);
+            if (!styled) { setStatus(QStringLiteral("Could not apply HTML CSS.")); return false; }
+            html = *styled;
+        }
         const QByteArray bytes = html.toUtf8();
         if (output.write(bytes) != bytes.size()) { setStatus(output.errorString()); return false; }
     } else {
@@ -2834,7 +3363,7 @@ void Backend::paintOutput(QPagedPaintDevice &device, QTextDocument &document) co
     metrics.setDotsPerMeterX(2835); metrics.setDotsPerMeterY(2835);
     document.documentLayout()->setPaintDevice(&metrics);
     const auto restoreDevice = qScopeGuard([&] { document.documentLayout()->setPaintDevice(nullptr); });
-    const bool decorated=m_outputStyle!=0;
+    const bool decorated=m_outputStyle!=0 && (m_outputStyle!=3 || m_customPageFurniture);
     const qreal inset=decorated?margin:0;
     const QSizeF content(page.width(),qMax(100.0,page.height()-2*inset));
     document.setPageSize(content);

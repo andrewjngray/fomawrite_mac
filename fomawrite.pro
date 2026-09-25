@@ -8,12 +8,18 @@ TEMPLATE = app
 HEADERS += \
     src/backend.h \
     src/markdownhighlighter.h \
+    src/sourcevisualmapping.h \
+    src/visualtexthighlighter.h \
+    src/outputcss.h \
     src/systemtheme.h
 
 SOURCES += \
     src/main.cpp \
     src/backend.cpp \
-    src/markdownhighlighter.cpp
+    src/markdownhighlighter.cpp \
+    src/sourcevisualmapping.cpp \
+    src/visualtexthighlighter.cpp \
+    src/outputcss.cpp
 
 macx {
     SOURCES += src/systemtheme_mac.cpp

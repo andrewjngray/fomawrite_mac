@@ -48,6 +48,7 @@ Button {
             font.family: Qt.platform.os === "osx" ? Qt.application.font.family : "Helvetica Neue"
             font.pixelSize: control.font.pixelSize
             font.bold: control.font.bold
+            font.italic: control.font.italic
             color: parent.ink
             horizontalAlignment: control.alignLeft ? Text.AlignLeft : Text.AlignHCenter
             elide: Text.ElideRight

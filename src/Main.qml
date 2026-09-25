@@ -27,6 +27,7 @@ ApplicationWindow {
     readonly property color textColor: backend.themeForeground
     readonly property color strongTextColor: backend.themeForeground
     readonly property color mutedColor: backend.palette.muted
+    readonly property var appBackend: backend
     readonly property color selectionFill: backend.themeSelection
     // The desktop's text size knob (GNOME's text-scaling-factor, which
     // `omarchy display text size` drives) anchored so its 12px default leaves
@@ -128,7 +129,12 @@ ApplicationWindow {
         }
         return false;
     }
-    onActiveFocusItemChanged: topChrome.keyboardReveal = isInside(activeFocusItem, topChrome)
+    property string lastWritingSurface: "source"
+    onActiveFocusItemChanged: {
+        topChrome.keyboardReveal = isInside(activeFocusItem, topChrome)
+        if (previewPane.visualEditorFocused) lastWritingSurface = "visual"
+        else if (editor.activeFocus) lastWritingSurface = "source"
+    }
 
     Settings {
         id: workspaceSettings
@@ -205,9 +211,9 @@ ApplicationWindow {
             case "reveal": win.showCurrentFileInLibrary(); break;
             case "quickOpen": win.openQuickSearchState("", false, backend.library.rootFolder, false); break;
             case "refreshTags": backend.library.refreshTags(); break;
-            case "exportHtml": exportDialog.outputFormat="html"; exportDialog.nameFilters=["HTML (*.html)"]; exportDialog.open(); break;
+            case "exportHtml": win.openExportHub("html"); break;
             case "printPreview": backend.printPreview(); break;
-            case "exportPdf": exportDialog.outputFormat="pdf"; exportDialog.nameFilters=["PDF (*.pdf)"]; exportDialog.open(); break;
+            case "exportPdf": win.openExportHub("pdf"); break;
             case "pageBreak": editor.replaceSelectionWith("\n\n<!-- pagebreak -->\n\n"); break;
             case "writingReview": analysisDialog.open(); break;
             case "spelling": spellingDialog.open(); break;
@@ -222,10 +228,16 @@ ApplicationWindow {
 
     component NativeCommand: NativeCommandMenuItem { commands: workspaceCommands }
 
+    function openExportHub(format) {
+        exportHub.selectedFormat = format || "pdf";
+        exportHub.open();
+    }
+
     ToolBar {
         id: topChrome
         objectName: "topChrome"
         property bool keyboardReveal: false
+        readonly property bool writingClusterExpanded: workspaceSettings.libraryVisible ? win.width >= 1010 : win.width >= 800
         readonly property bool revealRequested: chromeHover.hovered || keyboardReveal
         readonly property real titleContentOpacity: workspaceSettings.titleBarMode === 1 || revealRequested ? 1 : 0
         readonly property real toolbarContentOpacity: workspaceSettings.toolbarVisibilityMode === 1 || revealRequested ? 1 : 0
@@ -288,10 +300,61 @@ ApplicationWindow {
                 opacity: topChrome.toolbarContentOpacity
                 spacing: 5
                 Behavior on opacity { NumberAnimation { duration: 160 } }
+                RowLayout {
+                    id: compactWritingControls
+                    objectName: "compactWritingControls"
+                    spacing: 1
+                    ChromeButton {
+                        objectName: "compactBoldButton"
+                        visible: topChrome.writingClusterExpanded
+                        text: "B"
+                        font.bold: true
+                        hint: "Bold selection"
+                        darkMode: win.darkMode
+                        onClicked: win.tryWrapSelection("**", "**")
+                    }
+                    ChromeButton {
+                        objectName: "compactItalicButton"
+                        visible: topChrome.writingClusterExpanded
+                        text: "I"
+                        font.italic: true
+                        hint: "Italic selection"
+                        darkMode: win.darkMode
+                        onClicked: win.tryWrapSelection("*", "*")
+                    }
+                    ChromeButton {
+                        id: compactLinkButton
+                        objectName: "compactLinkButton"
+                        visible: topChrome.writingClusterExpanded
+                        text: "Link"
+                        hint: "Insert link with destination and title"
+                        darkMode: win.darkMode
+                        onClicked: win.openLinkEditor(this)
+                    }
+                    ChromeButton {
+                        id: compactParagraphButton
+                        objectName: "compactParagraphButton"
+                        visible: topChrome.writingClusterExpanded
+                        text: "¶"
+                        hint: "Paragraph formatting"
+                        darkMode: win.darkMode
+                        onClicked: win.openQuickFormat(this)
+                    }
+                    ChromeButton {
+                        id: compactFormatButton
+                        objectName: "compactFormatButton"
+                        visible: !topChrome.writingClusterExpanded
+                        text: "Format"
+                        hint: "Writing format controls"
+                        darkMode: win.darkMode
+                        onClicked: win.openQuickFormat(this)
+                    }
+                }
                 ChromeButton { iconName: "outline"; hint: "Document outline"; darkMode: win.darkMode; onClicked: workspaceCommands.run("outline") }
                 ChromeButton { text: "Aa"; hint: "Writing options"; darkMode: win.darkMode; onClicked: writingOptions.open() }
                 ChromeButton { iconName: "search"; hint: "Find in document"; darkMode: win.darkMode; onClicked: win.openSearch(false, false) }
                 ChromeButton { iconName: "preview"; hint: "Show or hide preview"; darkMode: win.darkMode; checked: workspaceSettings.layoutMode !== 0; onClicked: workspaceCommands.run("togglePreview") }
+                ChromeButton { objectName: "exportHubButton"; text: "Export"; hint: "Export or share document"; darkMode: win.darkMode; onClicked: win.openExportHub("pdf") }
             }
         }
     }
@@ -388,6 +451,126 @@ ApplicationWindow {
         }
     }
 
+    Popup {
+        id: linkEditor
+        objectName: "linkEditor"
+        property int selectionStart: 0
+        property int selectionEnd: 0
+        property string label: ""
+        property string url: "https://"
+        property string title: ""
+        property string error: ""
+        property bool editingExisting: false
+        property string originalMarkdown: ""
+        property string originalLabel: ""
+        property string originalUrl: ""
+        property string originalTitle: ""
+        width: Math.min(340, win.width - 16)
+        padding: 12
+        modal: false
+        focus: true
+        closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
+        background: Rectangle {
+            color: backend.palette.panel
+            border.color: backend.palette.border
+            radius: 8
+        }
+        function applyLink() {
+            var destination = linkEditorUrl.text.trim();
+            var labelText = linkEditorLabel.text;
+            var titleText = linkEditorTitle.text;
+            if (destination.length === 0) {
+                error = "A link destination is required.";
+                linkEditorUrl.forceActiveFocus();
+                return;
+            }
+            if (/[\r\n]/.test(destination) || /[\r\n]/.test(titleText)) {
+                error = "Link destinations and titles cannot contain line breaks.";
+                return;
+            }
+            if (labelText.length === 0)
+                labelText = "link text";
+            if (editingExisting && labelText === originalLabel
+                    && destination === originalUrl && titleText === originalTitle) {
+                close();
+                editor.forceActiveFocus();
+                return;
+            }
+            var markdown = "[" + editor.escapeMarkdownLinkText(labelText) + "]("
+                    + editor.escapeMarkdownLinkDestination(destination);
+            if (titleText.trim().length > 0)
+                markdown += " \"" + titleText.trim().replace(/\\/g, "\\\\").replace(/\"/g, "\\\"") + "\"";
+            markdown += ")";
+            editor.replaceAtomic(selectionStart, selectionEnd, markdown);
+            close();
+            editor.forceActiveFocus();
+        }
+        contentItem: ColumnLayout {
+            spacing: 8
+            Label { text: "Insert link"; font.bold: true; Accessible.role: Accessible.Heading }
+            Label { text: "Text" }
+            TextField {
+                id: linkEditorLabel
+                objectName: "linkEditorLabel"
+                Layout.fillWidth: true
+                text: linkEditor.label
+                placeholderText: "link text"
+                Accessible.name: "Link text"
+                onAccepted: linkEditor.applyLink()
+            }
+            Label { text: "Destination" }
+            TextField {
+                id: linkEditorUrl
+                objectName: "linkEditorUrl"
+                Layout.fillWidth: true
+                text: linkEditor.url
+                placeholderText: "https://"
+                inputMethodHints: Qt.ImhUrlCharactersOnly
+                Accessible.name: "Link destination"
+                onAccepted: linkEditor.applyLink()
+            }
+            Label { text: "Title (optional)" }
+            TextField {
+                id: linkEditorTitle
+                objectName: "linkEditorTitle"
+                Layout.fillWidth: true
+                text: linkEditor.title
+                placeholderText: "Shown by supporting readers"
+                Accessible.name: "Link title, optional"
+                onAccepted: linkEditor.applyLink()
+            }
+            Label {
+                visible: linkEditor.error.length > 0
+                Layout.fillWidth: true
+                text: linkEditor.error
+                color: "#c74040"
+                wrapMode: Text.Wrap
+                Accessible.name: text
+            }
+            RowLayout {
+                Layout.fillWidth: true
+                Item { Layout.fillWidth: true }
+                Button { text: "Cancel"; Accessible.name: "Cancel link insertion"; onClicked: linkEditor.close() }
+                Button { text: "Insert"; Accessible.name: "Insert link"; onClicked: linkEditor.applyLink() }
+            }
+        }
+    }
+
+    Menu {
+        id: formatQuickMenu
+        objectName: "quickFormatMenu"
+        width: 210
+        MenuItem { text: "Body"; onTriggered: win.editMarkdown("body") }
+        MenuItem { text: "Heading 1"; onTriggered: win.editMarkdown("heading1") }
+        MenuItem { text: "Heading 2"; onTriggered: win.editMarkdown("heading2") }
+        MenuItem { text: "Heading 3"; onTriggered: win.editMarkdown("heading3") }
+        MenuSeparator {}
+        MenuItem { text: "Blockquote"; onTriggered: win.editMarkdown("quote") }
+        MenuItem { text: "Bullet List"; onTriggered: win.editMarkdown("bullet") }
+        MenuItem { text: "Ordered List"; onTriggered: win.editMarkdown("ordered") }
+        MenuItem { text: "Task List"; onTriggered: win.editMarkdown("task") }
+    }
+
     Menu {
         id: formatPopover
         x: Math.max(0, editorPane.x + 12)
@@ -453,10 +636,94 @@ ApplicationWindow {
             unsavedChangesDialog.open();
     }
 
+    function sourceFormattingAllowed() {
+        if (previewPane.visualEditEnabled && lastWritingSurface === "visual") {
+            previewPane.visualStatus = "Choose Source before applying Markdown formatting."
+            return false
+        }
+        return true
+    }
+
+    function tryWrapSelection(before, after) {
+        if (sourceFormattingAllowed()) editor.wrapSelection(before, after)
+    }
+
+    function tryInsertLink() {
+        if (sourceFormattingAllowed()) editor.insertLink()
+    }
+
     function editMarkdown(action) {
+        if (!sourceFormattingAllowed()) return
         var result = backend.editMarkdown(action, editor.selectionStart, editor.selectionEnd);
         editor.forceActiveFocus();
         if (result.start !== undefined) editor.select(result.start, result.end);
+    }
+
+    function decodeSimpleMarkdownLinkPart(value) {
+        return value.replace(/\\(.)/g, "$1");
+    }
+
+    function simpleInlineLinkAt(selectionStart, selectionEnd) {
+        var lineStart = editor.text.lastIndexOf("\n", selectionStart - 1) + 1;
+        var lineEnd = editor.text.indexOf("\n", selectionEnd);
+        if (lineEnd < 0) lineEnd = editor.text.length;
+        var line = editor.text.slice(lineStart, lineEnd);
+        // Deliberately support only ordinary inline links. Images, wikilinks,
+        // nested syntax and multiline forms stay on the safe insertion path.
+        var pattern = /\[((?:\\.|[^\]\\\r\n])*)\]\(((?:\\.|[^\s()\\\r\n])*)(?:\s+"((?:\\.|[^"\\\r\n])*)")?\)/g;
+        var match;
+        while ((match = pattern.exec(line)) !== null) {
+            var start = lineStart + match.index;
+            var end = start + match[0].length;
+            var before = start > 0 ? editor.text.charAt(start - 1) : "";
+            if (before === "!" || before === "[" || before === "\\")
+                continue;
+            if (selectionStart >= start && selectionEnd <= end) {
+                return {
+                    start: start,
+                    end: end,
+                    markdown: match[0],
+                    label: decodeSimpleMarkdownLinkPart(match[1]),
+                    url: decodeSimpleMarkdownLinkPart(match[2]),
+                    title: match[3] === undefined ? "" : decodeSimpleMarkdownLinkPart(match[3])
+                };
+            }
+        }
+        return null;
+    }
+
+    function openLinkEditor(button) {
+        if (!sourceFormattingAllowed()) return
+        var selectionStart = Math.min(editor.selectionStart, editor.selectionEnd);
+        var selectionEnd = Math.max(editor.selectionStart, editor.selectionEnd);
+        var existing = simpleInlineLinkAt(selectionStart, selectionEnd);
+        linkEditor.editingExisting = existing !== null;
+        linkEditor.originalMarkdown = existing ? existing.markdown : "";
+        linkEditor.originalLabel = existing ? existing.label : "";
+        linkEditor.originalUrl = existing ? existing.url : "";
+        linkEditor.originalTitle = existing ? existing.title : "";
+        linkEditor.selectionStart = existing ? existing.start : selectionStart;
+        linkEditor.selectionEnd = existing ? existing.end : selectionEnd;
+        linkEditor.label = existing ? existing.label : editor.text.slice(selectionStart, selectionEnd);
+        linkEditor.url = existing ? existing.url : (backend.clipboardUrl() || "https://");
+        linkEditor.title = existing ? existing.title : "";
+        linkEditor.error = "";
+        var point = button.mapToItem(win.contentItem, 0, button.height);
+        linkEditor.x = Math.max(8, Math.min(win.contentItem.width - linkEditor.width - 8,
+                                            point.x + button.width - linkEditor.width));
+        linkEditor.y = Math.min(win.contentItem.height - linkEditor.height - 8,
+                                 Math.max(48, point.y + 6));
+        linkEditor.open();
+        Qt.callLater(function() { linkEditorLabel.forceActiveFocus(); linkEditorLabel.selectAll(); });
+    }
+
+    function openQuickFormat(button) {
+        var point = button.mapToItem(win.contentItem, 0, button.height);
+        formatQuickMenu.x = Math.max(8, Math.min(win.contentItem.width - formatQuickMenu.width - 8,
+                                                  point.x + button.width - formatQuickMenu.width));
+        formatQuickMenu.y = Math.min(win.contentItem.height - formatQuickMenu.height - 8,
+                                     Math.max(48, point.y + 6));
+        formatQuickMenu.open();
     }
 
     function showCompletions() {
@@ -674,7 +941,8 @@ ApplicationWindow {
             : Window.FullScreen;
     }
 
-    readonly property var editTarget: activeFocusItem && typeof activeFocusItem.cut === "function" ? activeFocusItem : editor
+    readonly property bool visualEditorActive: previewPane.visualEditEnabled && previewPane.visualEditorFocused
+    readonly property var editTarget: visualEditorActive ? editor : (activeFocusItem && typeof activeFocusItem.cut === "function" ? activeFocusItem : editor)
 
     function openSearch(withReplace, useSelection) {
         var selected = editor.selectedText;
@@ -749,19 +1017,19 @@ ApplicationWindow {
     Shortcut {
         sequence: "Ctrl+B"
         context: Qt.WindowShortcut
-        onActivated: editor.wrapSelection("**", "**")
+        onActivated: win.tryWrapSelection("**", "**")
     }
 
     Shortcut {
         sequence: "Ctrl+I"
         context: Qt.WindowShortcut
-        onActivated: editor.wrapSelection("*", "*")
+        onActivated: win.tryWrapSelection("*", "*")
     }
 
     Shortcut {
         sequence: "Ctrl+K"
         context: Qt.WindowShortcut
-        onActivated: editor.insertLink()
+        onActivated: win.tryInsertLink()
     }
 
     Shortcut {
@@ -876,8 +1144,8 @@ ApplicationWindow {
             }
             Platform.Menu {
                 title: "Export"
-                Platform.MenuItem { objectName: "fileExportHtml"; text: "Export HTML…"; onTriggered: { exportDialog.outputFormat = "html"; exportDialog.nameFilters = ["HTML (*.html)"]; exportDialog.open(); } }
-                Platform.MenuItem { objectName: "fileExportPdf"; text: "Export PDF…"; onTriggered: { exportDialog.outputFormat = "pdf"; exportDialog.nameFilters = ["PDF (*.pdf)"]; exportDialog.open(); } }
+                Platform.MenuItem { objectName: "fileExportHtml"; text: "Export HTML…"; onTriggered: win.openExportHub("html") }
+                Platform.MenuItem { objectName: "fileExportPdf"; text: "Export PDF…"; onTriggered: win.openExportHub("pdf") }
             }
             Platform.Menu {
                 title: "Print"
@@ -908,20 +1176,20 @@ ApplicationWindow {
             Platform.MenuItem { objectName: "editUndo"; text: "Undo"; enabled: win.editTarget.canUndo; onTriggered: win.editTarget.undo() }
             Platform.MenuItem { objectName: "editRedo"; text: "Redo"; enabled: win.editTarget.canRedo; onTriggered: win.editTarget.redo() }
             Platform.MenuSeparator {}
-            Platform.MenuItem { text: "Cut"; enabled: !win.editTarget.readOnly && win.editTarget.selectedText.length > 0; onTriggered: { if (win.editTarget === editor) { backend.copySelection(editor.selectionStart, editor.selectionEnd, "markdown"); editor.remove(editor.selectionStart, editor.selectionEnd); } else win.editTarget.cut(); } }
-            Platform.MenuItem { text: "Copy"; enabled: win.editTarget.selectedText.length > 0; onTriggered: { if (win.editTarget === editor) backend.copySelection(editor.selectionStart, editor.selectionEnd, "markdown"); else win.editTarget.copy(); } }
-            Platform.MenuItem { objectName: "editCopyFormatted"; text: "Copy Formatted"; enabled: win.editTarget === editor && editor.selectedText.length > 0; onTriggered: backend.copySelection(editor.selectionStart, editor.selectionEnd, "formatted") }
-            Platform.MenuItem { objectName: "editCopyHtml"; text: "Copy HTML"; enabled: win.editTarget === editor && editor.selectedText.length > 0; onTriggered: backend.copySelection(editor.selectionStart, editor.selectionEnd, "html") }
-            Platform.MenuItem { objectName: "editCopyMarkdown"; text: "Copy Markdown"; enabled: win.editTarget === editor && editor.selectedText.length > 0; onTriggered: backend.copySelection(editor.selectionStart, editor.selectionEnd, "markdown") }
-            Platform.MenuItem { text: "Paste"; enabled: !win.editTarget.readOnly && win.editTarget.canPaste; onTriggered: { if (win.editTarget === editor) editor.pasteClipboardAsPlainText(); else win.editTarget.paste(); } }
+            Platform.MenuItem { text: "Cut"; enabled: !win.visualEditorActive && !win.editTarget.readOnly && win.editTarget.selectedText.length > 0; onTriggered: { if (win.editTarget === editor) { backend.copySelection(editor.selectionStart, editor.selectionEnd, "markdown"); editor.remove(editor.selectionStart, editor.selectionEnd); } else win.editTarget.cut(); } }
+            Platform.MenuItem { text: "Copy"; enabled: !win.visualEditorActive && win.editTarget.selectedText.length > 0; onTriggered: { if (win.editTarget === editor) backend.copySelection(editor.selectionStart, editor.selectionEnd, "markdown"); else win.editTarget.copy(); } }
+            Platform.MenuItem { objectName: "editCopyFormatted"; text: "Copy Formatted"; enabled: !win.visualEditorActive && win.editTarget === editor && editor.selectedText.length > 0; onTriggered: backend.copySelection(editor.selectionStart, editor.selectionEnd, "formatted") }
+            Platform.MenuItem { objectName: "editCopyHtml"; text: "Copy HTML"; enabled: !win.visualEditorActive && win.editTarget === editor && editor.selectedText.length > 0; onTriggered: backend.copySelection(editor.selectionStart, editor.selectionEnd, "html") }
+            Platform.MenuItem { objectName: "editCopyMarkdown"; text: "Copy Markdown"; enabled: !win.visualEditorActive && win.editTarget === editor && editor.selectedText.length > 0; onTriggered: backend.copySelection(editor.selectionStart, editor.selectionEnd, "markdown") }
+            Platform.MenuItem { text: "Paste"; enabled: !win.visualEditorActive && !win.editTarget.readOnly && win.editTarget.canPaste; onTriggered: { if (win.editTarget === editor) editor.pasteClipboardAsPlainText(); else win.editTarget.paste(); } }
             Platform.Menu {
                 title: "Paste As"
-                Platform.MenuItem { objectName: "editPastePlain"; text: "Plain Text"; enabled: win.editTarget === editor && editor.canPaste; onTriggered: { editor.forceActiveFocus(); editor.replaceAtomic(editor.selectionStart, editor.selectionEnd, backend.clipboardText()); } }
-                Platform.MenuItem { objectName: "editPasteMarkdown"; text: "Markdown from HTML"; enabled: win.editTarget === editor && editor.canPaste; onTriggered: { editor.forceActiveFocus(); editor.replaceAtomic(editor.selectionStart, editor.selectionEnd, backend.clipboardMarkdown()); } }
+                Platform.MenuItem { objectName: "editPastePlain"; text: "Plain Text"; enabled: !win.visualEditorActive && win.editTarget === editor && editor.canPaste; onTriggered: { editor.forceActiveFocus(); editor.replaceAtomic(editor.selectionStart, editor.selectionEnd, backend.clipboardText()); } }
+                Platform.MenuItem { objectName: "editPasteMarkdown"; text: "Markdown from HTML"; enabled: !win.visualEditorActive && win.editTarget === editor && editor.canPaste; onTriggered: { editor.forceActiveFocus(); editor.replaceAtomic(editor.selectionStart, editor.selectionEnd, backend.clipboardMarkdown()); } }
             }
             Platform.MenuSeparator {}
-            Platform.MenuItem { objectName: "editDelete"; text: "Delete"; enabled: !win.editTarget.readOnly && win.editTarget.selectedText.length > 0; onTriggered: win.editTarget.remove(win.editTarget.selectionStart, win.editTarget.selectionEnd) }
-            Platform.MenuItem { text: "Select All"; enabled: win.editTarget.length > 0; onTriggered: win.editTarget.selectAll() }
+            Platform.MenuItem { objectName: "editDelete"; text: "Delete"; enabled: !win.visualEditorActive && !win.editTarget.readOnly && win.editTarget.selectedText.length > 0; onTriggered: win.editTarget.remove(win.editTarget.selectionStart, win.editTarget.selectionEnd) }
+            Platform.MenuItem { text: "Select All"; enabled: !win.visualEditorActive && win.editTarget.length > 0; onTriggered: win.editTarget.selectAll() }
             Platform.MenuSeparator {}
             Platform.Menu {
                 title: "Find"
@@ -996,16 +1264,16 @@ ApplicationWindow {
                 Platform.MenuItem { text: "Move Line Down"; onTriggered: win.editMarkdown("lineDown") }
             }
             Platform.MenuSeparator {}
-            Platform.MenuItem { text: "Bold"; onTriggered: editor.wrapSelection("**", "**") }
-            Platform.MenuItem { text: "Italic"; onTriggered: editor.wrapSelection("*", "*") }
+            Platform.MenuItem { text: "Bold"; onTriggered: win.tryWrapSelection("**", "**") }
+            Platform.MenuItem { text: "Italic"; onTriggered: win.tryWrapSelection("*", "*") }
             NativeCommand { commandId: "strike" }
-            Platform.MenuItem { text: "Highlight"; onTriggered: editor.wrapSelection("==", "==") }
+            Platform.MenuItem { text: "Highlight"; onTriggered: win.tryWrapSelection("==", "==") }
             Platform.MenuSeparator {}
             NativeCommand { commandId: "inlineCode"; text: "Code" }
             Platform.MenuItem { text: "Code Block"; onTriggered: win.editMarkdown("codeBlock") }
             Platform.MenuSeparator {}
-            Platform.MenuItem { text: "Add Link"; onTriggered: editor.insertLink() }
-            Platform.MenuItem { text: "Add Wikilink"; onTriggered: editor.wrapSelection("[[", "]]") }
+            Platform.MenuItem { text: "Add Link"; onTriggered: win.tryInsertLink() }
+            Platform.MenuItem { text: "Add Wikilink"; onTriggered: win.tryWrapSelection("[[", "]]") }
             Platform.MenuItem { text: "Add Footnote"; onTriggered: editor.replaceAtomic(editor.selectionStart, editor.selectionEnd, "[^note]\n\n[^note]: Note text") }
             Platform.MenuItem { text: "Add Content Block"; onTriggered: editor.replaceAtomic(editor.selectionStart, editor.selectionEnd, "\n/chapter.md\n") }
             Platform.MenuItem { text: "Add Hashtag"; onTriggered: editor.replaceAtomic(editor.selectionStart, editor.selectionEnd, "#tag") }
@@ -1659,6 +1927,19 @@ ApplicationWindow {
         title: "Export Document"
         fileMode: Dialogs.FileDialog.SaveFile
         onAccepted: backend.exportDocument(selectedFile, outputFormat)
+    }
+    ExportHub {
+        id: exportHub
+        backend: win.appBackend
+        renderer: win.appBackend
+        markdown: editor.text
+        documentBaseUrl: win.appBackend.documentBaseUrl
+        darkMode: win.darkMode
+        onDestinationRequested: function(format) {
+            exportDialog.outputFormat = format;
+            exportDialog.nameFilters = format === "pdf" ? ["PDF (*.pdf)"] : ["HTML (*.html)"];
+            exportDialog.open();
+        }
     }
     Dialogs.FileDialog {
         id: outputStyleDialog
@@ -2446,9 +2727,9 @@ ApplicationWindow {
                 anchors.leftMargin: 6
                 anchors.rightMargin: 10
                 spacing: 2
-                ChromeButton { visible: workspaceSettings.toolbarMode !== 1; text: "Bold"; hint: "Bold selection"; darkMode: win.darkMode; onClicked: editor.wrapSelection("**", "**") }
-                ChromeButton { visible: workspaceSettings.toolbarMode !== 1; text: "Italic"; hint: "Italic selection"; darkMode: win.darkMode; onClicked: editor.wrapSelection("*", "*") }
-                ChromeButton { visible: workspaceSettings.toolbarMode !== 1; text: "Link"; hint: "Insert link"; darkMode: win.darkMode; onClicked: editor.insertLink() }
+                ChromeButton { visible: workspaceSettings.toolbarMode !== 1; text: "Bold"; hint: "Bold selection"; darkMode: win.darkMode; onClicked: win.tryWrapSelection("**", "**") }
+                ChromeButton { visible: workspaceSettings.toolbarMode !== 1; text: "Italic"; hint: "Italic selection"; darkMode: win.darkMode; onClicked: win.tryWrapSelection("*", "*") }
+                ChromeButton { visible: workspaceSettings.toolbarMode !== 1; text: "Link"; hint: "Insert link"; darkMode: win.darkMode; onClicked: win.tryInsertLink() }
                 ChromeButton { visible: workspaceSettings.toolbarMode !== 1; text: "More"; hint: "More formatting"; darkMode: win.darkMode; onClicked: formatPopover.open() }
                 Item { visible: workspaceSettings.toolbarMode !== 1; Layout.fillWidth: true }
                 ChromeButton {
@@ -2609,7 +2890,7 @@ ApplicationWindow {
 
         PreviewPane {
             id: previewPane
-            renderer: backend
+            renderer: win.appBackend
             onScrollFractionChanged: function(fraction) {
                 if (!workspaceSettings.synchronizedScroll || win.synchronizingScroll || workspaceSettings.layoutMode !== 1) return;
                 win.synchronizingScroll = true;
@@ -2618,6 +2899,14 @@ ApplicationWindow {
             }
             markdown: editor.text
             documentBaseUrl: backend.documentBaseUrl
+            onSourceEditRequested: {
+                workspaceSettings.layoutMode = 1;
+                editor.forceActiveFocus();
+                editorFlick.ensureCursorVisible();
+            }
+            onVisualEditorFocusedChanged: if (visualEditorFocused) win.lastWritingSurface = "visual"
+            onEditorUndoRequested: editor.undo()
+            onEditorRedoRequested: editor.redo()
             darkMode: win.darkMode
             visible: workspaceSettings.layoutMode !== 0
             SplitView.fillWidth: workspaceSettings.layoutMode === 2

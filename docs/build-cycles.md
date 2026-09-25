@@ -996,3 +996,51 @@ Changes: moved the existing checkout with its Git history and uncommitted sample
 Validation: `./bin/build` succeeded at the new path and `./bin/test` passed **102 tests, zero failures and zero skips**. Both local app bundles passed strict signature verification. `dist/Fomawrite Dev.app` launched from the renamed checkout; the installed ordinary app reopened its clean saved document and showed a `fomawrite_mac` favorite. Preferences and workspace snapshots were checked for the exact old prefix after migration. See [verification record](../research/cycle-61/verification.txt). No screenshot was committed because the live sidebar contains private shortcuts.
 
 Known gap: the Codex desktop app's saved project registration still points to the old folder and this task's filesystem permission remains anchored there. Re-add or relink the project at `fomawrite_mac` before starting the next Codex task. The physical folder rename itself is local and does not appear in Git; this record is the portable history. Other external applications with independently saved absolute paths were not exhaustively audited. Runnable artifacts: local `dist/Fomawrite.app` and `dist/Fomawrite Dev.app` under the renamed checkout. Optional usability exercise: open the new checkout favorite, a saved search and a recent sample Markdown file, and report any missing path.
+
+## Cycle 62 — canonical Markdown and visual-edit mapping foundation
+
+Planned scope: establish a conservative source-to-visual mapping before making the rendered pane editable. Preserve plain UTF-8 Markdown exactly across view changes, and identify syntax that must stay source-only.
+
+Changes: added `SourceVisualMapping`, a UTF-16 offset projection for supported paragraph, ATX-heading, list-item, emphasis/strong and inline-link-label text. It retains the original source byte-for-byte and returns a bounded single-span replacement only for mapped text. Code, tables, footnotes, images, comments, raw HTML, escaped constructs and reference links are source-only. The architecture and fixture corpus are recorded in [research/cycle-62/README.md](../research/cycle-62/README.md).
+
+Tests: `./bin/build` passed. Both focused mapping tests passed (4 total Qt test functions including setup/cleanup). The combined `./bin/test` run reported 103 passed and one failure in the existing native Window Center geometry check; a second agent run instead hit an existing recovery-file numbering check. The mapping tests passed in both runs. This cycle has no QML/native feature to verify, so no Dev app was replaced or inspected.
+
+Known gaps: no editable preview yet, no multi-line/IME/paste or cross-marker transformations. The full-suite environment-sensitive failures need isolation before an integrated release claim. Runnable artifact: `build/Fomawrite.app` from the combined source checkout. Optional exercise for Andrew: none yet; Cycle 64 will provide the first visual-edit surface for review.
+
+## Cycles 63–69 — visual writing and export closeout
+
+The following records describe the combined source state on 25 September 2026. The integrated automated suite passes **111 tests, zero failures and zero skips**. Final `./bin/build` and `./bin/test` passed; the stable `dist/Fomawrite Dev.app` was refreshed and inspected with a disposable sample. Native acceptance remains partial as specified under Cycle 69.
+
+### Cycle 63 — compact writing controls
+
+The top-right chrome now has accessible Bold, Italic, Link and paragraph-format controls, with a single Format control at narrow widths. Link opens a target/title popover and uses the established Markdown command; bold and italic reuse existing wrapping. `ChromeButton` labels inherit italic styling. Native keyboard-only, VoiceOver, dark-mode, narrow-layout and link-title checks remain pending. [Exercise](../research/usability/cycle-63.md).
+
+### Cycle 64 — visual editing baseline
+
+Visual Edit is a separate plain-text projection over canonical Markdown. One bounded inline change is applied through `Backend::applyVisualEdit`; stale, syntax-bearing, multiline and source-only edits are rejected. It uses document Undo, preserves bounded selection, waits for IME composition, routes Control-Z/Control-Y to source Undo/Redo and offers a Source route. Destructive native Edit actions are disabled while it is focused. This is not general WYSIWYG Markdown: tables, code, footnotes, images, comments, raw HTML, escaped constructs, reference links and structural/multiline changes are source-only. [Exercise](../research/usability/cycle-64.md).
+
+### Cycle 65 — conservative visual styling
+
+`VisualTextHighlighter` applies presentation-only heading, strong, emphasis and link-label styling from mapping-owned spans, and differentiates source-only blocks. The editable subset remains ordinary paragraphs, headings, list-item content and supported inline text; no Markdown is inferred from formatting. Simple quote bodies and task-item bodies are editable while their Markdown markers remain protected. Nested structures, image insertion, multiline paste/drag/drop and visual-surface formatting actions remain unimplemented; source-formatting commands explicitly route visual focus back to Source. [Exercise](../research/usability/cycle-65.md).
+
+### Cycle 66 — unified export hub
+
+The upper-right Export control and File → Export HTML/PDF open `ExportHub`, which selects PDF/HTML, style, paper, orientation and destination. It exposes Share Markdown, a clearly labelled continuous preview and separate native paginated preview. Paper/orientation persist through the existing page-layout model. The direct File → Share Markdown native action remains available. Continuous preview is not page-exact; native output comparisons, cancellation/failure, dark/narrow layout and accessibility checks remain pending. [Exercise](../research/usability/cycle-66.md).
+
+### Cycle 67 — Fomawrite-owned output style gallery
+
+The Export hub now has a responsive gallery for built-in Fomawrite styles and local user styles. A user can duplicate the current style and edit its name, font family, point size, header, footer and PDF header/footer and title-page settings, or delete it. The versioned app-data JSON catalog is capped at 64 styles/64 KiB, uses UUIDs and atomic save. Invalid/malformed/oversized catalogs are left untouched; built-in selection clears stale custom selection. No Ulysses presets/assets, thumbnails, margins/spacing/hierarchy controls or import are included. A disposable native style was duplicated, selected and deleted; restart persistence and HTML/PDF appearance comparisons remain pending. [Exercise](../research/usability/cycle-67.md).
+
+### Cycle 68 — scoped output CSS
+
+HTML export accepts a user-selected local CSS file. It must be a regular, non-symlinked UTF-8 file no larger than 64 KiB; external assets, `url()`, imports, font-face declarations, namespaces, embedded markup, URLs and control characters are refused. Valid CSS is embedded only into exported HTML and the local selection persists. PDF and Markdown remain unaffected. DOCX/ePub and Ulysses style import are absent; a future importer requires demonstrated mapping and rights review. [Exercise](../research/usability/cycle-68.md).
+
+### Cycle 69 — integrated acceptance (partial checkpoint)
+
+Scope and changes: integrate source mapping and guarded visual editing, compact writing controls, export hub, local style gallery and output-only CSS. The native pass found and fixed visual typing Undo grouping, accidental source formatting from visual focus, style-copy selection, and gallery button clipping in its 245 px panel. Simple quote/task bodies were added to the conservative editable subset. The iA Writer acceptance ledger remains open.
+
+Tests and native verification: final `./bin/build` and `./bin/test` pass with **111/111 tests**. The refreshed stable `dist/Fomawrite Dev.app` opened a saved synthetic sample. Native QA verified source-preserving bold replacement, a single Command-Z for contiguous visual typing, quote-body edit/Undo, source-format command refusal while visual focus was active, built-in style switching, user-style duplicate/select/delete, PDF options, and the corrected gallery button layout. The ordinary installed app was left running and untouched. No screenshot was committed because the sidebar displayed private location shortcuts. [Sanitized native record](../research/cycle-69/README.md).
+
+Known gaps: Visual Edit remains a bounded inline subset, not a general WYSIWYG editor. Multiline/complex nested Markdown, images, tables, code and several insertion commands stay source-only. The continuous export preview is not page-exact. Saved HTML/PDF visual comparisons, custom CSS selection in the final native bundle, style restart persistence, dirty/recovered/multiwindow/external-edit cases, long files, dark/narrow/fullscreen layout, keyboard-only navigation and VoiceOver remain for a later acceptance pass. DOCX/ePub and Ulysses style import are not built. These gaps prevent claiming the full Cycle 69 acceptance gate or iA Writer parity.
+
+Runnable artifacts: `dist/Fomawrite Dev.app` is refreshed with the clean synthetic sample open for review. `dist/Fomawrite.app` was packaged from the same source; both generated bundles passed strict local signature verification. `/Applications/Fomawrite.app` was not replaced. [Exercise](../research/usability/cycle-69.md).

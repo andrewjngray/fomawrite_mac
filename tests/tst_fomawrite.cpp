@@ -24,9 +24,12 @@
 #include <QQmlContext>
 #include <QQmlEngine>
 #include <QQuickStyle>
+#include <QSettings>
+#include <QStandardPaths>
 
 #include "backend.h"
 #include "markdownhighlighter.h"
+#include "sourcevisualmapping.h"
 
 class FomawriteTest : public QObject {
     Q_OBJECT
@@ -272,6 +275,7 @@ private slots:
         const QRect otherGeometry = other.geometry();
 
         target->setGeometry(4, 7, 720, 520);
+        target->show();
         QCoreApplication::processEvents();
         QCOMPARE(centerAction->property("enabled").toBool(), true);
         const QSize targetSize = target->size();
@@ -279,9 +283,10 @@ private slots:
         backend.nativeWindowAction(QStringLiteral("center"));
         QCoreApplication::processEvents();
 
-        const QPoint expected = available.center() - QPoint(targetSize.width() / 2, targetSize.height() / 2);
-        QVERIFY(qAbs(target->position().x() - expected.x()) <= 2);
-        QVERIFY(qAbs(target->position().y() - expected.y()) <= 2);
+        // AppKit centers the native frame, which includes the title bar. Qt's
+        // content position is therefore not the available-screen center.
+        QTRY_VERIFY(qAbs(target->frameGeometry().center().x() - available.center().x()) <= 2);
+        QTRY_VERIFY(qAbs(target->frameGeometry().center().y() - available.center().y()) <= 2);
         QCOMPARE(target->size(), targetSize);
         QCOMPARE(other.geometry(), otherGeometry);
         QCOMPARE(editor->property("text").toString(), source);
@@ -600,7 +605,7 @@ private slots:
             QCOMPARE(backend.themePreset(), QString(preset));
             backend.setDarkMode(true); // manual presets override system changes
             QCOMPARE(backend.darkMode(), preset == QString("dark"));
-            Backend reopened; QCOMPARE(reopened.themePreset(), QString(preset));
+            Backend reopened(nullptr, true); QCOMPARE(reopened.themePreset(), QString(preset));
             QCOMPARE(reopened.themeBackground(), backend.themeBackground());
             QCOMPARE(editor->property("text").toString(), QString("theme-independent Markdown"));
             QVERIFY(backend.modified());
@@ -918,6 +923,150 @@ private slots:
         QCOMPARE(counts.value("old"), 259);
         QCOMPARE(counts.value("new"), 1);
         QVERIFY(library.tagStatus().contains("automatic refresh unavailable"));
+    }
+
+    void userOutputStyleCatalogIsBoundedPersistentAndLeavesSourceUntouched() {
+        const QString catalogPath = QDir(QStandardPaths::writableLocation(
+            QStandardPaths::AppDataLocation)).filePath(QStringLiteral("output-user-styles.json"));
+        QFile prior(catalogPath);
+        const bool hadPrior = prior.exists();
+        QByteArray priorBytes;
+        if (hadPrior) { QVERIFY(prior.open(QIODevice::ReadOnly)); priorBytes = prior.readAll(); }
+        const QStringList outputKeys{QStringLiteral("output/style"), QStringLiteral("output/font"),
+                                     QStringLiteral("output/size"), QStringLiteral("output/header"),
+                                     QStringLiteral("output/footer"), QStringLiteral("output/titlePage"),
+                                     QStringLiteral("output/pageFurniture"),
+                                     QStringLiteral("output/userStyleId")};
+        QSettings initialSettings;
+        QVariantMap savedSettings;
+        QVariantMap savedPresence;
+        for (const QString &key : outputKeys) {
+            savedPresence.insert(key, initialSettings.contains(key));
+            savedSettings.insert(key, initialSettings.value(key));
+        }
+        const auto restore = qScopeGuard([&] {
+            if (hadPrior) { QFile file(catalogPath); if (file.open(QIODevice::WriteOnly | QIODevice::Truncate)) file.write(priorBytes); }
+            else QFile::remove(catalogPath);
+            QSettings settings;
+            for (const QString &key : outputKeys) {
+                if (savedPresence.value(key).toBool()) settings.setValue(key, savedSettings.value(key));
+                else settings.remove(key);
+            }
+        });
+        QVERIFY(QDir().mkpath(QFileInfo(catalogPath).absolutePath()));
+        QFile::remove(catalogPath);
+        QSettings().remove(QStringLiteral("output/userStyleId"));
+
+        Backend backend(nullptr, true);
+        backend.setOutputStyle(0);
+        const QString source = QStringLiteral("# Stable source\n\nText with **markup**.\n");
+        const QString renderedBefore = backend.previewMarkdown(source);
+
+        const QVariantMap created = backend.createUserOutputStyleFromCurrent(QStringLiteral("Gallery Serif"));
+        QVERIFY(!created.contains(QStringLiteral("error")));
+        const QString id = created.value(QStringLiteral("id")).toString();
+        QCOMPARE(id.size(), 36);
+        QCOMPARE(created.value(QStringLiteral("fontFamily")).toString(), QStringLiteral("Helvetica Neue"));
+        QCOMPARE(created.value(QStringLiteral("pointSize")).toInt(), 12);
+        QCOMPARE(created.value(QStringLiteral("pageFurniture")).toBool(), false);
+        QCOMPARE(created.value(QStringLiteral("header")).toString(), QString());
+        QCOMPARE(backend.userOutputStyles().size(), 1);
+        QVERIFY(backend.updateUserOutputStyle(id, {{QStringLiteral("fontFamily"), QStringLiteral("Georgia")},
+                                                   {QStringLiteral("pointSize"), 14},
+                                                   {QStringLiteral("header"), QStringLiteral("{title}")},
+                                                   {QStringLiteral("footer"), QStringLiteral("{page}")},
+                                                   {QStringLiteral("titlePage"), true},
+                                                   {QStringLiteral("pageFurniture"), true}}));
+        QVERIFY(!backend.updateUserOutputStyle(id, {{QStringLiteral("pointSize"), 48}}));
+        QVERIFY(!backend.updateUserOutputStyle(id, {{QStringLiteral("fontFamily"), QStringLiteral("bad\nfont")}}));
+        QVERIFY(backend.selectUserOutputStyle(id));
+        QCOMPARE(backend.outputStyle(), 3);
+        QCOMPARE(backend.outputFont(), QStringLiteral("Georgia"));
+        QCOMPARE(backend.outputPointSize(), 14);
+        QCOMPARE(backend.previewMarkdown(source), renderedBefore);
+
+        QFile catalog(catalogPath); QVERIFY(catalog.open(QIODevice::ReadOnly));
+        const QJsonObject root = QJsonDocument::fromJson(catalog.readAll()).object();
+        QCOMPARE(root.value(QStringLiteral("version")).toInt(), 1);
+        QCOMPARE(root.value(QStringLiteral("styles")).toArray().size(), 1);
+        catalog.close();
+        Backend reopened(nullptr, true);
+        QCOMPARE(reopened.selectedUserOutputStyleId(), id);
+        QCOMPARE(reopened.outputStyle(), 3);
+        QCOMPARE(reopened.outputPointSize(), 14);
+
+        QTemporaryDir importedDirectory;
+        QFile importedStyle(importedDirectory.filePath(QStringLiteral("style.json")));
+        QVERIFY(importedStyle.open(QIODevice::WriteOnly));
+        importedStyle.write(R"({"fontFamily":"Palatino","pointSize":13})");
+        importedStyle.close();
+        QVERIFY(backend.loadOutputStyle(QUrl::fromLocalFile(importedStyle.fileName())));
+        QVERIFY(backend.selectedUserOutputStyleId().isEmpty());
+        backend.selectUserOutputStyle(id);
+        backend.setOutputStyle(1);
+        QVERIFY(backend.selectedUserOutputStyleId().isEmpty());
+        Backend builtInReopened(nullptr, true);
+        QCOMPARE(builtInReopened.outputStyle(), 1);
+        QVERIFY(builtInReopened.selectedUserOutputStyleId().isEmpty());
+
+        QVERIFY(catalog.open(QIODevice::WriteOnly | QIODevice::Truncate));
+        catalog.write("{ invalid json");
+        catalog.close();
+        QSettings().remove(QStringLiteral("output/userStyleId"));
+        Backend malformed(nullptr, true);
+        QVERIFY(malformed.userOutputStyles().isEmpty());
+        QVERIFY(!malformed.selectUserOutputStyle(id));
+        QVERIFY(malformed.createUserOutputStyleFromCurrent(QStringLiteral("Do not overwrite")).contains(QStringLiteral("error")));
+        QVERIFY(catalog.open(QIODevice::ReadOnly));
+        QCOMPARE(catalog.readAll(), QByteArray("{ invalid json"));
+    }
+
+    void userCssOnlyStylesPortableHtmlAndRollsBackOnFailure() {
+        const QVariant previous = QSettings().value(QStringLiteral("output/cssFile"));
+        const auto restore = qScopeGuard([&] { QSettings().setValue(QStringLiteral("output/cssFile"), previous); });
+        QSettings().remove(QStringLiteral("output/cssFile"));
+        QTemporaryDir dir; QVERIFY(dir.isValid());
+        Backend backend;
+        QQmlEngine engine;
+        engine.rootContext()->setContextProperty(QStringLiteral("backend"), &backend);
+        QQmlComponent component(&engine, QUrl::fromLocalFile(QFINDTESTDATA("../src/Main.qml")));
+        QScopedPointer<QObject> window(component.create());
+        QVERIFY2(window, qPrintable(component.errorString()));
+        QObject *editor = window->findChild<QObject *>(QStringLiteral("sourceEditor"));
+        QVERIFY(editor);
+        const QString source = QStringLiteral("# CSS sample\n\nUntouched **Markdown**.\n");
+        editor->setProperty("text", source);
+        QFile css(dir.filePath(QStringLiteral("sample.css")));
+        QVERIFY(css.open(QIODevice::WriteOnly));
+        css.write("h1 { color: #124578; }\n"); css.close();
+        QVERIFY(backend.loadOutputCss(QUrl::fromLocalFile(css.fileName())));
+        QCOMPARE(backend.outputCssName(), QStringLiteral("sample.css"));
+        const QUrl html = QUrl::fromLocalFile(dir.filePath(QStringLiteral("sample.html")));
+        QVERIFY(backend.exportDocument(html, QStringLiteral("html")));
+        QFile exported(html.toLocalFile()); QVERIFY(exported.open(QIODevice::ReadOnly));
+        const QByteArray original = exported.readAll(); exported.close();
+        QVERIFY(original.contains("data-fomawrite-user-style"));
+        QVERIFY(original.contains("h1 { color: #124578; }"));
+        QCOMPARE(editor->property("text").toString(), source);
+        QFile invalid(dir.filePath(QStringLiteral("invalid.css")));
+        QVERIFY(invalid.open(QIODevice::WriteOnly));
+        invalid.write("</style><script>bad</script>"); invalid.close();
+        QVERIFY(!backend.loadOutputCss(QUrl::fromLocalFile(invalid.fileName())));
+        QFile remote(dir.filePath(QStringLiteral("remote.css")));
+        QVERIFY(remote.open(QIODevice::WriteOnly));
+        remote.write(".x { background: image-set(\"//tracker.example/pixel.png\" 1x); }");
+        remote.close();
+        QVERIFY(!backend.loadOutputCss(QUrl::fromLocalFile(remote.fileName())));
+        QCOMPARE(backend.outputCssName(), QStringLiteral("sample.css"));
+        QVERIFY(css.open(QIODevice::WriteOnly | QIODevice::Truncate));
+        css.write("@import 'https://example.invalid/x.css';"); css.close();
+        QVERIFY(!backend.exportDocument(html, QStringLiteral("html")));
+        QVERIFY(exported.open(QIODevice::ReadOnly));
+        QCOMPARE(exported.readAll(), original); exported.close();
+        QCOMPARE(editor->property("text").toString(), source);
+        backend.clearOutputCss();
+        QCOMPARE(backend.outputCssName(), QStringLiteral("None"));
+        backend.discardRecovery();
     }
 
     void templatesSharePreviewAndExportWithoutEditingSource() {
@@ -3874,6 +4023,241 @@ private slots:
         QCOMPARE(markup.at(0).content.length, 4);
         QCOMPARE(markup.at(2).content.length, 4);
         QCOMPARE(markup.at(2).markers[0].length, 1);
+    }
+
+    void visualSourceMappingIsConservativeAndLossless() {
+        const QString source = QStringLiteral("# Héadline\nPlain **bold** and *emphasis* with [a link](https://example.com \"Title\").\n- First item\n| Name | Value |\n| --- | --- |\n| table | 42 |\nText[^note] after a footnote reference.\n[^note]: Footnote definition\n![image](photo.png)\n<!-- keep this comment -->\n```cpp\n**literal**\n```\n");
+        const auto mapping = SourceVisualMapping::create(source);
+        QCOMPARE(mapping.roundTripSource(), source);
+        QCOMPARE(mapping.roundTripSource().toUtf8(), source.toUtf8());
+        QVERIFY(mapping.visualText().contains(QStringLiteral("Héadline")));
+        QVERIFY(mapping.visualText().contains(QStringLiteral("Plain bold and emphasis with a link.")));
+        QVERIFY(mapping.visualText().contains(QStringLiteral("First item")));
+        QVERIFY(mapping.visualText().contains(QStringLiteral("| Name | Value |")));
+        QVERIFY(mapping.visualText().contains(QStringLiteral("**literal**")));
+
+        const int labelStart = source.indexOf(QStringLiteral("a link"));
+        const auto labelVisual = mapping.visualSpanForSource({labelStart, 6});
+        QVERIFY(labelVisual.isValid());
+        QCOMPARE(mapping.visualText().mid(labelVisual.start, labelVisual.length), QStringLiteral("a link"));
+        const auto labelSource = mapping.sourceSpanForVisual(labelVisual);
+        QCOMPARE(labelSource.start, labelStart);
+        QCOMPARE(labelSource.length, 6);
+        const auto edit = mapping.sourceEditForVisualReplacement(labelVisual, QStringLiteral("renamed"));
+        QVERIFY(edit.has_value());
+        QCOMPARE(edit->source.start, labelStart);
+        QCOMPARE(edit->source.length, 6);
+        QString rewritten = source;
+        rewritten.replace(edit->source.start, edit->source.length, edit->replacement);
+        QCOMPARE(rewritten.mid(labelStart, 7), QStringLiteral("renamed"));
+        QCOMPARE(rewritten.left(labelStart), source.left(labelStart));
+        QCOMPARE(rewritten.mid(labelStart + 7), source.mid(labelStart + 6));
+        const int crossingStart = mapping.visualText().indexOf(QStringLiteral("bold and"));
+        QVERIFY(!mapping.sourceEditForVisualReplacement({crossingStart, 8}, QStringLiteral("x")).has_value());
+
+        QVERIFY(!mapping.visualSpanForSource({int(source.indexOf(QStringLiteral("**bold**"))), 8}).isValid());
+        for (const QString &sourceOnly : {QStringLiteral("| Name | Value |"), QStringLiteral("[^note]"), QStringLiteral("![image]"), QStringLiteral("<!--"), QStringLiteral("**literal**")}) {
+            const int start = source.indexOf(sourceOnly);
+            QVERIFY(start >= 0);
+            QVERIFY(!mapping.visualSpanForSource({start, int(sourceOnly.size())}).isValid());
+        }
+        int sourceOnlyBlocks = 0;
+        for (const auto &block : mapping.blocks()) if (!block.editable) ++sourceOnlyBlocks;
+        QVERIFY(sourceOnlyBlocks >= 8);
+    }
+
+    void visualSourceMappingProtectsInlineSyntaxAndCrLf() {
+        const QString crlf = QStringLiteral("# 📝 Café") + QChar(0x0d) + QChar(0x0a);
+        const auto unicode = SourceVisualMapping::create(crlf);
+        QCOMPARE(unicode.roundTripSource(), crlf);
+        const int emojiStart = crlf.indexOf(QStringLiteral("📝"));
+        const auto emojiVisual = unicode.visualSpanForSource({emojiStart, int(QStringLiteral("📝").size())});
+        QVERIFY(emojiVisual.isValid());
+        QCOMPARE(unicode.sourceSpanForVisual(emojiVisual).start, emojiStart);
+
+        const QString protectedSource = QStringLiteral("`code` [ref][id] <span>raw</span> escaped ")
+            + QChar(0x5c) + QStringLiteral("*stars") + QChar(0x5c) + QStringLiteral("*\n");
+        const auto protectedMapping = SourceVisualMapping::create(protectedSource);
+        QCOMPARE(protectedMapping.roundTripSource(), protectedSource);
+        QCOMPARE(protectedMapping.blocks().size(), 1);
+        QVERIFY(!protectedMapping.blocks().first().editable);
+        QVERIFY(!protectedMapping.visualSpanForSource({0, 4}).isValid());
+        const auto tableAndTask = SourceVisualMapping::create(
+            QStringLiteral("Name | Value\n--- | ---\n- [ ] unfinished\n"));
+        QCOMPARE(tableAndTask.blocks().size(), 3);
+        QVERIFY(!tableAndTask.blocks().at(0).editable);
+        QVERIFY(!tableAndTask.blocks().at(1).editable);
+        QVERIFY(tableAndTask.blocks().at(2).editable);
+    }
+
+    void visualSourceMappingEditsSimpleQuotesAndTasksOnly() {
+        const QString source = QStringLiteral(
+            "> quoted **words**\n"
+            "- [ ] write draft\n"
+            "- [X] review draft\n"
+            "> > nested quote\n"
+            "  - [ ] nested task\n"
+            "- [ ] > mixed task\n"
+            "[label](https://example.com/with(paren))\n");
+        const auto mapping = SourceVisualMapping::create(source);
+        QCOMPARE(mapping.roundTripSource(), source);
+        QVERIFY(mapping.visualText().contains(QString::fromUtf8("❝ quoted words")));
+        QVERIFY(mapping.visualText().contains(QString::fromUtf8("☐ write draft")));
+        QVERIFY(mapping.visualText().contains(QString::fromUtf8("☑ review draft")));
+
+        const int quotePrefix = source.indexOf(QStringLiteral("> "));
+        QVERIFY(!mapping.visualSpanForSource({quotePrefix, 2}).isValid());
+        const int taskPrefix = source.indexOf(QStringLiteral("- [ ]"));
+        QVERIFY(!mapping.visualSpanForSource({taskPrefix, 5}).isValid());
+        const int taskBody = source.indexOf(QStringLiteral("write draft"));
+        const auto taskVisual = mapping.visualSpanForSource({taskBody, 11});
+        QVERIFY(taskVisual.isValid());
+        QCOMPARE(mapping.visualText().mid(taskVisual.start, taskVisual.length), QStringLiteral("write draft"));
+        const auto taskEdit = mapping.sourceEditForVisualReplacement(taskVisual, QStringLiteral("finish draft"));
+        QVERIFY(taskEdit.has_value());
+        QString edited = source;
+        edited.replace(taskEdit->source.start, taskEdit->source.length, taskEdit->replacement);
+        QVERIFY(edited.contains(QStringLiteral("- [ ] finish draft")));
+        QVERIFY(edited.startsWith(QStringLiteral("> quoted **words**\n")));
+
+        for (const QString &sourceOnly : {QStringLiteral("> > nested quote"),
+                                          QStringLiteral("  - [ ] nested task"),
+                                          QStringLiteral("- [ ] > mixed task"),
+                                          QStringLiteral("[label](https://example.com/with(paren))")}) {
+            const int start = source.indexOf(sourceOnly);
+            QVERIFY(start >= 0);
+            QVERIFY(!mapping.visualSpanForSource({start, int(sourceOnly.size())}).isValid());
+        }
+    }
+
+    void visualProjectionAppliesOnlySafeMappedEdits() {
+        Backend backend;
+        QQmlEngine engine;
+        engine.rootContext()->setContextProperty(QStringLiteral("backend"), &backend);
+        QQmlComponent component(&engine, QUrl::fromLocalFile(QFINDTESTDATA("../src/Main.qml")));
+        QScopedPointer<QObject> window(component.create());
+        QVERIFY2(window, qPrintable(component.errorString()));
+        auto *editor = window->findChild<QObject *>(QStringLiteral("sourceEditor"));
+        QVERIFY(editor);
+
+        const QString source = QStringLiteral("# Heading\nPlain **bold** text.\n| table | value |\n");
+        editor->setProperty("text", source);
+        const QVariantMap projection = backend.visualProjection();
+        QCOMPARE(projection.value("source").toString(), source);
+        QCOMPARE(projection.value("visualText").toString(),
+                 QStringLiteral("Heading\nPlain bold text.\n| table | value |\n"));
+        const QVariantList blocks = projection.value("blocks").toList();
+        QCOMPARE(blocks.size(), 3);
+        QCOMPARE(blocks.at(0).toMap().value("kind").toString(), QStringLiteral("heading"));
+        QVERIFY(blocks.at(0).toMap().value("editable").toBool());
+        QCOMPARE(blocks.at(2).toMap().value("kind").toString(), QStringLiteral("sourceOnly"));
+        QVERIFY(!blocks.at(2).toMap().value("editable").toBool());
+
+        const int boldVisualStart = projection.value("visualText").toString().indexOf("bold");
+        QVERIFY(backend.applyVisualEdit(boldVisualStart, 4, QStringLiteral("strong"), source));
+        QCOMPARE(editor->property("text").toString(),
+                 QStringLiteral("# Heading\nPlain **strong** text.\n| table | value |\n"));
+        QVERIFY(QMetaObject::invokeMethod(editor, "undo"));
+        QCOMPARE(editor->property("text").toString(), source);
+
+        QVERIFY(!backend.applyVisualEdit(boldVisualStart, 4, QStringLiteral("stale"),
+                                         QStringLiteral("different source")));
+        QVERIFY(!backend.applyVisualEdit(boldVisualStart, 4, QStringLiteral("*markup*"), source));
+        QVERIFY(!backend.applyVisualEdit(boldVisualStart, 4, QStringLiteral("two\nlines"), source));
+        const int tableVisualStart = projection.value("visualText").toString().indexOf("table");
+        QVERIFY(!backend.applyVisualEdit(tableVisualStart, 5, QStringLiteral("grid"), source));
+        QCOMPARE(editor->property("text").toString(), source);
+        backend.discardRecovery();
+    }
+
+    void contiguousVisualTypingUndoesAsOneEdit() {
+        Backend backend;
+        QQmlEngine engine;
+        engine.rootContext()->setContextProperty(QStringLiteral("backend"), &backend);
+        QQmlComponent component(&engine, QUrl::fromLocalFile(QFINDTESTDATA("../src/Main.qml")));
+        QScopedPointer<QObject> window(component.create());
+        QVERIFY2(window, qPrintable(component.errorString()));
+        auto *editor = window->findChild<QObject *>(QStringLiteral("sourceEditor"));
+        QVERIFY(editor);
+        const QString source = QStringLiteral("Plain **bold** text.\n");
+        QVERIFY(editor->setProperty("text", source));
+        auto projection = backend.visualProjection();
+        const int start = projection.value("visualText").toString().indexOf(QStringLiteral("bold"));
+        QVERIFY(start >= 0);
+        QVERIFY(backend.applyVisualEdit(start, 4, QStringLiteral("s"), source));
+        for (const QChar character : QStringLiteral("trong")) {
+            projection = backend.visualProjection();
+            const QString currentSource = projection.value("source").toString();
+            const int position = projection.value("visualText").toString().indexOf(QStringLiteral("text.")) - 1;
+            QVERIFY(position >= 0);
+            QVERIFY(backend.applyVisualEdit(position, 0, QString(character), currentSource));
+        }
+        QCOMPARE(editor->property("text").toString(), QStringLiteral("Plain **strong** text.\n"));
+        QVERIFY(QMetaObject::invokeMethod(editor, "undo"));
+        QCOMPARE(editor->property("text").toString(), source);
+        QVERIFY(QMetaObject::invokeMethod(editor, "redo"));
+        QCOMPARE(editor->property("text").toString(), QStringLiteral("Plain **strong** text.\n"));
+        backend.discardRecovery();
+    }
+
+    void visualFocusNeverFormatsStaleSourceSelection() {
+        Backend backend;
+        QQmlEngine engine;
+        engine.rootContext()->setContextProperty(QStringLiteral("backend"), &backend);
+        QQmlComponent component(&engine, QUrl::fromLocalFile(QFINDTESTDATA("../src/Main.qml")));
+        QScopedPointer<QObject> window(component.create());
+        QVERIFY2(window, qPrintable(component.errorString()));
+        auto *editor = window->findChild<QObject *>(QStringLiteral("sourceEditor"));
+        auto *pane = window->findChild<QObject *>(QStringLiteral("previewPane"));
+        auto *bold = window->findChild<QObject *>(QStringLiteral("compactBoldButton"));
+        QVERIFY(editor && pane && bold);
+        const QString source = QStringLiteral("Plain bold text.\n");
+        QVERIFY(editor->setProperty("text", source));
+        QVERIFY(QMetaObject::invokeMethod(editor, "select", Q_ARG(int, 0), Q_ARG(int, 5)));
+        QVERIFY(pane->setProperty("visualEditEnabled", true));
+        QVERIFY(window->setProperty("lastWritingSurface", QStringLiteral("visual")));
+        QVERIFY(QMetaObject::invokeMethod(bold, "clicked"));
+        QCOMPARE(editor->property("text").toString(), source);
+        QVERIFY(pane->property("visualStatus").toString().contains(QStringLiteral("Source")));
+        QVERIFY(window->setProperty("lastWritingSurface", QStringLiteral("source")));
+        QVERIFY(QMetaObject::invokeMethod(bold, "clicked"));
+        QCOMPARE(editor->property("text").toString(), QStringLiteral("**Plain** bold text.\n"));
+        backend.discardRecovery();
+    }
+
+    void visualEditorRoundTripsWithoutRewritingSource() {
+        Backend backend;
+        QQmlEngine engine;
+        engine.rootContext()->setContextProperty(QStringLiteral("backend"), &backend);
+        QQmlComponent component(&engine, QUrl::fromLocalFile(QFINDTESTDATA("../src/Main.qml")));
+        QScopedPointer<QObject> window(component.create());
+        QVERIFY2(window, qPrintable(component.errorString()));
+        auto *sourceEditor = window->findChild<QObject *>(QStringLiteral("sourceEditor"));
+        auto *pane = window->findChild<QObject *>(QStringLiteral("previewPane"));
+        auto *visualEditor = window->findChild<QObject *>(QStringLiteral("visualEditor"));
+        QVERIFY(sourceEditor && pane && visualEditor);
+
+        const QString source = QStringLiteral("# Heading\n\nPlain **bold** text.\n| table | value |\n");
+        QVERIFY(sourceEditor->setProperty("text", source));
+        QVERIFY(pane->setProperty("visualEditEnabled", true));
+        QTRY_COMPARE(visualEditor->property("text").toString(),
+                     QStringLiteral("Heading\n\nPlain bold text.\n| table | value |\n"));
+        const QString revised = QStringLiteral("Heading\n\nPlain strong text.\n| table | value |\n");
+        QVERIFY(visualEditor->setProperty("text", revised));
+        QTRY_COMPARE(sourceEditor->property("text").toString(),
+                     QStringLiteral("# Heading\n\nPlain **strong** text.\n| table | value |\n"));
+        QVERIFY(QMetaObject::invokeMethod(sourceEditor, "undo"));
+        QTRY_COMPARE(sourceEditor->property("text").toString(), source);
+        QTRY_COMPARE(visualEditor->property("text").toString(),
+                     QStringLiteral("Heading\n\nPlain bold text.\n| table | value |\n"));
+
+        QVERIFY(visualEditor->setProperty("text", QStringLiteral("Heading\n\nPlain bold text.\n| grid | value |\n")));
+        QTRY_COMPARE(sourceEditor->property("text").toString(), source);
+        QTRY_COMPARE(visualEditor->property("text").toString(),
+                     QStringLiteral("Heading\n\nPlain bold text.\n| table | value |\n"));
+        QVERIFY(pane->setProperty("visualEditEnabled", false));
+        QCOMPARE(sourceEditor->property("text").toString(), source);
+        backend.discardRecovery();
     }
 
     void loadsCurrentOmarchyTheme() {

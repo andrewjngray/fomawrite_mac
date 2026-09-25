@@ -7,10 +7,16 @@ INCLUDEPATH += ../src
 SOURCES += \
     tst_fomawrite.cpp \
     ../src/backend.cpp \
-    ../src/markdownhighlighter.cpp
+    ../src/markdownhighlighter.cpp \
+    ../src/sourcevisualmapping.cpp \
+    ../src/visualtexthighlighter.cpp \
+    ../src/outputcss.cpp
 HEADERS += \
     ../src/backend.h \
-    ../src/markdownhighlighter.h
+    ../src/markdownhighlighter.h \
+    ../src/sourcevisualmapping.h \
+    ../src/visualtexthighlighter.h \
+    ../src/outputcss.h
 
 QT += widgets printsupport quickcontrols2 quickdialogs2
 CONFIG -= app_bundle
