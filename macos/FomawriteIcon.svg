@@ -3,6 +3,7 @@
   <rect width="1024" height="1024" fill="#f6f8fa"/>
   <rect x="168" y="198" width="688" height="682" rx="100" fill="#e1e5e9"/>
   <rect x="168" y="180" width="688" height="682" rx="100" fill="#ffffff" stroke="#e3e7ea" stroke-width="5"/>
+  <rect x="266" y="335" width="32" height="146" rx="16" fill="#aab1b6"/>
   <rect x="255" y="305" width="455" height="62" rx="31" fill="#555b60"/>
   <rect x="255" y="450" width="285" height="62" rx="31" fill="#555b60"/>
   <rect x="594" y="430" width="30" height="144" rx="10" fill="#079fe0"/>

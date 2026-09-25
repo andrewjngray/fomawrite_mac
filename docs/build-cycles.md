@@ -1068,3 +1068,15 @@ Validation: the 1024 px and 64 px renders were visually inspected; `./bin/build`
 Known gaps: Dock/Finder appearance across all scales, dark backgrounds and macOS icon caching still warrants Andrew's review. This is a local ad-hoc build, not a public release. `/Applications/Fomawrite.app` remains untouched.
 
 Runnable artifacts: `dist/Fomawrite.app` and `dist/Fomawrite Dev.app` after refresh. [Optional exercise](../research/usability/cycle-71.md): compare the new Dock icon against the previous Cycle 70 design and judge legibility at your normal Dock size.
+
+## Cycle 72 — final short-connector app icon
+
+Planned scope: finish Andrew's side-by-side icon comparison by adopting the short grey connector beside the two dark writing lines and blue caret. Keep product identity and editing behavior unchanged.
+
+Changes: selected the short-connector vector from the three-option comparison and regenerated the committed multi-resolution `Fomawrite.icns`. The no-stroke Cycle 71 and extended-stem alternatives remain documented by the comparison; the short connector is the final product mark.
+
+Validation: the 1024 px and 64 px renders were inspected. `./bin/build` passed and `./bin/test` passed **111 tests, zero failures and zero skips**. `./bin/package-mac` and `./bin/prepare-dev-app` succeeded. Both generated bundles declare `CFBundleIconFile=Fomawrite.icns`, carry the same icon resource as the source `.icns`, and pass strict local signature verification. The refreshed Dev app launched to a clean Untitled window. See [Cycle 72 evidence](../research/cycle-72/README.md).
+
+Known gaps: Dock/Finder rendering can be cached by macOS and has not been inspected across every scale and appearance. These are local ad-hoc bundles, not a notarized public release. The installed `/Applications/Fomawrite.app` was not replaced.
+
+Runnable artifacts: `dist/Fomawrite.app` and `dist/Fomawrite Dev.app`. [Optional exercise](../research/usability/cycle-72.md): glance at the Dev Dock icon at your usual Dock size and check that the short connector reads clearly.

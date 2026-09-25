@@ -22,7 +22,7 @@ On macOS, install Apple's Command Line Tools and Homebrew Qt (`brew install qtba
 open dist/Fomawrite.app
 ```
 
-`dist/Fomawrite.app` is the ordinary app. `dist/Fomawrite Dev.app` is the stable QA app; both come from the same source, but can differ until refreshed. The selected writing-lines and blue-caret app icon is generated from `macos/FomawriteIcon.svg`; run `./bin/make-app-icon` (requires QtSvg and `iconutil`) to rebuild its committed `.icns`. They use bundle IDs `io.github.andrewjngray.fomawrite` and `io.github.andrewjngray.fomawrite.dev`. Bundles are locally ad-hoc signed, not notarized for public distribution. Do not replace either while it is running; close it normally and preserve unsaved work first.
+`dist/Fomawrite.app` is the ordinary app. `dist/Fomawrite Dev.app` is the stable QA app; both come from the same source, but can differ until refreshed. The final short-connector writing icon is generated from `macos/FomawriteIcon.svg`; run `./bin/make-app-icon` (requires QtSvg and `iconutil`) to rebuild its committed `.icns`. They use bundle IDs `io.github.andrewjngray.fomawrite` and `io.github.andrewjngray.fomawrite.dev`. Bundles are locally ad-hoc signed, not notarized for public distribution. Do not replace either while it is running; close it normally and preserve unsaved work first.
 
 The first launch of a renamed Mac bundle migrates prior preferences and copies matching workspace/recovery state from the matching former Omawrite identity, leaving the old files in place. Existing hidden `.omawrite-authors.json` sidecars and clipboard metadata remain compatible so a product rename does not discard authorship annotations. [Migration details](docs/product-rename.md).
 
