@@ -1044,3 +1044,15 @@ Tests and native verification: final `./bin/build` and `./bin/test` pass with **
 Known gaps: Visual Edit remains a bounded inline subset, not a general WYSIWYG editor. Multiline/complex nested Markdown, images, tables, code and several insertion commands stay source-only. The continuous export preview is not page-exact. Saved HTML/PDF visual comparisons, custom CSS selection in the final native bundle, style restart persistence, dirty/recovered/multiwindow/external-edit cases, long files, dark/narrow/fullscreen layout, keyboard-only navigation and VoiceOver remain for a later acceptance pass. DOCX/ePub and Ulysses style import are not built. These gaps prevent claiming the full Cycle 69 acceptance gate or iA Writer parity.
 
 Runnable artifacts: `dist/Fomawrite Dev.app` is refreshed with the clean synthetic sample open for review. `dist/Fomawrite.app` was packaged from the same source; both generated bundles passed strict local signature verification. `/Applications/Fomawrite.app` was not replaced. [Exercise](../research/usability/cycle-69.md).
+
+## Cycle 70 — selected macOS app icon
+
+Planned scope: use Andrew's selected third concept, with Markdown source on the left, formatted text on the right and a blue divider, as Fomawrite's app icon. Keep the mark original and readable at Dock sizes, without changing editing behavior or the installed ordinary app.
+
+Changes: added a source SVG and a reproducible QtSvg/iconutil generator for a multi-resolution `Fomawrite.icns`. qmake now copies the icon into the app bundle and the macOS Info.plist names it, so the ordinary and stable Dev bundles use the same product mark. The icon source is vector and the generated resource is committed for reproducible packaging.
+
+Validation: `./bin/build` passed and `./bin/test` passed **111 tests, zero failures and zero skips**. The generated Info.plist was regenerated after qmake had retained its prior copy; both final bundles contain `CFBundleIconFile=Fomawrite.icns` and identical icon resources. Both passed strict local signature verification. The 1024 px and 64 px renders were visually inspected; refreshed Dev launched successfully. Finder/Dock appearance remains Andrew’s review item. See [Cycle 70 evidence](../research/cycle-70/README.md).
+
+Known gaps: the light icon has not been checked in every macOS Dock appearance or at every scaled size. It is a local design asset, not a notarized public release. The installed `/Applications/Fomawrite.app` remains separate from generated `dist/` bundles.
+
+Runnable artifacts: generated `dist/Fomawrite.app` and `dist/Fomawrite Dev.app` after packaging. [Optional usability exercise](../research/usability/cycle-70.md): compare the icon in Finder and the Dock at small and large Dock settings, then report whether the source/preview meaning remains obvious.

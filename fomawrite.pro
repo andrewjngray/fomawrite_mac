@@ -26,6 +26,7 @@ macx {
     OBJECTIVE_SOURCES += src/windowchrome_mac.mm
     TARGET = Fomawrite
     QMAKE_INFO_PLIST = macos/Info.plist
+    ICON = macos/Fomawrite.icns
     QMAKE_MACOSX_DEPLOYMENT_TARGET = 14.0
 } else {
     SOURCES += src/systemtheme.cpp

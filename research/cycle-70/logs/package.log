@@ -1,0 +1,4 @@
+make: Nothing to be done for `first'.
+Built <checkout>/build/Fomawrite.app
+<checkout>/dist/Fomawrite.app: replacing existing signature
+Packaged <checkout>/dist/Fomawrite.app (local ad-hoc signature)

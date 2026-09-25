@@ -1,0 +1,17 @@
+#!/usr/bin/env sh
+set -eu
+ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
+[ "$(uname -s)" = Darwin ] || { echo 'Run on macOS.' >&2; exit 1; }
+ICONSET="$(mktemp -d "${TMPDIR:-/tmp}/fomawrite-icon.XXXXXX")"
+trap 'rm -rf "$ICONSET"' EXIT HUP INT TERM
+mkdir -p "$ICONSET/Fomawrite.iconset"
+c++ -std=c++17 "$ROOT/macos/render-icon.cpp" -o "$ICONSET/render-icon" $(pkg-config --cflags --libs Qt6Svg Qt6Widgets)
+for SIZE in 16 32 128 256 512; do
+  case "$SIZE" in
+    16) DOUBLE=32;; 32) DOUBLE=64;; 128) DOUBLE=256;; 256) DOUBLE=512;; 512) DOUBLE=1024;;
+  esac
+  "$ICONSET/render-icon" "$ROOT/macos/FomawriteIcon.svg" "$ICONSET/Fomawrite.iconset/icon_${SIZE}x${SIZE}.png" "$SIZE"
+  "$ICONSET/render-icon" "$ROOT/macos/FomawriteIcon.svg" "$ICONSET/Fomawrite.iconset/icon_${SIZE}x${SIZE}@2x.png" "$DOUBLE"
+done
+iconutil -c icns "$ICONSET/Fomawrite.iconset" -o "$ROOT/macos/Fomawrite.icns"
+echo "Wrote $ROOT/macos/Fomawrite.icns"
