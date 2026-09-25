@@ -23,7 +23,7 @@ The [17 September staged development plan](development-plan.md) turns the [iA me
 2. **Daily writing:** folder navigation and quick switching, adjustable typography, focus mode, recent documents. Choose the first addition through actual use.
 3. **Richer documents:** evaluate tables, local images, task lists, source/reading modes and export against real example documents. Establish Markdown round-trip fixtures before changing parsing or rendering.
 4. **Personal workflows:** document templates, search across folders, links between notes and user-defined commands. Add integrations only when needed.
-5. **Distribution:** selected app icon (Cycle 70) and naming, accessibility audit, multi-document lifecycle polish, signing/notarisation and automated releases if Andrew wants other people to use it.
+5. **Distribution:** selected app icon (refined in Cycle 71) and naming, accessibility audit, multi-document lifecycle polish, signing/notarisation and automated releases if Andrew wants other people to use it.
 
 ## Learning loop
 

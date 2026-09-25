@@ -1056,3 +1056,15 @@ Validation: `./bin/build` passed and `./bin/test` passed **111 tests, zero failu
 Known gaps: the light icon has not been checked in every macOS Dock appearance or at every scaled size. It is a local design asset, not a notarized public release. The installed `/Applications/Fomawrite.app` remains separate from generated `dist/` bundles.
 
 Runnable artifacts: generated `dist/Fomawrite.app` and `dist/Fomawrite Dev.app` after packaging. [Optional usability exercise](../research/usability/cycle-70.md): compare the icon in Finder and the Dock at small and large Dock settings, then report whether the source/preview meaning remains obvious.
+
+## Cycle 71 — simpler writing icon
+
+Planned scope: follow Andrew's updated selection of the middle icon from the original three-concept board: two dark-grey writing lines and a blue insertion caret, with no grey connecting stroke. Retain the existing bundle identity and icon build workflow.
+
+Changes: replaced the Cycle 70 split-view artwork in the editable SVG and regenerated the multi-resolution `.icns`. Both ordinary and Dev bundles continue to use the same icon metadata and product name. The previous artwork remains available in Git history.
+
+Validation: the 1024 px and 64 px renders were visually inspected; `./bin/build` passed and `./bin/test` passed **111 tests, zero failures and zero skips**. Both generated bundles contain `CFBundleIconFile=Fomawrite.icns` and an identical icon resource, and both passed strict local signature checks. The refreshed Dev app launched to a clean Untitled document. Finder/Dock appearance at different scales remains Andrew’s review item. See [Cycle 71 evidence](../research/cycle-71/README.md).
+
+Known gaps: Dock/Finder appearance across all scales, dark backgrounds and macOS icon caching still warrants Andrew's review. This is a local ad-hoc build, not a public release. `/Applications/Fomawrite.app` remains untouched.
+
+Runnable artifacts: `dist/Fomawrite.app` and `dist/Fomawrite Dev.app` after refresh. [Optional exercise](../research/usability/cycle-71.md): compare the new Dock icon against the previous Cycle 70 design and judge legibility at your normal Dock size.
