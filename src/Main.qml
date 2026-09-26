@@ -2900,9 +2900,11 @@ ApplicationWindow {
             markdown: editor.text
             documentBaseUrl: backend.documentBaseUrl
             onSourceEditRequested: {
-                workspaceSettings.layoutMode = 1;
+                previewPane.visualEditEnabled = false;
+                workspaceCommands.run("editor");
+                win.lastWritingSurface = "source";
                 editor.forceActiveFocus();
-                editorFlick.ensureCursorVisible();
+                Qt.callLater(function() { editorFlick.ensureCursorVisible(); });
             }
             onVisualEditorFocusedChanged: if (visualEditorFocused) win.lastWritingSurface = "visual"
             onEditorUndoRequested: editor.undo()

@@ -4288,6 +4288,31 @@ private slots:
         backend.discardRecovery();
     }
 
+    void visualSourceButtonReturnsToSourceEditor() {
+        Backend backend;
+        QQmlEngine engine;
+        engine.rootContext()->setContextProperty(QStringLiteral("backend"), &backend);
+        QQmlComponent component(&engine, QUrl::fromLocalFile(QFINDTESTDATA("../src/Main.qml")));
+        QScopedPointer<QObject> window(component.create());
+        QVERIFY2(window, qPrintable(component.errorString()));
+        auto *settings = window->findChild<QObject *>(QStringLiteral("workspaceSettings"));
+        auto *source = window->findChild<QObject *>(QStringLiteral("sourceEditor"));
+        auto *pane = window->findChild<QObject *>(QStringLiteral("previewPane"));
+        auto *sourceButton = pane ? pane->findChild<QObject *>(QStringLiteral("visualEditSourceButton")) : nullptr;
+        QVERIFY(settings && source && pane && sourceButton);
+        const QString markdown = QStringLiteral("# Heading\n\nA safe paragraph.\n");
+        QVERIFY(source->setProperty("text", markdown));
+        QVERIFY(settings->setProperty("layoutMode", 1));
+        QVERIFY(pane->setProperty("visualEditEnabled", true));
+        QVERIFY(pane->property("visualEditEnabled").toBool());
+        QVERIFY(QMetaObject::invokeMethod(sourceButton, "clicked"));
+        QCOMPARE(settings->property("layoutMode").toInt(), 0);
+        QVERIFY(!pane->property("visualEditEnabled").toBool());
+        QCOMPARE(window->property("lastWritingSurface").toString(), QStringLiteral("source"));
+        QCOMPARE(source->property("text").toString(), markdown);
+        backend.discardRecovery();
+    }
+
     void loadsCurrentOmarchyTheme() {
         QTemporaryDir homeDirectory;
         QVERIFY(homeDirectory.isValid());

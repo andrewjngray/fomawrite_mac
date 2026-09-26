@@ -1164,3 +1164,15 @@ Tests and native verification: `./bin/build` passed and `./bin/test` passed **11
 Known gaps: Andrew's visual judgment of the revised dialog and split view is still needed. Visual Edit remains limited to supported inline source spans; source-only blocks do not become WYSIWYG, and visual layout is an approximation of formatted output rather than page-exact. The full Cycle 69 acceptance matrix and notarized release remain open.
 
 Runnable artifacts: `dist/Fomawrite Dev.app` for immediate review and `dist/Fomawrite.app` as the packaged ordinary build. The older `/Applications/Fomawrite.app` remains running. [Optional exercise](../research/usability/cycle-79.md): compare the Dev export dialog and Visual Edit with the screenshots.
+
+## Cycle 80 — Source button leaves Visual Edit
+
+Planned scope: fix Andrew's report that clicking Source in Visual Edit produced no visible change in Split view.
+
+Changes: Source now turns off Visual Edit, selects the existing editor-only workspace mode, and focuses the Markdown source editor. It keeps the current document and cursor; the visual projection is not serialized or saved by switching modes.
+
+Tests and native verification: `./bin/build` passed and `./bin/test` passed **113 tests, zero failures and zero skips**. A focused regression invokes the document pane's Source button from Visual Edit and confirms editor-only mode, disabled visual mode and unchanged Markdown. `./bin/package-mac` and `./bin/prepare-dev-app` succeeded; both bundles passed strict local signature verification. Andrew authorized closing Dev; it had already exited when checked, so the refreshed Dev bundle was installed and launched on a disposable sample. The running `/Applications/Fomawrite.app` was not touched. See [Cycle 80 record](../research/cycle-80/README.md).
+
+Known gaps: the refreshed button still needs Andrew's direct click check in his window. Visual Edit remains the conservative inline subset recorded in Cycle 69; source-only Markdown constructs are unchanged. This is an ad-hoc local build, not a notarized public release.
+
+Runnable artifacts: `dist/Fomawrite Dev.app` for review and `dist/Fomawrite.app` as the packaged ordinary build. [Optional exercise](../research/usability/cycle-80.md): click Source from Visual Edit, then return to Split and Visual Edit.
