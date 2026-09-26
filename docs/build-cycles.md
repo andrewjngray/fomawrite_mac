@@ -1116,3 +1116,15 @@ Tests and native verification: `./bin/build` passed; `./bin/test` passed **111 t
 Known gaps: Andrew's visual check in his own Dock remains useful; the Dock itself was not captured. This is a local ad-hoc build, not a notarized release.
 
 Runnable artifacts: `/Applications/Fomawrite.app`, `dist/Fomawrite.app` and `dist/Fomawrite Dev.app`. [Optional exercise](../research/usability/cycle-75.md): compare the white face and gray rim beside Outlook at your usual Dock size.
+
+## Cycle 76 — pure-white app icon face
+
+Planned scope: match Andrew's OneDrive reference more closely by removing the visible gray border from the white Fomawrite tile while retaining subtle three-dimensional depth.
+
+Changes: replaced the bordered tile with a single pure-white rounded face over a soft offset shadow. The short connector, dark writing lines and blue caret remain unchanged. Regenerated the PNG and multiresolution `.icns` from the vector source.
+
+Tests and native verification: `./bin/build` passed; `./bin/test` passed **111 tests, zero failures and zero skips**. `./bin/package-mac` and `./bin/prepare-dev-app` succeeded. Andrew saved and quit the installed app before replacement. The installed executable and `.icns` match the signed packaged app; it launched, and `NSWorkspace` resolved the borderless white icon after Launch Services registration and a Dock restart. See [Cycle 76 evidence](../research/cycle-76/README.md).
+
+Known gaps: Andrew's visual check in his own Dock remains useful; the Dock itself was not captured. This is a local ad-hoc build, not a notarized release.
+
+Runnable artifacts: `/Applications/Fomawrite.app`, `dist/Fomawrite.app` and `dist/Fomawrite Dev.app`. [Optional exercise](../research/usability/cycle-76.md): compare the white tile beside OneDrive at your usual Dock size.

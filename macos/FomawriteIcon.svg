@@ -1,8 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
   <title>Fomawrite — writing lines and insertion caret</title>
-  <rect x="48" y="64" width="928" height="928" rx="222" fill="#818b92" fill-opacity="0.26"/>
-  <rect x="48" y="40" width="928" height="928" rx="222" fill="#c2cbd1"/>
-  <rect x="70" y="62" width="884" height="884" rx="202" fill="#ffffff" stroke="#e5e9ec" stroke-width="5"/>
+  <rect x="48" y="72" width="928" height="928" rx="222" fill="#858d94" fill-opacity="0.20"/>
+  <rect x="48" y="40" width="928" height="928" rx="222" fill="#ffffff"/>
   <rect x="246" y="352" width="32" height="184" rx="16" fill="#9ca7af"/>
   <rect x="230" y="334" width="564" height="68" rx="34" fill="#51595f"/>
   <rect x="230" y="502" width="340" height="68" rx="34" fill="#51595f"/>
