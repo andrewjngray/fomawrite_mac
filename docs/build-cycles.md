@@ -1137,6 +1137,6 @@ Changes: sampled the cmux screenshot's near-white top and light-gray bottom, the
 
 Tests: `./bin/build` passed; `./bin/test` passed **111 tests, zero failures and zero skips**. `./bin/package-mac` and `./bin/prepare-dev-app` succeeded. See [Cycle 77 evidence](../research/cycle-77/README.md).
 
-Native verification and known gaps: the installed app was still running during packaging, so it has not yet been replaced or checked in the Dock. Andrew's normal quit is required to preserve any unsaved work. This is a local ad-hoc build, not a notarized release.
+Native verification and known gaps: the installed app was left untouched while it was running, then replaced after it exited. The installed signed executable and `.icns` match the packaged bundle. The app launched, and `NSWorkspace` resolved the off-white icon after Launch Services registration and a Dock restart. Andrew's visual judgment in his own Dock remains useful; the Dock itself was not captured. This is a local ad-hoc build, not a notarized release.
 
-Runnable artifacts: `dist/Fomawrite.app` and `dist/Fomawrite Dev.app`; `/Applications/Fomawrite.app` remains on Cycle 76 until safe replacement. [Optional exercise](../research/usability/cycle-77.md): compare Fomawrite beside cmux at your usual Dock size.
+Runnable artifacts: `/Applications/Fomawrite.app`, `dist/Fomawrite.app` and `dist/Fomawrite Dev.app`. [Optional exercise](../research/usability/cycle-77.md): compare Fomawrite beside cmux at your usual Dock size.
