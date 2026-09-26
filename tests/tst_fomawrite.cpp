@@ -4033,6 +4033,12 @@ private slots:
         QVERIFY(mapping.visualText().contains(QStringLiteral("Héadline")));
         QVERIFY(mapping.visualText().contains(QStringLiteral("Plain bold and emphasis with a link.")));
         QVERIFY(mapping.visualText().contains(QStringLiteral("First item")));
+        QVERIFY(mapping.visualText().contains(QString::fromUtf8("• First item")));
+        const int marker = mapping.visualText().indexOf(QString::fromUtf8("• "));
+        QVERIFY(!mapping.sourceEditForVisualReplacement({marker, 1}, QStringLiteral("x")).has_value());
+        const auto numbered = SourceVisualMapping::create(QStringLiteral("12. Numbered item\n"));
+        QVERIFY(numbered.visualText().startsWith(QStringLiteral("12. Numbered item")));
+        QVERIFY(!numbered.sourceEditForVisualReplacement({0, 3}, QStringLiteral("x")).has_value());
         QVERIFY(mapping.visualText().contains(QStringLiteral("| Name | Value |")));
         QVERIFY(mapping.visualText().contains(QStringLiteral("**literal**")));
 
@@ -4257,6 +4263,28 @@ private slots:
                      QStringLiteral("Heading\n\nPlain bold text.\n| table | value |\n"));
         QVERIFY(pane->setProperty("visualEditEnabled", false));
         QCOMPARE(sourceEditor->property("text").toString(), source);
+        backend.discardRecovery();
+    }
+
+    void exportHubAndVisualEditorOpenWithReadableControls() {
+        Backend backend;
+        QQmlEngine engine;
+        engine.rootContext()->setContextProperty(QStringLiteral("backend"), &backend);
+        QQmlComponent component(&engine, QUrl::fromLocalFile(QFINDTESTDATA("../src/Main.qml")));
+        QScopedPointer<QObject> window(component.create());
+        QVERIFY2(window, qPrintable(component.errorString()));
+        auto *hub = window->findChild<QObject *>(QStringLiteral("exportHub"));
+        auto *destination = window->findChild<QObject *>(QStringLiteral("exportDestinationButton"));
+        auto *pane = window->findChild<QObject *>(QStringLiteral("previewPane"));
+        auto *visual = window->findChild<QObject *>(QStringLiteral("visualEditor"));
+        QVERIFY(hub && destination && pane && visual);
+        QVERIFY(QMetaObject::invokeMethod(hub, "open"));
+        QTRY_VERIFY(hub->property("visible").toBool());
+        QCOMPARE(destination->property("text").toString(), QStringLiteral("Save PDF…"));
+        QVERIFY(pane->setProperty("visualEditEnabled", true));
+        QTRY_VERIFY(visual->property("visible").toBool());
+        const QFont visualFont = qvariant_cast<QFont>(visual->property("font"));
+        QVERIFY(visualFont.pixelSize() >= 18);
         backend.discardRecovery();
     }
 

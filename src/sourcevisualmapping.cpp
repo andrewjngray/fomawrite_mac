@@ -89,8 +89,13 @@ SourceVisualMapping SourceVisualMapping::create(const QString &source) {
                                           headingMatch.capturedLength(1), hasNewline,
                                           headingMatch.capturedLength(2));
             } else if (listMatch.hasMatch()) {
+                // Show the list marker in Visual Edit without mapping it back
+                // to source. Editing the body can never rewrite the marker.
+                const QString marker = listMatch.captured(1).trimmed();
+                const QString visualMarker = marker.at(0).isDigit()
+                    ? marker + QLatin1Char(' ') : QString::fromUtf8("• ");
                 result.appendEditableLine(BlockKind::ListItem, offset, line,
-                                          listMatch.capturedLength(1), hasNewline);
+                                          listMatch.capturedLength(1), hasNewline, 0, visualMarker);
             } else {
                 result.appendEditableLine(BlockKind::Paragraph, offset, line, 0, hasNewline);
             }

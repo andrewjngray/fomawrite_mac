@@ -13,6 +13,8 @@ Rectangle {
     property bool darkMode: false
     property string typeface: "Helvetica Neue"
     property int textSize: 17
+    // Editing should remain legible even when a compact output style is selected.
+    property int visualTextSize: Math.max(18, textSize)
     property int layoutMode: 1
     property string pendingAnchor: ""
     property bool visualEditEnabled: false
@@ -46,6 +48,7 @@ Rectangle {
             visualRefreshTimer.restart()
     }
     onTextSizeChanged: { refreshTimer.restart(); if (visualEditEnabled) visualRefreshTimer.restart(); }
+    onVisualTextSizeChanged: if (visualEditEnabled) visualRefreshTimer.restart()
     onTypefaceChanged: { refreshTimer.restart(); if (visualEditEnabled) visualRefreshTimer.restart(); }
     onDarkModeChanged: { refreshTimer.restart(); if (visualEditEnabled) visualRefreshTimer.restart(); }
     function refresh() {
@@ -82,7 +85,7 @@ Rectangle {
         visualSourceSnapshot = projection.source || "";
         visualSnapshot = projection.visualText || "";
         visualText.text = visualSnapshot;
-        Qt.callLater(function() { if (root.visualEditEnabled) root.renderer.styleVisualEditor(visualText.textDocument, root.textSize); });
+        Qt.callLater(function() { if (root.visualEditEnabled) root.renderer.styleVisualEditor(visualText.textDocument, root.visualTextSize); });
         first = Math.max(0, Math.min(first, visualSnapshot.length));
         last = Math.max(0, Math.min(last, visualSnapshot.length));
         if (first === last)
@@ -189,7 +192,7 @@ Rectangle {
             selectionColor: backend.palette.selection
             selectedTextColor: "white"
             font.family: root.typeface
-            font.pixelSize: root.textSize
+            font.pixelSize: root.visualTextSize
             onTextChanged: root.applyVisualTextChange()
             onInputMethodComposingChanged: if (!inputMethodComposing) root.applyVisualTextChange()
             Keys.priority: Keys.BeforeItem

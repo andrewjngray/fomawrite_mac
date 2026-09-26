@@ -1,0 +1,9 @@
+# Cycle 79 — export and Visual Edit presentation
+
+Andrew's three screenshots showed an export dialog with vertically centered controls and heavy gray pill-style choices, plus a split Visual Edit pane whose type was too small and whose list markers disappeared. The screenshots were used as references and were not copied into the repo because they show a personal document and locations.
+
+The controls column now starts at the top. The dialog title and subtitle, section labels, selected-style line and footer actions have a clearer hierarchy. The gallery buttons use light bordered cards with a distinct selection border. The visual editor has an 18 px minimum body size, while larger writing-size choices still apply. Safe unordered and ordered list lines show bullet or number markers generated from source; those markers remain unmapped and cannot be edited back into Markdown. Source-only blocks and the existing inline-edit guard are unchanged.
+
+`./bin/build` passed. `./bin/test` passed 112 tests with zero failures and zero skips. The new UI regression opens the export hub and checks its primary action and Visual Edit text size; mapping checks verify that display-only list markers cannot alter source. `qmllint` parsed all three changed QML files successfully and reported its existing unqualified-access style warnings. `./bin/package-mac` and `./bin/prepare-dev-app` succeeded; the Dev bundle passed strict local signature verification and launched on `/private/tmp/fomawrite-cycle79-ui-sample.md`. The already-running Applications app was untouched.
+
+Native appearance was not captured from the user's desktop. Andrew can review the refreshed Dev app, then report whether the spacing and visual type size feel right. The preview remains continuous and is not an exact PDF page layout; Visual Edit is still a guarded subset rather than full WYSIWYG.

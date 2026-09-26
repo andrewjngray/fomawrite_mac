@@ -106,14 +106,22 @@ ScrollView {
             model: gallery.builtIns
             delegate: Button {
                 required property var modelData
-                Layout.fillWidth: true; checkable: true
+                Layout.fillWidth: true; Layout.preferredHeight: 58; checkable: true
                 checked: backend.outputStyle === modelData.id
                 onClicked: gallery.selectBuiltIn(modelData)
                 Accessible.name: modelData.name + ", " + modelData.font
-                contentItem: Column {
-                    spacing: 2; leftPadding: 10; rightPadding: 10; topPadding: 8; bottomPadding: 8
-                    Label { text: modelData.name; color: backend.palette.text; font.weight: Font.DemiBold }
-                    Label { text: modelData.font; color: backend.palette.muted; font.pixelSize: 11 }
+                background: Rectangle {
+                    radius: 7
+                    color: parent.checked ? backend.palette.field : parent.hovered ? backend.palette.hover : "transparent"
+                    border.color: parent.checked ? backend.themeAccent : backend.palette.border
+                    border.width: parent.checked ? 2 : 1
+                }
+                contentItem: Item {
+                    Column {
+                        x: 13; anchors.verticalCenter: parent.verticalCenter; spacing: 3
+                        Label { text: modelData.name; color: backend.palette.text; font.pixelSize: 14; font.weight: Font.DemiBold }
+                        Label { text: modelData.font; color: backend.palette.muted; font.pixelSize: 12 }
+                    }
                 }
             }
         }
@@ -123,14 +131,22 @@ ScrollView {
             model: gallery.userStyles
             delegate: Button {
                 required property var modelData
-                Layout.fillWidth: true; checkable: true
+                Layout.fillWidth: true; Layout.preferredHeight: 58; checkable: true
                 checked: backend.outputStyle === 3 && backend.selectedUserOutputStyleId() === modelData.id
                 onClicked: gallery.selectUser(modelData)
                 Accessible.name: modelData.name + ", user style, " + modelData.fontFamily
-                contentItem: Column {
-                    spacing: 2; leftPadding: 10; rightPadding: 10; topPadding: 8; bottomPadding: 8
-                    Label { text: modelData.name; color: backend.palette.text; font.weight: Font.DemiBold }
-                    Label { text: modelData.fontFamily + " / " + modelData.pointSize + " pt"; color: backend.palette.muted; font.pixelSize: 11 }
+                background: Rectangle {
+                    radius: 7
+                    color: parent.checked ? backend.palette.field : parent.hovered ? backend.palette.hover : "transparent"
+                    border.color: parent.checked ? backend.themeAccent : backend.palette.border
+                    border.width: parent.checked ? 2 : 1
+                }
+                contentItem: Item {
+                    Column {
+                        x: 13; anchors.verticalCenter: parent.verticalCenter; spacing: 3
+                        Label { text: modelData.name; color: backend.palette.text; font.pixelSize: 14; font.weight: Font.DemiBold }
+                        Label { text: modelData.fontFamily + " · " + modelData.pointSize + " pt"; color: backend.palette.muted; font.pixelSize: 12 }
+                    }
                 }
             }
         }
@@ -138,7 +154,11 @@ ScrollView {
         RowLayout {
             Layout.fillWidth: true; spacing: 6
             TextField { id: copyName; Layout.fillWidth: true; placeholderText: "Name this copy"; maximumLength: 80; Accessible.name: "Name for style copy"; onAccepted: gallery.createCopy() }
-            Button { text: "Duplicate current"; onClicked: gallery.createCopy(); Accessible.name: "Duplicate current style" }
+            Button {
+                text: "Duplicate current"; flat: true
+                background: Rectangle { radius: 6; color: parent.hovered ? backend.palette.hover : backend.palette.panel; border.color: backend.palette.border }
+                onClicked: gallery.createCopy(); Accessible.name: "Duplicate current style"
+            }
         }
         ColumnLayout {
             visible: gallery.editingId.length > 0; Layout.fillWidth: true; spacing: 7
@@ -159,8 +179,16 @@ ScrollView {
             CheckBox { id: editorTitlePage; text: "Add a title page to PDF"; Accessible.name: text }
             ColumnLayout {
                 Layout.fillWidth: true; spacing: 6
-                Button { Layout.fillWidth: true; text: "Apply to preview"; highlighted: true; onClicked: gallery.saveEditor(); Accessible.name: "Apply style changes to live preview" }
-                Button { Layout.fillWidth: true; text: "Delete style"; onClicked: gallery.removeEditor(); Accessible.name: "Delete selected user style" }
+                Button {
+                    Layout.fillWidth: true; text: "Apply to preview"; flat: true
+                    background: Rectangle { radius: 6; color: parent.hovered ? backend.palette.hover : backend.palette.field; border.color: backend.palette.border }
+                    onClicked: gallery.saveEditor(); Accessible.name: "Apply style changes to live preview"
+                }
+                Button {
+                    Layout.fillWidth: true; text: "Delete style"; flat: true
+                    background: Rectangle { radius: 6; color: parent.hovered ? backend.palette.hover : backend.palette.panel; border.color: backend.palette.border }
+                    onClicked: gallery.removeEditor(); Accessible.name: "Delete selected user style"
+                }
             }
         }
         Label { visible: gallery.feedback.length > 0; text: gallery.feedback; wrapMode: Text.Wrap; Layout.fillWidth: true; color: backend.palette.muted; font.pixelSize: 12 }

@@ -1152,3 +1152,15 @@ Tests and native verification: `./bin/build` passed and `./bin/test` passed **11
 Known gaps: the running dark Dock tile and return to light after Quit still need a direct visual check. The desktop capture showed a remote Windows taskbar rather than the macOS Dock. This remains a local ad-hoc build, not a notarized release.
 
 Runnable artifacts: `/Applications/Fomawrite.app`, `dist/Fomawrite.app` and `dist/Fomawrite Dev.app`. [Optional exercise](../research/usability/cycle-78.md): inspect the Dock tile through launch, canceled Quit, and completed Quit.
+
+## Cycle 79 — export and Visual Edit presentation
+
+Planned scope: respond to Andrew's export-dialog and split-view screenshots with a calmer dialog hierarchy, stronger labels and buttons, and more readable Visual Edit text that better resembles the rendered document without changing canonical Markdown.
+
+Changes: the export controls align to the top of the modal, with a concise subtitle, clearer section labels and a shorter Save action. The style gallery uses flat bordered selection cards rather than the native gray pill treatment; secondary actions are quieter. Visual Edit has an 18 px minimum body size independent of compact output styles, and supported bullet/numbered list lines display protected markers. Its bounded inline editing and source-only protections remain unchanged.
+
+Tests and native verification: `./bin/build` passed and `./bin/test` passed **112 tests, zero failures and zero skips**, including an export-hub open/readability regression and protected list-marker mapping checks. Both ordinary and Dev bundles were refreshed; the Dev bundle passed strict local signature verification and launched with a disposable Markdown sample. The running `/Applications/Fomawrite.app` was not replaced or inspected. No private-screen capture was taken. See [Cycle 79 record](../research/cycle-79/README.md).
+
+Known gaps: Andrew's visual judgment of the revised dialog and split view is still needed. Visual Edit remains limited to supported inline source spans; source-only blocks do not become WYSIWYG, and visual layout is an approximation of formatted output rather than page-exact. The full Cycle 69 acceptance matrix and notarized release remain open.
+
+Runnable artifacts: `dist/Fomawrite Dev.app` for immediate review and `dist/Fomawrite.app` as the packaged ordinary build. The older `/Applications/Fomawrite.app` remains running. [Optional exercise](../research/usability/cycle-79.md): compare the Dev export dialog and Visual Edit with the screenshots.
