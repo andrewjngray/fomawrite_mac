@@ -14,7 +14,7 @@ Dialog {
     property string selectedFormat: "pdf"
     property string cssName: backend.outputCssName()
     property string cssFeedback: ""
-    property bool compact: width < 760
+    property bool compact: width < 900
     signal destinationRequested(string format)
     Connections {
         target: hub.backend
@@ -38,8 +38,8 @@ Dialog {
     focus: true
     closePolicy: Popup.CloseOnEscape
     anchors.centerIn: parent
-    width: Math.min(Math.max(500, parent.width - 32), 1060)
-    height: Math.min(Math.max(470, parent.height - 32), 680)
+    width: Math.max(0, Math.min(1100, parent.width - 32))
+    height: Math.max(0, Math.min(720, parent.height - 32))
     padding: 0
     standardButtons: Dialog.NoButton
     background: Rectangle { color: backend.palette.panel; border.color: backend.palette.border; radius: 12 }
@@ -51,7 +51,9 @@ Dialog {
             Accessible.role: Accessible.Heading
         }
         Label {
-            x: 22; y: 44; text: "Choose a format and style, then save or share."
+            x: 22; y: 44; width: parent.width - 44
+            text: "Choose a format and style, then save or share."
+            elide: Text.ElideRight
             color: backend.palette.muted; font.pixelSize: 13
         }
         Rectangle { anchors.bottom: parent.bottom; width: parent.width; height: 1; color: backend.palette.border }
@@ -60,9 +62,14 @@ Dialog {
         spacing: 0
         RowLayout {
             Layout.fillWidth: true; Layout.fillHeight: true; Layout.margins: 20; spacing: 18
-            ColumnLayout {
+            ScrollView {
+                id: optionsScroll
                 Layout.preferredWidth: hub.compact ? -1 : 250
-                Layout.fillWidth: hub.compact; Layout.alignment: Qt.AlignTop; spacing: 12
+                Layout.fillWidth: hub.compact; Layout.fillHeight: true
+                clip: true; rightPadding: 10; contentWidth: availableWidth
+                ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
+                ColumnLayout {
+                width: optionsScroll.availableWidth; spacing: 12
                 Label { text: "Output"; color: backend.palette.text; font.pixelSize: 14; font.weight: Font.DemiBold }
                 ComboBox {
                     objectName: "exportFormatChoice"; Layout.fillWidth: true
@@ -72,7 +79,7 @@ Dialog {
                 }
                 Label { text: "Selected style"; color: backend.palette.text; font.pixelSize: 14; font.weight: Font.DemiBold }
                 Label { Layout.fillWidth: true; text: backend.outputTemplateName + " · " + backend.outputFont + " · " + backend.outputPointSize + " pt"; wrapMode: Text.Wrap; color: backend.palette.muted; font.pixelSize: 13; Accessible.name: "Current output style: " + text }
-                StyleGallery { visible: hub.compact; Layout.fillWidth: true; Layout.preferredHeight: 260; backend: hub.backend; onStyleChanged: hub.forceActiveFocus() }
+                StyleGallery { objectName: "exportCompactGallery"; visible: hub.compact; Layout.fillWidth: true; Layout.preferredHeight: 280; backend: hub.backend; onStyleChanged: hub.forceActiveFocus() }
                 ColumnLayout {
                     visible: hub.selectedFormat === "html"
                     Layout.fillWidth: true; spacing: 4
@@ -102,9 +109,11 @@ Dialog {
                 }
                 Label { Layout.fillWidth: true; text: selectedFormat === "html" ? "HTML uses the selected output style. Paper settings apply when printing it." : "PDF uses the selected style, paper size and orientation."; wrapMode: Text.Wrap; color: backend.palette.muted; font.pixelSize: 12 }
                 Button { visible: hub.compact; Layout.fillWidth: true; text: "Open paginated preview…"; flat: true; onClicked: backend.printPreview(); Accessible.name: "Open paginated print preview" }
+                Button { visible: hub.width < 520; Layout.fillWidth: true; text: "Share Markdown…"; flat: true; onClicked: backend.nativeWindowAction("share"); Accessible.name: "Share Markdown" }
+                }
             }
             Rectangle { visible: !hub.compact; Layout.fillHeight: true; Layout.preferredWidth: 1; color: backend.palette.border }
-            StyleGallery { visible: !hub.compact; Layout.preferredWidth: 245; Layout.fillHeight: true; backend: hub.backend; onStyleChanged: hub.forceActiveFocus() }
+            StyleGallery { objectName: "exportWideGallery"; visible: !hub.compact; Layout.preferredWidth: 280; Layout.fillHeight: true; backend: hub.backend; onStyleChanged: hub.forceActiveFocus() }
             Rectangle { visible: !hub.compact; Layout.fillHeight: true; Layout.preferredWidth: 1; color: backend.palette.border }
             ColumnLayout {
                 visible: !hub.compact; Layout.fillWidth: true; Layout.fillHeight: true; spacing: 8
@@ -120,7 +129,7 @@ Dialog {
         Rectangle { Layout.fillWidth: true; Layout.preferredHeight: 1; color: backend.palette.border }
         RowLayout {
             Layout.fillWidth: true; Layout.margins: 20
-            Button { objectName: "exportShareMarkdownButton"; text: "Share Markdown…"; flat: true; onClicked: backend.nativeWindowAction("share"); Accessible.name: "Share Markdown" }
+            Button { objectName: "exportShareMarkdownButton"; visible: hub.width >= 520; text: "Share Markdown…"; flat: true; onClicked: backend.nativeWindowAction("share"); Accessible.name: "Share Markdown" }
             Item { Layout.fillWidth: true }
             Button { text: "Cancel"; flat: true; onClicked: hub.close(); Accessible.name: "Cancel export" }
             Button {

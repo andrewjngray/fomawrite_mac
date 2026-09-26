@@ -4275,12 +4275,28 @@ private slots:
         QVERIFY2(window, qPrintable(component.errorString()));
         auto *hub = window->findChild<QObject *>(QStringLiteral("exportHub"));
         auto *destination = window->findChild<QObject *>(QStringLiteral("exportDestinationButton"));
+        auto *wideGallery = window->findChild<QObject *>(QStringLiteral("exportWideGallery"));
+        auto *compactGallery = window->findChild<QObject *>(QStringLiteral("exportCompactGallery"));
         auto *pane = window->findChild<QObject *>(QStringLiteral("previewPane"));
         auto *visual = window->findChild<QObject *>(QStringLiteral("visualEditor"));
-        QVERIFY(hub && destination && pane && visual);
+        QVERIFY(hub && destination && wideGallery && compactGallery && pane && visual);
         QVERIFY(QMetaObject::invokeMethod(hub, "open"));
         QTRY_VERIFY(hub->property("visible").toBool());
         QCOMPARE(destination->property("text").toString(), QStringLiteral("Save PDF…"));
+        QVERIFY(!hub->property("compact").toBool());
+        QTRY_VERIFY(wideGallery->property("availableWidth").toReal() > 200);
+        QVERIFY(wideGallery->property("contentWidth").toReal()
+                <= wideGallery->property("availableWidth").toReal() + 1);
+        auto *galleryColumn = wideGallery->findChild<QObject *>(QStringLiteral("styleGalleryColumn"));
+        QVERIFY(galleryColumn);
+        QVERIFY(galleryColumn->property("implicitWidth").toReal()
+                <= wideGallery->property("availableWidth").toReal() + 1);
+        QVERIFY(window->setProperty("width", 720));
+        QVERIFY(window->setProperty("height", 520));
+        QTRY_VERIFY(hub->property("compact").toBool());
+        QTRY_VERIFY(compactGallery->property("availableWidth").toReal() > 200);
+        QVERIFY(hub->property("width").toReal() <= window->property("width").toReal() - 31);
+        QVERIFY(hub->property("height").toReal() <= window->property("height").toReal() - 31);
         QVERIFY(pane->setProperty("visualEditEnabled", true));
         QTRY_VERIFY(visual->property("visible").toBool());
         const QFont visualFont = qvariant_cast<QFont>(visual->property("font"));

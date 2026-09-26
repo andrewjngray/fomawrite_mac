@@ -13,7 +13,16 @@ ScrollView {
     signal styleChanged()
 
     clip: true
+    // Reserve a gutter: the vertical thumb must never sit on top of a card.
+    leftPadding: 3
+    rightPadding: 16
+    contentWidth: availableWidth
     ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
+    ScrollBar.vertical: ScrollBar {
+        policy: ScrollBar.AsNeeded
+        implicitWidth: 7
+        contentItem: Rectangle { radius: 3; color: backend.palette.muted }
+    }
 
     function refresh() {
         builtIns = backend.builtInOutputStyles()
@@ -99,6 +108,7 @@ ScrollView {
     }
 
     ColumnLayout {
+        objectName: "styleGalleryColumn"
         width: gallery.availableWidth
         spacing: 10
         Label { text: "Built-in styles"; color: backend.palette.muted; font.pixelSize: 12; font.weight: Font.DemiBold; Accessible.role: Accessible.Heading }
@@ -151,11 +161,11 @@ ScrollView {
             }
         }
         Label { visible: gallery.userStyles.length === 0; text: "No saved styles yet."; color: backend.palette.muted; font.pixelSize: 12 }
-        RowLayout {
+        ColumnLayout {
             Layout.fillWidth: true; spacing: 6
             TextField { id: copyName; Layout.fillWidth: true; placeholderText: "Name this copy"; maximumLength: 80; Accessible.name: "Name for style copy"; onAccepted: gallery.createCopy() }
             Button {
-                text: "Duplicate current"; flat: true
+                Layout.fillWidth: true; text: "Duplicate current"; flat: true
                 background: Rectangle { radius: 6; color: parent.hovered ? backend.palette.hover : backend.palette.panel; border.color: backend.palette.border }
                 onClicked: gallery.createCopy(); Accessible.name: "Duplicate current style"
             }
@@ -175,8 +185,8 @@ ScrollView {
             TextField { id: editorHeader; Layout.fillWidth: true; maximumLength: 200; Accessible.name: "Style header" }
             Label { text: "Footer (optional; {title}, {page}, {pages})"; color: backend.palette.text; font.pixelSize: 11; wrapMode: Text.Wrap; Layout.fillWidth: true }
             TextField { id: editorFooter; Layout.fillWidth: true; maximumLength: 200; Accessible.name: "Style footer" }
-            CheckBox { id: editorPageFurniture; text: "Show header and footer in PDF"; Accessible.name: text }
-            CheckBox { id: editorTitlePage; text: "Add a title page to PDF"; Accessible.name: text }
+            CheckBox { id: editorPageFurniture; text: "PDF header and footer"; Accessible.name: "Show header and footer in PDF" }
+            CheckBox { id: editorTitlePage; text: "PDF title page"; Accessible.name: "Add a title page to PDF" }
             ColumnLayout {
                 Layout.fillWidth: true; spacing: 6
                 Button {

@@ -1176,3 +1176,15 @@ Tests and native verification: `./bin/build` passed and `./bin/test` passed **11
 Known gaps: the refreshed button still needs Andrew's direct click check in his window. Visual Edit remains the conservative inline subset recorded in Cycle 69; source-only Markdown constructs are unchanged. This is an ad-hoc local build, not a notarized public release.
 
 Runnable artifacts: `dist/Fomawrite Dev.app` for review and `dist/Fomawrite.app` as the packaged ordinary build. [Optional exercise](../research/usability/cycle-80.md): click Source from Visual Edit, then return to Split and Visual Edit.
+
+## Cycle 81 — export gallery width and dialog fit
+
+Planned scope: fix Andrew's screenshots showing the export style cards and heading clipped horizontally, with the scrollbar covering the card edges. Keep the dialog usable as its host window becomes narrower.
+
+Changes: the style gallery now reserves a scrollbar gutter, uses a slim thumb, fixes its content to one column, and stacks the style-copy field and button so their combined implicit width cannot create horizontal scrolling. The export dialog fits within the host window, switches to a compact layout before the preview gets cramped, and scrolls its options independently; the wide gallery grows to 280 px. This dialog adapts with the parent window but is not a separate resizable window.
+
+Tests and native verification: `./bin/build` passed and `./bin/test` passed **113 tests, zero failures and zero skips**. The export UI regression verifies a wide gallery without horizontal overflow and checks that the compact dialog remains inside a 720 × 520 window. `./bin/package-mac` and `./bin/prepare-dev-app` succeeded. The previously running Dev app exited normally before replacement, and the refreshed Dev bundle launched on a disposable sample. The running `/Applications/Fomawrite.app` was not replaced. See [Cycle 81 record](../research/cycle-81/README.md).
+
+Known gaps: Andrew's direct visual check of the middle column at his display scale is still needed. The separate-window resizing idea has not been built; export preview remains continuous rather than page-exact. Full Cycle 69 acceptance and public signing remain open.
+
+Runnable artifacts: `dist/Fomawrite Dev.app` for review and `dist/Fomawrite.app` as the packaged ordinary build. [Optional exercise](../research/usability/cycle-81.md): open Export at normal and minimum app sizes and inspect the style cards and controls.
