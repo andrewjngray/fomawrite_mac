@@ -31,6 +31,7 @@ void applyMacWindowTheme(QWindow *window, bool followSystem, bool dark);
 QVariantMap macWorkspaceState(QWindow *window);
 void restoreMacWorkspaceTabs(const QList<QWindow *> &windows);
 void migrateMacPreferences();
+bool setMacRunningDockIcon(bool running);
 #endif
 
 static QString workspaceIdentity(const QString &executablePath) {
@@ -99,10 +100,15 @@ int main(int argc, char *argv[]) {
     app.setApplicationName(QStringLiteral("fomawrite"));
     app.setDesktopFileName(QStringLiteral("fomawrite"));
 #ifdef Q_OS_MACOS
-    // The freedesktop theme lookup is empty on macOS; give running windows the
-    // same mark as the bundled .icns instead of replacing it with an empty icon.
-    const QIcon appIcon(QStringLiteral(":/app/FomawriteIcon.png"));
+    // Finder and a pinned Dock tile use the light bundle icon while the app is
+    // closed. Running windows use the selected dark concept instead.
+    const QIcon lightIcon(QStringLiteral(":/app/FomawriteIcon.png"));
+    const QIcon appIcon(QStringLiteral(":/app/FomawriteRunningIcon.png"));
     app.setWindowIcon(appIcon);
+    QObject::connect(&app, &QCoreApplication::aboutToQuit, &app, [&app, lightIcon] {
+        app.setWindowIcon(lightIcon);
+        setMacRunningDockIcon(false);
+    });
 #else
     app.setWindowIcon(QIcon::fromTheme(QStringLiteral("fomawrite")));
 #endif
@@ -385,6 +391,12 @@ int main(int argc, char *argv[]) {
     checkpointTimer.start();
     for (const QUrl &url : app.pendingDocuments) createWindow(url);
     app.pendingDocuments.clear();
+#ifdef Q_OS_MACOS
+    QTimer::singleShot(0, &app, [] {
+        if (!setMacRunningDockIcon(true))
+            qWarning("Unable to set the running Dock icon");
+    });
+#endif
 
     const int result = app.exec();
     // QApplication outlives these captured locals. Disconnect callbacks before

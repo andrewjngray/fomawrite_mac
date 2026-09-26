@@ -15,4 +15,5 @@ for SIZE in 16 32 128 256 512; do
 done
 iconutil -c icns "$ICONSET/Fomawrite.iconset" -o "$ROOT/macos/Fomawrite.icns"
 cp "$ICONSET/Fomawrite.iconset/icon_512x512@2x.png" "$ROOT/macos/FomawriteIcon.png"
-echo "Wrote $ROOT/macos/Fomawrite.icns and $ROOT/macos/FomawriteIcon.png"
+"$ICONSET/render-icon" "$ROOT/macos/FomawriteRunningIcon.svg" "$ROOT/macos/FomawriteRunningIcon.png" 1024
+echo "Wrote $ROOT/macos/Fomawrite.icns, $ROOT/macos/FomawriteIcon.png and $ROOT/macos/FomawriteRunningIcon.png"

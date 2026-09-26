@@ -1,8 +1,27 @@
 #include <QVariantMap>
+#include <QFile>
 #include <QGuiApplication>
 #include <QScreen>
 #include <QWindow>
 #import <AppKit/AppKit.h>
+
+// This changes only the running Dock tile. Passing nil restores the bundle's
+// light icon, which Finder and a pinned tile use when the process exits.
+bool setMacRunningDockIcon(bool running) {
+    if (!NSApp) return false;
+    if (!running) {
+        NSApp.applicationIconImage = nil;
+        return true;
+    }
+    QFile file(QStringLiteral(":/app/FomawriteRunningIcon.png"));
+    if (!file.open(QIODevice::ReadOnly)) return false;
+    const QByteArray bytes = file.readAll();
+    NSData *data = [NSData dataWithBytes:bytes.constData() length:bytes.size()];
+    NSImage *image = [[[NSImage alloc] initWithData:data] autorelease];
+    if (!image) return false;
+    NSApp.applicationIconImage = image;
+    return true;
+}
 
 void migrateMacPreferences() {
     NSString *bundleId = [[NSBundle mainBundle] bundleIdentifier];

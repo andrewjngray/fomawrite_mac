@@ -1,0 +1,8 @@
+Built and packaged ordinary and Dev macOS bundles; strict ad-hoc signature verification passed.
+Both packaged CFBundleIconFile resources match the unchanged approved light .icns.
+The running SVG renders identically to the first dark concept snapshot at 128 px.
+Fomawrite Dev and the refreshed Applications app both launched.
+After the old app exited, the installed executable and .icns matched the packaged ordinary app.
+NSWorkspace resolved the installed bundle icon to the approved light version.
+A bottom-screen capture showed a remote Windows taskbar, so the macOS Dock tile was not visibly inspected.
+Running dark and post-quit light Dock appearance remain for Andrew's visual check.
