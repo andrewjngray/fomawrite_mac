@@ -1104,3 +1104,15 @@ Tests and native verification: `./bin/build` passed and `./bin/test` passed **11
 Known gaps: the Dock itself was not captured through the UI tool, so Andrew should judge the result at his own Dock size and desktop appearance. This remains a local ad-hoc build, not a notarized release.
 
 Runnable artifacts: `/Applications/Fomawrite.app`, `dist/Fomawrite.app` and `dist/Fomawrite Dev.app`. [Optional exercise](../research/usability/cycle-74.md): compare both Dock tiles with Outlook against light and dark backgrounds.
+
+## Cycle 75 — white-face rounded app icon
+
+Planned scope: correct the Cycle 74 interpretation of Andrew's Outlook comparison: keep the rounded gray border but return the icon face to white.
+
+Changes: replaced the gray-filled tile with a white face and narrow cool-gray rounded rim; retained the short-connector writing mark and blue caret. Regenerated the PNG and multiresolution `.icns` from the vector source.
+
+Tests and native verification: `./bin/build` passed; `./bin/test` passed **111 tests, zero failures and zero skips**. `./bin/package-mac` and `./bin/prepare-dev-app` succeeded. With the app closed, the signed build was installed in `/Applications`; the executable and `.icns` match the packaged app. It launched, and `NSWorkspace` resolved the installed icon to the white-face design after macOS icon registration and a Dock restart. See [Cycle 75 evidence](../research/cycle-75/README.md).
+
+Known gaps: Andrew's visual check in his own Dock remains useful; the Dock itself was not captured. This is a local ad-hoc build, not a notarized release.
+
+Runnable artifacts: `/Applications/Fomawrite.app`, `dist/Fomawrite.app` and `dist/Fomawrite Dev.app`. [Optional exercise](../research/usability/cycle-75.md): compare the white face and gray rim beside Outlook at your usual Dock size.
