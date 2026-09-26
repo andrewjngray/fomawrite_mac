@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <title>Fomawrite negative running-icon concept</title>
+  <defs>
+    <linearGradient id="face" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#303337"/>
+      <stop offset="1" stop-color="#0e1012"/>
+    </linearGradient>
+  </defs>
+  <rect x="48" y="72" width="928" height="928" rx="222" fill="#000000" fill-opacity="0.42"/>
+  <rect x="48" y="40" width="928" height="928" rx="222" fill="url(#face)" stroke="#73797e" stroke-opacity="0.5" stroke-width="6"/>
+  <rect x="246" y="352" width="32" height="184" rx="16" fill="#abb5bc"/>
+  <rect x="230" y="334" width="564" height="68" rx="34" fill="#f4f6f7"/>
+  <rect x="230" y="502" width="340" height="68" rx="34" fill="#f4f6f7"/>
+  <rect x="650" y="480" width="30" height="148" rx="10" fill="#0db8f2"/>
+</svg>
