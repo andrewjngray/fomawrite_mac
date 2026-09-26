@@ -1128,3 +1128,15 @@ Tests and native verification: `./bin/build` passed; `./bin/test` passed **111 t
 Known gaps: Andrew's visual check in his own Dock remains useful; the Dock itself was not captured. This is a local ad-hoc build, not a notarized release.
 
 Runnable artifacts: `/Applications/Fomawrite.app`, `dist/Fomawrite.app` and `dist/Fomawrite Dev.app`. [Optional exercise](../research/usability/cycle-76.md): compare the white tile beside OneDrive at your usual Dock size.
+
+## Cycle 77 — cmux-inspired off-white icon
+
+Planned scope: soften the pure-white Cycle 76 tile to match the slightly off-white face in Andrew's cmux Dock screenshot while keeping the borderless shape and gentle dimensional shadow.
+
+Changes: sampled the cmux screenshot's near-white top and light-gray bottom, then applied a subtle `#fefefe` to `#eeeeee` vertical gradient to the Fomawrite face. The writing mark, blue caret and shadow remain unchanged. Regenerated the PNG and multiresolution `.icns`.
+
+Tests: `./bin/build` passed; `./bin/test` passed **111 tests, zero failures and zero skips**. `./bin/package-mac` and `./bin/prepare-dev-app` succeeded. See [Cycle 77 evidence](../research/cycle-77/README.md).
+
+Native verification and known gaps: the installed app was still running during packaging, so it has not yet been replaced or checked in the Dock. Andrew's normal quit is required to preserve any unsaved work. This is a local ad-hoc build, not a notarized release.
+
+Runnable artifacts: `dist/Fomawrite.app` and `dist/Fomawrite Dev.app`; `/Applications/Fomawrite.app` remains on Cycle 76 until safe replacement. [Optional exercise](../research/usability/cycle-77.md): compare Fomawrite beside cmux at your usual Dock size.

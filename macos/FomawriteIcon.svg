@@ -1,7 +1,13 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
   <title>Fomawrite — writing lines and insertion caret</title>
+  <defs>
+    <linearGradient id="face" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#fefefe"/>
+      <stop offset="1" stop-color="#eeeeee"/>
+    </linearGradient>
+  </defs>
   <rect x="48" y="72" width="928" height="928" rx="222" fill="#858d94" fill-opacity="0.20"/>
-  <rect x="48" y="40" width="928" height="928" rx="222" fill="#ffffff"/>
+  <rect x="48" y="40" width="928" height="928" rx="222" fill="url(#face)"/>
   <rect x="246" y="352" width="32" height="184" rx="16" fill="#9ca7af"/>
   <rect x="230" y="334" width="564" height="68" rx="34" fill="#51595f"/>
   <rect x="230" y="502" width="340" height="68" rx="34" fill="#51595f"/>
