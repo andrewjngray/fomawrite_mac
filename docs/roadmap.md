@@ -15,6 +15,8 @@ Make reading and writing local Markdown pleasant enough to use every day. Take t
 
 Cycle 61 completed the local checkout path rename. The [next development phases](next-development-phases.md) propose Cycles 62–69 for direct visual editing, compact writing controls and a richer export/style workflow, using Andrew's Ulysses screenshots and Typora as interaction references. The older [iA menu closeout plan](menu-closeout-plan.md) and its still-open [acceptance ledger](release-acceptance.md) remain separate work; neither is silently marked complete by the new plan.
 
+After Cycle 84, the [editor surface redesign](editor-surface-redesign.md) refocuses the next proposed cycles on the everyday writing view: optional Studio column tones and Editorial/Book/Manuscript appearances first, then richer safe in-place editing. It distinguishes a visual styling pass from the larger Markdown round-trip work required for editable image and link objects.
+
 The [17 September staged development plan](development-plan.md) turns the [iA menu parity log](ia-menu-parity-2026-09-17.md) into proposed Cycles 14–28: menu access, safe file/editing commands, navigation, richer documents/output, native lifecycle, then advanced writing tools. Codex remains the visual reference. Full functional parity includes explicit validation of hidden submenu behavior and is not claimed by matching labels.
 
 ## Milestones
