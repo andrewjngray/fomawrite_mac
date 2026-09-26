@@ -1,0 +1,3 @@
+# Editor surface review
+
+In the refreshed Fomawrite Dev app, open a disposable Markdown note. Use Aa → Theme → Studio, then Aa → Writing appearance → Editorial. Compare the three column tones, text size and width, top margin, selected file row, and word-count chip with Andrew's Ulysses reference. Try Book and Manuscript, then switch between editor-only and Split; neither appearance switch should alter the Markdown. In Visual Edit, Return within an ordinary paragraph should add a paragraph break; Return in a list item should leave the source untouched and direct you to Source. Check the same note in Dark, at a narrow width, and after save/reopen.

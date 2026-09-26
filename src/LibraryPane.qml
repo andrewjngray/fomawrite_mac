@@ -41,7 +41,7 @@ Rectangle {
     }
     signal openRequested(url file)
     signal createRequested(string name, bool inNewWindow)
-    color: backend.palette.panel
+    color: backend.palette.library
     objectName: "libraryPane"
     function chooseFolder() { folderDialog.open(); }
     function newDocument(inNewWindow) { newFileDialog.inNewWindow = !!inNewWindow; newFileDialog.open(); }
@@ -124,7 +124,7 @@ Rectangle {
                 }
                 background: Rectangle {
                     radius: 7
-                    color: entry.highlighted ? (backend.palette.hover)
+                    color: entry.highlighted ? (backend.palette.selectedRow)
                         : entry.hovered ? (backend.palette.hover) : "transparent"
                 }
                 contentItem: RowLayout {

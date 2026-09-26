@@ -41,6 +41,7 @@ QtObject {
         { id: "themeLight", title: "Theme: Light" },
         { id: "themeDark", title: "Theme: Dark" },
         { id: "themePaper", title: "Theme: Warm Paper" },
+        { id: "themeStudio", title: "Theme: Studio" },
         { id: "library", title: "Library", toggle: true },
         { id: "organizer", title: "Organizer", toggle: true },
         { id: "sortBar", title: "Sort Bar", toggle: true },
@@ -61,6 +62,9 @@ QtObject {
         { id: "larger", title: "Larger Text" },
         { id: "smaller", title: "Smaller Text" },
         { id: "resetSize", title: "Reset Text Size" },
+        { id: "writingManuscript", title: "Manuscript (Mono)", toggle: true },
+        { id: "writingEditorial", title: "Editorial (Sans)", toggle: true },
+        { id: "writingBook", title: "Book (Serif)", toggle: true },
         { id: "editor", title: "Editor Only", toggle: true },
         { id: "split", title: "Editor and Preview", toggle: true },
         { id: "preview", title: "Preview Only", toggle: true },
@@ -167,6 +171,9 @@ QtObject {
         case "serif": return backend.outputStyle === 1;
         case "mono": return backend.outputStyle === 2;
         case "markup": return settings.showMarkup;
+        case "writingManuscript": return settings.writingAppearance === "manuscript";
+        case "writingEditorial": return settings.writingAppearance === "editorial";
+        case "writingBook": return settings.writingAppearance === "book";
         case "sentence": return settings.sentenceFocus;
         case "paragraph": return settings.paragraphFocus;
         case "typewriter": return settings.typewriter;
@@ -199,6 +206,9 @@ QtObject {
         case "larger": settings.writingSize = Math.min(32, settings.writingSize + 2); break;
         case "smaller": settings.writingSize = Math.max(12, settings.writingSize - 2); break;
         case "resetSize": settings.writingSize = 16; break;
+        case "writingManuscript": settings.writingAppearance = "manuscript"; break;
+        case "writingEditorial": settings.writingAppearance = "editorial"; break;
+        case "writingBook": settings.writingAppearance = "book"; break;
         case "editor": settings.layoutMode = 0; break;
         case "split": settings.layoutMode = 1; break;
         case "preview": settings.layoutMode = 2; break;

@@ -450,7 +450,7 @@ Backend::Backend(QObject *parent, bool outputOnly) : QObject(parent), m_library(
     if (!cssPath.isEmpty()) m_outputCssFile = QUrl::fromLocalFile(cssPath);
     loadUserOutputStyles();
     const auto preset = QSettings().value("appearance/theme", "system").toString();
-    if (QStringList{"system", "light", "dark", "paper"}.contains(preset)) m_themePreset = preset;
+    if (QStringList{"system", "light", "dark", "paper", "studio"}.contains(preset)) m_themePreset = preset;
     loadOmarchyTheme();
     watchOmarchyTheme();
     connect(&m_themeWatcher, &QFileSystemWatcher::fileChanged, this, [this]() {
@@ -510,7 +510,7 @@ void Backend::setDarkMode(bool darkMode) {
 }
 
 void Backend::setThemePreset(const QString &preset) {
-    if (!QStringList{"system", "light", "dark", "paper"}.contains(preset) || m_themePreset == preset) return;
+    if (!QStringList{"system", "light", "dark", "paper", "studio"}.contains(preset) || m_themePreset == preset) return;
     m_themePreset = preset;
     QSettings().setValue("appearance/theme", preset);
     loadOmarchyTheme();
@@ -519,12 +519,16 @@ void Backend::setThemePreset(const QString &preset) {
 
 QVariantMap Backend::palette() const {
     const bool paper = m_themePreset == "paper";
+    const bool studio = m_themePreset == "studio";
     return {{"page", m_themeBackground}, {"text", m_themeForeground},
-        {"panel", m_darkMode ? "#222428" : paper ? "#f0e8d8" : "#fafaf9"},
-        {"muted", m_darkMode ? "#afb5bf" : paper ? "#706451" : "#616975"},
-        {"border", m_darkMode ? "#50545c" : paper ? "#c9bda7" : "#d5d7da"},
-        {"hover", m_darkMode ? "#34383f" : paper ? "#e5dac4" : "#e8eaed"},
-        {"field", m_darkMode ? "#2b2e34" : paper ? "#eae0cd" : "#eff0f2"},
+        {"panel", m_darkMode ? "#222428" : studio ? "#f8f7f5" : paper ? "#f0e8d8" : "#fafaf9"},
+        {"organizer", studio ? "#ebeae8" : m_darkMode ? "#222428" : paper ? "#f0e8d8" : "#fafaf9"},
+        {"library", studio ? "#fdfcfa" : m_darkMode ? "#222428" : paper ? "#f0e8d8" : "#fafaf9"},
+        {"muted", m_darkMode ? "#afb5bf" : studio ? "#686966" : paper ? "#706451" : "#616975"},
+        {"border", m_darkMode ? "#50545c" : studio ? "#dedbd7" : paper ? "#c9bda7" : "#d5d7da"},
+        {"hover", m_darkMode ? "#34383f" : studio ? "#dddcd9" : paper ? "#e5dac4" : "#e8eaed"},
+        {"selectedRow", m_darkMode ? "#34383f" : studio ? "#d8d6d2" : paper ? "#e5dac4" : "#e8eaed"},
+        {"field", m_darkMode ? "#2b2e34" : studio ? "#f1f0ed" : paper ? "#eae0cd" : "#eff0f2"},
         {"focus", m_darkMode ? "#9ec5ff" : "#285e9e"},
         {"folder", m_darkMode ? "#63c9f1" : "#087fa9"},
         {"selection", m_themeSelection}};
@@ -871,7 +875,7 @@ QVariantMap Backend::visualProjection() const {
 bool Backend::applyVisualEdit(int start, int length, const QString &replacement,
                               const QString &expectedSource) {
     if (!m_document || expectedSource != currentDocumentText() || start < 0 || length < 0
-            || replacement.contains(QRegularExpression(QStringLiteral("[\\\\`*_\\[\\]<>\\r\\n]"))))
+            || replacement.contains(QRegularExpression(QStringLiteral("[\\\\`*_\\[\\]<>\\r]"))))
         return false;
     const SourceVisualMapping mapping = SourceVisualMapping::create(expectedSource);
     const auto edit = mapping.sourceEditForVisualReplacement({start, length}, replacement);
@@ -2270,6 +2274,11 @@ void Backend::loadOmarchyTheme() {
         m_themeForeground = "#342f27";
         m_themeAccent = "#285e9e";
         m_themeSelection = "#345f98";
+    } else if (m_themePreset == "studio") {
+        m_themeBackground = "#f5f3ef";
+        m_themeForeground = "#343431";
+        m_themeAccent = "#28669d";
+        m_themeSelection = "#355f88";
     }
     if (oldDark != m_darkMode) emit darkModeChanged();
     if (m_highlighter) {

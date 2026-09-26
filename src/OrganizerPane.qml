@@ -19,7 +19,7 @@ Rectangle {
     }
     signal searchRequested(string query, bool contents, url folder)
     signal openRequested(url file)
-    color: backend.palette.panel
+    color: backend.palette.organizer
     function activate(entry) {
         if (entry.directory) library.rootFolder = entry.url;
         else openRequested(entry.url);

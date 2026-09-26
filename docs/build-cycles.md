@@ -1224,3 +1224,29 @@ Tests and visual verification: `./bin/build` and `./bin/test` passed **113 tests
 Native verification and known gaps: after the prior Dev process exited normally, the stable Dev bundle was refreshed, passed strict signature verification and launched on a disposable Markdown sample. The stopped Applications copy was replaced with the signed package; its executable matches the package and strict signature verification passed. Andrew's direct display-scale review remains open. The dialog is still bounded by the host window; exact PDF page breaks are available through Paginated preview, not the live view. Public signing and broader Cycle 69 acceptance remain open.
 
 Runnable artifacts: `/Applications/Fomawrite.app`, `dist/Fomawrite.app` and `dist/Fomawrite Dev.app` are current. [Optional exercise](../research/usability/cycle-84.md): shrink Export, scroll across all three bands, then expand it again.
+
+## Cycle 85 — Studio tones and writing appearances
+
+Planned scope: move the Ulysses-inspired work to the everyday writing surface while retaining canonical plain Markdown. Give the three columns distinct calm tones and offer reversible typography choices.
+
+Changes: added an optional Studio light theme with a gray organizer, near-white file list and warm off-white editor. Writing Appearance in View and the Aa menu now offers Manuscript (existing mono default), Editorial (larger system sans, wider measure and more top space) and Book (serif). The choices persist separately from theme and export style. The source editor retains its existing document-level 140% line spacing, caret, selection and Markdown highlighter; no source conversion occurs on appearance changes.
+
+Tests and evidence: `./bin/build` passed. The appearance regression switches all three choices without changing text, cursor, Undo state, workspace layout or output style, then saves and reopens exact UTF-8 source. Theme tests check Studio persistence and pane-tone separation. Synthetic wide/narrow Studio, Book and Dark captures are in [Cycle 85 evidence](../research/cycle-85/README.md). Andrew's visual review at his display scale remains open.
+
+Known gaps: Studio is optional and does not replace existing users' theme. The current appearance presets choose font, size, measure and top space; paragraph spacing beyond the existing 140% line height is not yet independently adjustable. This is an original Fomawrite palette, not Ulysses assets or themes.
+
+## Cycle 86 — writing chrome and selected states
+
+Planned scope: make the document more prominent without removing writing controls that already work in narrow layouts.
+
+Changes: Editorial and Book show a compact word-count chip at the top of the editor. The existing upper-right Bold/Italic/Link/paragraph cluster remains the primary wide-window control group; the lower toolbar remains available when that cluster collapses. Studio gives the selected file row a distinct resting tone while retaining a separate hover tone. The chip opens Document Statistics, so it is an actual control.
+
+Validation and gaps: the full QML suite covers the appearance-dependent chip and existing toolbar commands. Synthetic wide and narrow images check that the chip clears the text column and the upper cluster collapses. VoiceOver and long-filename review on Andrew's display remain open. See [Cycle 85 images](../research/cycle-85/README.md) and the [Cycle 86 note](../research/cycle-86/README.md).
+
+## Cycle 87 — safe paragraph breaks in Visual Edit
+
+Planned scope: allow a useful multi-line edit without converting the whole rendered document back to Markdown.
+
+Changes: Return in Visual Edit inserts a Markdown paragraph break in a mapped plain paragraph; Shift-Return inserts a single line break. The source mapping accepts the edit only when reprojecting the candidate source produces exactly the expected visual text. CRLF input, headings, list markers, styled spans whose syntax would change, source-only blocks and mixed-text multiline paste remain protected. Unsupported Return shows a route back to Source. Existing list/quote/task body edits remain available; creating new list items in Visual Edit is still source-only.
+
+Validation and gaps: regressions exercise the mapping, actual Return key, protected list case, one-step Undo and exact source preservation. Visual Edit is still a bounded editor, not a general WYSIWYG surface: image cards, link-target editing, tables and arbitrary nested Markdown require further source mapping and native QA. See [Cycle 87 note](../research/cycle-87/README.md).

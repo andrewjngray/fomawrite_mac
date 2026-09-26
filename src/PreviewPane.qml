@@ -116,11 +116,6 @@ Rectangle {
                 || visualText.text === visualSnapshot)
             return;
         var change = visualDiff(visualSnapshot, visualText.text);
-        if (change.replacement.indexOf("\n") >= 0 || change.replacement.indexOf("\r") >= 0) {
-            visualStatus = "Visual editing supports inline changes only. Use Source for line breaks.";
-            loadVisualProjection(change.start, change.start);
-            return;
-        }
         if (renderer.applyVisualEdit(change.start, change.length, change.replacement,
                                      visualSourceSnapshot)) {
             visualStatus = "Applied to Markdown source.";
@@ -132,9 +127,20 @@ Rectangle {
             loadVisualProjection(change.start, change.start);
         }
     }
+    function insertVisualBreak(shift) {
+        var position = visualText.cursorPosition;
+        var inserted = shift ? "\n" : "\n\n";
+        if (visualText.selectionStart === visualText.selectionEnd
+                && root.renderer.applyVisualEdit(position, 0, inserted, root.visualSourceSnapshot)) {
+            root.visualStatus = "Paragraph break applied to Markdown source.";
+            root.loadVisualProjection(position + inserted.length, position + inserted.length);
+        } else {
+            root.visualStatus = "This break needs Source editing to preserve Markdown.";
+        }
+    }
     onVisualEditEnabledChanged: {
         visualStatus = visualEditEnabled
-            ? "Visual editing is limited to inline text in supported blocks."
+            ? "Visual editing supports text and simple paragraph breaks. Other structures remain source-only."
             : "Rendered preview is read-only.";
         if (visualEditEnabled)
             Qt.callLater(loadVisualProjection);
@@ -211,15 +217,15 @@ Rectangle {
                 }
             }
             Keys.onReturnPressed: function(event) {
-                root.visualStatus = "Visual editing supports inline changes only. Use Source for line breaks.";
+                root.insertVisualBreak(event.modifiers & Qt.ShiftModifier);
                 event.accepted = true;
             }
             Keys.onEnterPressed: function(event) {
-                root.visualStatus = "Visual editing supports inline changes only. Use Source for line breaks.";
+                root.insertVisualBreak(event.modifiers & Qt.ShiftModifier);
                 event.accepted = true;
             }
             Accessible.name: "Visual Markdown editor"
-            Accessible.description: "Edits supported inline text and keeps Markdown source canonical"
+            Accessible.description: "Edits supported text and simple paragraph breaks while keeping Markdown source canonical"
         }
         Label {
             anchors.centerIn: parent

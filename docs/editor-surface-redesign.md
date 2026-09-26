@@ -2,6 +2,8 @@
 
 Proposed after Cycle 84. Andrew's 27 September Ulysses screenshot is a visual and interaction reference, not an asset or style file to copy. The aim is an original Fomawrite writing surface with the same calm hierarchy, while retaining plain UTF-8 Markdown and safe editing.
 
+Implementation checkpoint: Studio's three pane tones, Manuscript/Editorial/Book source typography, a word-count chip and clearer selected rows are implemented. Visual Edit accepts safe paragraph breaks; list markers, images, tables and other complex blocks remain protected. The typography and theme controls are independent of export styles and the document's Markdown. See Cycles 85–87 in the build log. Full general-purpose visual editing and Andrew's display-scale acceptance are still open.
+
 ## What the reference gets right
 
 The screenshot uses three related, distinct column tones: a quiet gray navigation rail, a lighter sheet list, and a slightly warm off-white writing canvas. The text has generous line spacing, moderate measure and a broad top margin. Markdown markers are present but recede; bold and emphasis are evident within the editable-looking text. The toolbar uses small, grouped controls and leaves the document as the visual focus. A word-count chip is available without occupying a permanent footer band. The image is treated as a content object rather than a long source path.

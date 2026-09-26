@@ -70,8 +70,8 @@ public:
     Span sourceSpanForVisual(Span visual) const;
 
     // Produces one bounded source replacement only when the visual range is
-    // wholly inside a single editable mapping. Newlines are rejected here
-    // because this inline foundation does not remap block structure.
+    // wholly inside a single editable mapping. A line break is allowed only
+    // inside a paragraph when reprojection preserves every visible character.
     std::optional<SourceEdit> sourceEditForVisualReplacement(
         Span visual, const QString &replacement) const;
 

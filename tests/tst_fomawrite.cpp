@@ -600,8 +600,10 @@ private slots:
         QScopedPointer<QObject> window(component.create()); QVERIFY2(window, qPrintable(component.errorString()));
         auto *editor = window->findChild<QObject *>("sourceEditor"); QVERIFY(editor);
         editor->setProperty("text", "theme-independent Markdown");
-        for (const auto &preset : {"light", "dark", "paper"}) {
-            auto *choice = window->findChild<QObject *>(QString("theme%1").arg(preset == QString("paper") ? "Paper" : preset == QString("dark") ? "Dark" : "Light"));
+        for (const auto &preset : {"light", "dark", "paper", "studio"}) {
+            auto *choice = window->findChild<QObject *>(QString("theme%1").arg(
+                preset == QString("studio") ? "Studio" : preset == QString("paper") ? "Paper"
+                : preset == QString("dark") ? "Dark" : "Light"));
             QVERIFY(choice); QVERIFY(QMetaObject::invokeMethod(choice, "triggered"));
             QCOMPARE(backend.themePreset(), QString(preset));
             backend.setDarkMode(true); // manual presets override system changes
@@ -615,14 +617,105 @@ private slots:
                 return .2126*linear(c.redF())+.7152*linear(c.greenF())+.0722*linear(c.blueF());
             };
             const auto palette = backend.palette();
+            if (preset == QString("studio")) {
+                QVERIFY(palette["organizer"] != palette["library"]);
+                QVERIFY(palette["library"] != palette["page"]);
+            }
             for (auto role : {"text", "muted"}) {
                 const double a=luminance(QColor(palette[role].toString())), b=luminance(QColor(palette["panel"].toString()));
                 QVERIFY((qMax(a,b)+.05)/(qMin(a,b)+.05) >= 4.5);
             }
         }
-        backend.setThemePreset("invalid"); QCOMPARE(backend.themePreset(), QString("paper"));
+        backend.setThemePreset("invalid"); QCOMPARE(backend.themePreset(), QString("studio"));
         backend.setThemePreset("system"); backend.setDarkMode(false); QVERIFY(!backend.darkMode());
         backend.setDarkMode(true); QVERIFY(backend.darkMode());
+        backend.discardRecovery();
+    }
+
+    void writingAppearancesKeepMarkdownAndEditingState() {
+        Backend backend;
+        QQmlEngine engine; engine.rootContext()->setContextProperty("backend", &backend);
+        QQmlComponent component(&engine, QUrl::fromLocalFile(QFINDTESTDATA("../src/Main.qml")));
+        QScopedPointer<QObject> window(component.create()); QVERIFY2(window, qPrintable(component.errorString()));
+        auto *commands = window->findChild<QObject *>("workspaceCommands");
+        auto *settings = window->findChild<QObject *>("workspaceSettings");
+        auto *editor = window->findChild<QObject *>("sourceEditor");
+        auto *chip = window->findChild<QObject *>("editorWordCountChip");
+        QVERIFY(commands && settings && editor && chip);
+        const QString source = QStringLiteral("# A heading\n\nA **bold** sentence.\n");
+        QVERIFY(editor->setProperty("text", source));
+        QVERIFY(editor->setProperty("cursorPosition", 13));
+        const bool canUndo = editor->property("canUndo").toBool();
+        const int originalLayout = settings->property("layoutMode").toInt();
+        const bool originalLibrary = settings->property("libraryVisible").toBool();
+        const bool originalOrganizer = settings->property("organizerVisible").toBool();
+        const int originalStyle = backend.outputStyle();
+        const QString originalAppearance = settings->property("writingAppearance").toString();
+        const QString originalTheme = backend.themePreset();
+        for (const auto &entry : {std::pair{"writingEditorial", "editorial"},
+                                  std::pair{"writingBook", "book"},
+                                  std::pair{"writingManuscript", "manuscript"}}) {
+            QVERIFY(QMetaObject::invokeMethod(commands, "run", Q_ARG(QVariant, entry.first)));
+            QCOMPARE(settings->property("writingAppearance").toString(), QString::fromLatin1(entry.second));
+            QCOMPARE(editor->property("text").toString(), source);
+            QCOMPARE(editor->property("cursorPosition").toInt(), 13);
+            QCOMPARE(editor->property("canUndo").toBool(), canUndo);
+            QCOMPARE(settings->property("layoutMode").toInt(), originalLayout);
+            QCOMPARE(backend.outputStyle(), originalStyle);
+            QCOMPARE(chip->property("visible").toBool(), QString::fromLatin1(entry.second) != QStringLiteral("manuscript"));
+        }
+        QTemporaryDir savedDirectory;
+        QVERIFY(savedDirectory.isValid());
+        const QUrl savedUrl = QUrl::fromLocalFile(savedDirectory.filePath(QStringLiteral("appearance.md")));
+        backend.saveAs(savedUrl);
+        QFile savedFile(savedUrl.toLocalFile());
+        QVERIFY(savedFile.open(QIODevice::ReadOnly));
+        QCOMPARE(savedFile.readAll(), source.toUtf8());
+        savedFile.close();
+        QVERIFY(backend.open(savedUrl));
+        QCOMPARE(editor->property("text").toString(), source);
+        if (qEnvironmentVariableIsSet("FOMAWRITE_EDITOR_TEST_CAPTURE")) {
+            backend.setThemePreset(QStringLiteral("studio"));
+            QVERIFY(QMetaObject::invokeMethod(commands, "run", Q_ARG(QVariant, "writingEditorial")));
+            QVERIFY(QMetaObject::invokeMethod(commands, "run", Q_ARG(QVariant, "editor")));
+            QVERIFY(settings->setProperty("libraryVisible", true));
+            QVERIFY(settings->setProperty("organizerVisible", true));
+            QVERIFY(window->setProperty("width", 1440));
+            QVERIFY(window->setProperty("height", 900));
+            QVERIFY(editor->setProperty("text", QStringLiteral(
+                "# A quieter place to write\n\n"
+                "This is an original **Fomawrite** sample. The writing view keeps plain Markdown editable "
+                "while giving the page more room and a softer tone.\n\n"
+                "## Next draft\n\n"
+                "The organizer, file list and editor now have different surfaces. "
+                "Use the appearance menu to return to Manuscript or try Book.\n")));
+            QTest::qWait(200);
+            auto *quickWindow = qobject_cast<QQuickWindow *>(window.data());
+            QVERIFY(quickWindow);
+            const QString widePath = qEnvironmentVariable("FOMAWRITE_EDITOR_TEST_CAPTURE");
+            QVERIFY(quickWindow->grabWindow().save(widePath));
+            QVERIFY(window->setProperty("width", 900));
+            QVERIFY(window->setProperty("height", 700));
+            QTest::qWait(150);
+            const QString narrowPath = widePath.left(widePath.lastIndexOf('.')) + QStringLiteral("-narrow.png");
+            QVERIFY(quickWindow->grabWindow().save(narrowPath));
+            QVERIFY(window->setProperty("width", 1440));
+            QVERIFY(window->setProperty("height", 900));
+            QVERIFY(QMetaObject::invokeMethod(commands, "run", Q_ARG(QVariant, "writingBook")));
+            QTest::qWait(150);
+            const QString bookPath = widePath.left(widePath.lastIndexOf('.')) + QStringLiteral("-book.png");
+            QVERIFY(quickWindow->grabWindow().save(bookPath));
+            backend.setThemePreset(QStringLiteral("dark"));
+            QVERIFY(QMetaObject::invokeMethod(commands, "run", Q_ARG(QVariant, "writingEditorial")));
+            QTest::qWait(150);
+            const QString darkPath = widePath.left(widePath.lastIndexOf('.')) + QStringLiteral("-dark.png");
+            QVERIFY(quickWindow->grabWindow().save(darkPath));
+        }
+        QVERIFY(settings->setProperty("writingAppearance", originalAppearance));
+        QVERIFY(settings->setProperty("layoutMode", originalLayout));
+        QVERIFY(settings->setProperty("libraryVisible", originalLibrary));
+        QVERIFY(settings->setProperty("organizerVisible", originalOrganizer));
+        backend.setThemePreset(originalTheme);
         backend.discardRecovery();
     }
 
@@ -4135,6 +4228,71 @@ private slots:
             QVERIFY(start >= 0);
             QVERIFY(!mapping.visualSpanForSource({start, int(sourceOnly.size())}).isValid());
         }
+    }
+
+    void visualParagraphBreaksPreserveSourceAndUndo() {
+        const QString source = QStringLiteral("A plain sentence.\n- List item\n# Heading\n**bold** text\n");
+        const auto mapping = SourceVisualMapping::create(source);
+        const int paragraphPosition = mapping.visualText().indexOf(QStringLiteral(" sentence"));
+        QVERIFY(paragraphPosition > 0);
+        const auto breakEdit = mapping.sourceEditForVisualReplacement({paragraphPosition, 0}, QStringLiteral("\n\n"));
+        QVERIFY(breakEdit.has_value());
+        QString expected = source;
+        expected.insert(breakEdit->source.start, QStringLiteral("\n\n"));
+        QCOMPARE(SourceVisualMapping::create(expected).visualText(),
+                 QString(mapping.visualText()).insert(paragraphPosition, QStringLiteral("\n\n")));
+        QVERIFY(!mapping.sourceEditForVisualReplacement({int(mapping.visualText().indexOf("List item")), 0},
+                                                         QStringLiteral("\n\n")).has_value());
+        QVERIFY(!mapping.sourceEditForVisualReplacement({int(mapping.visualText().indexOf("Heading")), 0},
+                                                         QStringLiteral("\n\n")).has_value());
+        QVERIFY(!mapping.sourceEditForVisualReplacement({int(mapping.visualText().indexOf("bold")), 0},
+                                                         QStringLiteral("\n\n")).has_value());
+        QVERIFY(!SourceVisualMapping::create(QStringLiteral("Plain\r\n"))
+                     .sourceEditForVisualReplacement({2, 0}, QStringLiteral("\n")).has_value());
+
+        Backend backend;
+        QQmlEngine engine; engine.rootContext()->setContextProperty("backend", &backend);
+        QQmlComponent component(&engine, QUrl::fromLocalFile(QFINDTESTDATA("../src/Main.qml")));
+        QScopedPointer<QObject> window(component.create()); QVERIFY2(window, qPrintable(component.errorString()));
+        auto *editor = window->findChild<QObject *>("sourceEditor"); QVERIFY(editor);
+        QVERIFY(editor->setProperty("text", source));
+        QVERIFY(backend.applyVisualEdit(paragraphPosition, 0, QStringLiteral("\n\n"), source));
+        QCOMPARE(editor->property("text").toString(), expected);
+        QVERIFY(QMetaObject::invokeMethod(editor, "undo"));
+        QCOMPARE(editor->property("text").toString(), source);
+        backend.discardRecovery();
+    }
+
+    void visualReturnAddsOnlySafeParagraphBreaks() {
+        Backend backend;
+        QQmlEngine engine; engine.rootContext()->setContextProperty("backend", &backend);
+        QQmlComponent component(&engine, QUrl::fromLocalFile(QFINDTESTDATA("../src/Main.qml")));
+        QScopedPointer<QObject> window(component.create()); QVERIFY2(window, qPrintable(component.errorString()));
+        auto *editor = window->findChild<QObject *>("sourceEditor");
+        auto *visual = window->findChild<QObject *>("visualEditor");
+        auto *pane = window->findChild<QObject *>("previewPane");
+        auto *settings = window->findChild<QObject *>("workspaceSettings");
+        auto *quickWindow = qobject_cast<QQuickWindow *>(window.data());
+        QVERIFY(editor && visual && pane && settings && quickWindow);
+        const int originalLayout = settings->property("layoutMode").toInt();
+        QVERIFY(settings->setProperty("layoutMode", 1));
+        QVERIFY(editor->setProperty("text", QStringLiteral("Plain sentence.\n")));
+        QVERIFY(pane->setProperty("visualEditEnabled", true));
+        QTRY_COMPARE(visual->property("text").toString(), QStringLiteral("Plain sentence.\n"));
+        QVERIFY(QMetaObject::invokeMethod(visual, "forceActiveFocus"));
+        QVERIFY(visual->setProperty("cursorPosition", 5));
+        QTest::keyClick(quickWindow, Qt::Key_Return);
+        QTRY_COMPARE(editor->property("text").toString(), QStringLiteral("Plain\n\n sentence.\n"));
+        QVERIFY(QMetaObject::invokeMethod(editor, "undo"));
+        QCOMPARE(editor->property("text").toString(), QStringLiteral("Plain sentence.\n"));
+
+        QVERIFY(editor->setProperty("text", QStringLiteral("- List item\n")));
+        QTRY_COMPARE(visual->property("text").toString(), QString::fromUtf8("• List item\n"));
+        QVERIFY(visual->setProperty("cursorPosition", 5));
+        QTest::keyClick(quickWindow, Qt::Key_Return);
+        QCOMPARE(editor->property("text").toString(), QStringLiteral("- List item\n"));
+        QVERIFY(settings->setProperty("layoutMode", originalLayout));
+        backend.discardRecovery();
     }
 
     void visualProjectionAppliesOnlySafeMappedEdits() {

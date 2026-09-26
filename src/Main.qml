@@ -33,9 +33,15 @@ ApplicationWindow {
     // `omarchy display text size` drives) anchored so its 12px default leaves
     // the app at the sizes it was designed around.
     readonly property real textScale: backend.textScale
-    readonly property int editorFontPixelSize: scaledSize(workspaceSettings.writingSize)
+    readonly property string activeWritingAppearance: ["editorial", "book"].indexOf(workspaceSettings.writingAppearance) >= 0
+        ? workspaceSettings.writingAppearance : "manuscript"
+    readonly property string editorFontFamily: activeWritingAppearance === "editorial" ? Qt.application.font.family
+        : activeWritingAppearance === "book" ? "Georgia" : "iA Writer Mono S"
+    readonly property int editorFontPixelSize: scaledSize(workspaceSettings.writingSize
+        + (activeWritingAppearance === "manuscript" ? 0 : 3))
     readonly property int editorWidth: Math.min(
-        Math.round(writerFontMetrics.averageCharacterWidth * 65),
+        activeWritingAppearance === "manuscript"
+            ? Math.round(writerFontMetrics.averageCharacterWidth * 65) : scaledSize(720),
         Math.max(180, editorPane.width - 64))
     property int tabInset: 0
     Timer { interval: 250; repeat: true; running: win.visible && win.isMac; onTriggered: win.tabInset = backend.nativeTabInset() }
@@ -144,6 +150,7 @@ ApplicationWindow {
         property bool organizerVisible: true
         property int layoutMode: 1
         property int writingSize: 16
+        property string writingAppearance: "manuscript"
         property int appearanceRevision: 0
         property bool showMarkup: true
         property string reviewWords: ""
@@ -222,6 +229,7 @@ ApplicationWindow {
             case "themeLight": backend.themePreset="light"; break;
             case "themeDark": backend.themePreset="dark"; break;
             case "themePaper": backend.themePreset="paper"; break;
+            case "themeStudio": backend.themePreset="studio"; break;
             }
         }
     }
@@ -593,6 +601,12 @@ ApplicationWindow {
             MenuItem { objectName: "themeLight"; text: "Light"; checkable: true; checked: backend.themePreset === "light"; onTriggered: backend.themePreset = "light" }
             MenuItem { objectName: "themeDark"; text: "Dark"; checkable: true; checked: backend.themePreset === "dark"; onTriggered: backend.themePreset = "dark" }
             MenuItem { objectName: "themePaper"; text: "Warm paper"; checkable: true; checked: backend.themePreset === "paper"; onTriggered: backend.themePreset = "paper" }
+            MenuItem { objectName: "themeStudio"; text: "Studio"; checkable: true; checked: backend.themePreset === "studio"; onTriggered: backend.themePreset = "studio" }
+        }
+        Menu { title: "Writing appearance"
+            MenuItem { text: "Manuscript"; checkable: true; checked: win.activeWritingAppearance === "manuscript"; onTriggered: workspaceCommands.run("writingManuscript") }
+            MenuItem { text: "Editorial"; checkable: true; checked: win.activeWritingAppearance === "editorial"; onTriggered: workspaceCommands.run("writingEditorial") }
+            MenuItem { text: "Book"; checkable: true; checked: win.activeWritingAppearance === "book"; onTriggered: workspaceCommands.run("writingBook") }
         }
         MenuSeparator {}
         MenuItem { text: "Show Markdown syntax"; checkable: true; checked: workspaceSettings.showMarkup; onTriggered: workspaceCommands.run("markup") }
@@ -926,7 +940,7 @@ ApplicationWindow {
 
     FontMetrics {
         id: writerFontMetrics
-        font.family: "iA Writer Mono S"
+        font.family: win.editorFontFamily
         font.pixelSize: win.editorFontPixelSize
     }
 
@@ -1352,6 +1366,12 @@ ApplicationWindow {
                 NativeCommand { commandId: "larger" }
                 NativeCommand { commandId: "smaller" }
                 NativeCommand { commandId: "resetSize" }
+            }
+            Platform.Menu {
+                title: "Writing Appearance"
+                NativeCommand { commandId: "writingManuscript"; text: "Manuscript (Mono)" }
+                NativeCommand { commandId: "writingEditorial"; text: "Editorial (Sans)" }
+                NativeCommand { commandId: "writingBook"; text: "Book (Serif)" }
             }
             Platform.MenuItem {
                 objectName: "native_showCompletions"
@@ -2211,10 +2231,36 @@ ApplicationWindow {
         }
         Rectangle {
             id: editorPane
+            objectName: "editorPane"
             color: backend.palette.page
             visible: workspaceSettings.layoutMode !== 2
             SplitView.fillWidth: true
             SplitView.minimumWidth: 260
+
+        Rectangle {
+            id: editorWordCountChip
+            objectName: "editorWordCountChip"
+            visible: win.activeWritingAppearance !== "manuscript"
+            anchors.top: parent.top
+            anchors.topMargin: 12
+            anchors.right: parent.right
+            anchors.rightMargin: 18
+            width: Math.max(94, chipLabel.implicitWidth + 24)
+            height: 28
+            radius: 14
+            color: backend.palette.library
+            border.color: backend.palette.border
+            z: 2
+            Label {
+                id: chipLabel
+                anchors.centerIn: parent
+                text: win.compactStatistic("words")
+                color: backend.palette.muted
+                font.pixelSize: 12
+            }
+            TapHandler { onTapped: workspaceCommands.run("statistics") }
+            Accessible.name: "Document word count: " + chipLabel.text
+        }
 
         Flickable {
             id: editorFlick
@@ -2424,7 +2470,8 @@ ApplicationWindow {
                 objectName: "sourceEditor"
             Accessible.name: "Markdown editor"
                 x: Math.round((editorFlick.width - width) / 2)
-                y: workspaceSettings.typewriter ? editorFlick.height / 2 : 10
+                y: workspaceSettings.typewriter ? editorFlick.height / 2
+                    : win.activeWritingAppearance === "manuscript" ? 10 : win.scaledSize(72)
                 width: win.editorWidth
                 height: Math.max(editorFlick.height - y - 96, implicitHeight + 20)
                 text: ""
@@ -2436,7 +2483,7 @@ ApplicationWindow {
                 color: win.textColor
                 selectedTextColor: "#ffffff"
                 selectionColor: win.selectionFill
-                font.family: "iA Writer Mono S"
+                font.family: win.editorFontFamily
                 font.pixelSize: win.editorFontPixelSize
                 font.weight: Font.Normal
                 // Native rendering hints glyphs to the pixel grid, which is

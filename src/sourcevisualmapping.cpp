@@ -214,12 +214,36 @@ SourceVisualMapping::Span SourceVisualMapping::visualSpanForSource(Span requeste
 std::optional<SourceVisualMapping::SourceEdit> SourceVisualMapping::sourceEditForVisualReplacement(
         Span visual, const QString &replacement) const {
     if (!visual.isValid() || visual.end() > m_visual.size()
-            || replacement.contains(QChar(0x0a))
             || replacement.contains(QChar(0x0d))) return std::nullopt;
+    const bool lineBreak = replacement.contains(QLatin1Char('\n'));
+    if (lineBreak && (visual.length != 0
+            || m_source.contains(QLatin1Char('\r'))
+            || (replacement != QStringLiteral("\n") && replacement != QStringLiteral("\n\n"))))
+        return std::nullopt;
     for (const Mapping &mapping : m_mappings) {
         if (visual.start < mapping.visual.start || visual.end() > mapping.visual.end()) continue;
         const int offset = visual.start - mapping.visual.start;
-        return SourceEdit{{mapping.source.start + offset, visual.length}, replacement};
+        const SourceEdit edit{{mapping.source.start + offset, visual.length}, replacement};
+        if (lineBreak) {
+            bool plainParagraph = false;
+            for (const Block &block : m_blocks) {
+                if (block.kind == BlockKind::Paragraph && block.editable
+                        && block.source.start <= edit.source.start
+                        && edit.source.start <= block.source.end()
+                        && block.source.length > 0) {
+                    plainParagraph = true;
+                    break;
+                }
+            }
+            if (!plainParagraph) return std::nullopt;
+            QString candidate = m_source;
+            candidate.insert(edit.source.start, replacement);
+            const SourceVisualMapping projected = create(candidate);
+            QString expectedVisual = m_visual;
+            expectedVisual.insert(visual.start, replacement);
+            if (projected.visualText() != expectedVisual) return std::nullopt;
+        }
+        return edit;
     }
     return std::nullopt;
 }
