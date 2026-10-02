@@ -1,0 +1,19 @@
+PASS: one initial test window
+PASS: open disposable source
+PASS: trigger New Window from context menu
+PASS: New Window creates a second editor for the selected open file
+PASS: new window loads the clicked file
+PASS: New Window is separate from native tab groups
+PASS: trigger New Tab from context menu
+PASS: New Tab creates a third editor
+PASS: new tab joins its source window
+PASS: unrelated window stays separate
+PASS: ordinary opening still focuses an existing editor
+PASS: dispatch print submenu action
+PASS: opened and canceled "rendered print"
+PASS: dispatch print submenu action
+PASS: opened and canceled "source print"
+PASS: dispatch print submenu action
+PASS: opened and canceled "paginated preview"
+PASS: Finder reveal request accepted for sample
+PASS: native sharing picker request accepted for sample

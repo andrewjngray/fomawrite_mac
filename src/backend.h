@@ -191,7 +191,7 @@ public:
     Q_INVOKABLE bool moveDocument(const QUrl &folder);
     Q_INVOKABLE QVariantMap libraryItemInfo(const QUrl &url) const;
     Q_INVOKABLE bool libraryItemAction(const QUrl &url, const QString &action, const QString &argument = QString());
-    Q_INVOKABLE void openInNewTab(const QUrl &url) { emit newTabRequested(url); }
+    Q_INVOKABLE bool openInNewTab(const QUrl &url);
     Q_INVOKABLE bool openInNewWindow(const QUrl &url);
     Q_INVOKABLE bool showInFinder();
     Q_INVOKABLE int pasteWithAuthorship(int start, int end);
@@ -314,6 +314,7 @@ private:
     QByteArray m_lastKnownFileContents;
     bool m_requiresExplicitSave = false;
     bool m_hasKnownFileContents = false;
+    bool m_requiresViewConflictCheck = false;
     QString m_recoveryPath;
     std::unique_ptr<QLockFile> m_recoveryLock;
 

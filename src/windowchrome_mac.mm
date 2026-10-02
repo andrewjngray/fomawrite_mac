@@ -271,12 +271,14 @@ void macSpeakText(const QString &text) {
 }
 void macStopSpeaking() { [writingSpeaker stopSpeaking]; }
 
-void shareMacFile(QWindow *window, const QString &path) {
-    if (!window) return;
+bool shareMacFile(QWindow *window, const QString &path) {
+    if (!window) return false;
     NSView *view = reinterpret_cast<NSView *>(window->winId());
+    if (!view || !view.window) return false;
     static NSSharingServicePicker *picker = nil;
     [picker release];
     NSURL *url = [NSURL fileURLWithPath:[NSString stringWithUTF8String:path.toUtf8().constData()]];
     picker = [[NSSharingServicePicker alloc] initWithItems:@[url]];
     [picker showRelativeToRect:NSMakeRect(20, 20, 1, 1) ofView:view preferredEdge:NSMinYEdge];
+    return true;
 }

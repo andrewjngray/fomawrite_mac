@@ -1,0 +1,12 @@
+#!/usr/bin/env sh
+# Native integration test of the production session manager, using disposable data.
+set -eu
+ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
+[ "$(uname -s)" = Darwin ] || { echo 'Run the native tab test on macOS.' >&2; exit 1; }
+. "$ROOT/bin/qt-env"
+TEST_BUILD="$(mktemp -d /private/tmp/fomawrite-window-tests.XXXXXX)"
+trap 'rm -rf "$TEST_BUILD"' EXIT
+cd "$TEST_BUILD"
+"$QMAKE" "$ROOT/fomawrite.pro" 'DEFINES+=FOMAWRITE_CONTEXT_SMOKE' 'CONFIG-=app_bundle'
+make -j"$JOBS"
+./Fomawrite

@@ -21,10 +21,17 @@
 #include <QCryptographicHash>
 #include <QMessageBox>
 #include <QScreen>
+#include <QSet>
 #include "workspace.h"
 
 #include "backend.h"
 #include "systemtheme.h"
+#ifdef FOMAWRITE_CONTEXT_SMOKE
+#include <QTemporaryDir>
+#include <QSettings>
+#include <QPrintDialog>
+#include <QPrintPreviewDialog>
+#endif
 #ifdef Q_OS_MACOS
 void configureMacWindowChrome(QWindow *window);
 void applyMacWindowTheme(QWindow *window, bool followSystem, bool dark);
@@ -121,8 +128,19 @@ int main(int argc, char *argv[]) {
     app.setOrganizationDomain(QStringLiteral("andrewjngray.github.io"));
     app.setApplicationDisplayName(QStringLiteral("Fomawrite"));
     app.setApplicationVersion(QStringLiteral("0.2.0-rc1"));
+#ifdef FOMAWRITE_CONTEXT_SMOKE
+    // A separately compiled integration test runs the real window manager with
+    // disposable settings and documents, never the user's workspace.
+    QTemporaryDir smokeDirectory;
+    QStandardPaths::setTestModeEnabled(true);
+    app.setApplicationName(QStringLiteral("FomawriteWindowTest-%1").arg(app.applicationPid()));
+    QSettings::setDefaultFormat(QSettings::IniFormat);
+    QSettings::setPath(QSettings::IniFormat, QSettings::UserScope, smokeDirectory.path());
+#endif
 #ifdef Q_OS_MACOS
+#ifndef FOMAWRITE_CONTEXT_SMOKE
     migrateMacPreferences();
+#endif
 #endif
 
     QQuickStyle::setStyle(QStringLiteral("Material"));
@@ -131,7 +149,9 @@ int main(int argc, char *argv[]) {
     const QString stateDirectory = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
     QDir().mkpath(stateDirectory);
     const QString workspacePath = QDir(stateDirectory).filePath("workspace-" + identity + ".json");
+#ifndef FOMAWRITE_CONTEXT_SMOKE
     migrateLegacyWorkspace(stateDirectory, workspacePath);
+#endif
     QStringList launchPaths;
     for (const auto &arg : app.arguments().mid(1))
         if (!arg.startsWith('-')) launchPaths.append(QFileInfo(arg).absoluteFilePath());
@@ -241,8 +261,11 @@ int main(int argc, char *argv[]) {
         return false;
     };
     std::function<void(const QUrl &)> createWindow;
-    createWindow = [&](const QUrl &url) {
-        if (!url.isEmpty() && focusExisting(url, nullptr)) return;
+    std::function<void(const QUrl &, bool)> createDocumentWindow;
+    createWindow = [&](const QUrl &url) { createDocumentWindow(url, false); };
+    createDocumentWindow = [&](const QUrl &url, bool explicitView) {
+        if (!explicitView && !url.isEmpty() && focusExisting(url, nullptr)) return;
+        const QPointer<QWindow> previousActive = lastActiveWindow;
         auto session = std::make_shared<Session>();
         session->backend = new Backend(&app);
         auto *backend = session->backend.data();
@@ -252,12 +275,11 @@ int main(int argc, char *argv[]) {
         });
         backend->setDarkMode(systemTheme.darkMode());
         backend->setTextScale(systemTheme.textScale());
-        backend->focusExistingDocument = [&, backend](const QUrl &target) { return focusExisting(target, backend); };
         QObject::connect(&systemTheme, &SystemTheme::darkModeChanged, backend, &Backend::setDarkMode);
         QObject::connect(&systemTheme, &SystemTheme::textScaleChanged, backend, &Backend::setTextScale);
         QObject::connect(backend, &Backend::newWindowRequested, &app, [&, backend](const QUrl &url) {
             const int count = sessions.size();
-            createWindow(url);
+            createDocumentWindow(url, true);
             if (sessions.size() > count)
                 sessions.last()->backend->library()->setProperty("rootFolder", backend->library()->property("rootFolder"));
         });
@@ -265,13 +287,19 @@ int main(int argc, char *argv[]) {
             QPointer<QWindow> source;
             for (const auto &item : sessions) if (item->backend == backend) source = item->window;
             const int count = sessions.size();
-            createWindow(url);
+            createDocumentWindow(url, true);
             if (sessions.size() > count)
                 sessions.last()->backend->library()->setProperty("rootFolder", backend->library()->property("rootFolder"));
 #ifdef Q_OS_MACOS
-            for (const auto &item : sessions)
-                if (source && item->window && item->window != source && item->backend
-                    && item->backend->fileUrl() == url) restoreMacWorkspaceTabs({source, item->window});
+            if (sessions.size() > count && source) {
+                QPointer<QWindow> destination = sessions.last()->window;
+                QTimer::singleShot(0, &app, [source, destination] {
+                    if (source && destination) {
+                        restoreMacWorkspaceTabs({source, destination});
+                        destination->raise(); destination->requestActivate();
+                    }
+                });
+            }
 #endif
         });
         QObject::connect(backend, &Backend::quitReady, &app, [&, backend] {
@@ -325,6 +353,12 @@ int main(int argc, char *argv[]) {
             });
         });
         if (!url.isEmpty() && !backend->modified()) backend->open(url);
+        backend->focusExistingDocument = [&, backend](const QUrl &target) { return focusExisting(target, backend); };
+        if (explicitView && session->window) {
+            if (previousActive && previousActive != session->window)
+                session->window->setPosition(previousActive->position() + QPoint(28, 28));
+            session->window->raise(); session->window->requestActivate();
+        }
         // Never let an orphan recovery snapshot swallow an explicit open request.
         if (!url.isEmpty() && backend->modified() && backend->fileUrl() != url) createWindow(url);
     };
@@ -337,18 +371,24 @@ int main(int argc, char *argv[]) {
     auto spare = sessions.isEmpty() ? std::shared_ptr<Session>() : sessions.last();
     if (spare && spare->backend->modified()) spare.reset();
     QMap<QString, QMap<int, QWindow *>> tabGroups;
+    QSet<Backend *> restoredViews;
     QPointer<QWindow> activeWindow;
     for (const auto &value : savedWorkspace) {
         const auto entry = value.toObject();
         const QUrl url(entry["url"].toString());
         if (!url.isLocalFile() || !QFileInfo(url.toLocalFile()).isFile()) continue;
         std::shared_ptr<Session> restored;
+        bool alreadyOpen = false;
         for (const auto &session : sessions)
-            if (QFileInfo(session->backend->fileUrl().toLocalFile()).canonicalFilePath() == QFileInfo(url.toLocalFile()).canonicalFilePath()) { restored = session; break; }
+            if (QFileInfo(session->backend->fileUrl().toLocalFile()).canonicalFilePath() == QFileInfo(url.toLocalFile()).canonicalFilePath()) {
+                alreadyOpen = true;
+                if (!restoredViews.contains(session->backend)) { restored = session; break; }
+            }
         if (!restored) {
-            if (spare) { restored = spare; spare.reset(); restored->backend->open(url); }
-            else { createWindow(url); restored = sessions.last(); }
+            if (spare && !alreadyOpen) { restored = spare; spare.reset(); restored->backend->open(url); }
+            else { createDocumentWindow(url, true); restored = sessions.last(); }
         }
+        restoredViews.insert(restored->backend);
         const QUrl root(entry["root"].toString());
         if (root.isLocalFile() && QFileInfo(root.toLocalFile()).isDir()) restored->backend->library()->setProperty("rootFolder", root);
         auto *w = restored->window.data();
@@ -398,6 +438,9 @@ int main(int argc, char *argv[]) {
     });
 #endif
 
+#ifdef FOMAWRITE_CONTEXT_SMOKE
+#include "../tests/window-routing-smoke.inc"
+#endif
     const int result = app.exec();
     // QApplication outlives these captured locals. Disconnect callbacks before
     // its child windows/backends are destroyed during application teardown.
@@ -407,5 +450,12 @@ int main(int argc, char *argv[]) {
     }
     app.openDocument = {};
     app.guardedQuit = {};
+#ifdef FOMAWRITE_CONTEXT_SMOKE
+    for (const auto &session : sessions) {
+        delete session->engine.data();
+        delete session->backend.data();
+    }
+    QDir(stateDirectory).removeRecursively();
+#endif
     return result;
 }

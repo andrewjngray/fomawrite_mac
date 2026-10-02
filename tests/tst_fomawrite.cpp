@@ -86,6 +86,143 @@ private slots:
         QVERIFY(!QFileInfo::exists(dir.filePath("Rejected")));
     }
 
+    void contextMenuDispatchesClickedFileActions() {
+        QTemporaryDir dir;
+        const QUrl target = QUrl::fromLocalFile(dir.filePath("Clicked.md"));
+        QFile file(target.toLocalFile()); QVERIFY(file.open(QIODevice::WriteOnly));
+        file.write("# Clicked\n\n**Selected** document.\n"); file.close();
+        Backend backend;
+        QQmlEngine engine; engine.rootContext()->setContextProperty("backend", &backend);
+        QQmlComponent component(&engine, QUrl::fromLocalFile(QFINDTESTDATA("../src/Main.qml")));
+        QScopedPointer<QObject> window(component.create()); QVERIFY2(window, qPrintable(component.errorString()));
+        auto *editor = window->findChild<QObject *>("sourceEditor"); QVERIFY(editor);
+        editor->setProperty("text", "Keep this unsaved draft");
+        auto *menu = window->findChild<QObject *>("libraryContextMenu"); QVERIFY(menu);
+        const auto setTarget = [&](const QUrl &url) { return menu->setProperty("target", backend.libraryItemInfo(url)); };
+        const auto trigger = [&](const QString &title) {
+            for (auto *item : menu->findChildren<QObject *>()) {
+                if (item->property("text").toString() == title && item->metaObject()->indexOfSignal("triggered()") >= 0)
+                    return QMetaObject::invokeMethod(item, "triggered");
+            }
+            return false;
+        };
+        QVERIFY(setTarget(target));
+        QSignalSpy tabs(&backend, &Backend::newTabRequested), windows(&backend, &Backend::newWindowRequested);
+        QVERIFY(trigger("Open in New Tab")); QTRY_COMPARE(tabs.size(), 1);
+        QCOMPARE(tabs.first().first().toUrl(), QUrl::fromLocalFile(QFileInfo(target.toLocalFile()).canonicalFilePath()));
+        QVERIFY(trigger("Open in New Window")); QTRY_COMPARE(windows.size(), 1);
+        QCOMPARE(windows.first().first().toUrl(), QUrl::fromLocalFile(QFileInfo(target.toLocalFile()).canonicalFilePath()));
+        QVERIFY(trigger("Markdown")); QTRY_VERIFY(QGuiApplication::clipboard()->text().startsWith("# Clicked"));
+        QVERIFY(trigger("HTML")); QTRY_VERIFY(QGuiApplication::clipboard()->mimeData()->hasHtml());
+        QVERIFY(trigger("Plain Text")); QTRY_VERIFY(!QGuiApplication::clipboard()->text().contains("**"));
+        QVERIFY(trigger("Path")); QCOMPARE(QGuiApplication::clipboard()->text(), target.toLocalFile());
+        QVERIFY(trigger("Favorite"));
+        QTRY_VERIFY(backend.libraryItemInfo(target).value("favorite").toBool());
+        QVERIFY(setTarget(target)); QVERIFY(trigger("Remove Favorite"));
+        QTRY_VERIFY(!backend.libraryItemInfo(target).value("favorite").toBool());
+        auto *nameDialog = menu->findChild<QObject *>("libraryNameDialog"); QVERIFY(nameDialog);
+        auto *nameField = menu->findChild<QObject *>("libraryNameField"); QVERIFY(nameField);
+        for (const auto &entry : {std::pair{"Duplicate…", "Duplicate.md"}, std::pair{"New File…", "New.md"},
+                                 std::pair{"New Folder…", "New folder"}, std::pair{"Rename…", "Renamed.md"}}) {
+            QVERIFY(trigger(QString::fromUtf8(entry.first)));
+            QTRY_VERIFY(nameDialog->property("visible").toBool());
+            QVERIFY(nameField->setProperty("text", entry.second));
+            QVERIFY(QMetaObject::invokeMethod(nameDialog, "submit"));
+            QTRY_VERIFY(!nameDialog->property("visible").toBool());
+            QVERIFY(QFileInfo::exists(dir.filePath(entry.second)));
+        }
+        const QUrl renamed = QUrl::fromLocalFile(dir.filePath("Renamed.md"));
+        QVERIFY(setTarget(renamed));
+        for (const auto &entry : {std::pair{"Get Info", "libraryMessageDialog"},
+                                 std::pair{"Export…", "libraryExportDialog"},
+                                 std::pair{"Move to Trash…", "libraryTrashDialog"}}) {
+            QVERIFY(trigger(QString::fromUtf8(entry.first)));
+            auto *dialog = menu->findChild<QObject *>(entry.second); QVERIFY(dialog);
+            QTRY_VERIFY(dialog->property("visible").toBool());
+            QVERIFY(QMetaObject::invokeMethod(dialog, "close"));
+            QVERIFY(QFileInfo::exists(renamed.toLocalFile()));
+        }
+        auto *library = qobject_cast<FileLibrary *>(backend.library()); QVERIFY(library);
+        QVERIFY(trigger("Name")); QCOMPARE(library->sortMode(), 0);
+        QVERIFY(trigger("Date Created")); QCOMPARE(library->sortMode(), 2);
+        QVERIFY(trigger("Z to A")); QVERIFY(!library->ascending());
+        QVERIFY(trigger("A to Z")); QVERIFY(library->ascending());
+        QVERIFY(trigger("Extension")); QCOMPARE(library->sortMode(), 3);
+        const bool foldersFirst = library->foldersFirst();
+        QVERIFY(trigger("Pin Folders to Top")); QCOMPARE(library->foldersFirst(), !foldersFirst);
+        auto *pane = window->findChild<QObject *>("libraryPane"); QVERIFY(pane);
+        for (const auto &entry : {std::pair{"Show Text Excerpts", "showExcerpts"},
+                                 std::pair{"Show Sort Bar", "showSortBar"},
+                                 std::pair{"Show Filter Bar", "showFilterBar"}}) {
+            const bool before = pane->property(entry.second).toBool();
+            QVERIFY(trigger(entry.first)); QCOMPARE(pane->property(entry.second).toBool(), !before);
+            QVERIFY(trigger(entry.first)); QCOMPARE(pane->property(entry.second).toBool(), before);
+        }
+        QVERIFY(trigger("None")); QCOMPARE(pane->property("dateMode").toInt(), 0);
+        QVERIFY(trigger("Tree")); QCOMPARE(library->navigationMode(), 0);
+        QVERIFY(trigger("List")); QCOMPARE(library->navigationMode(), 1);
+        const QUrl html = QUrl::fromLocalFile(dir.filePath("Output.html"));
+        const QUrl pdf = QUrl::fromLocalFile(dir.filePath("Output.pdf"));
+        QVERIFY(backend.libraryItemAction(renamed, "exportHtml", html.toString()));
+        QVERIFY(backend.libraryItemAction(renamed, "exportPdf", pdf.toString()));
+        QFile pdfFile(pdf.toLocalFile()); QVERIFY(pdfFile.open(QIODevice::ReadOnly));
+        QVERIFY(pdfFile.read(5) == QByteArray("%PDF-"));
+        // Confirm Trash only for this disposable fixture, then try the stale menu target.
+        QVERIFY(trigger("Move to Trash…"));
+        auto *trash = menu->findChild<QObject *>("libraryTrashDialog"); QVERIFY(trash);
+        QTRY_VERIFY(trash->property("visible").toBool());
+        QVERIFY(QMetaObject::invokeMethod(trash, "accept"));
+        QTRY_VERIFY(!QFileInfo::exists(renamed.toLocalFile()));
+        QVERIFY(trigger("Open in New Tab"));
+        auto *error = menu->findChild<QObject *>("libraryMessageDialog");
+        QTRY_VERIFY(error->property("visible").toBool()); QCOMPARE(tabs.size(), 1);
+        QVERIFY(!backend.openInNewWindow(renamed)); QCOMPARE(windows.size(), 1);
+        QVERIFY(!backend.openInNewTab(QUrl::fromLocalFile(dir.path())));
+        QCOMPARE(editor->property("text").toString(), QString("Keep this unsaved draft"));
+        QVERIFY(backend.modified()); backend.discardRecovery();
+    }
+
+    void additionalViewsPreserveDraftsAndRejectStaleSaves() {
+        QTemporaryDir dir;
+        const QUrl url = QUrl::fromLocalFile(dir.filePath("Shared.md"));
+        Backend first, second;
+        QQmlEngine firstEngine, secondEngine;
+        firstEngine.rootContext()->setContextProperty("backend", &first);
+        secondEngine.rootContext()->setContextProperty("backend", &second);
+        QQmlComponent firstComponent(&firstEngine, QUrl::fromLocalFile(QFINDTESTDATA("../src/Main.qml")));
+        QQmlComponent secondComponent(&secondEngine, QUrl::fromLocalFile(QFINDTESTDATA("../src/Main.qml")));
+        QScopedPointer<QObject> firstWindow(firstComponent.create()), secondWindow(secondComponent.create());
+        QVERIFY(firstWindow && secondWindow);
+        auto *a = firstWindow->findChild<QObject *>("sourceEditor");
+        auto *b = secondWindow->findChild<QObject *>("sourceEditor"); QVERIFY(a && b);
+        a->setProperty("text", "Original"); first.saveAs(url); QVERIFY(!first.modified());
+        QVERIFY(first.openInNewTab(url)); QVERIFY(first.openInNewWindow(url));
+        a->setProperty("text", "Unsaved original");
+        QVERIFY(!first.openInNewTab(url)); QVERIFY(!first.openInNewWindow(url));
+        QCOMPARE(a->property("text").toString(), QString("Unsaved original"));
+        first.save(); QVERIFY(!first.modified());
+        QVERIFY(second.open(url));
+        // Normal open/Save As de-duplication must not redirect Save or Reload of the active file.
+        first.focusExistingDocument = second.focusExistingDocument = [](const QUrl &) { return true; };
+        a->setProperty("text", "First view saved");
+        b->setProperty("text", "Second view draft");
+        first.save(); QVERIFY(!first.modified());
+        QSignalSpy failed(&second, &Backend::saveFailed);
+        second.save(); QCOMPARE(failed.size(), 1); QVERIFY(second.modified());
+        QFile disk(url.toLocalFile()); QVERIFY(disk.open(QIODevice::ReadOnly));
+        QCOMPARE(disk.readAll(), QByteArray("First view saved")); disk.close();
+        QCOMPARE(b->property("text").toString(), QString("Second view draft"));
+        QVERIFY(!first.libraryItemAction(url, "rename", "Renamed.md"));
+        QVERIFY(!first.libraryItemAction(url, "trash"));
+        QVERIFY(second.libraryItemAction(url, "copyMarkdown"));
+        QCOMPARE(QGuiApplication::clipboard()->text(), QString("Second view draft"));
+        second.reloadFromDisk();
+        QCOMPARE(b->property("text").toString(), QString("First view saved"));
+        QVERIFY(!second.modified());
+        b->setProperty("text", "Second view saved after reload"); second.save(); QVERIFY(!second.modified());
+        first.discardRecovery(); second.discardRecovery();
+    }
+
     void contextOperationsPreserveOpenUnsavedDocument() {
         QTemporaryDir dir;
         Backend backend;
@@ -98,6 +235,7 @@ private slots:
         const QUrl file=QUrl::fromLocalFile(dir.filePath("Open.md"));
         editor->setProperty("text", "Saved"); backend.saveAs(file);
         editor->setProperty("text", "Unsaved text"); QVERIFY(backend.modified());
+        QVERIFY(!backend.libraryItemAction(file, "share"));
         QVERIFY(backend.libraryItemAction(file, "duplicate", "Copy.md"));
         QFile copy(dir.filePath("Copy.md")); QVERIFY(copy.open(QIODevice::ReadOnly)); QCOMPARE(copy.readAll(), QByteArray("Unsaved text"));
         QVERIFY(!backend.libraryItemAction(file, "trash"));

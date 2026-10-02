@@ -200,7 +200,8 @@ QVariantMap Backend::libraryItemInfo(const QUrl &url) const {
     if (!url.isLocalFile() || !info.exists()) return {{"error", "This item is no longer available."}};
     bool favorite = false;
     for (const auto &entry : m_library.favorites())
-        if (entry.toMap().value("url").toUrl() == url) favorite = true;
+        if (QFileInfo(entry.toMap().value("url").toUrl().toLocalFile()).canonicalFilePath()
+                == info.canonicalFilePath()) favorite = true;
     return {{"name", info.fileName()}, {"url", url}, {"path", info.absoluteFilePath()},
         {"directory", info.isDir()}, {"available", true}, {"favorite", favorite},
         {"bytes", info.size()}, {"modified", info.lastModified().toString(Qt::ISODate)},
@@ -216,18 +217,35 @@ bool Backend::libraryItemAction(const QUrl &url, const QString &action, const QS
     if (info.isDir() && QDir(path).isRoot() && (action == "rename" || action == "trash" || action == "duplicate"))
         return fail("A filesystem root cannot be renamed, duplicated or moved to Trash.");
     Backend *owner = nullptr;
+    QList<Backend *> owners;
     for (auto *candidate : liveBackends) {
         const QString openPath = QFileInfo(candidate->fileUrl().toLocalFile()).canonicalFilePath();
-        if (openPath == path) owner = candidate;
+        if (openPath == path) owners.append(candidate);
         if (info.isDir() && (action == "rename" || action == "trash" || action == "duplicate")
             && !openPath.isEmpty() && pathWithin(openPath, path))
             return fail("Close documents inside this folder before renaming, duplicating or moving it to Trash.");
     }
+    if (owners.size() > 1 && (action == "rename" || action == "trash"))
+        return fail("Close the other views of this document before renaming it or moving it to Trash.");
+    if (owners.contains(this)) owner = this;
+    else if (!owners.isEmpty()) {
+        owner = owners.first();
+        int dirtyOwners = 0;
+        for (auto *candidate : owners) if (candidate->modified()) { owner = candidate; ++dirtyOwners; }
+        if (dirtyOwners > 1) return fail("This document has unsaved edits in multiple views. Use the menu in the view you want to act on.");
+    }
     if (action == "favorite") { m_library.toggleFavorite(url); return true; }
+    if (action == "reveal") {
+        if (!m_library.showInFileManager(url)) return fail("Could not show this item in the file manager.");
+        return true;
+    }
     if (action == "share") {
+        if (owner && owner->modified())
+            return fail("Save this document before sharing so the shared file includes your latest edits.");
 #ifdef Q_OS_MACOS
-        extern void shareMacFile(QWindow *, const QString &);
-        shareMacFile(m_parentWindow, path); return true;
+        extern bool shareMacFile(QWindow *, const QString &);
+        if (!shareMacFile(m_parentWindow, path)) return fail("Could not open sharing options for this window.");
+        return true;
 #else
         return fail("System sharing is available on macOS.");
 #endif
@@ -1458,7 +1476,9 @@ void Backend::openDialog() {
 bool Backend::open(const QUrl &url) {
     QUrl documentUrl = url;
     documentUrl.setFragment(QString());
-    if (focusExistingDocument && focusExistingDocument(documentUrl)) return false;
+    const QString canonical = QFileInfo(documentUrl.toLocalFile()).canonicalFilePath();
+    const bool sameDocument = !canonical.isEmpty() && canonical == QFileInfo(m_fileUrl.toLocalFile()).canonicalFilePath();
+    if (!sameDocument && focusExistingDocument && focusExistingDocument(documentUrl)) return false;
     if (!documentUrl.isLocalFile()) {
         setStatus(QStringLiteral("Only local files can be opened."));
         return false;
@@ -1480,6 +1500,14 @@ bool Backend::open(const QUrl &url) {
     clearRecovery();
     m_lastKnownFileContents = contents;
     m_hasKnownFileContents = true;
+    m_requiresViewConflictCheck = false;
+    for (auto *candidate : liveBackends) {
+        if (candidate != this && !canonical.isEmpty()
+                && canonical == QFileInfo(candidate->fileUrl().toLocalFile()).canonicalFilePath()) {
+            m_requiresViewConflictCheck = true;
+            candidate->m_requiresViewConflictCheck = true;
+        }
+    }
     setFileUrl(documentUrl);
     loadAuthorship(documentUrl);
     m_library.recordRecentFile(documentUrl);
@@ -1636,6 +1664,7 @@ void Backend::newDocument() {
     setFileUrl(QUrl());
     m_lastKnownFileContents.clear();
     m_hasKnownFileContents = false;
+    m_requiresViewConflictCheck = false;
     watchCurrentFile();
     setModified(false);
     setStatus(QStringLiteral("New untitled document"));
@@ -1804,12 +1833,37 @@ bool Backend::moveDocument(const QUrl &folder) {
     return true;
 }
 
+bool Backend::openInNewTab(const QUrl &url) {
+    const QFileInfo info(url.toLocalFile());
+    if (!url.isLocalFile() || !info.isFile() || !info.isReadable()
+            || !FileLibrary::isTextFile(info.fileName())) {
+        setStatus(QStringLiteral("Choose an available, readable Markdown or text file."));
+        return false;
+    }
+    for (auto *candidate : liveBackends) {
+        if (candidate->modified() && QFileInfo(candidate->fileUrl().toLocalFile()).canonicalFilePath() == info.canonicalFilePath()) {
+            setStatus(QStringLiteral("Save this document's unsaved changes before opening another view."));
+            return false;
+        }
+    }
+    emit newTabRequested(QUrl::fromLocalFile(info.canonicalFilePath()));
+    return true;
+}
+
 bool Backend::openInNewWindow(const QUrl &url) {
-    if (!url.isLocalFile() || !QFileInfo(url.toLocalFile()).isFile()) {
+    const QFileInfo info(url.toLocalFile());
+    if (!url.isLocalFile() || !info.isFile() || !info.isReadable()
+            || !FileLibrary::isTextFile(info.fileName())) {
         setStatus(QStringLiteral("The file is no longer available."));
         return false;
     }
-    emit newWindowRequested(url);
+    for (auto *candidate : liveBackends) {
+        if (candidate->modified() && QFileInfo(candidate->fileUrl().toLocalFile()).canonicalFilePath() == info.canonicalFilePath()) {
+            setStatus(QStringLiteral("Save this document's unsaved changes before opening another view."));
+            return false;
+        }
+    }
+    emit newWindowRequested(QUrl::fromLocalFile(info.canonicalFilePath()));
     return true;
 }
 
@@ -2033,7 +2087,12 @@ void Backend::setStatus(const QString &status) {
 }
 
 void Backend::saveTo(const QUrl &url, bool protectExternalChanges) {
-    if (focusExistingDocument && focusExistingDocument(url)) {
+    const bool sameDocument = !m_fileUrl.isEmpty() && (url == m_fileUrl
+        || (!QFileInfo(url.toLocalFile()).canonicalFilePath().isEmpty()
+            && QFileInfo(url.toLocalFile()).canonicalFilePath() == QFileInfo(m_fileUrl.toLocalFile()).canonicalFilePath()));
+    const bool anotherView = sameDocument && m_requiresViewConflictCheck;
+    protectExternalChanges = protectExternalChanges || anotherView;
+    if (!sameDocument && focusExistingDocument && focusExistingDocument(url)) {
         setStatus("That file is already open in another window. Choose a different path.");
         emit saveFailed(); emit quitCanceled(); return;
     }
@@ -2089,7 +2148,10 @@ void Backend::saveTo(const QUrl &url, bool protectExternalChanges) {
         if (QFileInfo(url.toLocalFile()).isSymLink() || !current.open(QIODevice::ReadOnly)
             || current.readAll() != m_lastKnownFileContents || current.error() != QFile::NoError) {
             file.cancelWriting();
-            setStatus("Autosave paused: file changed outside Fomawrite."); return;
+            m_closeAfterSave = false;
+            setStatus(anotherView ? "Save paused: another view changed this file. Review the changes or use Save As."
+                                  : "Autosave paused: file changed outside Fomawrite.");
+            emit saveFailed(); emit quitCanceled(); return;
         }
     }
 

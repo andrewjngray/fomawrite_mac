@@ -5,6 +5,7 @@ import QtQuick.Dialogs as Dialogs
 
 CompactMenu {
     id: menu
+    objectName: "libraryContextMenu"
     delegate: CompactMenuItem {
         visible: !subMenu || subMenu.contextAllowed
         height: visible ? implicitHeight : 0
@@ -18,13 +19,14 @@ CompactMenu {
     height: Math.min(implicitHeight, (Overlay.overlay ? Overlay.overlay.height : 900) - 24)
     function showFor(item, entry, isLocation, point) {
         target = backend.libraryItemInfo(entry.url);
-        if (target.error) target = entry;
+        if (target.error) target = {url: entry.url, name: entry.name, directory: entry.directory, available: false};
         location = isLocation;
         popup(item, point.x, point.y);
     }
     function later(action) { pending = action; close(); Qt.callLater(performPending); }
     function run(action, argument) {
         if (!backend.libraryItemAction(target.url, action, argument || "")) {
+            messageDialog.title = "Library";
             message.text = backend.status;
             messageDialog.open();
             return false;
@@ -52,8 +54,10 @@ CompactMenu {
             messageDialog.open();
         } else if (action === "trash") trashDialog.open();
         else if (action === "export") exportChoice.open();
-        else if (action === "tab") backend.openInNewTab(target.url);
-        else if (action === "window") backend.openInNewWindow(target.url);
+        else if (action === "tab" || action === "window") {
+            const ok = action === "tab" ? backend.openInNewTab(target.url) : backend.openInNewWindow(target.url);
+            if (!ok) { messageDialog.title = "Open Document"; message.text = backend.status; messageDialog.open(); }
+        }
         else if (action === "open") library.rootFolder = target.url;
         else run(action);
     }
@@ -69,7 +73,7 @@ CompactMenu {
     CompactMenuItem { text: "Rename…"; visible: !menu.location; height: visible ? implicitHeight : 0; enabled: !!menu.target.available; onTriggered: menu.later("rename") }
     CompactMenuItem { text: "Move to Trash…"; visible: !menu.location; height: visible ? implicitHeight : 0; enabled: !!menu.target.available; onTriggered: menu.later("trash") }
     MenuSeparator { visible: !menu.location; height: visible ? implicitHeight : 0 }
-    CompactMenuItem { text: Qt.platform.os === "osx" ? "Show in Finder" : "Show in File Manager"; enabled: !!menu.target.available; onTriggered: menu.library.showInFileManager(menu.target.url) }
+    CompactMenuItem { text: Qt.platform.os === "osx" ? "Show in Finder" : "Show in File Manager"; enabled: !!menu.target.available; onTriggered: menu.later("reveal") }
     MenuSeparator {}
     CompactMenuItem { text: "Share…"; visible: !menu.location && Qt.platform.os === "osx"; height: visible ? implicitHeight : 0; enabled: !!menu.target.available; onTriggered: menu.later("share") }
     CompactMenuItem { text: "Export…"; visible: !menu.location && !menu.folder; height: visible ? implicitHeight : 0; enabled: !!menu.target.available; onTriggered: menu.later("export") }
@@ -121,11 +125,12 @@ CompactMenu {
     }
     Dialog {
         id: nameDialog
+        objectName: "libraryNameDialog"
         property string action
         parent: Overlay.overlay; anchors.centerIn: parent; modal: true; width: 360
         ColumnLayout {
             width: parent.width
-            TextField { id: nameField; Layout.fillWidth: true; maximumLength: 200; Accessible.name: "Item name"; onAccepted: nameDialog.submit() }
+            TextField { id: nameField; objectName: "libraryNameField"; Layout.fillWidth: true; maximumLength: 200; Accessible.name: "Item name"; onAccepted: nameDialog.submit() }
             Label { id: nameError; Layout.fillWidth: true; wrapMode: Text.Wrap; visible: text !== "" }
         }
         function submit() {
@@ -140,12 +145,14 @@ CompactMenu {
     }
     Dialog {
         id: messageDialog
+        objectName: "libraryMessageDialog"
         parent: Overlay.overlay; anchors.centerIn: parent; modal: true; width: 420
         title: "Library"; standardButtons: Dialog.Ok
         Label { id: message; width: parent.width; wrapMode: Text.Wrap; textFormat: Text.PlainText }
     }
     Dialog {
         id: trashDialog
+        objectName: "libraryTrashDialog"
         parent: Overlay.overlay; anchors.centerIn: parent; modal: true; width: 380
         title: "Move to Trash?"; standardButtons: Dialog.Ok | Dialog.Cancel
         Label { width: parent.width; wrapMode: Text.Wrap; text: "Move “" + menu.target.name + "”" + (menu.folder ? " and its contents" : "") + " to Trash? You can restore it using Finder."; textFormat: Text.PlainText }
@@ -153,6 +160,7 @@ CompactMenu {
     }
     Dialog {
         id: exportChoice
+        objectName: "libraryExportDialog"
         parent: Overlay.overlay; anchors.centerIn: parent; modal: true; width: 280
         title: "Export Document"; standardButtons: Dialog.Cancel
         Column {
