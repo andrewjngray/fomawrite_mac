@@ -65,7 +65,7 @@ Item {
                 hint: "Choose library folder — " + (backend.library.rootName || "Folder")
                 alignLeft: true
                 tonal: true
-                implicitHeight: 32
+                implicitHeight: 34
                 font.weight: Font.Medium
                 Layout.fillWidth: true
                 Layout.minimumWidth: 32
@@ -118,7 +118,7 @@ Item {
                     objectName: "documentHistoryControls"
                     visible: root.writingControlsWidth >= 360
                     ToolbarButton { objectName: "documentBackButton"; grouped: true; iconName: "back"; hint: "Previous document"; enabled: backend.canGoBack; onClicked: root.actionRequested("back", this) }
-                    ToolbarButton { objectName: "documentForwardButton"; grouped: true; iconName: "forward"; hint: "Next document"; enabled: backend.canGoForward; onClicked: root.actionRequested("forward", this) }
+                    ToolbarButton { objectName: "documentForwardButton"; grouped: true; showDivider: true; iconName: "forward"; hint: "Next document"; enabled: backend.canGoForward; onClicked: root.actionRequested("forward", this) }
                 }
                 ToolbarButton { objectName: "documentSearchButton"; iconName: "search"; hint: "Find in document"; onClicked: root.actionRequested("find", this) }
             }
@@ -132,9 +132,9 @@ Item {
                     objectName: "compactWritingControls"
                     visible: root.writingClusterExpanded
                     ToolbarButton { objectName: "compactBoldButton"; grouped: true; text: "B"; font.pixelSize: 16; font.weight: Font.Bold; hint: trailing.formattingAllowed ? "Bold selection" : "Choose Source to apply formatting"; enabled: trailing.formattingAllowed; onClicked: root.actionRequested("bold", this) }
-                    ToolbarButton { objectName: "compactItalicButton"; grouped: true; text: "I"; font.family: "Georgia"; font.pixelSize: 16; font.italic: true; hint: "Italic selection"; enabled: trailing.formattingAllowed; onClicked: root.actionRequested("italic", this) }
+                    ToolbarButton { objectName: "compactItalicButton"; grouped: true; text: "I"; font.family: "Times New Roman"; font.pixelSize: 18; font.italic: true; hint: "Italic selection"; enabled: trailing.formattingAllowed; onClicked: root.actionRequested("italic", this) }
                     ToolbarButton { objectName: "compactLinkButton"; grouped: true; iconName: "link"; hint: "Insert or edit link"; enabled: trailing.formattingAllowed; onClicked: root.actionRequested("link", this) }
-                    ToolbarButton { objectName: "compactParagraphButton"; grouped: true; text: "¶"; font.pixelSize: 16; hint: "Paragraph formatting"; enabled: trailing.formattingAllowed; onClicked: root.actionRequested("format", this) }
+                    ToolbarButton { objectName: "compactParagraphButton"; grouped: true; iconName: "paragraph"; hint: "Paragraph formatting"; enabled: trailing.formattingAllowed; onClicked: root.actionRequested("format", this) }
                 }
                 ToolbarButton { objectName: "compactFormatButton"; visible: !root.writingClusterExpanded; iconName: "paragraph"; hint: "Formatting"; enabled: trailing.formattingAllowed; onClicked: root.actionRequested("format", this) }
                 ToolbarGroup {

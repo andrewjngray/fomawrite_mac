@@ -7,14 +7,14 @@ Item {
     property real horizontalPadding: 1
     property alias spacing: contentRow.spacing
     implicitWidth: contentRow.implicitWidth + horizontalPadding * 2
-    implicitHeight: 32
+    implicitHeight: 34
     // Keep implementation children outside the public default content alias.
     data: [
         Rectangle {
             anchors.fill: parent
             radius: height / 2
             color: backend.palette.control || backend.palette.field
-            border.color: backend.palette.border
+            border.color: backend.palette.toolbarBorder || backend.palette.border
             border.width: 1
         },
         Row {

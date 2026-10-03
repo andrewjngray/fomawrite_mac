@@ -1367,3 +1367,14 @@ Changes: blue-folder tonal heading button retaining the native picker; bold B, i
 Verification: final build/package and **144 regression tests pass**. Three focused tests pass offscreen and native Cocoa (**5/0/0** each including setup/cleanup). Actual pointer clicks verify rendered line-height changes in Source/Preview/Visual Edit, first-minus behavior, bounds, exact Unicode Markdown, disk contents, dirty state, Undo/Redo and output-style preservation. Resize checks cover 720–1440px across layouts, plus collapsed navigation; the folder heading routes to the existing picker action. Native synthetic screenshots were inspected. [Evidence](../research/cycle-104/README.md).
 
 Runnable artifacts: stable Dev, ordinary demo/package and Applications are refreshed to `0.3.0-dev5`, macOS `0.3.0 (104)`, with strict signatures and matching demo/Applications executables. No public release. [Optional exercise](../research/usability/cycle-104.md). Physical VoiceOver/display acceptance and Andrew’s visual review remain open. Next product scope follows that review; bounded image/table/list ergonomics remains the subsequent work, with optional distribution separate.
+
+
+## Cycle 105 — cleaner toolbar glyphs and capsules
+
+Planned scope: match Andrew’s supplied Ulysses toolbar treatment more closely in the actual Qt build while retaining Fomawrite’s folder indicator, quick zoom and existing actions.
+
+Changes: 34px circle/capsule surfaces, 32px segments, 18px glyphs, darker theme-aware toolbar ink and softer edges; uninterrupted formatting/zoom groups and an inset history divider; simpler original compose, link, search, share, pilcrow and sidebar geometry. Keep blue folders, hover/press/focus/disabled states and all existing command routing. Capture resting controls by moving the test pointer off the toolbar.
+
+Validation: **144 regression tests pass**, build passes, and six existing native Cocoa checks pass (**8/0/0** including setup/cleanup). Native wide/reference/narrow/dark screenshots received a separate visual review with no blockers. Existing tests cover command clicks, exact Markdown/Undo/export preservation, resize fit and pane restoration. [Evidence](../research/cycle-105/README.md). No tests added merely to mirror visual properties.
+
+Runnable artifacts: stable Dev, demo/package and Applications, all `0.3.0-dev6`, macOS `0.3.0 (105)`, strict-signature verified; demo/Applications executables match. Physical VoiceOver/display review and Andrew’s visual acceptance remain open. [Optional exercise](../research/usability/cycle-105.md). Next product work follows that feedback; bounded image/table/list ergonomics and optional distribution remain separate scopes.

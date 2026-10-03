@@ -553,6 +553,7 @@ QVariantMap Backend::palette() const {
             {"control", "#333B47"}, {"controlHover", "#424D5D"},
             {"controlPressed", "#536176"}, {"controlSelected", "#435674"},
             {"controlBorder", "#B3BED0"}, {"focus", "#9EC5FF"},
+            {"toolbarInk", "#F1F3F6"}, {"toolbarBorder", "#505966"},
             {"folder", "#63C9F1"}, {"inactiveText", "#D1D6DE"},
             {"inactiveMuted", "#AEB7C4"}, {"inactiveSelectedRow", "#394352"}};
     } else if (paper) {
@@ -563,6 +564,7 @@ QVariantMap Backend::palette() const {
             {"control", "#FAF5EB"}, {"controlHover", "#E7DCC8"},
             {"controlPressed", "#D7C8AE"}, {"controlSelected", "#D9D5C8"},
             {"controlBorder", "#756953"}, {"focus", "#285E9E"},
+            {"toolbarInk", "#27231D"}, {"toolbarBorder", "#DED5C5"},
             {"folder", "#087FA9"}, {"inactiveText", "#514B40"},
             {"inactiveMuted", "#6B604F"}, {"inactiveSelectedRow", "#E1D8C8"}};
     } else {
@@ -573,6 +575,7 @@ QVariantMap Backend::palette() const {
             {"selectedRow", "#D7DADE"}, {"control", "#F9F9F8"},
             {"controlHover", "#E2E5E9"}, {"controlPressed", "#C7CDD4"},
             {"controlSelected", "#CEDAEB"}, {"controlBorder", "#6B7078"},
+            {"toolbarInk", "#202124"}, {"toolbarBorder", "#E2E1DF"},
             {"focus", studio ? "#2479B8" : "#285E9E"}, {"folder", studio ? "#177CAA" : "#087FA9"},
             {"inactiveText", "#555B63"}, {"inactiveMuted", "#62666D"},
             {"inactiveSelectedRow", "#DFE1E4"}};

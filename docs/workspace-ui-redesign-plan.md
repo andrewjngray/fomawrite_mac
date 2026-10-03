@@ -1,6 +1,6 @@
 # Fomawrite workspace UI redesign plan
 
-Planning date: 3 October 2026. Original baseline: `52af519`. Cycles 90–100 and 102 implemented the workspace and editing foundations, but Andrew’s 4 October visual comparison rejected the remaining gap between the approved concept and the shipped app. Cycle 103 follows the concept’s actual geometry, typography, icons and writing presentation; Cycle 104 refines the folder heading and formatting tools and adds quick text sizing. The current target is `0.3.0-dev5`, macOS `0.3.0 (104)`. [Native screenshots and verification](../research/cycle-104/README.md). Visual sign-off from Andrew remains pending.
+Planning date: 3 October 2026. Original baseline: `52af519`. Cycles 90–100 and 102 implemented the workspace and editing foundations, but Andrew’s 4 October visual comparison rejected the remaining gap between the approved concept and the shipped app. Cycle 103 follows the concept’s actual geometry, typography, icons and writing presentation; Cycle 104 refines the folder heading and formatting tools and adds quick text sizing. Cycle 105 follows the Ulysses toolbar reference with cleaner glyphs and uninterrupted formatting capsules. The current target is `0.3.0-dev6`, macOS `0.3.0 (105)`. [Native screenshots and verification](../research/cycle-105/README.md). Visual sign-off from Andrew remains pending.
 
 The approved direction makes Fomawrite a composed writing workspace. Andrew's preferred reference is the Ulysses window in his three-app comparison: a quiet gray organizer, clean document list, warm writing canvas, and clearly grouped controls belonging to each column. Preserve Fomawrite's blue folders, local Markdown files and existing editing protections.
 
@@ -35,7 +35,7 @@ After Cycles 103–104’s visual and toolbar feedback, the next product work re
 - Existing guidance: [editor surface work](editor-surface-redesign.md), [dialog guide](dialog-style-guide.md), [build log](build-cycles.md), [acceptance ledger](release-acceptance.md).
 - Baseline validation: Cycle 89 records 118 passing tests and native window-routing checks. Those are historical results, not tests rerun for this document. Installed, packaged and Dev copies must be identified by commit before future comparisons; their presence alone does not establish that they match.
 - The interactive concept demonstrates composition, blue folders, control grouping and writing appearances. Its simplified widths, breakpoints and appearance selector are illustrative; the written fit rules govern implementation. It is not native layout, complete feature or accessibility acceptance.
-- The original planning pass produced a plan and illustrative concept without changing app code. Andrew subsequently authorized the implementation checkpoint above; current verification and deployment status belong in the Cycle 104 handoff; the Cycle 97 record preserves its earlier verified checkpoint.
+- The original planning pass produced a plan and illustrative concept without changing app code. Andrew subsequently authorized the implementation checkpoint above; current verification and deployment status belong in the Cycle 105 handoff; the Cycle 97 record preserves its earlier verified checkpoint.
 
 ## What exists and what must change
 
@@ -112,11 +112,13 @@ Keep blue for real filesystem folders, monochrome document outlines for files, s
 
 Use one original line-icon family with consistent visual weight and baseline. Preserve familiar existing folder artwork; do not import Ulysses icons or mix emoji, arbitrary Unicode glyphs and line icons as permanent controls. Custom per-folder artwork and folder colors are a later option, not needed to solve the current hierarchy.
 
-### Toolbar refinements — Cycle 104
+### Toolbar refinements — Cycles 104–105
 
 The folder heading is a labeled, tonal button with the same blue folder glyph as filesystem rows. Its tooltip names the current folder and the chooser action; clicking retains the native folder picker. Do not imply an inline menu with a disclosure chevron when the action opens a system picker.
 
 Formatting uses typographic **B**, italic **I** and **¶** to communicate the result, with the existing line-link glyph. These are semantic formatting symbols, rather than a second decorative icon family. A separate two-segment **− / +** capsule sits between formatting and **Aa**, sharing the persisted writing-size commands and their 12–32 bounds. Its change must be visible in Source, Preview and Visual Edit without modifying document bytes or export point size. At narrow widths, preserve zoom/Aa and pane restoration; collapse formatting and omit the history capsule when necessary. History remains in the native Go menu.
+
+Cycle 105 uses 34px circular targets/capsules, 32px segments and an 18px glyph frame. Toolbar ink and borders have their own theme-aware tokens: stronger ink, quieter perimeter, with the existing distinct hover/pressed/focus treatments. Formatting and zoom groups are continuous capsules; only history retains a short inset divider. The chain, compose, search, share, pilcrow and sidebar symbols are locally drawn geometry aligned to a 24-unit grid. Blue filesystem folders retain their existing shape and color. This follows the supplied screenshot's visual treatment without replacing commands or claiming pixel identity.
 
 ## Collapsing, resizing and restoring columns
 

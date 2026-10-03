@@ -29,6 +29,8 @@ bool cycle102Capture(QQuickWindow *window, const QString &name) {
     const QString directory = qEnvironmentVariable("FOMAWRITE_WORKSPACE_CAPTURE_DIR");
     if (directory.isEmpty()) return true;
     if (!QDir().mkpath(directory)) return false;
+    // Capture the resting toolbar, rather than the last clicked button’s hover.
+    QTest::mouseMove(window, QPoint(window->width() / 2, window->height() / 2));
     QTest::qWait(200);
     return window->grabWindow().save(QDir(directory).filePath(name + ".png"));
 }

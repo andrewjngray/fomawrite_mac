@@ -1,8 +1,8 @@
 # Acceptance ledger — current follow-through and Cycle 59 history
 
-## Current follow-through — Cycles 98–104
+## Current follow-through — Cycles 98–105
 
-The current review target is application `0.3.0-dev5`, macOS `0.3.0 (104)`. Cycle 104 refines the folder heading and formatting controls, and adds quick text sizing to the native workspace implemented in Cycle 103. See [Cycle 104](../research/cycle-104/README.md) for evidence. This records the affected workflows; it does not recertify the full historical menu matrix.
+The current review target is application `0.3.0-dev6`, macOS `0.3.0 (105)`. Cycle 105 simplifies the actual toolbar glyphs and capsule treatment against Andrew’s reference. Cycle 104 refines the folder heading and formatting controls, and adds quick text sizing to the native workspace implemented in Cycle 103. See [Cycle 105](../research/cycle-105/README.md) for evidence. This records the affected workflows; it does not recertify the full historical menu matrix.
 
 | Area | New bounded evidence | Still open |
 | --- | --- | --- |
