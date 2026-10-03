@@ -1,0 +1,34 @@
+{
+  "recorded_at": "2026-10-04T05:15:14.523895+13:00",
+  "application_version": "0.3.0-dev3",
+  "source_commit": "7b44337615f6cffc812b2caba158e434f631d086",
+  "artifacts": [
+    {
+      "role": "dev",
+      "path": "/Users/andrewgray/repo/projects/fomawrite_mac/dist/Fomawrite Dev.app",
+      "bundle_id": "io.github.andrewjngray.fomawrite.dev",
+      "version": "0.3.0",
+      "build": "102",
+      "sha256": "deae23aad9806402c0f5dbe2c40d8fc948a299f2386da5a0568108c35aa2ed3a",
+      "strict_signature": true
+    },
+    {
+      "role": "demo",
+      "path": "/Users/andrewgray/repo/projects/fomawrite_mac/dist/Fomawrite.app",
+      "bundle_id": "io.github.andrewjngray.fomawrite",
+      "version": "0.3.0",
+      "build": "102",
+      "sha256": "032849247fb797e5ba2bb3167df05a040fddf31195a53613dd5ba8890bc8bcf1",
+      "strict_signature": true
+    },
+    {
+      "role": "applications",
+      "path": "/Applications/Fomawrite.app",
+      "bundle_id": "io.github.andrewjngray.fomawrite",
+      "version": "0.3.0",
+      "build": "102",
+      "sha256": "032849247fb797e5ba2bb3167df05a040fddf31195a53613dd5ba8890bc8bcf1",
+      "strict_signature": true
+    }
+  ]
+}

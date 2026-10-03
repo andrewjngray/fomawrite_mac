@@ -29,7 +29,7 @@ All three copies are synchronized to `0.3.0-dev3` / `0.3.0 (102)` on 4 October 2
 - `dist/Fomawrite.app` — ordinary/demo package with bundled Qt.
 - `/Applications/Fomawrite.app` — installed from the ordinary package; matching executable hash.
 
-All were closed before replacement. The prior Applications copy is retained in the backup path in [install.log](install.log). Exact hashes, bundle identities and product source revision are recorded in `artifacts.json`. These local ad-hoc signatures do not imply notarization or a new public release.
+All were closed before replacement. The prior Applications copy is retained in the backup path in [install.log](install.log). Exact hashes, bundle identities and product source revision are recorded in [artifacts.json](artifacts.json). These local ad-hoc signatures do not imply notarization or a new public release.
 
 ## Review
 
