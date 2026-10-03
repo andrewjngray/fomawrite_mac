@@ -1,0 +1,36 @@
+{
+  "application_version": "0.3.0-dev6",
+  "bundle_version": "0.3.0",
+  "build": "105",
+  "source_commit": "868f445cc7e2aca3b24a39b7248f0d1a2ebbe54d",
+  "recorded_at": "2026-10-03T21:01:53.822594+00:00",
+  "artifacts": [
+    {
+      "name": "dev",
+      "path": "/Users/andrewgray/repo/projects/fomawrite_mac/dist/Fomawrite Dev.app",
+      "bundle_id": "io.github.andrewjngray.fomawrite.dev",
+      "bundle_version": "0.3.0",
+      "build": "105",
+      "executable_sha256": "142a2495647ecf941b6f74847d7ec02e7ffee20271c7f062b5983138895f7778",
+      "signature": "strict deep local verification passed"
+    },
+    {
+      "name": "demo",
+      "path": "/Users/andrewgray/repo/projects/fomawrite_mac/dist/Fomawrite.app",
+      "bundle_id": "io.github.andrewjngray.fomawrite",
+      "bundle_version": "0.3.0",
+      "build": "105",
+      "executable_sha256": "8bab46b20e44935762b3adfe873452e9d401425384b8ba981a54501258845c4a",
+      "signature": "strict deep local verification passed"
+    },
+    {
+      "name": "applications",
+      "path": "/Applications/Fomawrite.app",
+      "bundle_id": "io.github.andrewjngray.fomawrite",
+      "bundle_version": "0.3.0",
+      "build": "105",
+      "executable_sha256": "8bab46b20e44935762b3adfe873452e9d401425384b8ba981a54501258845c4a",
+      "signature": "strict deep local verification passed"
+    }
+  ]
+}
