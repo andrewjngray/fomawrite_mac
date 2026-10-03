@@ -10,7 +10,7 @@ Andrew’s toolbar review requested a recognizable folder heading, stronger form
 - The formatting capsule uses a visibly bold **B**, italic serif **I**, the existing link glyph and typographic **¶**. Its existing formatting actions remain unchanged.
 - A compact **− / +** capsule sits between formatting and **Aa**. It uses the existing persisted text-size commands, changes Source, Preview and Visual Edit, and disables each end at the supported size limits. It does not change Markdown, Undo history or export point size.
 - Preview and Visual Edit previously applied minimum font sizes after the zoom offset, making some initial minus clicks ineffective. Applying the zoom after their normal baseline keeps the initial appearance and lets each step visibly change the text.
-- In narrow document headers, formatting condenses and the history capsule hides when necessary, retaining zoom, Aa and pane restoration without overlap. Document history remains available from the native Go menu and its existing shortcuts.
+- In narrow document headers, formatting condenses and the history capsule hides when necessary, retaining zoom, Aa and pane restoration without overlap. Document history remains available from the native Go menu.
 
 ## Native visual evidence
 

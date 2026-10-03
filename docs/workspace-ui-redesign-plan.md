@@ -116,7 +116,7 @@ Use one original line-icon family with consistent visual weight and baseline. Pr
 
 The folder heading is a labeled, tonal button with the same blue folder glyph as filesystem rows. Its tooltip names the current folder and the chooser action; clicking retains the native folder picker. Do not imply an inline menu with a disclosure chevron when the action opens a system picker.
 
-Formatting uses typographic **B**, italic **I** and **¶** to communicate the result, with the existing line-link glyph. These are semantic formatting symbols, rather than a second decorative icon family. A separate two-segment **− / +** capsule sits between formatting and **Aa**, sharing the persisted writing-size commands and their 12–32 bounds. Its change must be visible in Source, Preview and Visual Edit without modifying document bytes or export point size. At narrow widths, preserve zoom/Aa and pane restoration; collapse formatting and omit the history capsule when necessary. History remains in the native Go menu and its existing shortcuts.
+Formatting uses typographic **B**, italic **I** and **¶** to communicate the result, with the existing line-link glyph. These are semantic formatting symbols, rather than a second decorative icon family. A separate two-segment **− / +** capsule sits between formatting and **Aa**, sharing the persisted writing-size commands and their 12–32 bounds. Its change must be visible in Source, Preview and Visual Edit without modifying document bytes or export point size. At narrow widths, preserve zoom/Aa and pane restoration; collapse formatting and omit the history capsule when necessary. History remains in the native Go menu.
 
 ## Collapsing, resizing and restoring columns
 
