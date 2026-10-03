@@ -58,7 +58,19 @@ Item {
         RowLayout {
             anchors.fill: parent; anchors.leftMargin: root.window.isMac && !organizerHeader.visible ? 84 : 12; anchors.rightMargin: 12; spacing: 8
             visible: root.toolbarContentVisible; opacity: root.toolbarContentOpacity; enabled: opacity > 0
-            ChromeButton { text: backend.library.rootName || "Folder"; hint: "Choose library folder"; alignLeft: true; leftPadding: 0; font.weight: Font.Medium; Layout.fillWidth: true; Layout.minimumWidth: 0; onClicked: root.actionRequested("chooseFolder", this) }
+            ChromeButton {
+                objectName: "workspaceFolderButton"
+                text: backend.library.rootName || "Folder"
+                iconName: "folder"
+                hint: "Choose library folder — " + (backend.library.rootName || "Folder")
+                alignLeft: true
+                tonal: true
+                implicitHeight: 32
+                font.weight: Font.Medium
+                Layout.fillWidth: true
+                Layout.minimumWidth: 32
+                onClicked: root.actionRequested("chooseFolder", this)
+            }
             ToolbarButton { objectName: "newDocumentButton"; iconName: "compose"; hint: "New document"; onClicked: root.actionRequested("newDocument", this) }
             ToolbarButton { objectName: "collapseFilesButton"; iconName: "panel-left-close"; hint: "Hide library"; onClicked: root.actionRequested("hideFiles", this) }
         }
@@ -103,6 +115,8 @@ Item {
                 spacing: 8
                 // Workspace remains available to reveal faded controls before keyboard traversal.
                 ToolbarGroup {
+                    objectName: "documentHistoryControls"
+                    visible: root.writingControlsWidth >= 360
                     ToolbarButton { objectName: "documentBackButton"; grouped: true; iconName: "back"; hint: "Previous document"; enabled: backend.canGoBack; onClicked: root.actionRequested("back", this) }
                     ToolbarButton { objectName: "documentForwardButton"; grouped: true; iconName: "forward"; hint: "Next document"; enabled: backend.canGoForward; onClicked: root.actionRequested("forward", this) }
                 }
@@ -117,13 +131,32 @@ Item {
                 ToolbarGroup {
                     objectName: "compactWritingControls"
                     visible: root.writingClusterExpanded
-                    ToolbarButton { objectName: "compactBoldButton"; grouped: true; iconName: "bold"; hint: trailing.formattingAllowed ? "Bold selection" : "Choose Source to apply formatting"; enabled: trailing.formattingAllowed; onClicked: root.actionRequested("bold", this) }
-                    ToolbarButton { objectName: "compactItalicButton"; grouped: true; iconName: "italic"; hint: "Italic selection"; enabled: trailing.formattingAllowed; onClicked: root.actionRequested("italic", this) }
+                    ToolbarButton { objectName: "compactBoldButton"; grouped: true; text: "B"; font.pixelSize: 16; font.weight: Font.Bold; hint: trailing.formattingAllowed ? "Bold selection" : "Choose Source to apply formatting"; enabled: trailing.formattingAllowed; onClicked: root.actionRequested("bold", this) }
+                    ToolbarButton { objectName: "compactItalicButton"; grouped: true; text: "I"; font.family: "Georgia"; font.pixelSize: 16; font.italic: true; hint: "Italic selection"; enabled: trailing.formattingAllowed; onClicked: root.actionRequested("italic", this) }
                     ToolbarButton { objectName: "compactLinkButton"; grouped: true; iconName: "link"; hint: "Insert or edit link"; enabled: trailing.formattingAllowed; onClicked: root.actionRequested("link", this) }
-                    ToolbarButton { objectName: "compactParagraphButton"; grouped: true; iconName: "paragraph"; hint: "Paragraph formatting"; enabled: trailing.formattingAllowed; onClicked: root.actionRequested("format", this) }
+                    ToolbarButton { objectName: "compactParagraphButton"; grouped: true; text: "¶"; font.pixelSize: 16; hint: "Paragraph formatting"; enabled: trailing.formattingAllowed; onClicked: root.actionRequested("format", this) }
                 }
                 ToolbarButton { objectName: "compactFormatButton"; visible: !root.writingClusterExpanded; iconName: "paragraph"; hint: "Formatting"; enabled: trailing.formattingAllowed; onClicked: root.actionRequested("format", this) }
-                ToolbarButton { text: "Aa"; hint: "Writing appearance"; onClicked: root.actionRequested("appearance", this) }
+                ToolbarGroup {
+                    objectName: "workspaceZoomControls"
+                    ToolbarButton {
+                        objectName: "workspaceZoomOutButton"
+                        grouped: true
+                        iconName: "minus"
+                        hint: "Decrease text size"
+                        enabled: root.settings.writingSize > 12
+                        onClicked: root.actionRequested("smaller", this)
+                    }
+                    ToolbarButton {
+                        objectName: "workspaceZoomInButton"
+                        grouped: true
+                        iconName: "plus"
+                        hint: "Increase text size"
+                        enabled: root.settings.writingSize < 32
+                        onClicked: root.actionRequested("larger", this)
+                    }
+                }
+                ToolbarButton { objectName: "workspaceAppearanceButton"; text: "Aa"; hint: "Writing appearance"; onClicked: root.actionRequested("appearance", this) }
                 ToolbarButton { objectName: "exportHubButton"; visible: root.writingControlsWidth >= 420; iconName: "export"; hint: "Export and share"; onClicked: root.actionRequested("export", this) }
             }
             ToolbarButton {

@@ -432,6 +432,8 @@ ApplicationWindow {
             case "italic": win.tryWrapSelection("*", "*"); break;
             case "link": win.openLinkEditor(anchor); break;
             case "format": win.openQuickFormat(anchor); break;
+            case "smaller": workspaceCommands.run("smaller"); break;
+            case "larger": workspaceCommands.run("larger"); break;
             case "appearance": win.openAnchoredMenu(writingOptions, anchor); break;
             case "workspace": win.openAnchoredMenu(workspaceMenu, anchor); break;
             case "export": win.openExportHub("pdf"); break;
@@ -3268,12 +3270,14 @@ ApplicationWindow {
             SplitView.preferredWidth: workspaceLayout.effectivePreviewWidth
             SplitView.minimumWidth: 320
             typeface: backend.outputFont
-            textSize: Math.max(12, backend.outputPointSize * 4 / 3 + workspaceSettings.writingSize - 19)
+            // Apply view zoom after the readable baseline, so every minus click
+            // changes the visible text rather than hitting a hidden size floor.
+            textSize: Math.max(12, backend.outputPointSize * 4 / 3 - 3) + workspaceSettings.writingSize - 16
             layoutMode: workspaceLayout.effectiveLayoutMode
             visualEditEnabled: workspaceLayout.visualEditEnabled
             onVisualEditEnabledChanged: workspaceLayout.visualEditEnabled = visualEditEnabled
             visualTypeface: win.editorFontFamily
-            visualTextSize: Math.max(18, win.editorFontPixelSize)
+            visualTextSize: win.editorFontPixelSize + (win.activeWritingAppearance === "manuscript" ? win.scaledSize(1) : 0)
             visualTopInset: height < 600 ? 32 : 64
             onLayoutRequested: function(mode) {
                 // Split/Full change arrangement; the explicit Preview command changes editing mode.

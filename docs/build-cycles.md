@@ -1356,3 +1356,14 @@ Scope: Andrew’s side-by-side review showed a material gap between the approved
 Changes: single aligned pane rules with generous invisible resize targets; original tabbed blue folder and pane/compose glyphs; 32px circular tools and divided capsules; regular-weight UI labels; dated document cards drawn from bounded local-file summaries; quiet library caption and preserved folder/list actions; warm Manuscript source editing with controlled line length, word-count pill, quiet search and footer. A one-time, per-copy presentation migration applies Source/Manuscript and cards across restored windows while preserving documents, recovery, output templates and future user preferences. The explicit Aa → Reference writing layout action remains available.
 
 Validation and native screenshot evidence are recorded in [Cycle 103](../research/cycle-103/README.md). Runnable artifacts: stable Dev, ordinary demo/package and Applications, version `0.3.0-dev4` / macOS `0.3.0 (103)`. Andrew’s visual sign-off and physical VoiceOver/display checks remain open. [Optional exercise](../research/usability/cycle-103.md). Next cycle should follow his visual review before broadening image/table/list work; optional distribution Cycle 101 remains separate.
+
+
+## Cycle 104 — folder heading and quick text sizing
+
+Planned scope: address Andrew’s follow-up on the central folder heading, thin formatting glyphs and missing direct zoom controls.
+
+Changes: blue-folder tonal heading button retaining the native picker; bold B, italic I and typographic paragraph glyph; separate minus/plus capsule before Aa using existing saved text-size commands. Remove hidden size floors after the zoom offset in Preview/Visual Edit so the first minus click visibly works. Condense narrow headers without obscuring zoom or pane restoration. Document the shared toolbar behavior.
+
+Verification: final build/package and **144 regression tests pass**. Three focused tests pass offscreen and native Cocoa (**5/0/0** each including setup/cleanup). Actual pointer clicks verify rendered line-height changes in Source/Preview/Visual Edit, first-minus behavior, bounds, exact Unicode Markdown, disk contents, dirty state, Undo/Redo and output-style preservation. Resize checks cover 720–1440px across layouts, plus collapsed navigation; the folder heading routes to the existing picker action. Native synthetic screenshots were inspected. [Evidence](../research/cycle-104/README.md).
+
+Runnable artifacts: stable Dev, ordinary demo/package and Applications are refreshed to `0.3.0-dev5`, macOS `0.3.0 (104)`, with strict signatures and matching demo/Applications executables. No public release. [Optional exercise](../research/usability/cycle-104.md). Physical VoiceOver/display acceptance and Andrew’s visual review remain open. Next product scope follows that review; bounded image/table/list ergonomics remains the subsequent work, with optional distribution separate.

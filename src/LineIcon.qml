@@ -72,6 +72,7 @@ Item {
             case "outline": for (let y=6;y<=18;y+=6) { line(3,y,4,y); line(8,y,21,y) } break
             case "split": panel(); line(12,3,12,21); break
             case "preview": c.moveTo(8,4); c.lineTo(20,12); c.lineTo(8,20); c.closePath(); break
+            case "minus": line(5,12,19,12); break
             case "plus": line(12,5,12,19); line(5,12,19,12); break
             case "close": line(6,6,18,18); line(18,6,6,18); break
             case "more":

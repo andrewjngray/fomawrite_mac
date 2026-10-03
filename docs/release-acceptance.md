@@ -1,8 +1,8 @@
 # Acceptance ledger — current follow-through and Cycle 59 history
 
-## Current follow-through — Cycles 98–102
+## Current follow-through — Cycles 98–104
 
-The current review target is application `0.3.0-dev4`, macOS `0.3.0 (103)`. Cycle 103 brings the approved workspace concept into the actual native UI and adopts its source-writing presentation on upgrade. See [Cycle 103](../research/cycle-103/README.md) for evidence. This records the affected workflows; it does not recertify the full historical menu matrix.
+The current review target is application `0.3.0-dev5`, macOS `0.3.0 (104)`. Cycle 104 refines the folder heading and formatting controls, and adds quick text sizing to the native workspace implemented in Cycle 103. See [Cycle 104](../research/cycle-104/README.md) for evidence. This records the affected workflows; it does not recertify the full historical menu matrix.
 
 | Area | New bounded evidence | Still open |
 | --- | --- | --- |
@@ -12,7 +12,7 @@ The current review target is application `0.3.0-dev4`, macOS `0.3.0 (103)`. Cycl
 | Pane/template controls | Cycle 102 restores hidden panes directly from the surviving header, orders and names View toggles consistently, and synchronizes the Preview dropdown with native template selection. Pointer, compact, draft/Undo and native checks are in its handoff. | Andrew’s everyday usage and physical VoiceOver review. |
 | Distribution | Local review packaging remains separate from product acceptance. | Developer ID signing, notarization, another-machine installation and an explicit public-release decision. |
 
-The next product cycle is review-led image/table/list ergonomics (Cycle 103), with remaining human accessibility/display acceptance alongside it. Cycle 101 is an optional distribution track.
+The next product cycle is review-led image/table/list ergonomics after the current UI review, with remaining human accessibility/display acceptance alongside it. Cycle 101 is an optional distribution track.
 
 ## Historical Cycle 59 checkpoint and subsequent September follow-ups
 
