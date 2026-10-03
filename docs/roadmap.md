@@ -19,7 +19,7 @@ After Cycle 84, the [editor surface redesign](editor-surface-redesign.md) refocu
 
 The [17 September staged development plan](development-plan.md) turns the [iA menu parity log](ia-menu-parity-2026-09-17.md) into proposed Cycles 14–28: menu access, safe file/editing commands, navigation, richer documents/output, native lifecycle, then advanced writing tools. Codex remains the visual reference. Full functional parity includes explicit validation of hidden submenu behavior and is not claimed by matching labels.
 
-The [3 October workspace UI plan](workspace-ui-redesign-plan.md) was approved and implemented across Cycles 90–97. Cycles 98–100 extend that candidate toward the next review target: `0.3.0-dev2`, macOS bundle `0.3.0` build `100`. The source includes the bounded changes below; all 134 regression tests and native Visual Edit checks pass. Demo/package and Applications are build 100; the running Dev copy awaits save/close for replacement, as recorded in the [Cycle 100 handoff](../research/cycle-100/README.md). Earlier historical results above remain unchanged.
+The [3 October workspace UI plan](workspace-ui-redesign-plan.md) was approved and implemented across Cycles 90–97. Cycles 98–100 extend that candidate toward the next review target: `0.3.0-dev2`, macOS bundle `0.3.0` build `100`. The source includes the bounded changes below; all 134 regression tests and native Visual Edit checks pass. Dev, demo/package and Applications are synchronized to build 100 and strict-signature verified, as recorded in the [Cycle 100 handoff](../research/cycle-100/README.md). Earlier historical results above remain unchanged.
 
 ## Follow-through after the workspace candidate
 

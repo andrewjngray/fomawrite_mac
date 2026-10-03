@@ -2,7 +2,7 @@
 
 ## Current follow-through — Cycles 98–100
 
-The next review target is application `0.3.0-dev2`, macOS `0.3.0 (100)`. All 134 tests and native Visual Edit checks pass; package and Applications are build 100, while Dev awaits save/close for replacement, recorded in the [Cycle 100 handoff](../research/cycle-100/README.md). This section narrows specific historical gaps; it does not recertify the full menu matrix.
+The next review target is application `0.3.0-dev2`, macOS `0.3.0 (100)`. All 134 tests and native Visual Edit checks pass; Dev, package and Applications are synchronized to build 100 and strict-signature verified, recorded in the [Cycle 100 handoff](../research/cycle-100/README.md). This section narrows specific historical gaps; it does not recertify the full menu matrix.
 
 | Area | New bounded evidence | Still open |
 | --- | --- | --- |

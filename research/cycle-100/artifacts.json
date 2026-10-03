@@ -1,7 +1,7 @@
 {
-  "recorded_at": "2026-10-03T19:56:05.843377",
+  "recorded_at": "2026-10-04T04:38:57.297303+13:00",
   "application_version": "0.3.0-dev2",
-  "dev_refresh": "Pending normal save/close of running Dev copy; replacement staged.",
+  "dev_refresh": "Complete. Dev closed before replacement; all three review apps verified at build 100 on 4 October 2026.",
   "artifacts": [
     {
       "role": "build",
@@ -35,18 +35,10 @@
       "path": "/Users/andrewgray/repo/projects/fomawrite_mac/dist/Fomawrite Dev.app",
       "bundle_id": "io.github.andrewjngray.fomawrite.dev",
       "version": "0.3.0",
-      "build": "97",
-      "sha256": "9dcf158c8c2c95d6429b702c4bdd602eb4a31df072bac45aa6a6ffc420f4b39f",
-      "strict_signature": true
-    },
-    {
-      "role": "dev-ready",
-      "path": "/private/tmp/Fomawrite-Dev-build100-ready.app",
-      "bundle_id": "io.github.andrewjngray.fomawrite.dev",
-      "version": "0.3.0",
       "build": "100",
       "sha256": "d59c84543592e3df385500f3a7cc9e09e417c88b9fabce74f3a1274fc46c87a5",
       "strict_signature": true
     }
-  ]
+  ],
+  "source_commit": "ab9443c13e33a06f483232db3b87ec6ac0266c00"
 }

@@ -30,6 +30,8 @@ The final build passes all 134 regression tests (zero failures/skips), including
 
 Application **0.3.0-dev2**, bundle **0.3.0 (100)**. The demo/package `dist/Fomawrite.app` and `/Applications/Fomawrite.app` are refreshed, strict-signature verified and have identical executable hashes. The previous Applications copy is backed up under `/private/tmp/Fomawrite-before-build100-20261003-195432.app`.
 
-The stable Dev app canceled its normal quit request. Its running bundle remains unchanged; the verified build-100 replacement is staged at `/private/tmp/Fomawrite-Dev-build100-ready.app` until Andrew saves/closes Dev. It has the same stable Dev identifier and has not been launched or registered as another app. Exact installed/staged versions and hashes: [artifacts.json](artifacts.json).
+On **4 October 2026**, Andrew confirmed Dev was closed. The running-process guard confirmed it had exited, and `./bin/prepare-dev-app` refreshed `dist/Fomawrite Dev.app` using its stable identifier. Dev, demo/package and Applications are now all **0.3.0 (100)** and pass strict/deep local signature verification. Dev’s executable matches the staged replacement; package and Applications executables match each other. The obsolete temporary staging bundle was removed. Applications was already current and running, so no replacement or restart was needed. Exact current versions and hashes: [artifacts.json](artifacts.json).
+
+No product code changed in this installation closeout; the 134-test suite and recorded native checks apply to the same source (`ab9443c`). The apps were not relaunched for this metadata/signature verification.
 
 The generated bundles are excluded from Git. Public releases and notarization are unchanged. The source push is recorded in Git history for this cycle.

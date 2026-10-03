@@ -1316,7 +1316,7 @@ Verification: the production-main native fixture compiles and passes **111 asser
 
 Known gaps: listening to physical VoiceOver, actual macOS display setting changes/multiple displays, arbitrary-workspace quit/relaunch and Andrew's normal writing review remain open. The fixture boundary now waits for document-load cursor reset before preparing its independent selected draft; production cursor behavior was not weakened.
 
-Runnable artifact target: stable `dist/Fomawrite Dev.app`, ordinary/demo `dist/Fomawrite.app` and `/Applications/Fomawrite.app`, all intended for the combined `0.3.0-dev2` / `0.3.0 (100)` handoff. The aggregate gate passes below; package and Applications are refreshed. Dev awaits safe close.
+Runnable artifact target: stable `dist/Fomawrite Dev.app`, ordinary/demo `dist/Fomawrite.app` and `/Applications/Fomawrite.app`, all intended for the combined `0.3.0-dev2` / `0.3.0 (100)` handoff. The aggregate gate passes below; Dev, package and Applications are synchronized and strict-signature verified as of 4 October 2026.
 
 ## Cycle 99 — bounded visual blocks, images, tables and lists
 
@@ -1336,6 +1336,6 @@ Changes: preserve heading fragments through ordinary open routing and explicit n
 
 Verification: cross-window encoded Unicode headings, unsaved targets, missing feedback, source Cancel and exact Undo pass in the integrated native fixture. Focused navigation regressions also pass. See the [Cycle 100 record](../research/cycle-100/README.md).
 
-**Final integrated gate: passed.** `./bin/build` and all **134 tests** pass, with zero failures/skips. Native Visual Edit/navigation checks pass **5/0/0** including setup/cleanup; the workspace fixture passes 111 assertions. Application `0.3.0-dev2`, macOS `0.3.0 (100)`, is packaged and installed in Applications; both pass strict local signatures and executable hashes match. The Dev replacement is ready but its running copy canceled normal quit, so replacement awaits save/close. [Bundle identities](../research/cycle-100/artifacts.json). No public release or notarization is implied.
+**Final integrated gate: passed.** `./bin/build` and all **134 tests** pass, with zero failures/skips. Native Visual Edit/navigation checks pass **5/0/0** including setup/cleanup; the workspace fixture passes 111 assertions. Application `0.3.0-dev2`, macOS `0.3.0 (100)`, is packaged and installed in Applications; both pass strict local signatures and executable hashes match. On 4 October, after Andrew quit Dev, `./bin/prepare-dev-app` refreshed the stable Dev copy to build 100. Dev passes strict signature verification and matches the prepared replacement; all three review copies are current. [Bundle identities](../research/cycle-100/artifacts.json). No public release or notarization is implied.
 
 Next: review the combined build during normal writing and complete physical accessibility/display checks. Product Cycle 102 should address the highest-value image/table/list ergonomics from that review, with exact-source safeguards. Cycle 101 remains an optional distribution decision. Broader parser/output/interoperability gaps remain in the acceptance ledger.
