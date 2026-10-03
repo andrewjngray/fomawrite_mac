@@ -4,7 +4,7 @@ import QtQuick
 Item {
     id: group
     default property alias content: contentRow.data
-    property real horizontalPadding: 2
+    property real horizontalPadding: 1
     property alias spacing: contentRow.spacing
     implicitWidth: contentRow.implicitWidth + horizontalPadding * 2
     implicitHeight: 32

@@ -19,7 +19,7 @@ After Cycle 84, the [editor surface redesign](editor-surface-redesign.md) refocu
 
 The [17 September staged development plan](development-plan.md) turns the [iA menu parity log](ia-menu-parity-2026-09-17.md) into proposed Cycles 14–28: menu access, safe file/editing commands, navigation, richer documents/output, native lifecycle, then advanced writing tools. Codex remains the visual reference. Full functional parity includes explicit validation of hidden submenu behavior and is not claimed by matching labels.
 
-The [3 October workspace UI plan](workspace-ui-redesign-plan.md) was approved and implemented across Cycles 90–97, with keyboard/native acceptance, bounded visual editing and heading links added in Cycles 98–100. Andrew’s next review identified pane restoration and template access as the immediate priority. Cycle 102 addresses that feedback in `0.3.0-dev3`, macOS `0.3.0 (102)`. See the [Cycle 102 handoff](../research/cycle-102/README.md) for current verification and installed bundle identities. Earlier historical results above remain unchanged.
+The [3 October workspace UI plan](workspace-ui-redesign-plan.md) established Cycles 90–97, followed by bounded editing/navigation in 98–100 and pane/template access in 102. Andrew’s build 102 comparison showed that the native presentation still diverged from the approved concept. Cycle 103 makes visual fidelity the immediate priority: shared geometry, reference typography/icons/cards, first-launch adoption and native screenshot comparison. Current review target: `0.3.0-dev4`, macOS `0.3.0 (103)`. See the [Cycle 103 handoff](../research/cycle-103/README.md). Earlier historical results above remain unchanged.
 
 ## Follow-through after the workspace candidate
 

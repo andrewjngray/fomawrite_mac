@@ -77,6 +77,7 @@ const auto smokePaneState = [](QWindow *window) {
 const auto smokeRestorePanes = [](QWindow *window, const QVariantMap &state) {
     return QMetaObject::invokeMethod(window, "restoreWorkspacePaneState", Q_ARG(QVariant, state));
 };
+#include "cycle103-migration.inc"
 const auto smokeHeadersAlign = [](QWindow *window) {
     const auto aligns = [window](const char *headerName, const char *paneName) {
         auto *header = window->findChild<QQuickItem *>(QString::fromLatin1(headerName));
@@ -370,6 +371,7 @@ const auto smokeWorkspace = [&](const std::shared_ptr<Session> &original,
 QTimer::singleShot(200, &app, [&] {
     if (!smokeCheck(sessions.size() == 1, "one initial test window")) return;
     auto original = sessions.first();
+    if (!smokeReferenceMigration(original)) return;
     if (!smokeCheck(original->backend->open(smokeFile), "open disposable source")) return;
     if (!smokeCheck(smokeTrigger(original, "Open in New Window"), "trigger New Window from context menu")) return;
     smokeWaitFor([&] { return sessions.size() >= 2; }, [&, original] {

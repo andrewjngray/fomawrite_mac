@@ -39,15 +39,14 @@ Item {
         color: backend.palette.organizer
         MouseArea { anchors.fill: parent; onPressed: root.window.startSystemMove(); onDoubleClicked: root.window.visibility === Window.Maximized ? root.window.showNormal() : root.window.showMaximized() }
         RowLayout {
-            anchors.fill: parent; anchors.leftMargin: root.window.isMac ? 84 : 12; anchors.rightMargin: 10; spacing: 6
+            anchors.fill: parent; anchors.leftMargin: root.window.isMac ? 84 : 12; anchors.rightMargin: 12; spacing: 8
             visible: root.toolbarContentVisible
             opacity: root.toolbarContentOpacity
             enabled: opacity > 0
             Item { Layout.fillWidth: true }
-            ToolbarButton { iconName: "plus"; hint: "Add a library location"; onClicked: root.actionRequested("addLocation", this) }
-            ToolbarButton { objectName: "collapseOrganizerButton"; iconName: "organizer"; hint: "Hide organizer"; onClicked: root.actionRequested("hideOrganizer", this) }
+            ToolbarButton { objectName: "collapseOrganizerButton"; iconName: "panel-left-close"; hint: "Hide organizer"; onClicked: root.actionRequested("hideOrganizer", this) }
         }
-        Rectangle { anchors.right: parent.right; width: 1; height: parent.height; color: backend.palette.border }
+        Rectangle { objectName: "organizerHeaderDivider"; x: parent.width; width: 1; height: parent.height; color: backend.palette.border }
     }
     Rectangle {
         id: filesHeader
@@ -57,14 +56,13 @@ Item {
         color: backend.palette.library
         MouseArea { anchors.fill: parent; onPressed: root.window.startSystemMove(); onDoubleClicked: root.window.visibility === Window.Maximized ? root.window.showNormal() : root.window.showMaximized() }
         RowLayout {
-            anchors.fill: parent; anchors.leftMargin: root.window.isMac && !organizerHeader.visible ? 84 : 12; anchors.rightMargin: 10; spacing: 6
+            anchors.fill: parent; anchors.leftMargin: root.window.isMac && !organizerHeader.visible ? 84 : 12; anchors.rightMargin: 12; spacing: 8
             visible: root.toolbarContentVisible; opacity: root.toolbarContentOpacity; enabled: opacity > 0
-            ChromeButton { text: backend.library.rootName || "Folder"; hint: "Choose library folder"; alignLeft: true; Layout.fillWidth: true; onClicked: root.actionRequested("chooseFolder", this) }
-            ToolbarButton { iconName: "plus"; hint: "New document"; onClicked: root.actionRequested("newDocument", this) }
-            ToolbarButton { iconName: "more"; hint: "Folder actions, sorting and search"; onClicked: root.actionRequested("libraryOptions", this) }
-            ToolbarButton { objectName: "collapseFilesButton"; iconName: "library"; hint: "Hide library"; onClicked: root.actionRequested("hideFiles", this) }
+            ChromeButton { text: backend.library.rootName || "Folder"; hint: "Choose library folder"; alignLeft: true; leftPadding: 0; font.weight: Font.Medium; Layout.fillWidth: true; Layout.minimumWidth: 0; onClicked: root.actionRequested("chooseFolder", this) }
+            ToolbarButton { objectName: "newDocumentButton"; iconName: "compose"; hint: "New document"; onClicked: root.actionRequested("newDocument", this) }
+            ToolbarButton { objectName: "collapseFilesButton"; iconName: "panel-left-close"; hint: "Hide library"; onClicked: root.actionRequested("hideFiles", this) }
         }
-        Rectangle { anchors.right: parent.right; width: 1; height: parent.height; color: backend.palette.border }
+        Rectangle { objectName: "filesHeaderDivider"; x: parent.width; width: 1; height: parent.height; color: backend.palette.border }
     }
     Rectangle {
         id: documentHeader
@@ -87,14 +85,14 @@ Item {
                 ToolbarButton {
                     objectName: "restoreOrganizerButton"
                     visible: !organizerHeader.visible
-                    iconName: "organizer"
+                    iconName: "panel-left-open"
                     hint: "Show organizer"
                     onClicked: root.actionRequested("toggleOrganizer", this)
                 }
                 ToolbarButton {
                     objectName: "restoreFilesButton"
                     visible: !filesHeader.visible
-                    iconName: "library"
+                    iconName: "panel-left-open"
                     hint: "Show library"
                     onClicked: root.actionRequested("toggleFiles", this)
                 }
@@ -108,7 +106,7 @@ Item {
                     ToolbarButton { objectName: "documentBackButton"; grouped: true; iconName: "back"; hint: "Previous document"; enabled: backend.canGoBack; onClicked: root.actionRequested("back", this) }
                     ToolbarButton { objectName: "documentForwardButton"; grouped: true; iconName: "forward"; hint: "Next document"; enabled: backend.canGoForward; onClicked: root.actionRequested("forward", this) }
                 }
-                ToolbarButton { iconName: "search"; hint: "Find in document"; onClicked: root.actionRequested("find", this) }
+                ToolbarButton { objectName: "documentSearchButton"; iconName: "search"; hint: "Find in document"; onClicked: root.actionRequested("find", this) }
             }
             Item { Layout.fillWidth: true; Layout.minimumWidth: 6 }
             Row {
@@ -119,8 +117,8 @@ Item {
                 ToolbarGroup {
                     objectName: "compactWritingControls"
                     visible: root.writingClusterExpanded
-                    ToolbarButton { objectName: "compactBoldButton"; grouped: true; text: "B"; font.bold: true; hint: trailing.formattingAllowed ? "Bold selection" : "Choose Source to apply formatting"; enabled: trailing.formattingAllowed; onClicked: root.actionRequested("bold", this) }
-                    ToolbarButton { objectName: "compactItalicButton"; grouped: true; text: "I"; font.italic: true; hint: "Italic selection"; enabled: trailing.formattingAllowed; onClicked: root.actionRequested("italic", this) }
+                    ToolbarButton { objectName: "compactBoldButton"; grouped: true; iconName: "bold"; hint: trailing.formattingAllowed ? "Bold selection" : "Choose Source to apply formatting"; enabled: trailing.formattingAllowed; onClicked: root.actionRequested("bold", this) }
+                    ToolbarButton { objectName: "compactItalicButton"; grouped: true; iconName: "italic"; hint: "Italic selection"; enabled: trailing.formattingAllowed; onClicked: root.actionRequested("italic", this) }
                     ToolbarButton { objectName: "compactLinkButton"; grouped: true; iconName: "link"; hint: "Insert or edit link"; enabled: trailing.formattingAllowed; onClicked: root.actionRequested("link", this) }
                     ToolbarButton { objectName: "compactParagraphButton"; grouped: true; iconName: "paragraph"; hint: "Paragraph formatting"; enabled: trailing.formattingAllowed; onClicked: root.actionRequested("format", this) }
                 }

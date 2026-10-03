@@ -38,7 +38,7 @@ The upstream Omawrite code is copyright David Heinemeier Hansson and remains und
 
 ## Current workspace review build
 
-The current review target is **0.3.0-dev3**, macOS bundle **0.3.0 (102)**. It adds persistent Library/Organizer reopen buttons, clearer View menu organization, and a template dropdown in the Preview footer to the earlier workspace and bounded editing improvements. Choose **Aa → Studio writing layout** to apply the reference appearance while retaining control over stored preferences.
+The current review target is **0.3.0-dev4**, macOS bundle **0.3.0 (103)**. The approved workspace concept now drives the native UI: aligned pane rules, tabbed blue folders, dated document cards, circular grouped tools and a warm Manuscript writing surface. Each app copy adopts that presentation on its first upgraded launch; subsequent layout choices persist. **Aa → Reference writing layout** reapplies it without changing document contents or export templates. See [Cycle 103](research/cycle-103/README.md) for native screenshots and verification.
 
 Use `dist/Fomawrite Dev.app`, `/Applications/Fomawrite.app` or the ordinary/demo package `dist/Fomawrite.app` to review build 102. **All three copies are synchronized and signature-verified. All 137 tests and the native checks pass.** Exact installed bundle identities are recorded in the [Cycle 102 handoff](research/cycle-102/README.md). The old public GitHub RC1 download remains a different, earlier release.
 

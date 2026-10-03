@@ -7,6 +7,47 @@
 #include <QTextBlock>
 #include <algorithm>
 
+namespace {
+bool escapedMarker(const QString &text, int start) {
+    int backslashes = 0;
+    while (start > 0 && text.at(--start) == QLatin1Char('\\')) ++backslashes;
+    return backslashes % 2 != 0;
+}
+
+QList<MarkdownHighlighter::Span> inlineCodeSpans(const QString &text) {
+    QList<MarkdownHighlighter::Span> spans;
+    for (int start = 0; start < text.size();) {
+        if (text.at(start) != QLatin1Char('`') || escapedMarker(text, start)) { ++start; continue; }
+        int openingEnd = start;
+        while (openingEnd < text.size() && text.at(openingEnd) == QLatin1Char('`')) ++openingEnd;
+        const int count = openingEnd - start;
+        int after = openingEnd;
+        bool matched = false;
+        while (after < text.size()) {
+            const int closing = text.indexOf(QLatin1Char('`'), after);
+            if (closing < 0) break;
+            int closingEnd = closing;
+            while (closingEnd < text.size() && text.at(closingEnd) == QLatin1Char('`')) ++closingEnd;
+            if (closingEnd - closing == count) {
+                spans.append({start, closingEnd - start});
+                start = closingEnd;
+                matched = true;
+                break;
+            }
+            after = closingEnd;
+        }
+        if (!matched) start = openingEnd;
+    }
+    return spans;
+}
+
+bool overlapsSpan(const QList<MarkdownHighlighter::Span> &spans, const MarkdownHighlighter::Span &candidate) {
+    const auto first = std::lower_bound(spans.cbegin(), spans.cend(), candidate.start,
+        [](const MarkdownHighlighter::Span &span, int start) { return span.start + span.length <= start; });
+    return first != spans.cend() && first->start < candidate.start + candidate.length;
+}
+} // namespace
+
 MarkdownHighlighter::MarkdownHighlighter(QTextDocument *document)
     : QSyntaxHighlighter(document) {
     rebuildFormats();
@@ -102,6 +143,9 @@ void MarkdownHighlighter::rebuildFormats() {
     m_italicFormat = QTextCharFormat();
     m_italicFormat.setFontItalic(true);
     m_italicFormat.setForeground(text);
+
+    m_boldItalicFormat = m_boldFormat;
+    m_boldItalicFormat.setFontItalic(true);
 
     m_codeFormat = QTextCharFormat();
     m_codeFormat.setForeground(text);
@@ -268,21 +312,16 @@ void MarkdownHighlighter::highlightMarkers(const QString &text) {
 }
 
 void MarkdownHighlighter::highlightInline(const QString &text) {
-    if (text.contains(QLatin1Char('`'))) {
-        static const QRegularExpression codeRe(QStringLiteral("`([^`]+)`"));
-        QRegularExpressionMatchIterator codeMatches = codeRe.globalMatch(text);
-        while (codeMatches.hasNext()) {
-            const QRegularExpressionMatch match = codeMatches.next();
-            setFormat(match.capturedStart(0), match.capturedLength(0), m_codeFormat);
-        }
-    }
+    for (const Span &code : inlineCodeSpans(text))
+        setFormat(code.start, code.length, m_codeFormat);
 
     const QList<InlineMarkup> markup = inlineMarkup(text);
     for (const InlineMarkup &item : markup) {
         const QTextCharFormat &contentFormat =
             item.kind == InlineKind::Bold ? m_boldFormat
             : item.kind == InlineKind::Italic ? m_italicFormat
-                                              : m_linkFormat;
+            : item.kind == InlineKind::BoldItalic ? m_boldItalicFormat
+                                                 : m_linkFormat;
         setFormat(item.content.start, item.content.length, contentFormat);
         for (const Span &marker : item.markers)
             setFormat(marker.start, marker.length, m_showMarkup ? m_markerFormat : m_hiddenMarkerFormat);
@@ -300,10 +339,30 @@ QList<MarkdownHighlighter::InlineMarkup> MarkdownHighlighter::inlineMarkup(const
         return Span{int(match.capturedStart(group)), int(match.capturedLength(group))};
     };
 
+    const auto literal = inlineCodeSpans(text);
+    QList<Span> combined;
+    static const QRegularExpression combinedRe(QStringLiteral(
+        "(?<!\\*)(\\*{3})(\\S(?:.*?\\S)?)(\\*{3})(?!\\*)"
+        "|(?<![\\p{L}\\p{N}_])(_{3})(\\S(?:.*?\\S)?)(_{3})(?![\\p{L}\\p{N}_])"));
+    auto combinedMatches = combinedRe.globalMatch(text);
+    while (combinedMatches.hasNext()) {
+        const auto match = combinedMatches.next();
+        const Span whole = span(match, 0);
+        const int marker = match.capturedStart(1) >= 0 ? 1 : 4;
+        if (overlapsSpan(literal, whole) || escapedMarker(text, whole.start)
+            || escapedMarker(text, match.capturedStart(marker + 2))) continue;
+        combined.append(whole);
+        markup.append({InlineKind::BoldItalic, span(match, marker + 1),
+                       {span(match, marker), span(match, marker + 2)}});
+    }
+
     static const QRegularExpression boldRe(QStringLiteral("(\\*\\*|__)(.+?)(\\1)"));
     QRegularExpressionMatchIterator boldMatches = boldRe.globalMatch(text);
     while (boldMatches.hasNext()) {
         const QRegularExpressionMatch match = boldMatches.next();
+        const Span whole = span(match, 0);
+        if (overlapsSpan(literal, whole) || overlapsSpan(combined, whole)
+            || escapedMarker(text, whole.start) || escapedMarker(text, match.capturedStart(3))) continue;
         markup.append({InlineKind::Bold, span(match, 2),
                        {span(match, 1), span(match, 3)}});
     }
@@ -314,6 +373,8 @@ QList<MarkdownHighlighter::InlineMarkup> MarkdownHighlighter::inlineMarkup(const
     while (italicMatches.hasNext()) {
         const QRegularExpressionMatch match = italicMatches.next();
         const Span whole = span(match, 0);
+        if (overlapsSpan(literal, whole) || overlapsSpan(combined, whole)
+            || escapedMarker(text, whole.start) || escapedMarker(text, whole.start + whole.length - 1)) continue;
         const int contentIndex = match.capturedStart(1) >= 0 ? 1 : 2;
         markup.append({InlineKind::Italic, span(match, contentIndex),
                        {{whole.start, 1}, {whole.start + whole.length - 1, 1}}});
@@ -325,6 +386,7 @@ QList<MarkdownHighlighter::InlineMarkup> MarkdownHighlighter::inlineMarkup(const
     while (linkMatches.hasNext()) {
         const QRegularExpressionMatch match = linkMatches.next();
         const Span whole = span(match, 0);
+        if (overlapsSpan(literal, whole) || escapedMarker(text, whole.start)) continue;
         const Span content = span(match, 1);
         const int contentEnd = content.start + content.length;
         markup.append({InlineKind::Link, content,

@@ -27,7 +27,7 @@ public:
 
     void setReviewSpans(const QList<Span> &spans);
 
-    enum class InlineKind { Bold, Italic, Link };
+    enum class InlineKind { Bold, Italic, BoldItalic, Link };
 
     struct InlineMarkup {
         InlineKind kind;
@@ -63,6 +63,7 @@ private:
     QTextCharFormat m_headingFormat;
     QTextCharFormat m_boldFormat;
     QTextCharFormat m_italicFormat;
+    QTextCharFormat m_boldItalicFormat;
     QTextCharFormat m_codeFormat;
     QTextCharFormat m_quoteFormat;
     QTextCharFormat m_linkFormat;

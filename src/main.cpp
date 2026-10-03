@@ -1,3 +1,4 @@
+#include <QSettings>
 #include <QFont>
 #include <QFontDatabase>
 #include <QApplication>
@@ -34,7 +35,6 @@
 #include <QQuickWindow>
 #include <QImage>
 #include <QTemporaryDir>
-#include <QSettings>
 #include <QPrintDialog>
 #include <QPrintPreviewDialog>
 #endif
@@ -133,7 +133,7 @@ int main(int argc, char *argv[]) {
     app.setOrganizationName(QStringLiteral("AndrewGray"));
     app.setOrganizationDomain(QStringLiteral("andrewjngray.github.io"));
     app.setApplicationDisplayName(QStringLiteral("Fomawrite"));
-    app.setApplicationVersion(QStringLiteral("0.3.0-dev3"));
+    app.setApplicationVersion(QStringLiteral("0.3.0-dev4"));
 #ifdef FOMAWRITE_CONTEXT_SMOKE
     // A separately compiled integration test runs the real window manager with
     // disposable settings and documents, never the user's workspace.
@@ -142,6 +142,7 @@ int main(int argc, char *argv[]) {
     app.setApplicationName(QStringLiteral("FomawriteWindowTest-%1").arg(app.applicationPid()));
     QSettings::setDefaultFormat(QSettings::IniFormat);
     QSettings::setPath(QSettings::IniFormat, QSettings::UserScope, smokeDirectory.path());
+#include "../tests/cycle103-migration-seed.inc"
 #endif
 #ifdef Q_OS_MACOS
 #ifndef FOMAWRITE_CONTEXT_SMOKE
@@ -277,6 +278,12 @@ int main(int argc, char *argv[]) {
         }
         return false;
     };
+    // Apply the approved source-writing presentation once across every restored
+    // window. This is independent of content, export templates and recovery.
+    // Dev, packaged and installed copies share preferences, but keep separate
+    // window checkpoints; each copy must adopt this presentation exactly once.
+    const QString referenceRevisionKey = "workspace/referenceRevision/" + identity;
+    bool referenceWorkspaceUpgrade = QSettings().value(referenceRevisionKey, 0).toInt() < 1;
     std::function<void(const QUrl &)> createWindow;
     std::function<void(const QUrl &, bool)> createDocumentWindow;
     createWindow = [&](const QUrl &url) { createDocumentWindow(url, false); };
@@ -328,6 +335,7 @@ int main(int argc, char *argv[]) {
         QObject::connect(backend, &Backend::quitCanceled, &app, [&] { quitting = false; persist(); });
         session->engine = new QQmlApplicationEngine(&app);
         session->engine->rootContext()->setContextProperty(QStringLiteral("backend"), backend);
+        session->engine->rootContext()->setContextProperty(QStringLiteral("referenceWorkspaceUpgrade"), referenceWorkspaceUpgrade);
         session->engine->load(QUrl(QStringLiteral("qrc:/Main.qml")));
         if (session->engine->rootObjects().isEmpty()) {
             session->engine->deleteLater(); backend->deleteLater(); return;
@@ -462,6 +470,14 @@ int main(int argc, char *argv[]) {
     checkpointTimer.start();
     for (const QUrl &url : app.pendingDocuments) createWindow(url);
     app.pendingDocuments.clear();
+    if (referenceWorkspaceUpgrade) {
+        if (WorkspaceStore::write(workspacePath, capture()))
+            QSettings().setValue(referenceRevisionKey, 1);
+        referenceWorkspaceUpgrade = false;
+        for (const auto &session : sessions)
+            if (session->engine) session->engine->rootContext()->setContextProperty(
+                QStringLiteral("referenceWorkspaceUpgrade"), false);
+    }
 #ifdef Q_OS_MACOS
     QTimer::singleShot(0, &app, [] {
         if (!setMacRunningDockIcon(true))

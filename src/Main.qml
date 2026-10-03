@@ -36,12 +36,11 @@ ApplicationWindow {
     readonly property string activeWritingAppearance: ["editorial", "book"].indexOf(workspaceSettings.writingAppearance) >= 0
         ? workspaceSettings.writingAppearance : "manuscript"
     readonly property string editorFontFamily: activeWritingAppearance === "editorial" ? Qt.application.font.family
-        : activeWritingAppearance === "book" ? "Georgia" : "iA Writer Mono S"
+        : activeWritingAppearance === "book" ? "Georgia" : isMac ? "Menlo" : "iA Writer Mono S"
     readonly property int editorFontPixelSize: scaledSize(workspaceSettings.writingSize
         + (activeWritingAppearance === "manuscript" ? 1 : activeWritingAppearance === "book" ? 4 : 3))
     readonly property int editorWidth: Math.min(
-        activeWritingAppearance === "manuscript"
-            ? Math.round(writerFontMetrics.averageCharacterWidth * 65) : scaledSize(720),
+        scaledSize(680),
         Math.max(180, editorPane.width - 64))
     property int tabInset: 0
     Timer { interval: 250; repeat: true; running: win.visible && win.isMac; onTriggered: win.tabInset = backend.nativeTabInset() }
@@ -206,7 +205,7 @@ ApplicationWindow {
     WorkspaceLayout {
         id: workspaceLayout
         objectName: "workspaceLayout"
-        availableWidth: Math.max(0, win.width - 24)
+        availableWidth: Math.max(0, win.width - 3)
         activeSurface: win.lastWritingSurface
     }
     Connections {
@@ -217,7 +216,13 @@ ApplicationWindow {
         function onEffectiveLayoutModeChanged() { Qt.callLater(win.rescueHiddenWorkspaceFocus); }
     }
     readonly property var workspacePaneState: workspaceLayout.saveState()
-    function restoreWorkspacePaneState(state) { workspaceLayout.restoreState(state); }
+    // The approved presentation is adopted once, including checkpointed windows.
+    // Future launches restore each window's subsequently chosen layout as usual.
+    readonly property bool adoptReferenceWorkspace: typeof referenceWorkspaceUpgrade !== "undefined" && referenceWorkspaceUpgrade
+    function restoreWorkspacePaneState(state) {
+        workspaceLayout.restoreState(state);
+        if (adoptReferenceWorkspace) applyReferenceWorkspace();
+    }
     function openAnchoredMenu(menu, anchor) {
         var point = anchor.mapToItem(win.contentItem, 0, anchor.height + 5);
         menu.parent = win.contentItem;
@@ -276,6 +281,27 @@ ApplicationWindow {
         workspaceLayout.visualEditEnabled = false;
         libraryPane.showExcerpts = true;
         libraryPane.dateMode = 1;
+    }
+
+    function applyReferenceWorkspace() {
+        backend.themePreset = "studio";
+        workspaceSettings.writingAppearance = "manuscript";
+        workspaceSettings.writingSize = 16;
+        workspaceSettings.toolbarVisibilityMode = 1;
+        workspaceSettings.toolbarMode = 0;
+        workspaceSettings.titleBarMode = 1;
+        workspaceSettings.typewriter = false;
+        workspaceSettings.showMarkup = false;
+        workspaceLayout.restoreState({ version: 1, organizerVisible: true, filesVisible: true,
+            layoutMode: 0, visualEditEnabled: false, organizerWidth: 184, fileWidth: 232,
+            previewWidth: workspaceLayout.previewWidth });
+        libraryPane.showExcerpts = true;
+        libraryPane.dateMode = 1;
+        libraryPane.showSortBar = true;
+        backend.library.sortMode = 1;
+        backend.library.ascending = false;
+        libraryPane.showFilterBar = false;
+        lastWritingSurface = "source";
     }
 
     Settings {
@@ -679,6 +705,7 @@ ApplicationWindow {
         id: writingOptions
         objectName: "writingOptions"
         width: 270
+        CompactMenuItem { text: "Reference writing layout"; onTriggered: win.applyReferenceWorkspace() }
         CompactMenuItem { text: "Studio writing layout"; onTriggered: win.applyStudioWorkspace() }
         MenuSeparator {}
         x: Math.max(0, win.width - width - 160)
@@ -2430,10 +2457,14 @@ ApplicationWindow {
         anchors.left: parent.left
         anchors.right: parent.right
         orientation: Qt.Horizontal
-        handle: Item {
-            implicitWidth: 8
-            Rectangle { anchors.centerIn: parent; width: 1; height: parent.height; color: SplitHandle.hovered || SplitHandle.pressed ? backend.palette.focus : backend.palette.border }
-            HoverHandler { cursorShape: Qt.SplitHCursor }
+        handle: Rectangle {
+            id: workspaceDivider
+            objectName: "workspaceDivider"
+            implicitWidth: 1
+            color: SplitHandle.hovered || SplitHandle.pressed ? backend.palette.focus : backend.palette.border
+            // A fine visual rule still has a generous mouse target for resizing.
+            containmentMask: Item { x: -4; width: 9; height: workspaceDivider.height }
+            HoverHandler { cursorShape: Qt.SplitHCursor; margin: 4 }
         }
         Item {
             id: organizerSlot
@@ -2458,7 +2489,7 @@ ApplicationWindow {
             objectName: "filesSlot"
             visible: workspaceLayout.effectiveFilesVisible
             SplitView.preferredWidth: workspaceLayout.effectiveFileWidth
-            SplitView.minimumWidth: 240
+            SplitView.minimumWidth: 232
             SplitView.maximumWidth: 420
             LibraryPane {
                 id: libraryPane
@@ -2482,6 +2513,8 @@ ApplicationWindow {
         RowLayout {
             id: documentMeta
             anchors.top: parent.top; anchors.left: parent.left; anchors.right: parent.right
+            objectName: "documentMeta"
+            anchors.topMargin: win.searchOpen ? searchPane.height + 24 : 0
             anchors.leftMargin: 24; anchors.rightMargin: 24; height: 48
             Label {
                 objectName: "topChromeTitle"
@@ -2496,9 +2529,16 @@ ApplicationWindow {
             ChromeButton {
                 id: editorWordCountChip
                 objectName: "editorWordCountChip"
-                visible: win.activeWritingAppearance !== "manuscript"
                 text: win.compactStatistic("words")
-                tonal: true
+                font.pixelSize: 12
+                implicitHeight: 26
+                background: Rectangle {
+                    radius: height / 2
+                    color: editorWordCountChip.down ? backend.palette.controlPressed
+                        : editorWordCountChip.hovered ? backend.palette.controlHover : backend.palette.control
+                    border.width: editorWordCountChip.activeFocus ? 2 : 1
+                    border.color: editorWordCountChip.activeFocus ? backend.palette.focus : backend.palette.border
+                }
                 hint: "Document statistics"
                 Accessible.name: "Document word count: " + text
                 onClicked: workspaceCommands.run("statistics")
@@ -2517,8 +2557,8 @@ ApplicationWindow {
             anchors.fill: parent
             anchors.leftMargin: 24
             anchors.rightMargin: 24
-            anchors.bottomMargin: 34
-            anchors.topMargin: win.searchOpen ? searchPane.height + 24 : documentMeta.height
+            anchors.bottomMargin: 38
+            anchors.topMargin: documentMeta.y + documentMeta.height
             clip: true
             contentWidth: width
             contentHeight: Math.max(height, editor.y + editor.implicitHeight + (workspaceSettings.typewriter ? height / 2 : 220))
@@ -2714,7 +2754,7 @@ ApplicationWindow {
             Accessible.name: "Markdown editor"
                 x: Math.round((editorFlick.width - width) / 2)
                 y: workspaceSettings.typewriter ? editorFlick.height / 2
-                    : win.scaledSize(editorPane.height < 600 ? 24 : 36)
+                    : win.scaledSize(38)
                 width: win.editorWidth
                 height: Math.max(editorFlick.height - y - 96, implicitHeight + 20)
                 text: ""
@@ -3006,19 +3046,40 @@ ApplicationWindow {
         }
 
         Rectangle {
+            objectName: "sourceFooter"
             anchors.left: parent.left; anchors.right: parent.right; anchors.bottom: parent.bottom
             height: 38
             color: backend.palette.page
             Rectangle { width: parent.width; height: 1; color: backend.palette.border }
             RowLayout {
-                anchors.fill: parent; anchors.leftMargin: 12; anchors.rightMargin: 12; spacing: 6
-                Label { visible: workspaceSettings.toolbarMode !== 1; text: "Source"; color: backend.palette.muted; font.pixelSize: 12 }
-                ChromeButton { visible: workspaceSettings.toolbarMode !== 1; text: win.activeWritingAppearance === "editorial" ? "Editorial" : win.activeWritingAppearance === "book" ? "Book" : "Manuscript"; hint: "Writing appearance"; onClicked: win.openAnchoredMenu(writingOptions, this) }
+                anchors.fill: parent; anchors.leftMargin: 24; anchors.rightMargin: 24; spacing: 8
+                ChromeButton {
+                    objectName: "sourceModeButton"
+                    visible: workspaceSettings.toolbarMode !== 1
+                    text: "Source · " + (win.activeWritingAppearance === "editorial" ? "Editorial" : win.activeWritingAppearance === "book" ? "Book" : "Manuscript")
+                    font.pixelSize: 12; leftPadding: 0; rightPadding: 0
+                    hint: "Writing mode — " + backend.status
+                    onClicked: win.openAnchoredMenu(sourceModeMenu, this)
+                }
                 Item { Layout.fillWidth: true }
                 ChromeButton { objectName: "toolbarStatistic"; visible: workspaceSettings.toolbarMode === 1; text: win.compactToolbarStatistics(); hint: text; Layout.fillWidth: true; onClicked: workspaceCommands.run("statistics") }
-                ChromeButton { objectName: "sourceVisualEditButton"; visible: workspaceSettings.toolbarMode !== 1; text: "Visual Edit"; tonal: true; hint: "Edit supported rendered text"; onClicked: win.selectWritingMode("visual") }
-                ChromeButton { visible: workspaceSettings.toolbarMode !== 1; text: "Split"; tonal: true; checked: workspaceLayout.layoutMode === 1; hint: "Source and preview side by side"; onClicked: workspaceLayout.layoutMode = workspaceLayout.layoutMode === 1 ? 0 : 1 }
+                ChromeButton {
+                    objectName: "sourceAppearanceButton"
+                    visible: workspaceSettings.toolbarMode !== 1
+                    text: (win.activeWritingAppearance === "editorial" ? "Editorial" : win.activeWritingAppearance === "book" ? "Book" : "Manuscript") + "⌄"
+                    font.pixelSize: 12; rightPadding: 0
+                    hint: "Writing appearance"
+                    onClicked: win.openAnchoredMenu(writingOptions, this)
+                }
             }
+        }
+        CompactMenu {
+            id: sourceModeMenu
+            width: 220
+            CompactMenuItem { text: "Source"; checkable: true; checked: workspaceLayout.layoutMode === 0; onTriggered: win.selectWritingMode("source") }
+            CompactMenuItem { objectName: "sourceVisualEditButton"; text: "Visual Edit"; onTriggered: win.selectWritingMode("visual") }
+            CompactMenuItem { text: "Split"; checkable: true; checked: workspaceLayout.layoutMode === 1; onTriggered: workspaceLayout.layoutMode = 1 }
+            CompactMenuItem { text: "Preview"; onTriggered: win.selectWritingMode("preview") }
         }
 
 
@@ -3028,22 +3089,18 @@ ApplicationWindow {
             anchors.left: parent.left
             anchors.right: parent.right
             anchors.topMargin: 12
-            anchors.leftMargin: 12
-            anchors.rightMargin: 12
-            height: win.scaledSize(win.replaceOpen ? 104 : 56)
+            anchors.leftMargin: 20
+            anchors.rightMargin: 20
+            height: win.scaledSize(win.replaceOpen ? 88 : 36)
             visible: win.searchOpen
             z: 10
-            leftPadding: 16
-            rightPadding: 8
+            leftPadding: 0
+            rightPadding: 0
             topPadding: 0
             bottomPadding: 0
-            Material.elevation: 8
+            Material.elevation: 0
 
-            background: Rectangle {
-                radius: 9
-                color: backend.palette.popover
-                border.color: backend.palette.border
-            }
+            background: Item {}
 
             RowLayout {
                 anchors.fill: parent
@@ -3052,12 +3109,19 @@ ApplicationWindow {
                 Item {
                     Layout.fillWidth: true
                     Layout.fillHeight: true
+                    Rectangle {
+                        anchors.fill: parent
+                        radius: 8
+                        color: backend.palette.library
+                        border.color: backend.palette.border
+                    }
 
                     TextInput {
                         id: searchField
                         objectName: "searchField"
                         anchors.left: parent.left
                         anchors.right: parent.right
+                        anchors.leftMargin: 8; anchors.rightMargin: 8
                         anchors.top: parent.top
                         height: win.replaceOpen ? parent.height / 2 : parent.height
                         verticalAlignment: TextInput.AlignVCenter
@@ -3065,7 +3129,7 @@ ApplicationWindow {
                         color: win.textColor
                         selectionColor: win.selectionFill
                         selectedTextColor: "#ffffff"
-                        font.pixelSize: win.scaledSize(17)
+                        font.pixelSize: win.scaledSize(13)
                         clip: true
                         onTextChanged: win.updateSearch()
                         Keys.onReturnPressed: function(event) {
@@ -3083,6 +3147,7 @@ ApplicationWindow {
                         objectName: "replaceField"
                         anchors.left: parent.left
                         anchors.right: parent.right
+                        anchors.leftMargin: 8; anchors.rightMargin: 8
                         anchors.bottom: parent.bottom
                         height: parent.height / 2
                         visible: win.replaceOpen
@@ -3090,28 +3155,31 @@ ApplicationWindow {
                         color: win.textColor
                         selectionColor: win.selectionFill
                         selectedTextColor: "#ffffff"
-                        font.pixelSize: win.scaledSize(17)
+                        font.pixelSize: win.scaledSize(13)
                         Keys.onReturnPressed: replaceCurrentButton.clicked()
                     }
 
                     Label {
+                        x: 8
                         anchors.verticalCenter: replaceField.verticalCenter
                         text: "Replace with"
                         visible: win.replaceOpen && replaceField.text.length === 0
                         color: win.mutedColor
-                        font.pixelSize: win.scaledSize(17)
+                        font.pixelSize: win.scaledSize(13)
                     }
 
                     Label {
+                        x: 8
                         anchors.verticalCenter: searchField.verticalCenter
-                        text: "Find"
+                        text: "Find in document…"
                         visible: searchField.text.length === 0
                         color: win.mutedColor
-                        font.pixelSize: win.scaledSize(17)
+                        font.pixelSize: win.scaledSize(13)
                     }
                 }
 
                 Label {
+                    visible: searchField.text.length > 0
                     Layout.preferredWidth: win.scaledSize(58)
                     Layout.fillHeight: true
                     horizontalAlignment: Text.AlignHCenter
@@ -3120,7 +3188,7 @@ ApplicationWindow {
                         ? "0/0"
                         : (win.searchMatchIndex + 1) + "/" + win.searchMatches.length
                     color: backend.palette.text
-                    font.pixelSize: win.scaledSize(16)
+                    font.pixelSize: win.scaledSize(12)
                 }
 
                 Button {
@@ -3140,13 +3208,15 @@ ApplicationWindow {
                 }
 
                 Rectangle {
+                    visible: searchField.text.length > 0
                     Layout.preferredWidth: 1
-                    Layout.preferredHeight: 34
+                    Layout.preferredHeight: 24
                     color: backend.palette.border
                 }
 
                 SearchIconButton {
                     iconName: "up"
+                    visible: searchField.text.length > 0
                     Accessible.name: "Previous match"
                     iconColor: backend.palette.text
                     onClicked: win.moveSearch(-1)
@@ -3154,6 +3224,7 @@ ApplicationWindow {
 
                 SearchIconButton {
                     iconName: "down"
+                    visible: searchField.text.length > 0
                     Accessible.name: "Next match"
                     iconColor: backend.palette.text
                     onClicked: win.moveSearch(1)
@@ -3237,6 +3308,7 @@ ApplicationWindow {
             workspaceSettings.titleBarMode = 1;
         if (workspaceSettings.toolbarVisibilityMode < 0 || workspaceSettings.toolbarVisibilityMode > 2)
             workspaceSettings.toolbarVisibilityMode = 1;
+        if (adoptReferenceWorkspace) applyReferenceWorkspace();
         Qt.callLater(win.refreshDocumentStatistics);
         var geometry = backend.windowGeometry();
         if (geometry.x >= 0) x = geometry.x;

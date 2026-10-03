@@ -48,7 +48,7 @@ QtObject {
     function minimumAt(level) {
         var mode = modeAt(level)
         return (organizerVisible && level < 1 ? 184 : 0)
-                + (filesVisible && level < 2 ? 240 : 0)
+                + (filesVisible && level < 2 ? 232 : 0)
                 + (mode === 1 ? 800 : mode === 2 ? 320 : 480)
     }
 
@@ -76,14 +76,14 @@ QtObject {
         var showFiles = filesVisible && level < 2
         var mode = modeAt(level)
         var organizer = showOrganizer ? boundedWidth(organizerWidth, 184, 288, 208) : 0
-        var files = showFiles ? boundedWidth(fileWidth, 240, 420, 288) : 0
+        var files = showFiles ? boundedWidth(fileWidth, 232, 420, 288) : 0
         var preview = mode === 1 ? boundedWidth(previewWidth, 320, 2400, 420) : 0
         var documentMinimum = mode === 2 ? 320 : 480
         var excess = Math.max(0, organizer + files + preview + documentMinimum - width)
         var reduction = showOrganizer ? Math.min(excess, organizer - 184) : 0
         organizer -= reduction
         excess -= reduction
-        reduction = showFiles ? Math.min(excess, files - 240) : 0
+        reduction = showFiles ? Math.min(excess, files - 232) : 0
         files -= reduction
         excess -= reduction
         reduction = mode === 1 ? Math.min(excess, preview - 320) : 0
@@ -100,7 +100,7 @@ QtObject {
         if (pane === "organizer")
             organizerWidth = boundedWidth(width, 184, 288, organizerWidth)
         else if (pane === "files")
-            fileWidth = boundedWidth(width, 240, 420, fileWidth)
+            fileWidth = boundedWidth(width, 232, 420, fileWidth)
         else if (pane === "preview")
             previewWidth = boundedWidth(width, 320, 2400, previewWidth)
     }
@@ -109,7 +109,7 @@ QtObject {
         return { version: 1, organizerVisible: organizerVisible, filesVisible: filesVisible,
             layoutMode: desiredMode(), visualEditEnabled: visualEditEnabled,
             organizerWidth: boundedWidth(organizerWidth, 184, 288, 208),
-            fileWidth: boundedWidth(fileWidth, 240, 420, 288),
+            fileWidth: boundedWidth(fileWidth, 232, 420, 288),
             previewWidth: boundedWidth(previewWidth, 320, 2400, 420) }
     }
 
@@ -123,7 +123,7 @@ QtObject {
                 && state.layoutMode >= 0 && state.layoutMode <= 2 ? state.layoutMode : 1
         visualEditEnabled = typeof state.visualEditEnabled === "boolean" ? state.visualEditEnabled : false
         organizerWidth = boundedWidth(state.organizerWidth, 184, 288, 208)
-        fileWidth = boundedWidth(state.fileWidth, 240, 420, 288)
+        fileWidth = boundedWidth(state.fileWidth, 232, 420, 288)
         previewWidth = boundedWidth(state.previewWidth, 320, 2400, 420)
         _batching = false
         recalculate(true)

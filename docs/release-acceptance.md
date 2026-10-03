@@ -2,7 +2,7 @@
 
 ## Current follow-through — Cycles 98–102
 
-The current review target is application `0.3.0-dev3`, macOS `0.3.0 (102)`. Cycle 102 addresses disappearing pane controls, View menu organization and Preview template access; verification and installed bundle identities are in the [Cycle 102 handoff](../research/cycle-102/README.md). This section narrows specific historical gaps; it does not recertify the full menu matrix.
+The current review target is application `0.3.0-dev4`, macOS `0.3.0 (103)`. Cycle 103 brings the approved workspace concept into the actual native UI and adopts its source-writing presentation on upgrade. See [Cycle 103](../research/cycle-103/README.md) for evidence. This records the affected workflows; it does not recertify the full historical menu matrix.
 
 | Area | New bounded evidence | Still open |
 | --- | --- | --- |

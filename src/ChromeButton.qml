@@ -13,6 +13,7 @@ Button {
     property int tooltipDelay: 700
     font.family: Qt.application.font.family
     font.pixelSize: 13
+    font.weight: Font.Normal
     implicitHeight: 28
     implicitWidth: Math.max(28, label.implicitWidth + (iconName ? 16 + (text ? 8 : 0) : 0) + 16)
     padding: 0

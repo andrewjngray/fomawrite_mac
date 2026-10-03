@@ -16,6 +16,7 @@ Rectangle {
         category: "organizerSections"
         property bool favoritesExpanded: true
         property bool recentsExpanded: true
+        property bool tagsExpanded: false
     }
     signal searchRequested(string query, bool contents, url folder)
     signal openRequested(url file)
@@ -26,17 +27,45 @@ Rectangle {
         else openRequested(entry.url);
     }
     LibraryContextMenu { id: contextMenu; library: root.library; commands: root.commands; darkMode: root.darkMode }
-    component OrganizerEntry: RowLayout {
+    component OrganizerSection: ChromeButton {
+        id: sectionButton
+        implicitHeight: 20
+        font.pixelSize: 12
+        font.weight: Font.Medium
+        alignLeft: true
+        darkMode: root.darkMode
+        contentItem: Item {
+            Text {
+                anchors.fill: parent
+                anchors.rightMargin: 16
+                text: sectionButton.text
+                font: sectionButton.font
+                color: backend.palette.muted
+                elide: Text.ElideRight
+                verticalAlignment: Text.AlignVCenter
+            }
+            LineIcon {
+                width: 12; height: 12
+                anchors.right: parent.right
+                anchors.verticalCenter: parent.verticalCenter
+                name: sectionButton.iconName
+                ink: backend.palette.muted
+                opacity: sectionButton.hovered || sectionButton.activeFocus ? 1 : 0
+            }
+        }
+    }
+    component OrganizerEntry: Item {
         id: shortcutRow
         required property var entryData
         property string shortcutKind: ""
         Layout.fillWidth: true
-        spacing: 0
+        implicitHeight: 30
         HoverHandler { id: rowHover }
         ChromeButton {
             id: shortcutButton
-            Layout.fillWidth: true
-            Layout.minimumWidth: 0
+            anchors.fill: parent
+            rightPadding: 30
+            implicitHeight: 30
             text: shortcutRow.entryData.name
             iconName: shortcutRow.entryData.directory ? "folder" : "editor"
             iconColor: shortcutRow.entryData.available
@@ -64,7 +93,11 @@ Rectangle {
         }
         ChromeButton {
             visible: shortcutRow.shortcutKind === "location" || shortcutRow.shortcutKind === "favorite"
-            implicitWidth: 24
+            width: 24
+            height: 24
+            anchors.right: parent.right
+            anchors.rightMargin: 3
+            anchors.verticalCenter: parent.verticalCenter
             iconName: "close"
             darkMode: root.darkMode
             opacity: rowHover.hovered || shortcutButton.activeFocus || activeFocus ? 1 : 0
@@ -83,17 +116,20 @@ Rectangle {
     ScrollView {
         id: organizerScroll
         anchors.fill: parent
-        anchors.margins: 8
+        anchors.leftMargin: 8
+        anchors.rightMargin: 8
+        anchors.topMargin: 20
+        anchors.bottomMargin: 8
         contentWidth: availableWidth
         clip: true
         ColumnLayout {
             width: organizerScroll.availableWidth
-            spacing: 2
+            spacing: 0
             RowLayout {
                 Layout.fillWidth: true
-                Layout.bottomMargin: 6
+                Layout.bottomMargin: 8
                 Label {
-                    text: "Locations"
+                    text: "Library"
                     font.family: Qt.application.font.family
                     font.pixelSize: 12
                     font.weight: Font.Medium
@@ -101,7 +137,7 @@ Rectangle {
                     Layout.leftMargin: 8
                     Layout.fillWidth: true
                 }
-                ChromeButton { darkMode: root.darkMode; iconName: "plus"; hint: "Add library location"; onClicked: locationDialog.open() }
+                ChromeButton { darkMode: root.darkMode; implicitHeight: 20; implicitWidth: 24; iconName: "plus"; hint: "Add library location"; onClicked: locationDialog.open() }
             }
             Repeater {
                 model: root.library.locations
@@ -111,20 +147,27 @@ Rectangle {
                     shortcutKind: "location"
                 }
             }
-            ChromeButton {
-                objectName: "favoritesDisclosure"
-                Layout.topMargin: 14
-                Layout.bottomMargin: 6
+            RowLayout {
+                Layout.topMargin: 20
+                Layout.bottomMargin: 8
                 Layout.fillWidth: true
-                text: "Favorites"
-                hint: (sectionSettings.favoritesExpanded ? "Collapse" : "Expand") + " Favorites"
-                iconName: sectionSettings.favoritesExpanded ? "down" : "right"
-                iconColor: backend.palette.muted
-                alignLeft: true
-                darkMode: root.darkMode
-                font.pixelSize: 12
-                font.weight: Font.Medium
-                onClicked: sectionSettings.favoritesExpanded = !sectionSettings.favoritesExpanded
+                OrganizerSection {
+                    objectName: "favoritesDisclosure"
+                    Layout.fillWidth: true
+                    text: "Favorites"
+                    hint: (sectionSettings.favoritesExpanded ? "Collapse" : "Expand") + " Favorites"
+                    iconName: sectionSettings.favoritesExpanded ? "down" : "right"
+                    onClicked: sectionSettings.favoritesExpanded = !sectionSettings.favoritesExpanded
+                }
+                ChromeButton {
+                    id: favoriteActions
+                    implicitHeight: 20
+                    implicitWidth: 24
+                    iconName: "plus"
+                    hint: "Add a favorite folder or document"
+                    darkMode: root.darkMode
+                    onClicked: favoriteMenu.open()
+                }
             }
             ColumnLayout {
                 objectName: "favoritesContents"
@@ -139,8 +182,6 @@ Rectangle {
                         shortcutKind: "favorite"
                     }
                 }
-                ChromeButton { text: "Favorite folder"; iconName: "plus"; alignLeft: true; darkMode: root.darkMode; Layout.fillWidth: true; onClicked: root.library.toggleFavorite(root.library.rootFolder); enabled: root.library.rootFolder.toString() !== "" }
-                ChromeButton { text: "Favorite document"; iconName: "plus"; alignLeft: true; darkMode: root.darkMode; Layout.fillWidth: true; enabled: root.currentFile.toString() !== ""; onClicked: root.library.toggleFavorite(root.currentFile) }
             }
             Label {
                 text: "Smart folders"
@@ -149,14 +190,15 @@ Rectangle {
                 font.pixelSize: 12
                 font.weight: Font.Medium
                 Layout.leftMargin: 8
-                Layout.topMargin: 16
-                Layout.bottomMargin: 6
+                Layout.topMargin: 20
+                Layout.bottomMargin: 8
             }
             Repeater {
                 model: root.library.savedSearches
                 delegate: ChromeButton {
                     required property var modelData
                     Layout.fillWidth: true
+                    implicitHeight: 30
                     alignLeft: true
                     iconName: "search"
                     darkMode: root.darkMode
@@ -178,30 +220,59 @@ Rectangle {
             }
             RowLayout {
                 Layout.fillWidth: true
-                Layout.topMargin: 16
-                Layout.bottomMargin: 6
-                Label { text: "Tags"; font.family: Qt.application.font.family; font.pixelSize: 12; font.weight: Font.Medium; color: backend.palette.muted; Layout.leftMargin: 8; Layout.fillWidth: true }
-                ChromeButton { iconName: "refresh"; hint: "Scan saved files for tags"; darkMode: root.darkMode; onClicked: root.library.refreshTags() }
-            }
-            Label { text: root.library.tagStatus; wrapMode: Text.Wrap; Layout.fillWidth: true; Layout.leftMargin: 8; Layout.rightMargin: 8; color: backend.palette.muted; font.family: Qt.application.font.family; font.pixelSize: 12 }
-            Repeater {
-                model: root.library.tagIndex
-                delegate: ChromeButton {
-                    required property var modelData
+                Layout.topMargin: 20
+                Layout.bottomMargin: 8
+                OrganizerSection {
+                    objectName: "tagsDisclosure"
+                    text: "Tags"
                     Layout.fillWidth: true
-                    alignLeft: true
-                    iconName: "tag"
+                    hint: (sectionSettings.tagsExpanded ? "Collapse" : "Expand") + " Tags"
+                    iconName: sectionSettings.tagsExpanded ? "down" : "right"
+                    onClicked: sectionSettings.tagsExpanded = !sectionSettings.tagsExpanded
+                }
+                ChromeButton {
+                    implicitHeight: 20
+                    implicitWidth: 24
+                    iconName: "refresh"
+                    hint: "Scan saved files for tags"
                     darkMode: root.darkMode
-                    text: "#" + modelData.tag + " (" + modelData.count + ")"
-                    hint: "Search saved files for #" + modelData.tag
-                    onClicked: root.searchRequested("#" + modelData.tag, true, root.library.rootFolder)
+                    onClicked: { sectionSettings.tagsExpanded = true; root.library.refreshTags() }
+                }
+            }
+            ColumnLayout {
+                visible: sectionSettings.tagsExpanded
+                Layout.fillWidth: true
+                spacing: 0
+                Label {
+                    text: root.library.tagStatus
+                    wrapMode: Text.Wrap
+                    Layout.fillWidth: true
+                    Layout.leftMargin: 8
+                    Layout.rightMargin: 8
+                    color: backend.palette.muted
+                    font.family: Qt.application.font.family
+                    font.pixelSize: 12
+                }
+                Repeater {
+                    model: root.library.tagIndex
+                    delegate: ChromeButton {
+                        required property var modelData
+                        Layout.fillWidth: true
+                        implicitHeight: 30
+                        alignLeft: true
+                        iconName: "tag"
+                        darkMode: root.darkMode
+                        text: "#" + modelData.tag + " (" + modelData.count + ")"
+                        hint: "Search saved files for #" + modelData.tag
+                        onClicked: root.searchRequested("#" + modelData.tag, true, root.library.rootFolder)
+                    }
                 }
             }
             RowLayout {
                 Layout.fillWidth: true
-                Layout.topMargin: 14
-                Layout.bottomMargin: 6
-                ChromeButton {
+                Layout.topMargin: 20
+                Layout.bottomMargin: 8
+                OrganizerSection {
                     objectName: "recentsDisclosure"
                     Layout.fillWidth: true
                     text: "Recents"
@@ -214,7 +285,7 @@ Rectangle {
                     font.weight: Font.Medium
                     onClicked: sectionSettings.recentsExpanded = !sectionSettings.recentsExpanded
                 }
-                ChromeButton { id: recentActions; darkMode: root.darkMode; iconName: "more"; hint: "Recent file options"; onClicked: recentMenu.open() }
+                ChromeButton { id: recentActions; implicitHeight: 20; implicitWidth: 24; darkMode: root.darkMode; iconName: "more"; hint: "Recent file options"; onClicked: recentMenu.open() }
             }
             ColumnLayout {
                 objectName: "recentsContents"
@@ -229,6 +300,22 @@ Rectangle {
                     }
                 }
             }
+        }
+    }
+    CompactMenu {
+        id: favoriteMenu
+        parent: favoriteActions
+        y: favoriteActions.height + 3
+        darkMode: root.darkMode
+        CompactMenuItem {
+            text: "Favorite current folder"
+            enabled: root.library.rootFolder.toString() !== ""
+            onTriggered: root.library.toggleFavorite(root.library.rootFolder)
+        }
+        CompactMenuItem {
+            text: "Favorite current document"
+            enabled: root.currentFile.toString() !== ""
+            onTriggered: root.library.toggleFavorite(root.currentFile)
         }
     }
     CompactMenu {

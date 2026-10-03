@@ -1347,3 +1347,12 @@ Planned scope: address Andrew’s 4 October review of vanished collapse controls
 Changes: retain independent reopen buttons in the surviving document header, including faded/hidden toolbar and compact Drawer layouts; lead View with Toggle Library / Toggle Organizer; isolate Template below writing controls; turn the Preview template label into a compact dropdown sharing the backend output style. No document rewriting.
 
 Verification: final build and **137 regression tests pass**; native control tests pass **5/0/0**, and the native workspace fixture passes **111 assertions**. Dev, demo/package and Applications are synchronized to `0.3.0-dev3`, macOS `0.3.0 (102)`, with strict local signatures verified. See the [Cycle 102 record](../research/cycle-102/README.md). [Optional usability exercise](../research/usability/cycle-102.md). Physical VoiceOver/display checks remain open. Next product scope: review-led image/table/list ergonomics, Cycle 103; Cycle 101 remains optional distribution.
+
+
+## Cycle 103 — implement the approved workspace reference
+
+Scope: Andrew’s side-by-side review showed a material gap between the approved concept and build 102. Replace the remaining native chrome/navigation details and ensure the installed app actually opens in the approved writing composition.
+
+Changes: single aligned pane rules with generous invisible resize targets; original tabbed blue folder and pane/compose glyphs; 32px circular tools and divided capsules; regular-weight UI labels; dated document cards drawn from bounded local-file summaries; quiet library caption and preserved folder/list actions; warm Manuscript source editing with controlled line length, word-count pill, quiet search and footer. A one-time, per-copy presentation migration applies Source/Manuscript and cards across restored windows while preserving documents, recovery, output templates and future user preferences. The explicit Aa → Reference writing layout action remains available.
+
+Validation and native screenshot evidence are recorded in [Cycle 103](../research/cycle-103/README.md). Runnable artifacts: stable Dev, ordinary demo/package and Applications, version `0.3.0-dev4` / macOS `0.3.0 (103)`. Andrew’s visual sign-off and physical VoiceOver/display checks remain open. [Optional exercise](../research/usability/cycle-103.md). Next cycle should follow his visual review before broadening image/table/list work; optional distribution Cycle 101 remains separate.

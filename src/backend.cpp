@@ -57,7 +57,9 @@
 #include "markdownhighlighter.h"
 #include "visualtexthighlighter.h"
 
-constexpr qreal sourceLineHeightPercent = 150;
+// Qt proportional height includes font leading; 130% gives the reference
+// manuscript a roughly 1.55em baseline interval (17px Menlo ≈ 26px).
+constexpr qreal sourceLineHeightPercent = 130;
 const QString lastSaveDirectorySetting = QStringLiteral("file/lastSaveDirectory");
 
 namespace {
@@ -571,7 +573,7 @@ QVariantMap Backend::palette() const {
             {"selectedRow", "#D7DADE"}, {"control", "#F9F9F8"},
             {"controlHover", "#E2E5E9"}, {"controlPressed", "#C7CDD4"},
             {"controlSelected", "#CEDAEB"}, {"controlBorder", "#6B7078"},
-            {"focus", "#285E9E"}, {"folder", "#087FA9"},
+            {"focus", studio ? "#2479B8" : "#285E9E"}, {"folder", studio ? "#177CAA" : "#087FA9"},
             {"inactiveText", "#555B63"}, {"inactiveMuted", "#62666D"},
             {"inactiveSelectedRow", "#DFE1E4"}};
     }

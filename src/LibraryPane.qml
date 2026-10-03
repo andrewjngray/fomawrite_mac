@@ -39,6 +39,18 @@ Rectangle {
             }
         }
     }
+    readonly property int documentCount: {
+        var count = 0
+        for (var i = 0; i < root.library.entries.length; ++i)
+            if (!root.library.entries[i].directory) ++count
+        return count
+    }
+    readonly property string sortingCaption: {
+        if (root.library.sortMode === 1) return root.library.ascending ? "Modified earlier" : "Modified recently"
+        if (root.library.sortMode === 2) return root.library.ascending ? "Created earlier" : "Created recently"
+        if (root.library.sortMode === 3) return "By file type"
+        return root.library.ascending ? "By name · A–Z" : "By name · Z–A"
+    }
     signal openRequested(url file)
     signal createRequested(string name, bool inNewWindow)
     color: backend.palette.library
@@ -59,8 +71,11 @@ Rectangle {
     LibraryContextMenu { id: contextMenu; library: root.library; commands: root.commands; darkMode: root.darkMode }
     ColumnLayout {
         anchors.fill: parent
-        anchors.margins: 8
-        spacing: 8
+        anchors.leftMargin: 8
+        anchors.rightMargin: 8
+        anchors.topMargin: 20
+        anchors.bottomMargin: 8
+        spacing: 10
         RowLayout {
             objectName: "librarySortBar"
             visible: displaySettings.showSortBar
@@ -68,35 +83,48 @@ Rectangle {
             ChromeButton {
                 id: sortButton
                 objectName: "librarySort"
-                implicitHeight: 28
-                implicitWidth: sortLabel.implicitWidth + 34
-                text: "Sort by " + ["Name", "Date Modified", "Date Created", "Extension"][root.library.sortMode]
+                Layout.fillWidth: true
+                Layout.minimumWidth: 0
+                implicitHeight: 20
+                text: root.sortingCaption
+                hint: "Sort documents and change list options"
                 darkMode: root.darkMode
+                alignLeft: true
+                font.pixelSize: 12
                 onClicked: sortMenu.open()
-                contentItem: RowLayout {
-                    spacing: 3
-                    Text { id: sortLabel; text: sortButton.text; font.family: Qt.application.font.family; font.pixelSize: 12; color: backend.palette.muted }
-                    LineIcon { name: "down"; ink: backend.palette.muted; Layout.preferredWidth: 12; Layout.preferredHeight: 12 }
-                }
-                background: Rectangle {
-                    radius: 6
-                    color: sortButton.down ? (backend.palette.controlPressed || backend.palette.selectedRow)
-                        : sortButton.hovered ? (backend.palette.controlHover || backend.palette.hover)
-                        : (backend.palette.control || backend.palette.field)
-                    border.width: sortButton.activeFocus ? 2 : 1
-                    border.color: sortButton.activeFocus ? backend.palette.focus : backend.palette.border
+                contentItem: Text {
+                    text: sortButton.text
+                    font: sortButton.font
+                    color: backend.palette.muted
+                    elide: Text.ElideRight
+                    verticalAlignment: Text.AlignVCenter
                 }
             }
-            Item { Layout.fillWidth: true }
             ChromeButton {
+                id: excerptToggle
                 objectName: "libraryPreviewToggle"
-                text: "Previews"
-                hint: "Show or hide file text previews"
-                implicitHeight: 28
+                text: root.documentCount + (root.documentCount === 1 ? " document" : " documents")
+                hint: displaySettings.showExcerpts ? "Hide document text previews" : "Show document text previews"
+                Accessible.name: hint
+                implicitHeight: 20
+                font.pixelSize: 12
                 darkMode: root.darkMode
                 checkable: true
                 checked: displaySettings.showExcerpts
                 onClicked: root.commands.run("excerpts")
+                contentItem: Text {
+                    objectName: "libraryDocumentCount"
+                    text: excerptToggle.text
+                    font: excerptToggle.font
+                    color: backend.palette.muted
+                    verticalAlignment: Text.AlignVCenter
+                }
+                background: Rectangle {
+                    radius: 6
+                    color: excerptToggle.down ? backend.palette.selectedRow : excerptToggle.hovered ? backend.palette.hover : "transparent"
+                    border.width: excerptToggle.activeFocus ? 2 : 0
+                    border.color: backend.palette.focus
+                }
             }
         }
         Label {
@@ -116,85 +144,117 @@ Rectangle {
             model: root.library.entries
             boundsBehavior: Flickable.StopAtBounds
             ScrollBar.vertical: ScrollBar { id: fileScrollBar }
+            TapHandler {
+                acceptedButtons: Qt.RightButton
+                onTapped: (eventPoint) => {
+                    if (fileList.indexAt(eventPoint.position.x + fileList.contentX, eventPoint.position.y + fileList.contentY) < 0)
+                        folderMenu.popup(fileList, eventPoint.position.x, eventPoint.position.y)
+                }
+            }
+            spacing: displaySettings.showExcerpts ? 4 : 0
             delegate: ItemDelegate {
                 id: entry
+                objectName: "libraryEntry"
                 required property var modelData
+                readonly property bool documentCard: !modelData.directory && displaySettings.showExcerpts
+                readonly property var summary: documentCard ? root.library.documentSummary(modelData.url) : ({})
                 width: Math.max(0, fileList.width - (fileScrollBar.size < 1 ? 12 : 0))
-                height: modelData.directory || !displaySettings.showExcerpts ? 28 : 72
-                topPadding: modelData.directory || !displaySettings.showExcerpts ? 0 : 8
+                height: documentCard ? cardContent.implicitHeight + topPadding + bottomPadding : 30
+                topPadding: documentCard ? 14 : 0
                 bottomPadding: topPadding
-                rightPadding: 8
+                rightPadding: documentCard ? 12 : 8
                 font.family: Qt.application.font.family
                 font.pixelSize: 13
                 focusPolicy: Qt.StrongFocus
-                leftPadding: 8 + modelData.depth * 16
+                leftPadding: (documentCard ? 12 : 8) + modelData.depth * 16
                 highlighted: !modelData.directory && modelData.url.toString() === root.currentFile.toString()
-                Accessible.name: modelData.name
+                Accessible.name: documentCard && summary.title ? summary.title : modelData.name
                 Accessible.selected: highlighted
-                Accessible.description: modelData.directory ? "Folder" : "Markdown or text document"
+                Accessible.description: modelData.directory ? "Folder" : modelData.name
                 onClicked: {
                     if (modelData.directory) root.library.toggleFolder(modelData.url)
                     else root.openRequested(modelData.url)
                 }
                 background: Rectangle {
-                    radius: 6
+                    radius: entry.documentCard ? 8 : 6
                     color: entry.down ? (backend.palette.controlPressed || backend.palette.selectedRow)
                         : entry.highlighted ? backend.palette.selectedRow
                         : entry.hovered ? backend.palette.hover : "transparent"
                     border.width: entry.activeFocus ? 2 : 0
                     border.color: backend.palette.focus
                 }
-                contentItem: RowLayout {
-                    spacing: 8
-                    LineIcon {
-                        name: entry.modelData.directory ? "folder" : "editor"
-                        ink: entry.modelData.directory ? backend.palette.folder : backend.palette.muted
-                        Layout.preferredWidth: 16
-                        Layout.preferredHeight: 16
-                    }
-                    ColumnLayout {
-                        spacing: 3
+                contentItem: ColumnLayout {
+                    id: cardContent
+                    spacing: entry.documentCard ? 4 : 0
+                    Label {
+                        objectName: "libraryEntryDate"
+                        visible: entry.documentCard && displaySettings.dateMode !== 0
+                        text: displaySettings.dateMode === 2 ? entry.modelData.createdLabel : entry.modelData.modifiedLabel
                         Layout.fillWidth: true
                         Layout.minimumWidth: 0
-                        RowLayout {
-                            Layout.fillWidth: true
-                            Layout.minimumWidth: 0
-                            Label {
-                                text: entry.modelData.name
-                                font.family: Qt.application.font.family
-                                font.pixelSize: 13
-                                font.weight: displaySettings.showExcerpts && !entry.modelData.directory ? Font.Medium : Font.Normal
-                                color: backend.palette.text
-                                elide: Text.ElideMiddle
-                                Layout.fillWidth: true
-                                Layout.minimumWidth: 0
-                            }
-                            Label {
-                                visible: !entry.modelData.directory && displaySettings.dateMode !== 0
-                                text: displaySettings.dateMode === 2 ? entry.modelData.created : entry.modelData.modified
-                                elide: Text.ElideRight
-                                Layout.minimumWidth: 0
-                                Layout.maximumWidth: Math.max(0, entry.width * 0.35)
-                                font.family: Qt.application.font.family
-                                font.pixelSize: 12
-                                color: backend.palette.muted
-                            }
+                        Layout.bottomMargin: 1
+                        font.family: Qt.application.font.family
+                        font.pixelSize: 11
+                        color: backend.palette.muted
+                        elide: Text.ElideRight
+                    }
+                    RowLayout {
+                        spacing: 8
+                        Layout.fillWidth: true
+                        Layout.minimumWidth: 0
+                        LineIcon {
+                            visible: !entry.documentCard
+                            name: entry.modelData.directory ? "folder" : "editor"
+                            ink: entry.modelData.directory ? backend.palette.folder : backend.palette.muted
+                            Layout.preferredWidth: 16
+                            Layout.preferredHeight: 16
                         }
                         Label {
-                            visible: !entry.modelData.directory && displaySettings.showExcerpts
-                            text: visible ? root.library.excerpt(entry.modelData.url) : ""
-                            elide: Text.ElideRight
-                            wrapMode: Text.Wrap
-                            maximumLineCount: 2
+                            objectName: "libraryEntryTitle"
+                            text: entry.documentCard && entry.summary.title ? entry.summary.title : entry.modelData.name
                             font.family: Qt.application.font.family
-                            font.pixelSize: 12
-                            color: backend.palette.muted
+                            font.pixelSize: 13
+                            font.weight: entry.documentCard ? Font.DemiBold : Font.Normal
+                            color: backend.palette.text
+                            elide: Text.ElideRight
+                            wrapMode: entry.documentCard ? Text.Wrap : Text.NoWrap
+                            maximumLineCount: entry.documentCard ? 2 : 1
                             Layout.fillWidth: true
                             Layout.minimumWidth: 0
-                            Layout.maximumHeight: implicitHeight
+                        }
+                        Label {
+                            visible: !entry.documentCard && !entry.modelData.directory && displaySettings.dateMode !== 0
+                            text: displaySettings.dateMode === 2 ? entry.modelData.created : entry.modelData.modified
+                            elide: Text.ElideRight
+                            Layout.minimumWidth: 0
+                            Layout.maximumWidth: Math.max(0, entry.width * 0.35)
+                            font.family: Qt.application.font.family
+                            font.pixelSize: 11
+                            color: backend.palette.muted
+                        }
+                        LineIcon {
+                            visible: entry.modelData.directory
+                            name: root.library.navigationMode === 0 && entry.modelData.expanded ? "down" : "right"
+                            ink: backend.palette.muted
+                            Layout.preferredWidth: 14
+                            Layout.preferredHeight: 14
                         }
                     }
-                    LineIcon { visible: entry.modelData.directory; name: root.library.navigationMode === 0 && entry.modelData.expanded ? "down" : "right"; ink: backend.palette.muted; Layout.preferredWidth: 14; Layout.preferredHeight: 14 }
+                    Label {
+                        objectName: "libraryEntryExcerpt"
+                        visible: entry.documentCard
+                        text: entry.summary.excerpt || "Empty document"
+                        elide: Text.ElideRight
+                        wrapMode: Text.Wrap
+                        maximumLineCount: 2
+                        lineHeightMode: Text.ProportionalHeight
+                        lineHeight: 1.45
+                        font.family: Qt.application.font.family
+                        font.pixelSize: 13
+                        color: backend.palette.text
+                        Layout.fillWidth: true
+                        Layout.minimumWidth: 0
+                    }
                 }
                 TapHandler {
                     acceptedButtons: Qt.RightButton
@@ -273,18 +333,35 @@ Rectangle {
         CompactMenuItem { text: "Pin Folders to Top"; checkable: true; checked: root.library.foldersFirst; onTriggered: root.commands.run("foldersFirst") }
         MenuSeparator { padding: 4; implicitHeight: 9; contentItem: Rectangle { implicitHeight: 1; color: backend.palette.border } }
         CompactMenu {
-            title: "Show Date"
+            title: "View Options"
             darkMode: root.darkMode
-            CompactMenuItem { text: "Date Modified"; checkable: true; checked: displaySettings.dateMode === 1; onTriggered: root.commands.run("dateModified") }
-            CompactMenuItem { text: "Date Created"; checkable: true; checked: displaySettings.dateMode === 2; onTriggered: root.commands.run("dateCreated") }
-            CompactMenuItem { text: "None"; checkable: true; checked: displaySettings.dateMode === 0; onTriggered: root.commands.run("dateNone") }
+            CompactMenu {
+                title: "Show Date"
+                darkMode: root.darkMode
+                CompactMenuItem { text: "Date Modified"; checkable: true; checked: displaySettings.dateMode === 1; onTriggered: root.commands.run("dateModified") }
+                CompactMenuItem { text: "Date Created"; checkable: true; checked: displaySettings.dateMode === 2; onTriggered: root.commands.run("dateCreated") }
+                CompactMenuItem { text: "None"; checkable: true; checked: displaySettings.dateMode === 0; onTriggered: root.commands.run("dateNone") }
+            }
+            CompactMenuItem { text: "Show Text Excerpts"; checkable: true; checked: displaySettings.showExcerpts; onTriggered: root.commands.run("excerpts") }
+            CompactMenu {
+                title: "Navigation"
+                darkMode: root.darkMode
+                CompactMenuItem { text: "Tree"; checkable: true; checked: root.library.navigationMode === 0; onTriggered: root.commands.run("navigationTree") }
+                CompactMenuItem { text: "List"; checkable: true; checked: root.library.navigationMode === 1; onTriggered: root.commands.run("navigationList") }
+            }
+            MenuSeparator {}
+            CompactMenuItem { text: displaySettings.showFilterBar ? "Hide Filter Bar" : "Show Filter Bar"; onTriggered: root.commands.run("filterBar") }
+            CompactMenuItem { text: "Hide Sort Bar"; onTriggered: root.commands.run("sortBar") }
         }
-        CompactMenuItem { text: "Show Text Excerpts"; checkable: true; checked: displaySettings.showExcerpts; onTriggered: root.commands.run("excerpts") }
+        MenuSeparator { padding: 4; implicitHeight: 9; contentItem: Rectangle { implicitHeight: 1; color: backend.palette.border } }
         CompactMenu {
-            title: "Navigation"
+            title: "Folder actions"
             darkMode: root.darkMode
-            CompactMenuItem { text: "Tree"; checkable: true; checked: root.library.navigationMode === 0; onTriggered: root.commands.run("navigationTree") }
-            CompactMenuItem { text: "List"; checkable: true; checked: root.library.navigationMode === 1; onTriggered: root.commands.run("navigationList") }
+            CompactMenuItem { text: "New File…"; enabled: root.library.rootFolder.toString() !== ""; onTriggered: root.newDocument(false) }
+            CompactMenuItem { text: "New Folder…"; enabled: root.library.rootFolder.toString() !== ""; onTriggered: root.newFolder() }
+            MenuSeparator {}
+            CompactMenuItem { text: "Choose Folder…"; onTriggered: folderDialog.open() }
+            CompactMenuItem { text: "Refresh"; onTriggered: root.library.refresh() }
         }
     }
     LibrarySortMenu {

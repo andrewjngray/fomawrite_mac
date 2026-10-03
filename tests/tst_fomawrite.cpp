@@ -39,6 +39,10 @@ class FomawriteTest : public QObject {
     Q_OBJECT
 
 private slots:
+    void sourceTripleEmphasisKeepsFormattingAndLiteralCode();
+    void referenceWorkspacePresetPreservesDraftAndOutput();
+    void referenceWorkspaceCompositionMatchesConcept();
+    void libraryDocumentCardsReadSourceWithoutChangingFiles();
     void collapsedPaneButtonsRestoreEveryLayout();
     void previewTemplateFooterAndNativeMenuShareState();
     void previewTemplateRemainsReachableInNarrowSplit();
@@ -999,7 +1003,7 @@ private slots:
             QCOMPARE(editor->property("canUndo").toBool(), canUndo);
             QCOMPARE(layout->property("layoutMode").toInt(), originalLayout);
             QCOMPARE(backend.outputStyle(), originalStyle);
-            QCOMPARE(chip->property("visible").toBool(), QString::fromLatin1(entry.second) != QStringLiteral("manuscript"));
+            QVERIFY(chip->property("visible").toBool());
         }
         QTemporaryDir savedDirectory;
         QVERIFY(savedDirectory.isValid());
@@ -5200,6 +5204,8 @@ private:
 };
 
 #include "cycle102-workspace-controls.inc"
+#include "cycle103-concept.inc"
+#include "cycle103-inline.inc"
 #include "cycle100-navigation.inc"
 #include "cycle99-integration.inc"
 #include "sourcevisualmapping-cycle99.inc"

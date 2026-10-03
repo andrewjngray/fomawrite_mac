@@ -335,6 +335,16 @@ void FileLibrary::setFilter(const QString &filter) {
     refresh();
 }
 
+static QString libraryDateLabel(const QDateTime &date) {
+    if (!date.isValid()) return QStringLiteral("Unavailable");
+    const QDate today = QDate::currentDate();
+    const int days = date.date().daysTo(today);
+    if (days == 0) return QStringLiteral("Today");
+    if (days == 1) return QStringLiteral("Yesterday");
+    if (days > 1 && days < 7) return date.toString(QStringLiteral("dddd"));
+    return date.toString(date.date().year() == today.year() ? QStringLiteral("d MMM") : QStringLiteral("d MMM yyyy"));
+}
+
 void FileLibrary::appendDirectory(const QString &path, int depth, QStringList &watched) {
     if (depth > 24 || m_entries.size() >= 10000) return;
     watched.append(path);
@@ -366,6 +376,8 @@ void FileLibrary::appendDirectory(const QString &path, int depth, QStringList &w
             {"url", QUrl::fromLocalFile(childPath)}, {"directory", directory},
             {"depth", depth}, {"expanded", expanded},
             {"modified", info.lastModified().toString("d MMM")},
+            {"modifiedLabel", libraryDateLabel(info.lastModified())},
+            {"createdLabel", libraryDateLabel(created)},
             {"created", created.isValid() ? created.toString("d MMM") : QStringLiteral("Unavailable")}});
         if (expanded) appendDirectory(childPath, depth + 1, watched);
     }
@@ -481,6 +493,42 @@ QString FileLibrary::excerpt(const QUrl &url) const {
     sample.remove(QRegularExpression(QStringLiteral("(?m)^ {0,3}#{1,6} +")));
     sample = sample.simplified();
     return sample.isEmpty() ? QStringLiteral("Empty document") : sample.left(160);
+}
+
+QVariantMap FileLibrary::documentSummary(const QUrl &url) const {
+    if (!url.isLocalFile()) return {};
+    const QFileInfo info(url.toLocalFile());
+    if (!info.isFile() || !containsPath(info.canonicalFilePath()) || !isTextFile(info.fileName())) return {};
+    QFile file(info.absoluteFilePath());
+    if (!file.open(QIODevice::ReadOnly)) return {};
+    // Cards read only a small prefix for visible rows, never rewrite Markdown.
+    QString sample = QString::fromUtf8(file.read(2048));
+    sample.replace(QStringLiteral("\r\n"), QStringLiteral("\n"));
+    if (sample.startsWith(QChar(0xfeff))) sample.remove(0, 1);
+    const QRegularExpression frontMatter(QStringLiteral("\\A---[^\\S\\n]*\\n.*?\\n(?:---|\\.\\.\\.)[^\\S\\n]*(?:\\n|$)"), QRegularExpression::DotMatchesEverythingOption);
+    const auto metadata = frontMatter.match(sample);
+    if (metadata.hasMatch()) sample.remove(0, metadata.capturedLength());
+    sample = sample.trimmed();
+    QString title = info.completeBaseName();
+    const QRegularExpression heading(QStringLiteral("\\A {0,3}#{1,6}[ \\t]+([^\\n]+)"));
+    const auto match = heading.match(sample);
+    if (match.hasMatch()) {
+        title = match.captured(1).trimmed();
+        title.remove(QRegularExpression(QStringLiteral("[ \\t]+#+[ \\t]*$")));
+        sample.remove(0, match.capturedLength());
+    }
+    auto readable = [](QString value) {
+        value.remove(QRegularExpression(QStringLiteral("(?m)^ {0,3}(?:`{3,}|~{3,})[^\\n]*(?:\\n|$)")));
+        value.replace(QRegularExpression(QStringLiteral("!?\\[([^\\]]*)\\]\\([^\\n)]*\\)")), QStringLiteral("\\1"));
+        value.remove(QRegularExpression(QStringLiteral("(?m)^ {0,3}(?:#{1,6}[ \\t]+|>[ \\t]?|[-+*][ \\t]+|[0-9]+[.)][ \\t]+)")));
+        value.remove(QRegularExpression(QStringLiteral("(?<!\\\\)(?:\\*\\*|__|`|\\*)")));
+        return value.simplified();
+    };
+    title = readable(title);
+    QString preview = readable(sample).left(200);
+    if (!preview.isEmpty() && preview.back().isHighSurrogate()) preview.chop(1);
+    return {{QStringLiteral("title"), title.isEmpty() ? info.completeBaseName() : title},
+            {QStringLiteral("excerpt"), preview.isEmpty() ? QStringLiteral("Empty document") : preview}};
 }
 
 bool FileLibrary::navigateHistory(int direction) {

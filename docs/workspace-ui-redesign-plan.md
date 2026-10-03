@@ -1,6 +1,6 @@
 # Fomawrite workspace UI redesign plan
 
-Planning date: 3 October 2026. Original planning baseline: `52af519`. Andrew approved implementation; Cycles 90–97 established the workspace candidate, and Cycles 98–100 added acceptance fixes, bounded Visual Edit and heading navigation. Cycle 102 follows Andrew’s 4 October feedback with persistent pane reopen controls, clearer View commands and direct Preview template access. The current review target is `0.3.0-dev3`, macOS `0.3.0 (102)`; verification and artifact identities are in the [Cycle 102 handoff](../research/cycle-102/README.md). Andrew’s broader writing acceptance remains pending.
+Planning date: 3 October 2026. Original baseline: `52af519`. Cycles 90–100 and 102 implemented the workspace and editing foundations, but Andrew’s 4 October visual comparison rejected the remaining gap between the approved concept and the shipped app. Cycle 103 follows the concept’s actual geometry, typography, icons and writing presentation; the current target is `0.3.0-dev4`, macOS `0.3.0 (103)`. [Native screenshots and verification](../research/cycle-103/README.md). Visual sign-off from Andrew remains pending.
 
 The approved direction makes Fomawrite a composed writing workspace. Andrew's preferred reference is the Ulysses window in his three-app comparison: a quiet gray organizer, clean document list, warm writing canvas, and clearly grouped controls belonging to each column. Preserve Fomawrite's blue folders, local Markdown files and existing editing protections.
 
