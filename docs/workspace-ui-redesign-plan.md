@@ -1,6 +1,6 @@
 # Fomawrite workspace UI redesign plan
 
-Planning date: 3 October 2026. Original planning baseline: `52af519`. Andrew approved implementation; Cycles 90–97 established the workspace candidate, and Cycles 98–100 add bounded acceptance fixes, richer Visual Edit and cross-window heading navigation. The next review target is `0.3.0-dev2`, macOS `0.3.0 (100)`. The native integration fixture passes 111 assertions; **134 regression tests and native Visual Edit checks pass. Dev, demo/package and Applications are synchronized to build 100 and strict-signature verified**, recorded in the [Cycle 100 handoff](../research/cycle-100/README.md). Andrew's broad acceptance remains pending.
+Planning date: 3 October 2026. Original planning baseline: `52af519`. Andrew approved implementation; Cycles 90–97 established the workspace candidate, and Cycles 98–100 added acceptance fixes, bounded Visual Edit and heading navigation. Cycle 102 follows Andrew’s 4 October feedback with persistent pane reopen controls, clearer View commands and direct Preview template access. The current review target is `0.3.0-dev3`, macOS `0.3.0 (102)`; verification and artifact identities are in the [Cycle 102 handoff](../research/cycle-102/README.md). Andrew’s broader writing acceptance remains pending.
 
 The approved direction makes Fomawrite a composed writing workspace. Andrew's preferred reference is the Ulysses window in his three-app comparison: a quiet gray organizer, clean document list, warm writing canvas, and clearly grouped controls belonging to each column. Preserve Fomawrite's blue folders, local Markdown files and existing editing protections.
 
@@ -26,7 +26,7 @@ The approved direction is implemented as one integrated candidate, with the cycl
 
 Existing stored theme and writing choices take precedence. New installations start with Studio and Editorial; existing users can choose **Studio writing layout** explicitly. Layout preferences are per window and do not live-mirror another window. Source remains canonical plain UTF-8 Markdown; Visual Edit still protects unsupported structures. Private sample documents and pre-existing dirty files are outside this cycle's edits.
 
-The next product cycle is **102 — review-led block editing ergonomics**: review the combined build in normal writing, then improve the most useful image/table/list interactions while preserving exact-source checks and visible unsupported-edit fallback. Complete physical VoiceOver/display and arbitrary-workspace relaunch acceptance alongside that work. **Cycle 101 remains an optional distribution decision**, not an automatic public release. Current evidence: [Cycle 98](../research/cycle-98/README.md), [Cycle 99](../research/cycle-99/README.md), [Cycle 100](../research/cycle-100/README.md).
+The next product cycle is **103 — review-led block editing ergonomics**: review the combined build in normal writing, then improve the most useful image/table/list interactions while preserving exact-source checks and visible unsupported-edit fallback. Complete physical VoiceOver/display and arbitrary-workspace relaunch acceptance alongside that work. **Cycle 101 remains an optional distribution decision**, not an automatic public release. Current evidence: [Cycle 98](../research/cycle-98/README.md), [Cycle 99](../research/cycle-99/README.md), [Cycle 100](../research/cycle-100/README.md).
 
 ## Scope and evidence
 
@@ -35,7 +35,7 @@ The next product cycle is **102 — review-led block editing ergonomics**: revie
 - Existing guidance: [editor surface work](editor-surface-redesign.md), [dialog guide](dialog-style-guide.md), [build log](build-cycles.md), [acceptance ledger](release-acceptance.md).
 - Baseline validation: Cycle 89 records 118 passing tests and native window-routing checks. Those are historical results, not tests rerun for this document. Installed, packaged and Dev copies must be identified by commit before future comparisons; their presence alone does not establish that they match.
 - The interactive concept demonstrates composition, blue folders, control grouping and writing appearances. Its simplified widths, breakpoints and appearance selector are illustrative; the written fit rules govern implementation. It is not native layout, complete feature or accessibility acceptance.
-- The original planning pass produced a plan and illustrative concept without changing app code. Andrew subsequently authorized the implementation checkpoint above; current verification and deployment status belong in the Cycle 100 handoff; the Cycle 97 record preserves its earlier verified checkpoint.
+- The original planning pass produced a plan and illustrative concept without changing app code. Andrew subsequently authorized the implementation checkpoint above; current verification and deployment status belong in the Cycle 102 handoff; the Cycle 97 record preserves its earlier verified checkpoint.
 
 ## What exists and what must change
 

@@ -18,7 +18,9 @@ Item {
     readonly property real titleContentOpacity: settings.titleBarMode === 1 || revealRequested ? 1 : 0
     readonly property real toolbarContentOpacity: settings.toolbarVisibilityMode === 1 || revealRequested ? 1 : 0
     readonly property bool toolbarContentVisible: settings.toolbarVisibilityMode !== 2
-    readonly property bool writingClusterExpanded: documentHeader.width - documentHeader.nativeInset >= 490
+    readonly property real writingControlsWidth: documentHeader.width - documentHeader.nativeInset
+        - (paneRestoreControls.visible ? paneRestoreControls.implicitWidth + 8 : 0)
+    readonly property bool writingClusterExpanded: writingControlsWidth >= 490
     signal actionRequested(string action, var anchor)
     function focusWorkspaceControl() { workspaceButton.forceActiveFocus(Qt.TabFocusReason); }
     height: 52
@@ -60,7 +62,7 @@ Item {
             ChromeButton { text: backend.library.rootName || "Folder"; hint: "Choose library folder"; alignLeft: true; Layout.fillWidth: true; onClicked: root.actionRequested("chooseFolder", this) }
             ToolbarButton { iconName: "plus"; hint: "New document"; onClicked: root.actionRequested("newDocument", this) }
             ToolbarButton { iconName: "more"; hint: "Folder actions, sorting and search"; onClicked: root.actionRequested("libraryOptions", this) }
-            ToolbarButton { objectName: "collapseFilesButton"; iconName: "library"; hint: "Hide files"; onClicked: root.actionRequested("hideFiles", this) }
+            ToolbarButton { objectName: "collapseFilesButton"; iconName: "library"; hint: "Hide library"; onClicked: root.actionRequested("hideFiles", this) }
         }
         Rectangle { anchors.right: parent.right; width: 1; height: parent.height; color: backend.palette.border }
     }
@@ -75,6 +77,28 @@ Item {
         MouseArea { anchors.fill: parent; onPressed: root.window.startSystemMove(); onDoubleClicked: root.window.visibility === Window.Maximized ? root.window.showNormal() : root.window.showMaximized() }
         RowLayout {
             anchors.fill: parent; anchors.leftMargin: documentHeader.nativeInset; anchors.rightMargin: 12; spacing: 8
+            Row {
+                id: paneRestoreControls
+                objectName: "paneRestoreControls"
+                visible: !organizerHeader.visible || !filesHeader.visible
+                spacing: 8
+                // Collapsing a pane removes its header. Keep its reopen control in
+                // the surviving writing header, independent of toolbar visibility.
+                ToolbarButton {
+                    objectName: "restoreOrganizerButton"
+                    visible: !organizerHeader.visible
+                    iconName: "organizer"
+                    hint: "Show organizer"
+                    onClicked: root.actionRequested("toggleOrganizer", this)
+                }
+                ToolbarButton {
+                    objectName: "restoreFilesButton"
+                    visible: !filesHeader.visible
+                    iconName: "library"
+                    hint: "Show library"
+                    onClicked: root.actionRequested("toggleFiles", this)
+                }
+            }
             Row {
                 objectName: "topChromeToolbarLeading"
                 visible: root.toolbarContentVisible; opacity: root.toolbarContentOpacity; enabled: opacity > 0
@@ -102,7 +126,7 @@ Item {
                 }
                 ToolbarButton { objectName: "compactFormatButton"; visible: !root.writingClusterExpanded; iconName: "paragraph"; hint: "Formatting"; enabled: trailing.formattingAllowed; onClicked: root.actionRequested("format", this) }
                 ToolbarButton { text: "Aa"; hint: "Writing appearance"; onClicked: root.actionRequested("appearance", this) }
-                ToolbarButton { objectName: "exportHubButton"; visible: documentHeader.width - documentHeader.nativeInset >= 420; iconName: "export"; hint: "Export and share"; onClicked: root.actionRequested("export", this) }
+                ToolbarButton { objectName: "exportHubButton"; visible: root.writingControlsWidth >= 420; iconName: "export"; hint: "Export and share"; onClicked: root.actionRequested("export", this) }
             }
             ToolbarButton {
                 id: workspaceButton

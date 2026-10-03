@@ -24,6 +24,7 @@
 #include <QQmlComponent>
 #include <QQmlContext>
 #include <QQmlEngine>
+#include <QQmlListReference>
 #include <QJSValue>
 #include <QQuickStyle>
 #include <QSettings>
@@ -38,6 +39,9 @@ class FomawriteTest : public QObject {
     Q_OBJECT
 
 private slots:
+    void collapsedPaneButtonsRestoreEveryLayout();
+    void previewTemplateFooterAndNativeMenuShareState();
+    void previewTemplateRemainsReachableInNarrowSplit();
     void visualFormatsComposeWithoutChangingSource();
     void visualImagesExposeBoundedMetadata();
     void visualTablesEditCellsWithoutRewritingSyntax();
@@ -3099,13 +3103,13 @@ private slots:
         layout->setProperty("organizerVisible", true);
         QVERIFY(QMetaObject::invokeMethod(libraryAction, "triggered"));
         QVERIFY(!layout->property("filesVisible").toBool());
-        QCOMPARE(libraryAction->property("text").toString(), QStringLiteral("Show Library"));
+        QCOMPARE(libraryAction->property("text").toString(), QStringLiteral("Toggle Library"));
         QVERIFY(native("organizer")->property("enabled").toBool());
         layout->setProperty("filesVisible", true);
-        QCOMPARE(libraryAction->property("text").toString(), QStringLiteral("Hide Library"));
+        QCOMPARE(libraryAction->property("text").toString(), QStringLiteral("Toggle Library"));
         window->setProperty("width", 800);
         QTRY_VERIFY(native("organizer")->property("enabled").toBool());
-        QTRY_COMPARE(native("organizer")->property("text").toString(), QStringLiteral("Show Organizer"));
+        QTRY_COMPARE(native("organizer")->property("text").toString(), QStringLiteral("Toggle Organizer"));
         window->setProperty("width", 1280);
         QTRY_VERIFY(native("organizer")->property("enabled").toBool());
         for (const auto &pair : {qMakePair("sortBar", "showSortBar"), qMakePair("filterBar", "showFilterBar"),
@@ -5195,6 +5199,7 @@ private:
     QTemporaryDir m_settingsDirectory;
 };
 
+#include "cycle102-workspace-controls.inc"
 #include "cycle100-navigation.inc"
 #include "cycle99-integration.inc"
 #include "sourcevisualmapping-cycle99.inc"

@@ -222,7 +222,12 @@ ApplicationWindow {
         var point = anchor.mapToItem(win.contentItem, 0, anchor.height + 5);
         menu.parent = win.contentItem;
         menu.x = Math.max(8, Math.min(win.width - menu.width - 8, point.x));
-        menu.y = Math.max(8, Math.min(win.contentItem.height - menu.implicitHeight - 8, point.y));
+        // Footer menus open above their button so the trigger stays visible and
+        // the opening click does not land over the last menu command.
+        var above = anchor.mapToItem(win.contentItem, 0, 0).y - menu.implicitHeight - 5;
+        var top = point.y + menu.implicitHeight > win.contentItem.height - 8 && above >= 8
+                ? above : point.y;
+        menu.y = Math.max(8, Math.min(win.contentItem.height - menu.implicitHeight - 8, top));
         menu.open();
     }
     function hideWorkspacePane(pane) {
@@ -237,6 +242,10 @@ ApplicationWindow {
         if (pane === "organizer") workspaceLayout.organizerVisible = true;
         else workspaceLayout.filesVisible = true;
         Qt.callLater(function() {
+            // A second toggle can hide the pane before this deferred layout check.
+            // Do not reopen temporary navigation for a canceled reveal request.
+            var requested = pane === "organizer" ? workspaceLayout.organizerVisible : workspaceLayout.filesVisible;
+            if (!requested) return;
             var docked = pane === "organizer" ? workspaceLayout.effectiveOrganizerVisible : workspaceLayout.effectiveFilesVisible;
             if (!docked) {
                 navigationDrawer.paneName = pane;
@@ -385,6 +394,8 @@ ApplicationWindow {
             case "addLocation": organizerPane.chooseLocation(); break;
             case "hideOrganizer": win.hideWorkspacePane("organizer"); break;
             case "hideFiles": win.hideWorkspacePane("files"); break;
+            case "toggleOrganizer": workspaceCommands.run("organizer"); break;
+            case "toggleFiles": workspaceCommands.run("library"); break;
             case "chooseFolder": libraryPane.chooseFolder(); break;
             case "newDocument": libraryPane.newDocument(); break;
             case "libraryOptions": win.openAnchoredMenu(libraryActions, anchor); break;
@@ -699,11 +710,27 @@ ApplicationWindow {
     }
 
     CompactMenu {
+        id: previewTemplateMenu
+        objectName: "previewTemplateMenu"
+        width: 246
+        CompactMenuItem { objectName: "previewTemplate0"; text: "Modern (Sans)"; checkable: true; checked: backend.outputStyle === 0; onTriggered: backend.setOutputStyle(0) }
+        CompactMenuItem { objectName: "previewTemplate1"; text: "Classic (Serif)"; checkable: true; checked: backend.outputStyle === 1; onTriggered: backend.setOutputStyle(1) }
+        CompactMenuItem { objectName: "previewTemplate2"; text: "Manuscript (Mono)"; checkable: true; checked: backend.outputStyle === 2; onTriggered: backend.setOutputStyle(2) }
+        MenuSeparator {}
+        CompactMenuItem { objectName: "previewTemplate4"; text: "GitHub"; checkable: true; checked: backend.outputStyle === 4; onTriggered: backend.setOutputStyle(4) }
+        CompactMenuItem { objectName: "previewTemplate5"; text: "Helvetica"; checkable: true; checked: backend.outputStyle === 5; onTriggered: backend.setOutputStyle(5) }
+        CompactMenuItem { objectName: "previewTemplate6"; text: "Palatino"; checkable: true; checked: backend.outputStyle === 6; onTriggered: backend.setOutputStyle(6) }
+        CompactMenuItem { objectName: "previewTemplate7"; text: "MLA Draft"; checkable: true; checked: backend.outputStyle === 7; onTriggered: backend.setOutputStyle(7) }
+        MenuSeparator {}
+        CompactMenuItem { objectName: "previewTemplate3"; text: "Custom"; checkable: true; checked: backend.outputStyle === 3; onTriggered: backend.setOutputStyle(3) }
+        CompactMenuItem { objectName: "previewTemplateCustomLoad"; text: "Load Custom Template…"; onTriggered: outputStyleDialog.open() }
+    }
+    CompactMenu {
         id: workspaceMenu
         objectName: "workspaceMenu"
         width: 258
-        CompactMenuItem { objectName: "workspaceOrganizer"; text: "Organizer"; checkable: true; checked: workspaceLayout.effectiveOrganizerVisible; onTriggered: win.toggleWorkspacePane("organizer") }
-        CompactMenuItem { objectName: "workspaceFiles"; text: "Files"; checkable: true; checked: workspaceLayout.effectiveFilesVisible; onTriggered: win.toggleWorkspacePane("files") }
+        CompactMenuItem { objectName: "workspaceOrganizer"; text: workspaceCommands.label("organizer"); checkable: true; checked: workspaceLayout.effectiveOrganizerVisible; onTriggered: win.toggleWorkspacePane("organizer") }
+        CompactMenuItem { objectName: "workspaceFiles"; text: workspaceCommands.label("library"); checkable: true; checked: workspaceLayout.effectiveFilesVisible; onTriggered: win.toggleWorkspacePane("files") }
         MenuSeparator {}
         CompactMenuItem { text: "Source"; checkable: true; checked: workspaceLayout.layoutMode === 0; onTriggered: win.selectWritingMode("source") }
         CompactMenuItem { text: "Visual Edit"; checkable: true; checked: workspaceLayout.visualEditEnabled; onTriggered: win.selectWritingMode("visual") }
@@ -1492,25 +1519,12 @@ ApplicationWindow {
             }
         }
         Platform.Menu {
+            objectName: "nativeViewMenu"
             title: "View"
-            Platform.Menu {
-                title: "Template"
-                Platform.MenuItem { text: "Modern (Sans)"; checkable: true; checked: backend.outputStyle === 0; onTriggered: backend.setOutputStyle(0) }
-                Platform.MenuItem { text: "Classic (Serif)"; checkable: true; checked: backend.outputStyle === 1; onTriggered: backend.setOutputStyle(1) }
-                Platform.MenuItem { text: "Manuscript (Mono)"; checkable: true; checked: backend.outputStyle === 2; onTriggered: backend.setOutputStyle(2) }
-                Platform.MenuSeparator {}
-                Platform.MenuItem { text: "GitHub"; checkable: true; checked: backend.outputStyle === 4; onTriggered: backend.setOutputStyle(4) }
-                Platform.MenuItem { text: "Helvetica"; checkable: true; checked: backend.outputStyle === 5; onTriggered: backend.setOutputStyle(5) }
-                Platform.MenuItem { text: "Palatino"; checkable: true; checked: backend.outputStyle === 6; onTriggered: backend.setOutputStyle(6) }
-                Platform.MenuItem { text: "MLA Draft"; checkable: true; checked: backend.outputStyle === 7; onTriggered: backend.setOutputStyle(7) }
-                Platform.MenuSeparator {}
-                Platform.MenuItem { text: "Custom"; checkable: true; checked: backend.outputStyle === 3; onTriggered: backend.setOutputStyle(3) }
-                Platform.MenuItem { text: "Load Custom Template…"; onTriggered: outputStyleDialog.open() }
-            }
-            Platform.MenuItem { text: "Synchronized Scrolling"; checkable: true; checked: workspaceSettings.synchronizedScroll; onTriggered: workspaceSettings.synchronizedScroll = !workspaceSettings.synchronizedScroll }
             NativeCommand { commandId: "library" }
             NativeCommand { commandId: "organizer" }
             Platform.MenuSeparator {}
+            Platform.MenuItem { text: "Synchronized Scrolling"; checkable: true; checked: workspaceSettings.synchronizedScroll; onTriggered: workspaceSettings.synchronizedScroll = !workspaceSettings.synchronizedScroll }
             NativeCommand { commandId: "sortBar" }
             NativeCommand { commandId: "filterBar" }
             Platform.Menu {
@@ -1560,7 +1574,25 @@ ApplicationWindow {
                 onTriggered: win.showCompletions()
             }
             NativeCommand { commandId: "markup" }
-            Platform.MenuSeparator {}
+            Platform.MenuSeparator { objectName: "nativeBeforeTemplate" }
+            Platform.Menu {
+                id: nativeTemplateMenu
+                objectName: "nativeTemplateMenu"
+                title: "Template"
+                Binding { target: nativeTemplateMenu.menuItem; property: "objectName"; value: "nativeTemplateEntry" }
+                Platform.MenuItem { text: "Modern (Sans)"; objectName: "nativeTemplate0"; checkable: true; checked: backend.outputStyle === 0; onTriggered: backend.setOutputStyle(0) }
+                Platform.MenuItem { text: "Classic (Serif)"; objectName: "nativeTemplate1"; checkable: true; checked: backend.outputStyle === 1; onTriggered: backend.setOutputStyle(1) }
+                Platform.MenuItem { text: "Manuscript (Mono)"; objectName: "nativeTemplate2"; checkable: true; checked: backend.outputStyle === 2; onTriggered: backend.setOutputStyle(2) }
+                Platform.MenuSeparator {}
+                Platform.MenuItem { text: "GitHub"; objectName: "nativeTemplate4"; checkable: true; checked: backend.outputStyle === 4; onTriggered: backend.setOutputStyle(4) }
+                Platform.MenuItem { text: "Helvetica"; objectName: "nativeTemplate5"; checkable: true; checked: backend.outputStyle === 5; onTriggered: backend.setOutputStyle(5) }
+                Platform.MenuItem { text: "Palatino"; objectName: "nativeTemplate6"; checkable: true; checked: backend.outputStyle === 6; onTriggered: backend.setOutputStyle(6) }
+                Platform.MenuItem { text: "MLA Draft"; objectName: "nativeTemplate7"; checkable: true; checked: backend.outputStyle === 7; onTriggered: backend.setOutputStyle(7) }
+                Platform.MenuSeparator {}
+                Platform.MenuItem { text: "Custom"; objectName: "nativeTemplate3"; checkable: true; checked: backend.outputStyle === 3; onTriggered: backend.setOutputStyle(3) }
+                Platform.MenuItem { text: "Load Custom Template…"; onTriggered: outputStyleDialog.open() }
+            }
+            Platform.MenuSeparator { objectName: "nativeAfterTemplate" }
             NativeCommand { commandId: "reloadPreview" }
             Platform.Menu {
                 title: "Preview"
@@ -2143,6 +2175,7 @@ ApplicationWindow {
     }
     Dialogs.FileDialog {
         id: outputStyleDialog
+        objectName: "outputStyleDialog"
         title: "Load Custom Template"
         nameFilters: ["Custom template (*.json)"]
         onAccepted: backend.loadOutputStyle(selectedFile)
@@ -3139,6 +3172,7 @@ ApplicationWindow {
         PreviewPane {
             id: previewPane
             renderer: win.appBackend
+            onTemplateMenuRequested: function(anchor) { win.openAnchoredMenu(previewTemplateMenu, anchor); }
             onScrollFractionChanged: function(fraction) {
                 if (!workspaceSettings.synchronizedScroll || win.synchronizingScroll || workspaceLayout.effectiveLayoutMode !== 1) return;
                 win.synchronizingScroll = true;

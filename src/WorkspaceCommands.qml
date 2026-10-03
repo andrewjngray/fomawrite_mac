@@ -114,7 +114,8 @@ QtObject {
             return window.visibility === Window.FullScreen ? "Exit Full Screen" : "Enter Full Screen";
         var item = entry(id);
         if (!item) return "";
-        if (["library", "organizer", "sortBar", "filterBar", "togglePreview"].indexOf(id) >= 0)
+        if (id === "library" || id === "organizer") return "Toggle " + item.title;
+        if (["sortBar", "filterBar", "togglePreview"].indexOf(id) >= 0)
             return (isChecked(id) ? "Hide " : "Show ") + item.title;
         return item.title;
     }

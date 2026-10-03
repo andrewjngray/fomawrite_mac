@@ -26,6 +26,7 @@ Rectangle {
     signal editorUndoRequested()
     signal editorRedoRequested()
     signal sourceEditRequested()
+    signal templateMenuRequested(var anchor)
     property bool visualEditorFocused: visualText.activeFocus
     property string visualStatus: ""
     property string visualNotice: ""
@@ -461,9 +462,44 @@ Rectangle {
         RowLayout {
             anchors.fill: parent; anchors.leftMargin: 12; anchors.rightMargin: 12
             spacing: 4
+            FooterButton {
+                id: templateButton
+                objectName: "previewTemplateButton"
+                visible: !root.visualEditEnabled
+                text: (root.width >= 560 ? "Preview · " : "") + root.renderer.outputTemplateName
+                hint: "Choose preview template. Current template: " + root.renderer.outputTemplateName
+                darkMode: root.darkMode
+                implicitWidth: templateLabelMetrics.width + 40
+                Layout.minimumWidth: 80
+                Layout.fillWidth: true
+                onClicked: root.templateMenuRequested(templateButton)
+                TextMetrics {
+                    id: templateLabelMetrics
+                    text: templateButton.text
+                    font: templateButton.font
+                }
+                contentItem: Item {
+                    opacity: templateButton.enabled ? 1 : 0.45
+                    Text {
+                        text: templateButton.text
+                        font: templateButton.font
+                        color: backend.palette.text
+                        width: Math.max(0, parent.width - 20)
+                        anchors.verticalCenter: parent.verticalCenter
+                        elide: Text.ElideRight
+                    }
+                    LineIcon {
+                        name: "down"
+                        ink: backend.palette.muted
+                        width: 12; height: 12
+                        anchors.right: parent.right
+                        anchors.verticalCenter: parent.verticalCenter
+                    }
+                }
+            }
             Label {
-                visible: root.width >= 560
-                text: root.visualEditEnabled ? root.visualStatus : "Preview · " + root.renderer.outputTemplateName
+                visible: root.visualEditEnabled && root.width >= 560
+                text: root.visualStatus
                 font.family: Qt.application.font.family
                 font.pixelSize: 12
                 color: backend.palette.muted
@@ -494,8 +530,8 @@ Rectangle {
                 darkMode: root.darkMode
                 onClicked: root.sourceEditRequested()
             }
-            FooterButton { text: "Split"; hint: "Show Source and Preview side by side"; darkMode: root.darkMode; checked: root.layoutMode === 1; onClicked: root.layoutRequested(1) }
-            FooterButton { text: "Full"; hint: root.visualEditEnabled ? "Show Visual Edit across the document area" : "Show read-only Preview across the document area"; darkMode: root.darkMode; checked: root.layoutMode === 2; onClicked: root.layoutRequested(2) }
+            FooterButton { objectName: "previewSplitButton"; text: "Split"; hint: "Show Source and Preview side by side"; darkMode: root.darkMode; checked: root.layoutMode === 1; onClicked: root.layoutRequested(1) }
+            FooterButton { objectName: "previewFullButton"; text: "Full"; hint: root.visualEditEnabled ? "Show Visual Edit across the document area" : "Show read-only Preview across the document area"; darkMode: root.darkMode; checked: root.layoutMode === 2; onClicked: root.layoutRequested(2) }
         }
     }
 

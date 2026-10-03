@@ -1339,3 +1339,11 @@ Verification: cross-window encoded Unicode headings, unsaved targets, missing fe
 **Final integrated gate: passed.** `./bin/build` and all **134 tests** pass, with zero failures/skips. Native Visual Edit/navigation checks pass **5/0/0** including setup/cleanup; the workspace fixture passes 111 assertions. Application `0.3.0-dev2`, macOS `0.3.0 (100)`, is packaged and installed in Applications; both pass strict local signatures and executable hashes match. On 4 October, after Andrew quit Dev, `./bin/prepare-dev-app` refreshed the stable Dev copy to build 100. Dev passes strict signature verification and matches the prepared replacement; all three review copies are current. [Bundle identities](../research/cycle-100/artifacts.json). No public release or notarization is implied.
 
 Next: review the combined build during normal writing and complete physical accessibility/display checks. Product Cycle 102 should address the highest-value image/table/list ergonomics from that review, with exact-source safeguards. Cycle 101 remains an optional distribution decision. Broader parser/output/interoperability gaps remain in the acceptance ledger.
+
+## Cycle 102 — pane restoration and direct template access
+
+Planned scope: address Andrew’s 4 October review of vanished collapse controls, View menu wording/order, and the inert Preview template label.
+
+Changes: retain independent reopen buttons in the surviving document header, including faded/hidden toolbar and compact Drawer layouts; lead View with Toggle Library / Toggle Organizer; isolate Template below writing controls; turn the Preview template label into a compact dropdown sharing the backend output style. No document rewriting.
+
+Verification: final build and **137 regression tests pass**; native control tests pass **5/0/0**, and the native workspace fixture passes **111 assertions**. Dev, demo/package and Applications are synchronized to `0.3.0-dev3`, macOS `0.3.0 (102)`, with strict local signatures verified. See the [Cycle 102 record](../research/cycle-102/README.md). [Optional usability exercise](../research/usability/cycle-102.md). Physical VoiceOver/display checks remain open. Next product scope: review-led image/table/list ergonomics, Cycle 103; Cycle 101 remains optional distribution.

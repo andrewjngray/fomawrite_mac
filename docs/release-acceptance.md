@@ -1,17 +1,18 @@
 # Acceptance ledger — current follow-through and Cycle 59 history
 
-## Current follow-through — Cycles 98–100
+## Current follow-through — Cycles 98–102
 
-The next review target is application `0.3.0-dev2`, macOS `0.3.0 (100)`. All 134 tests and native Visual Edit checks pass; Dev, package and Applications are synchronized to build 100 and strict-signature verified, recorded in the [Cycle 100 handoff](../research/cycle-100/README.md). This section narrows specific historical gaps; it does not recertify the full menu matrix.
+The current review target is application `0.3.0-dev3`, macOS `0.3.0 (102)`. Cycle 102 addresses disappearing pane controls, View menu organization and Preview template access; verification and installed bundle identities are in the [Cycle 102 handoff](../research/cycle-102/README.md). This section narrows specific historical gaps; it does not recertify the full menu matrix.
 
 | Area | New bounded evidence | Still open |
 | --- | --- | --- |
 | Workspace/accessibility | Cycle 98 native fixture passes F6/reverse traversal, named Qt accessible button/text interfaces, compact Drawer Escape/focus, inactive toolbar focus, full screen, tab detach/regroup and independent pane checkpoints. | Physical VoiceOver listening/reading order, actual display scaling/multiple displays, arbitrary-workspace quit/relaunch, complete control-state/contrast inventory. |
 | Visual editing | Cycle 99 source implements simple table-cell and inline-code edits, image alt text with local thumbnails, supported list continuation/task reset/empty-item exit, grapheme-safe replacements and caret tracking. All 134 tests and native Visual Edit checks pass. | General WYSIWYG, arbitrary multiline paste, splitting within a list item, complex/nested structures, spatial image placement and a full table grid. |
 | Cycle 58 navigation | Cycle 100 transfers fragments to another open window/tab and resolves its live unsaved heading; missing/invalid headings give feedback. Native Unicode/dirty-target/source-Cancel/Undo checks pass within the 111-assertion integration run. Revision-guarded preview refresh prevents stale missing-heading feedback. | Broader parser/output parity and cross-application clipboard behavior. |
+| Pane/template controls | Cycle 102 restores hidden panes directly from the surviving header, orders and names View toggles consistently, and synchronizes the Preview dropdown with native template selection. Pointer, compact, draft/Undo and native checks are in its handoff. | Andrew’s everyday usage and physical VoiceOver review. |
 | Distribution | Local review packaging remains separate from product acceptance. | Developer ID signing, notarization, another-machine installation and an explicit public-release decision. |
 
-The next product cycle is review-led image/table/list ergonomics (Cycle 102), with remaining human accessibility/display acceptance alongside it. Cycle 101 is an optional distribution track.
+The next product cycle is review-led image/table/list ergonomics (Cycle 103), with remaining human accessibility/display acceptance alongside it. Cycle 101 is an optional distribution track.
 
 ## Historical Cycle 59 checkpoint and subsequent September follow-ups
 
