@@ -2,7 +2,11 @@
 
 Proposed after Cycle 84. Andrew's 27 September Ulysses screenshot is a visual and interaction reference, not an asset or style file to copy. The aim is an original Fomawrite writing surface with the same calm hierarchy, while retaining plain UTF-8 Markdown and safe editing.
 
-Implementation checkpoint: Studio's three pane tones, Manuscript/Editorial/Book source typography, a word-count chip and clearer selected rows are implemented. Visual Edit accepts safe paragraph breaks; list markers, images, tables and other complex blocks remain protected. The typography and theme controls are independent of export styles and the document's Markdown. See Cycles 85–87 in the build log. Full general-purpose visual editing and Andrew's display-scale acceptance are still open.
+Implementation checkpoint: the approved workspace pass integrates Cycles 90–96 into candidate `0.3.0-dev1` (macOS bundle `0.3.0`, build `97`). It extends the existing Studio tones and Manuscript/Editorial/Book appearances with pane-owned headers, shared controls, independent responsive navigation, an explicit Source / Visual Edit / Preview selector and 150% source line height. The word-count control occupies a reserved document strip, and the duplicate permanent formatting footer is removed. Existing stored theme/writing choices are retained; Studio and Editorial are defaults for new installations and an explicit combination for existing users.
+
+Visual Edit retains safe paragraph breaks and supported body/span edits; creating general list structures, image cards, tables and arbitrary nested blocks still requires additional source mapping. Source remains canonical UTF-8 Markdown and appearance remains independent of export style. Build, 122 regression tests and recorded native checks pass; broad writing, display-scale and accessibility acceptance remains pending. See the [Cycle 97 record](../research/cycle-97/README.md).
+
+The [3 October workspace UI redesign plan](workspace-ui-redesign-plan.md) now records the approved complete-workspace implementation and supersedes the original chrome sequence. The “Fomawrite today” table below preserves the pre-Cycle-85 assessment; use the workspace plan's implementation checkpoint for current behavior. The earlier Cycle 88 acceptance and broader feature gaps remain open.
 
 ## What the reference gets right
 
@@ -42,3 +46,7 @@ For the first implementation, keep the Markdown source `TextEdit` as the canonic
 4. **Cycle 88 — native usability and acceptance.** Use long real-world but non-private sample documents, check cursor/scroll stability while switching appearances and modes, verify light/dark/narrow/display scaling, and compare a saved/reopened document to its original bytes. Andrew judges whether Editorial is visually close enough to become the default for new installations.
 
 The attractive content blocks in the reference—especially inline image cards, link pills and annotations—need the later source-mapping work. They should not be faked in the first styling cycle or represented as generally editable until round-trip behavior passes.
+
+## Follow-through after Cycle 97
+
+Cycle 98 should resolve user feedback and complete native writing, keyboard/VoiceOver, display-scale and tab/window acceptance. Cycle 99 can then extend safe visual blocks and image/list/table projection one construct at a time, keeping exact source/Undo checks and visible unsupported-edit fallback. Cycle 100 selects bounded workflow/parser/export gaps from the acceptance ledger; Cycle 101 is optional distribution after product acceptance. None of these closes general visual editing or competitor parity by implication.

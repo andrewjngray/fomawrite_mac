@@ -60,7 +60,7 @@ Rectangle {
     ColumnLayout {
         anchors.fill: parent
         anchors.margins: 8
-        spacing: 4
+        spacing: 8
         RowLayout {
             objectName: "librarySortBar"
             visible: displaySettings.showSortBar
@@ -68,24 +68,31 @@ Rectangle {
             ChromeButton {
                 id: sortButton
                 objectName: "librarySort"
-                implicitHeight: 24
+                implicitHeight: 28
                 implicitWidth: sortLabel.implicitWidth + 34
                 text: "Sort by " + ["Name", "Date Modified", "Date Created", "Extension"][root.library.sortMode]
                 darkMode: root.darkMode
                 onClicked: sortMenu.open()
                 contentItem: RowLayout {
                     spacing: 3
-                    Text { id: sortLabel; text: sortButton.text; font.family: Qt.platform.os === "osx" ? Qt.application.font.family : "Helvetica Neue"; font.pixelSize: 12; color: backend.palette.muted }
+                    Text { id: sortLabel; text: sortButton.text; font.family: Qt.application.font.family; font.pixelSize: 12; color: backend.palette.muted }
                     LineIcon { name: "down"; ink: backend.palette.muted; Layout.preferredWidth: 12; Layout.preferredHeight: 12 }
                 }
-                background: Rectangle { radius: height / 2; color: backend.palette.field; border.width: sortButton.activeFocus ? 1 : 0; border.color: backend.palette.focus }
+                background: Rectangle {
+                    radius: 6
+                    color: sortButton.down ? (backend.palette.controlPressed || backend.palette.selectedRow)
+                        : sortButton.hovered ? (backend.palette.controlHover || backend.palette.hover)
+                        : (backend.palette.control || backend.palette.field)
+                    border.width: sortButton.activeFocus ? 2 : 1
+                    border.color: sortButton.activeFocus ? backend.palette.focus : backend.palette.border
+                }
             }
             Item { Layout.fillWidth: true }
             ChromeButton {
                 objectName: "libraryPreviewToggle"
                 text: "Previews"
                 hint: "Show or hide file text previews"
-                implicitHeight: 24
+                implicitHeight: 28
                 darkMode: root.darkMode
                 checkable: true
                 checked: displaySettings.showExcerpts
@@ -108,49 +115,86 @@ Rectangle {
             clip: true
             model: root.library.entries
             boundsBehavior: Flickable.StopAtBounds
-            ScrollBar.vertical: ScrollBar {}
+            ScrollBar.vertical: ScrollBar { id: fileScrollBar }
             delegate: ItemDelegate {
                 id: entry
                 required property var modelData
-                width: fileList.width
-                height: modelData.directory || !displaySettings.showExcerpts ? 28 : 50
+                width: Math.max(0, fileList.width - (fileScrollBar.size < 1 ? 12 : 0))
+                height: modelData.directory || !displaySettings.showExcerpts ? 28 : 72
+                topPadding: modelData.directory || !displaySettings.showExcerpts ? 0 : 8
+                bottomPadding: topPadding
+                rightPadding: 8
+                font.family: Qt.application.font.family
+                font.pixelSize: 13
+                focusPolicy: Qt.StrongFocus
                 leftPadding: 8 + modelData.depth * 16
                 highlighted: !modelData.directory && modelData.url.toString() === root.currentFile.toString()
                 Accessible.name: modelData.name
+                Accessible.selected: highlighted
                 Accessible.description: modelData.directory ? "Folder" : "Markdown or text document"
                 onClicked: {
                     if (modelData.directory) root.library.toggleFolder(modelData.url)
                     else root.openRequested(modelData.url)
                 }
                 background: Rectangle {
-                    radius: 7
-                    color: entry.highlighted ? (backend.palette.selectedRow)
-                        : entry.hovered ? (backend.palette.hover) : "transparent"
+                    radius: 6
+                    color: entry.down ? (backend.palette.controlPressed || backend.palette.selectedRow)
+                        : entry.highlighted ? backend.palette.selectedRow
+                        : entry.hovered ? backend.palette.hover : "transparent"
+                    border.width: entry.activeFocus ? 2 : 0
+                    border.color: backend.palette.focus
                 }
                 contentItem: RowLayout {
-                    spacing: 7
+                    spacing: 8
                     LineIcon {
                         name: entry.modelData.directory ? "folder" : "editor"
                         ink: entry.modelData.directory ? backend.palette.folder : backend.palette.muted
-                        Layout.preferredWidth: 18
-                        Layout.preferredHeight: 18
+                        Layout.preferredWidth: 16
+                        Layout.preferredHeight: 16
                     }
                     ColumnLayout {
                         spacing: 3
                         Layout.fillWidth: true
+                        Layout.minimumWidth: 0
                         RowLayout {
                             Layout.fillWidth: true
-                            Label { text: entry.modelData.name; font.pixelSize: 14; color: backend.palette.text; elide: Text.ElideMiddle; Layout.fillWidth: true }
+                            Layout.minimumWidth: 0
+                            Label {
+                                text: entry.modelData.name
+                                font.family: Qt.application.font.family
+                                font.pixelSize: 13
+                                font.weight: displaySettings.showExcerpts && !entry.modelData.directory ? Font.Medium : Font.Normal
+                                color: backend.palette.text
+                                elide: Text.ElideMiddle
+                                Layout.fillWidth: true
+                                Layout.minimumWidth: 0
+                            }
                             Label {
                                 visible: !entry.modelData.directory && displaySettings.dateMode !== 0
                                 text: displaySettings.dateMode === 2 ? entry.modelData.created : entry.modelData.modified
-                                font.pixelSize: 10
+                                elide: Text.ElideRight
+                                Layout.minimumWidth: 0
+                                Layout.maximumWidth: Math.max(0, entry.width * 0.35)
+                                font.family: Qt.application.font.family
+                                font.pixelSize: 12
                                 color: backend.palette.muted
                             }
                         }
-                        Label { visible: !entry.modelData.directory && displaySettings.showExcerpts; text: visible ? root.library.excerpt(entry.modelData.url) : ""; elide: Text.ElideRight; font.pixelSize: 11; color: backend.palette.muted; Layout.fillWidth: true }
+                        Label {
+                            visible: !entry.modelData.directory && displaySettings.showExcerpts
+                            text: visible ? root.library.excerpt(entry.modelData.url) : ""
+                            elide: Text.ElideRight
+                            wrapMode: Text.Wrap
+                            maximumLineCount: 2
+                            font.family: Qt.application.font.family
+                            font.pixelSize: 12
+                            color: backend.palette.muted
+                            Layout.fillWidth: true
+                            Layout.minimumWidth: 0
+                            Layout.maximumHeight: implicitHeight
+                        }
                     }
-                    LineIcon { visible: entry.modelData.directory; name: root.library.navigationMode === 0 && entry.modelData.expanded ? "down" : "right"; ink: "#92969e"; Layout.preferredWidth: 14; Layout.preferredHeight: 14 }
+                    LineIcon { visible: entry.modelData.directory; name: root.library.navigationMode === 0 && entry.modelData.expanded ? "down" : "right"; ink: backend.palette.muted; Layout.preferredWidth: 14; Layout.preferredHeight: 14 }
                 }
                 TapHandler {
                     acceptedButtons: Qt.RightButton
@@ -185,10 +229,10 @@ Rectangle {
             Layout.minimumWidth: 0
             Layout.maximumWidth: Math.max(0, root.width - 16)
             implicitWidth: 1
-            implicitHeight: 26
+            implicitHeight: 32
             placeholderText: "Filter files"
             padding: 4
-            leftPadding: 10
+            leftPadding: 32
             rightPadding: 10
             leftInset: 0
             rightInset: 0
@@ -196,13 +240,20 @@ Rectangle {
             bottomInset: 0
             color: backend.palette.text
             placeholderTextColor: backend.palette.muted
-            selectionColor: "#426da7"
+            selectionColor: backend.palette.selection
             selectedTextColor: "white"
-            font.pixelSize: 12
+            font.family: Qt.application.font.family
+            font.pixelSize: 13
             text: root.library.filter
             onTextEdited: root.library.filter = text
             Accessible.name: "Filter visible library files"
-            background: Rectangle { radius: height / 2; color: backend.palette.field; border.width: filterField.activeFocus ? 1 : 0; border.color: backend.palette.focus }
+            LineIcon { name: "filter"; ink: backend.palette.muted; width: 16; height: 16; x: 10; anchors.verticalCenter: parent.verticalCenter }
+            background: Rectangle {
+                radius: 6
+                color: backend.palette.field
+                border.width: filterField.activeFocus ? 2 : 1
+                border.color: filterField.activeFocus ? backend.palette.focus : backend.palette.border
+            }
             Keys.onEscapePressed: { text = ""; root.library.filter = ""; }
         }
     }

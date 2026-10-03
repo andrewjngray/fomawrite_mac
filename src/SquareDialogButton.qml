@@ -3,45 +3,47 @@ import QtQuick.Controls
 
 Button {
     id: control
-
     property bool primary: false
     property bool darkMode: true
-    property color labelColor: primary ? "#ffffff" : "#d0d0d0"
-    property color activeColor: "#428bca"
+    property color labelColor: primary ? "#ffffff" : backend.palette.text
+    property color activeColor: backend.palette.focus
     property real textScale: 1
 
+    implicitWidth: Math.max(88, label.implicitWidth + 32)
+    implicitHeight: 36
     leftPadding: 16
     rightPadding: 16
     topPadding: 7
     bottomPadding: 7
-
+    leftInset: 0
+    rightInset: 0
+    topInset: 0
+    bottomInset: 0
+    focusPolicy: Qt.StrongFocus
+    Accessible.name: text
     Keys.onReturnPressed: clicked()
     Keys.onEnterPressed: clicked()
 
     contentItem: Label {
+        id: label
         text: control.text
         color: control.labelColor
+        opacity: control.enabled ? 1 : 0.45
         horizontalAlignment: Text.AlignHCenter
         verticalAlignment: Text.AlignVCenter
-        font.family: "iA Writer Mono S"
-        font.pixelSize: Math.round(12 * control.textScale)
+        font.family: Qt.application.font.family
+        font.pixelSize: Math.round(13 * control.textScale)
     }
-
     background: Rectangle {
-        implicitWidth: 88
-        implicitHeight: 34
-        radius: 0
+        radius: 6
         color: control.primary
-            ? (control.down ? "#347ab3" : control.hovered ? "#4b96d0" : control.activeColor)
-            : control.down
-                ? (backend.palette.hover)
-                : control.hovered
-                    ? (backend.palette.hover)
-                    : (backend.palette.panel)
-        border.color: control.activeFocus
-            ? (backend.palette.text)
-            : control.primary
-                ? "#367eb7"
-                : (backend.palette.border)
+            ? (control.down ? Qt.darker(control.activeColor, 1.18) : control.hovered && control.enabled ? Qt.lighter(control.activeColor, 1.12) : control.activeColor)
+            : control.down ? (backend.palette.controlPressed || backend.palette.selectedRow)
+            : control.hovered && control.enabled ? (backend.palette.controlHover || backend.palette.hover)
+            : (backend.palette.control || backend.palette.field)
+        border.width: control.activeFocus ? 2 : 1
+        border.color: control.activeFocus ? backend.palette.focus
+            : control.primary ? control.activeColor : backend.palette.border
+        opacity: control.enabled ? 1 : 0.55
     }
 }

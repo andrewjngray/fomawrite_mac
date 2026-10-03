@@ -1,0 +1,3 @@
+/opt/homebrew/bin/qmake6 -o Makefile ../fomawrite.pro
+make: Nothing to be done for `first'.
+Built /Users/andrewgray/repo/projects/fomawrite_mac/build/Fomawrite.app

@@ -57,7 +57,7 @@
 #include "markdownhighlighter.h"
 #include "visualtexthighlighter.h"
 
-constexpr qreal typoraLineHeightPercent = 140;
+constexpr qreal sourceLineHeightPercent = 150;
 const QString lastSaveDirectorySetting = QStringLiteral("file/lastSaveDirectory");
 
 namespace {
@@ -467,7 +467,9 @@ Backend::Backend(QObject *parent, bool outputOnly) : QObject(parent), m_library(
     const QString cssPath = QSettings().value(QStringLiteral("output/cssFile")).toString();
     if (!cssPath.isEmpty()) m_outputCssFile = QUrl::fromLocalFile(cssPath);
     loadUserOutputStyles();
-    const auto preset = QSettings().value("appearance/theme", "system").toString();
+    // New installations start with the composed writing palette; a stored
+    // choice, including System, always takes precedence.
+    const auto preset = QSettings().value("appearance/theme", "studio").toString();
     if (QStringList{"system", "light", "dark", "paper", "studio"}.contains(preset)) m_themePreset = preset;
     loadOmarchyTheme();
     watchOmarchyTheme();
@@ -538,18 +540,51 @@ void Backend::setThemePreset(const QString &preset) {
 QVariantMap Backend::palette() const {
     const bool paper = m_themePreset == "paper";
     const bool studio = m_themePreset == "studio";
-    return {{"page", m_themeBackground}, {"text", m_themeForeground},
-        {"panel", m_darkMode ? "#222428" : studio ? "#f8f7f5" : paper ? "#f0e8d8" : "#fafaf9"},
-        {"organizer", studio ? "#ebeae8" : m_darkMode ? "#222428" : paper ? "#f0e8d8" : "#fafaf9"},
-        {"library", studio ? "#fdfcfa" : m_darkMode ? "#222428" : paper ? "#f0e8d8" : "#fafaf9"},
-        {"muted", m_darkMode ? "#afb5bf" : studio ? "#686966" : paper ? "#706451" : "#616975"},
-        {"border", m_darkMode ? "#50545c" : studio ? "#dedbd7" : paper ? "#c9bda7" : "#d5d7da"},
-        {"hover", m_darkMode ? "#34383f" : studio ? "#dddcd9" : paper ? "#e5dac4" : "#e8eaed"},
-        {"selectedRow", m_darkMode ? "#34383f" : studio ? "#d8d6d2" : paper ? "#e5dac4" : "#e8eaed"},
-        {"field", m_darkMode ? "#2b2e34" : studio ? "#f1f0ed" : paper ? "#eae0cd" : "#eff0f2"},
-        {"focus", m_darkMode ? "#9ec5ff" : "#285e9e"},
-        {"folder", m_darkMode ? "#63c9f1" : "#087fa9"},
-        {"selection", m_themeSelection}};
+    // Each column keeps its own surface in dark as well as light appearances.
+    // Control boundaries have their own stronger token; dividers stay quiet.
+    QVariantMap colors;
+    if (m_darkMode) {
+        colors = {{"organizer", "#252A32"}, {"library", "#1D2229"},
+            {"panel", "#292F38"}, {"popover", "#292F38"},
+            {"muted", "#B9C0CB"}, {"selectedMuted", "#DCE1E8"}, {"border", "#505966"},
+            {"field", "#333B47"}, {"selectedRow", "#414C5D"},
+            {"control", "#333B47"}, {"controlHover", "#424D5D"},
+            {"controlPressed", "#536176"}, {"controlSelected", "#435674"},
+            {"controlBorder", "#B3BED0"}, {"focus", "#9EC5FF"},
+            {"folder", "#63C9F1"}, {"inactiveText", "#D1D6DE"},
+            {"inactiveMuted", "#AEB7C4"}, {"inactiveSelectedRow", "#394352"}};
+    } else if (paper) {
+        colors = {{"organizer", "#EDE4D3"}, {"library", "#F8F2E7"},
+            {"panel", "#F4ECDC"}, {"popover", "#FCF7EE"},
+            {"muted", "#6B604F"}, {"selectedMuted", "#5E5444"}, {"border", "#C9BDA7"},
+            {"field", "#FDF8EF"}, {"selectedRow", "#DDD1BA"},
+            {"control", "#FAF5EB"}, {"controlHover", "#E7DCC8"},
+            {"controlPressed", "#D7C8AE"}, {"controlSelected", "#D9D5C8"},
+            {"controlBorder", "#756953"}, {"focus", "#285E9E"},
+            {"folder", "#087FA9"}, {"inactiveText", "#514B40"},
+            {"inactiveMuted", "#6B604F"}, {"inactiveSelectedRow", "#E1D8C8"}};
+    } else {
+        colors = {{"organizer", studio ? "#ECEDEF" : "#EBEDF0"},
+            {"library", "#FAFAF9"}, {"panel", "#F3F4F5"},
+            {"popover", "#FBFBFA"}, {"muted", "#62666D"}, {"selectedMuted", "#50565D"},
+            {"border", "#D8DADD"}, {"field", "#FFFFFF"},
+            {"selectedRow", "#D7DADE"}, {"control", "#F9F9F8"},
+            {"controlHover", "#E2E5E9"}, {"controlPressed", "#C7CDD4"},
+            {"controlSelected", "#CEDAEB"}, {"controlBorder", "#6B7078"},
+            {"focus", "#285E9E"}, {"folder", "#087FA9"},
+            {"inactiveText", "#555B63"}, {"inactiveMuted", "#62666D"},
+            {"inactiveSelectedRow", "#DFE1E4"}};
+    }
+    colors.insert("page", m_themeBackground);
+    colors.insert("canvas", m_themeBackground);
+    colors.insert("text", m_themeForeground);
+    colors.insert("selection", m_themeSelection);
+    // Keep established consumers compatible as shared controls adopt the
+    // explicit rest/hover/pressed/selected roles.
+    colors.insert("hover", colors.value("controlHover"));
+    colors.insert("divider", colors.value("border"));
+    colors.insert("header", colors.value("panel"));
+    return colors;
 }
 
 void Backend::setTextScale(qreal textScale) {
@@ -1367,7 +1402,7 @@ int Backend::markdownAnchorPosition(const QString &markdown, const QString &anch
     return -1;
 }
 
-void Backend::styleVisualEditor(QObject *textDocument, int textSize) {
+void Backend::styleVisualEditor(QObject *textDocument, int textSize, const QString &typeface) {
     auto *quick = qobject_cast<QQuickTextDocument *>(textDocument);
     if (!quick || !quick->textDocument() || quick->textDocument() == m_document) return;
     QTextDocument *visual = quick->textDocument();
@@ -1376,6 +1411,7 @@ void Backend::styleVisualEditor(QObject *textDocument, int textSize) {
     if (!m_visualHighlighter)
         m_visualHighlighter = new VisualTextHighlighter(visual);
     VisualTextHighlighter::Style style;
+    if (!typeface.isEmpty()) style.font.setFamily(typeface);
     style.font.setPointSizeF(qMax(9, textSize) * 0.75);
     style.textColor = QColor(m_themeForeground);
     style.linkColor = QColor(m_themeAccent);
@@ -2263,8 +2299,8 @@ void Backend::watchCurrentFile() {
 void Backend::loadOmarchyTheme() {
     const bool oldDark = m_darkMode;
     m_darkMode = m_themePreset == "dark" || (m_themePreset == "system" && m_systemDarkMode);
-    m_themeBackground = m_darkMode ? QStringLiteral("#101010") : QStringLiteral("#ffffff");
-    m_themeForeground = m_darkMode ? QStringLiteral("#eeeeee") : QStringLiteral("#222324");
+    m_themeBackground = m_darkMode ? QStringLiteral("#15181D") : QStringLiteral("#FFFFFF");
+    m_themeForeground = m_darkMode ? QStringLiteral("#ECEEF2") : QStringLiteral("#34363A");
 #ifdef Q_OS_MACOS
     m_themeAccent = m_darkMode ? QStringLiteral("#8eb5f0") : QStringLiteral("#244f88");
     m_themeSelection = m_darkMode ? QStringLiteral("#345783") : QStringLiteral("#345f98");
@@ -2337,8 +2373,8 @@ void Backend::loadOmarchyTheme() {
         m_themeAccent = "#285e9e";
         m_themeSelection = "#345f98";
     } else if (m_themePreset == "studio") {
-        m_themeBackground = "#f5f3ef";
-        m_themeForeground = "#343431";
+        m_themeBackground = "#F6F3EE";
+        m_themeForeground = "#34363A";
         m_themeAccent = "#28669d";
         m_themeSelection = "#355f88";
     }
@@ -2428,7 +2464,7 @@ void Backend::applyDocumentTypography() {
         return;
 
     QTextBlockFormat blockFormat;
-    blockFormat.setLineHeight(typoraLineHeightPercent, QTextBlockFormat::ProportionalHeight);
+    blockFormat.setLineHeight(sourceLineHeightPercent, QTextBlockFormat::ProportionalHeight);
 
     // A full pass is only used for freshly loaded/attached documents, so it is
     // safe to drop undo history here (re-enabling clears the stack anyway).
@@ -2451,7 +2487,7 @@ void Backend::reapplyTypographyToChange() {
         return;
 
     QTextBlockFormat blockFormat;
-    blockFormat.setLineHeight(typoraLineHeightPercent, QTextBlockFormat::ProportionalHeight);
+    blockFormat.setLineHeight(sourceLineHeightPercent, QTextBlockFormat::ProportionalHeight);
 
     // Format only the block(s) touched by the last edit instead of the whole
     // document, and fold the change into the preceding edit command so a single

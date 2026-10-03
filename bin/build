@@ -5,6 +5,11 @@ ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
 mkdir -p "$ROOT/build"
 cd "$ROOT/build"
 "$QMAKE" "$ROOT/fomawrite.pro"
+# qmake emits the bundle plist target without a dependency on our source plist.
+# Regenerate it explicitly so incremental builds carry the current version.
+if [ "$(uname -s)" = Darwin ]; then
+  make -B Fomawrite.app/Contents/Info.plist
+fi
 make -j"$JOBS"
 if [ "$(uname -s)" = Darwin ]; then
   echo "Built $ROOT/build/Fomawrite.app"

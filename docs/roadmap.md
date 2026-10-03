@@ -19,6 +19,19 @@ After Cycle 84, the [editor surface redesign](editor-surface-redesign.md) refocu
 
 The [17 September staged development plan](development-plan.md) turns the [iA menu parity log](ia-menu-parity-2026-09-17.md) into proposed Cycles 14–28: menu access, safe file/editing commands, navigation, richer documents/output, native lifecycle, then advanced writing tools. Codex remains the visual reference. Full functional parity includes explicit validation of hidden submenu behavior and is not claimed by matching labels.
 
+The [3 October workspace UI plan](workspace-ui-redesign-plan.md) is approved and Cycles 90–96 are integrated in the Cycle 97 candidate: `0.3.0-dev1`, macOS bundle `0.3.0` build `97`. It adds column-owned headers, shared controls and palette roles, independent responsive pane state, per-window persistence, writing presentation and navigation/supporting-surface refinements. Build, 122 regression tests and recorded native checks pass; Andrew's broad acceptance, Cycle 88's outstanding review and earlier functional gaps remain open. See the [candidate record](../research/cycle-97/README.md).
+
+## Next bounded work after the workspace candidate
+
+| Cycle | Recommended scope | Gate |
+| --- | --- | --- |
+| 98 | Incorporate Andrew's writing feedback; review keyboard/VoiceOver, inactive/dark states, display scaling, full screen, native tabs and independent-window restoration. | Record the acceptance matrix and resolve specific regressions before expanding editing scope. |
+| 99 | Extend safe visual projection for blocks, images, lists and tables in small increments. | Exact Markdown round trips, Unicode/paste/Undo fixtures and explicit Source fallback for unsupported edits. General WYSIWYG support is not presumed. |
+| 100 | Select the most useful workflow, parser or export gaps from the [acceptance ledger](release-acceptance.md) and inventories. | Define a bounded feature and validate its real workflow; matching menu labels is insufficient. |
+| 101 | Distribution, if Andrew wants it: signing/notarization, another-machine installation and release packaging. | Accepted product build and verified public-distribution artifacts. Current local signing does not close this gate. |
+
+These are recommendations for separate scopes, not a promise that the broader parity backlog will be complete in four cycles.
+
 ## Milestones
 
 1. **Mac foundation:** build an app bundle; native menus and file dialogs; Command shortcuts; Finder document opening; system appearance; existing save, recovery and external-change behaviour. Add a reproducible development workflow.

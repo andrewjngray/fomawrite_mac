@@ -1,0 +1,117 @@
+In file included from /Users/andrewgray/repo/projects/fomawrite_mac/src/main.cpp:464:
+/Users/andrewgray/repo/projects/fomawrite_mac/src/../tests/window-routing-smoke.inc:10:1: warning: ignoring return value of function declared with 'nodiscard' attribute [-Wunused-result]
+   10 | smokeSource.open(QIODevice::WriteOnly);
+      | ^~~~~~~~~~~~~~~~ ~~~~~~~~~~~~~~~~~~~~
+/Users/andrewgray/repo/projects/fomawrite_mac/src/windowchrome_mac.mm:266:8: warning: 'NSSpeechSynthesizer' is deprecated: first deprecated in macOS 14.0 - Use AVSpeechSynthesizer in AVFoundation instead [-Wdeprecated-declarations]
+  266 | static NSSpeechSynthesizer *writingSpeaker=nil;
+      |        ^
+   81 | @interface NSSpeechSynthesizer : NSObject
+      |            ^
+/Users/andrewgray/repo/projects/fomawrite_mac/src/windowchrome_mac.mm:268:42: warning: 'NSSpeechSynthesizer' is deprecated: first deprecated in macOS 14.0 - Use AVSpeechSynthesizer in AVFoundation instead [-Wdeprecated-declarations]
+  268 |     if(!writingSpeaker) writingSpeaker=[[NSSpeechSynthesizer alloc] initWithVoice:nil];
+      |                                          ^
+   81 | @interface NSSpeechSynthesizer : NSObject
+      |            ^
+/Users/andrewgray/repo/projects/fomawrite_mac/src/windowchrome_mac.mm:268:69: warning: 'initWithVoice:' is deprecated: first deprecated in macOS 14.0 - Use AVSpeechSynthesizer in AVFoundation instead [-Wdeprecated-declarations]
+  268 |     if(!writingSpeaker) writingSpeaker=[[NSSpeechSynthesizer alloc] initWithVoice:nil];
+      |                                                                     ^
+   83 | - (nullable instancetype)initWithVoice:(nullable NSSpeechSynthesizerVoiceName)voice;
+      | ^
+/Users/andrewgray/repo/projects/fomawrite_mac/src/windowchrome_mac.mm:269:21: warning: 'stopSpeaking' is deprecated: first deprecated in macOS 14.0 - Use AVSpeechSynthesizer in AVFoundation instead [-Wdeprecated-declarations]
+  269 |     [writingSpeaker stopSpeaking];
+      |                     ^
+   89 | - (void)stopSpeaking;
+      | ^
+/Users/andrewgray/repo/projects/fomawrite_mac/src/windowchrome_mac.mm:270:21: warning: 'startSpeakingString:' is deprecated: first deprecated in macOS 14.0 - Use AVSpeechSynthesizer in AVFoundation instead [-Wdeprecated-declarations]
+  270 |     [writingSpeaker startSpeakingString:[NSString stringWithUTF8String:text.toUtf8().constData()]];
+      |                     ^
+   85 | - (BOOL)startSpeakingString:(NSString *)string;
+      | ^
+/Users/andrewgray/repo/projects/fomawrite_mac/src/windowchrome_mac.mm:272:42: warning: 'stopSpeaking' is deprecated: first deprecated in macOS 14.0 - Use AVSpeechSynthesizer in AVFoundation instead [-Wdeprecated-declarations]
+  272 | void macStopSpeaking() { [writingSpeaker stopSpeaking]; }
+      |                                          ^
+   89 | - (void)stopSpeaking;
+      | ^
+6 warnings generated.
+/Users/andrewgray/repo/projects/fomawrite_mac/src/main.cpp:56:13: warning: unused function 'migrateLegacyWorkspace' [-Wunused-function]
+   56 | static void migrateLegacyWorkspace(const QString &stateDirectory,
+      |             ^~~~~~~~~~~~~~~~~~~~~~
+2 warnings generated.
+PASS: one initial test window
+PASS: open disposable source
+PASS: trigger New Window from context menu
+PASS: New Window creates a second editor for the selected open file
+PASS: new window loads the clicked file
+PASS: New Window is separate from native tab groups
+PASS: trigger New Tab from context menu
+PASS: New Tab creates a third editor
+PASS: new tab joins its source window
+PASS: unrelated window stays separate
+PASS: ordinary opening still focuses an existing editor
+PASS: native workspace exposes source and Studio action
+PASS: prepare an unsaved native QA edit and selection
+PASS: native QA begins with dirty source and usable Undo
+PASS: invoke Studio writing layout action
+PASS: Studio action applies the writing composition and preserves output style
+PASS: restore three independent per-window pane states
+PASS: native tabs and separate windows retain distinct requested layouts
+PASS: production checkpoint saves every test window
+PASS: saved production pane state restores through the root API
+PASS: native window reaches requested QA width
+PASS: native contraction hides columns in order and restores the requested split
+PASS: resize preserves desired visibility, widths and mode
+PASS: resizing a separate window leaves both native-tab pane states independent
+PASS: headers align with actual pane boundaries after native resize
+PASS: native layout changes preserve source, selection, undo availability and dirty state
+PASS: production workspace checkpoint saves desired state during contraction
+PASS: workspace resize width 1440
+PASS: native window reaches requested QA width
+PASS: native contraction hides columns in order and restores the requested split
+PASS: resize preserves desired visibility, widths and mode
+PASS: resizing a separate window leaves both native-tab pane states independent
+PASS: headers align with actual pane boundaries after native resize
+PASS: native layout changes preserve source, selection, undo availability and dirty state
+PASS: production workspace checkpoint saves desired state during contraction
+PASS: workspace resize width 1120
+PASS: native window reaches requested QA width
+PASS: native contraction hides columns in order and restores the requested split
+PASS: resize preserves desired visibility, widths and mode
+PASS: resizing a separate window leaves both native-tab pane states independent
+PASS: headers align with actual pane boundaries after native resize
+PASS: native layout changes preserve source, selection, undo availability and dirty state
+PASS: production workspace checkpoint saves desired state during contraction
+PASS: workspace resize width 900
+PASS: native window reaches requested QA width
+PASS: native contraction hides columns in order and restores the requested split
+PASS: resize preserves desired visibility, widths and mode
+PASS: resizing a separate window leaves both native-tab pane states independent
+PASS: headers align with actual pane boundaries after native resize
+PASS: native layout changes preserve source, selection, undo availability and dirty state
+PASS: production workspace checkpoint saves desired state during contraction
+PASS: prepare app-only workspace capture
+PASS: save synthetic app-only workspace screenshot
+PASS: workspace resize width 720
+PASS: native window reaches requested QA width
+PASS: native contraction hides columns in order and restores the requested split
+PASS: resize preserves desired visibility, widths and mode
+PASS: resizing a separate window leaves both native-tab pane states independent
+PASS: headers align with actual pane boundaries after native resize
+PASS: native layout changes preserve source, selection, undo availability and dirty state
+PASS: production workspace checkpoint saves desired state during contraction
+PASS: prepare app-only workspace capture
+PASS: save synthetic app-only workspace screenshot
+PASS: workspace resize width 1440
+PASS: dark headers retain pane alignment
+PASS: prepare app-only workspace capture
+PASS: save synthetic app-only workspace screenshot
+PASS: undo remains available after native workspace changes
+PASS: Undo restores the exact saved source after native resizing
+PASS: reload disposable QA source before native Quit
+PASS: dispatch print submenu action
+PASS: opened and canceled "rendered print"
+PASS: dispatch print submenu action
+PASS: opened and canceled "source print"
+PASS: dispatch print submenu action
+PASS: opened and canceled "paginated preview"
+PASS: Finder reveal request accepted for sample
+PASS: native sharing picker request accepted for sample

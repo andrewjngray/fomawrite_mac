@@ -1,0 +1,15 @@
+# Cycle 97 workspace review
+
+Use the verified `0.3.0-dev1` candidate (macOS `0.3.0`, build `97`) in the stable Fomawrite Dev app, with disposable Markdown samples. Dev, ordinary package and Applications are refreshed; bundle identities and hashes are in the [candidate record](../cycle-97/README.md). This checklist records acceptance work, not passed checks.
+
+1. Open a sample folder with nested folders, a long/Unicode filename and a short prose document. Inspect the aligned Organizer, Files and Writing headers and blue folder icons; compare compact file rows with document previews.
+2. Choose **Studio writing layout**, then compare Editorial, Manuscript and Book. Confirm text remains readable and that changing appearance leaves Markdown, caret, dirty state and export style intact.
+3. Resize through approximately 1440, 1120, 900 and 720 logical pixels, then grow again. Watch auxiliary widths contract, Organizer disappear before Files, and the requested split return. Manually hide one pane and confirm it stays hidden after growing.
+4. Drag an individual divider, narrow the window and grow again. Confirm remembered widths return and resizing one pane does not replace another pane's remembered width with its temporary narrow size. Use **Restore column widths** from Workspace with the keyboard; record any further keyboard resizing access needed.
+5. At 720 pixels, use Workspace to open temporary Organizer or Files navigation. Escape/Close should return focus predictably. Open another document, then repeat with an unsaved draft and cancel navigation; the previous draft and navigation state should survive cancellation.
+6. Switch Source → Visual Edit → Preview → Split. In a narrow Visual Edit view, open Find and verify the search UI is reachable. Type a supported paragraph edit, switch layouts, and Undo once; check source bytes and cursor/scroll stability.
+7. Use document Back/Forward, Find, formatting, Appearance and Export through the visible header or overflow route. Hide/fade the toolbar, then reveal it through Workspace or the native menu; invisible controls must not take clicks. Check narrow Export's horizontal band access and fixed Cancel/Save actions.
+8. Create a second window and native tab; give each different pane visibility/widths. Confirm they remain independent, detach a tab and check the result, then quit/reopen saved samples to inspect restored layouts. Review full screen and title-bar dragging.
+9. Repeat representative controls in dark mode and with an inactive window. Use keyboard-only navigation and VoiceOver; check names, roles, focus, selected state and Escape. Repeat at the normal and scaled display settings used for writing.
+
+Record the app identity, window size, appearance, action and observed result for each issue. App-only screenshots should contain synthetic samples. Andrew's direct composition/writing acceptance and broader accessibility/scale/tab checks are pending; general rich Visual Edit structures and competitor parity remain separate work.

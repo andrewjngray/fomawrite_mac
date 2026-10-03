@@ -24,6 +24,7 @@
 #include <QQmlComponent>
 #include <QQmlContext>
 #include <QQmlEngine>
+#include <QJSValue>
 #include <QQuickStyle>
 #include <QSettings>
 #include <QStandardPaths>
@@ -36,6 +37,186 @@ class FomawriteTest : public QObject {
     Q_OBJECT
 
 private slots:
+    void workspaceLayoutResponsiveOrderAndHysteresis() {
+        QQmlEngine engine;
+        QQmlComponent component(&engine, QUrl::fromLocalFile(QFINDTESTDATA("../src/WorkspaceLayout.qml")));
+        QScopedPointer<QObject> layout(component.create());
+        QVERIFY2(layout, qPrintable(component.errorString()));
+        const auto flag = [&](const char *name) { return layout->property(name).toBool(); };
+        const auto mode = [&] { return layout->property("effectiveLayoutMode").toInt(); };
+        layout->setProperty("availableWidth", 1440);
+        QVERIFY(flag("effectiveOrganizerVisible"));
+        QVERIFY(flag("effectiveFilesVisible"));
+        QCOMPARE(mode(), 1);
+        layout->setProperty("availableWidth", 1300);
+        QVERIFY(flag("effectiveOrganizerVisible"));
+        QVERIFY(flag("effectiveFilesVisible"));
+        QCOMPARE(mode(), 1);
+        QVERIFY(layout->property("effectiveOrganizerWidth").toDouble() < 208);
+        QVERIFY(layout->property("effectiveFileWidth").toDouble() < 288);
+        QCOMPARE(layout->property("organizerWidth").toDouble(), 208.0);
+        QCOMPARE(layout->property("fileWidth").toDouble(), 288.0);
+        layout->setProperty("availableWidth", 1200);
+        QVERIFY(!flag("effectiveOrganizerVisible"));
+        QVERIFY(flag("effectiveFilesVisible"));
+        QCOMPARE(mode(), 1);
+        layout->setProperty("availableWidth", 1000);
+        QVERIFY(!flag("effectiveOrganizerVisible"));
+        QVERIFY(!flag("effectiveFilesVisible"));
+        QCOMPARE(mode(), 1);
+        layout->setProperty("availableWidth", 720);
+        QCOMPARE(mode(), 0);
+        QCOMPARE(layout->property("layoutMode").toInt(), 1);
+        QCOMPARE(layout->property("previewWidth").toDouble(), 420.0);
+        QCOMPARE(layout->property("effectiveSourceWidth").toDouble(), 720.0);
+        layout->setProperty("availableWidth", 820);
+        QCOMPARE(mode(), 0);
+        layout->setProperty("availableWidth", 848);
+        QCOMPARE(mode(), 1);
+        layout->setProperty("availableWidth", 1060);
+        QVERIFY(!flag("effectiveFilesVisible"));
+        layout->setProperty("availableWidth", 1088);
+        QVERIFY(flag("effectiveFilesVisible"));
+        layout->setProperty("availableWidth", 1250);
+        QVERIFY(!flag("effectiveOrganizerVisible"));
+        layout->setProperty("availableWidth", 1272);
+        QVERIFY(flag("effectiveOrganizerVisible"));
+    }
+
+    void workspaceLayoutManualVisibilityAndActiveSurface() {
+        QQmlEngine engine;
+        QQmlComponent component(&engine, QUrl::fromLocalFile(QFINDTESTDATA("../src/WorkspaceLayout.qml")));
+        QScopedPointer<QObject> layout(component.create());
+        QVERIFY2(layout, qPrintable(component.errorString()));
+        layout->setProperty("availableWidth", 1440);
+        layout->setProperty("filesVisible", false);
+        QVERIFY(layout->property("effectiveOrganizerVisible").toBool());
+        QVERIFY(!layout->property("effectiveFilesVisible").toBool());
+        layout->setProperty("availableWidth", 720);
+        QCOMPARE(layout->property("effectiveLayoutMode").toInt(), 0);
+        layout->setProperty("activeSurface", "visual");
+        layout->setProperty("visualEditEnabled", true);
+        QCOMPARE(layout->property("effectiveLayoutMode").toInt(), 2);
+        QCOMPARE(layout->property("layoutMode").toInt(), 1);
+        QVERIFY(layout->property("visualEditEnabled").toBool());
+        layout->setProperty("availableWidth", 1440);
+        QCOMPARE(layout->property("effectiveLayoutMode").toInt(), 1);
+        QVERIFY(!layout->property("effectiveFilesVisible").toBool());
+        layout->setProperty("organizerVisible", false);
+        layout->setProperty("availableWidth", 720);
+        layout->setProperty("activeSurface", "source");
+        QCOMPARE(layout->property("effectiveLayoutMode").toInt(), 0);
+        QVERIFY(layout->property("visualEditEnabled").toBool());
+        layout->setProperty("availableWidth", 1440);
+        QVERIFY(!layout->property("effectiveOrganizerVisible").toBool());
+        QVERIFY(!layout->property("effectiveFilesVisible").toBool());
+        layout->setProperty("layoutMode", 2);
+        layout->setProperty("visualEditEnabled", false);
+        layout->setProperty("availableWidth", 500);
+        QCOMPARE(layout->property("effectiveLayoutMode").toInt(), 2);
+        QCOMPARE(layout->property("effectivePreviewWidth").toDouble(), 500.0);
+        layout->setProperty("layoutMode", 0);
+        QCOMPARE(layout->property("effectiveSourceWidth").toDouble(), 500.0);
+    }
+
+    void workspaceLayoutStateValidationAndWindowIndependence() {
+        QQmlEngine engine;
+        QQmlComponent component(&engine, QUrl::fromLocalFile(QFINDTESTDATA("../src/WorkspaceLayout.qml")));
+        QScopedPointer<QObject> first(component.create());
+        QScopedPointer<QObject> second(component.create());
+        QVERIFY2(first && second, qPrintable(component.errorString()));
+        first->setProperty("availableWidth", 1440);
+        QVERIFY(QMetaObject::invokeMethod(first.data(), "updateWidth",
+                                          Q_ARG(QVariant, "organizer"), Q_ARG(QVariant, 250)));
+        QVERIFY(QMetaObject::invokeMethod(first.data(), "updateWidth",
+                                          Q_ARG(QVariant, "files"), Q_ARG(QVariant, 380)));
+        QVERIFY(QMetaObject::invokeMethod(first.data(), "updateWidth",
+                                          Q_ARG(QVariant, "preview"), Q_ARG(QVariant, 600)));
+        first->setProperty("filesVisible", false);
+        first->setProperty("visualEditEnabled", true);
+        first->setProperty("availableWidth", 720);
+        QJSValue firstWrapper = engine.newQObject(first.data());
+        const QVariantMap saved = firstWrapper.property("saveState").callWithInstance(firstWrapper).toVariant().toMap();
+        QCOMPARE(saved.value("version").toInt(), 1);
+        QCOMPARE(saved.value("organizerWidth").toDouble(), 250.0);
+        QCOMPARE(saved.value("fileWidth").toDouble(), 380.0);
+        QCOMPARE(saved.value("previewWidth").toDouble(), 600.0);
+        QCOMPARE(saved.value("layoutMode").toInt(), 1);
+        QVERIFY(saved.value("visualEditEnabled").toBool());
+        QCOMPARE(second->property("fileWidth").toDouble(), 288.0);
+        QVERIFY(second->property("filesVisible").toBool());
+        QVERIFY(QMetaObject::invokeMethod(second.data(), "restoreState", Q_ARG(QVariant, saved)));
+        QCOMPARE(second->property("fileWidth").toDouble(), 380.0);
+        QVERIFY(!second->property("filesVisible").toBool());
+        second->setProperty("availableWidth", 1440);
+        QCOMPARE(second->property("organizerWidth").toDouble(), 250.0);
+        QCOMPARE(second->property("previewWidth").toDouble(), 600.0);
+        const QVariantMap malformed{{"version", 1}, {"organizerWidth", -100},
+            {"fileWidth", qQNaN()}, {"previewWidth", "bad"}, {"layoutMode", 7},
+            {"organizerVisible", "false"}, {"visualEditEnabled", "true"}};
+        QVERIFY(QMetaObject::invokeMethod(second.data(), "restoreState", Q_ARG(QVariant, malformed)));
+        QCOMPARE(second->property("organizerWidth").toDouble(), 184.0);
+        QCOMPARE(second->property("fileWidth").toDouble(), 288.0);
+        QCOMPARE(second->property("previewWidth").toDouble(), 420.0);
+        QCOMPARE(second->property("layoutMode").toInt(), 1);
+        QVERIFY(second->property("organizerVisible").toBool());
+        QVERIFY(!second->property("visualEditEnabled").toBool());
+        const QVariantMap future{{"version", 9}, {"organizerVisible", false}};
+        QVariant accepted;
+        QVERIFY(QMetaObject::invokeMethod(second.data(), "restoreState", Q_RETURN_ARG(QVariant, accepted),
+                                          Q_ARG(QVariant, future)));
+        QVERIFY(!accepted.toBool());
+        QVERIFY(second->property("organizerVisible").toBool());
+        QVERIFY(QMetaObject::invokeMethod(second.data(), "restoreDefaults"));
+        QCOMPARE(second->property("organizerWidth").toDouble(), 208.0);
+        QCOMPARE(second->property("fileWidth").toDouble(), 288.0);
+        QCOMPARE(second->property("previewWidth").toDouble(), 420.0);
+        QVERIFY(second->property("filesVisible").toBool());
+        QVERIFY(!first->property("filesVisible").toBool());
+        QCOMPARE(first->property("fileWidth").toDouble(), 380.0);
+    }
+
+    void compactWorkspaceNavigationAndFindKeepSourceSafe() {
+        QTemporaryDir directory;
+        QFile file(directory.filePath("Document.md"));
+        QVERIFY(file.open(QIODevice::WriteOnly)); file.write("# Saved\n\nA paragraph.\n"); file.close();
+        Backend backend;
+        QQmlEngine engine; engine.rootContext()->setContextProperty("backend", &backend);
+        QQmlComponent component(&engine, QUrl::fromLocalFile(QFINDTESTDATA("../src/Main.qml")));
+        QScopedPointer<QObject> window(component.create()); QVERIFY2(window, qPrintable(component.errorString()));
+        auto *layout = window->findChild<QObject *>("workspaceLayout");
+        auto *editor = window->findChild<QObject *>("sourceEditor");
+        auto *drawer = window->findChild<QObject *>("workspaceNavigationDrawer");
+        auto *prompt = window->findChild<QObject *>("unsavedChangesPrompt");
+        auto *search = window->findChild<QQuickItem *>("searchField");
+        QVERIFY(layout && editor && drawer && prompt && search);
+        window->setProperty("width", 720);
+        layout->setProperty("layoutMode", 1);
+        layout->setProperty("visualEditEnabled", true);
+        window->setProperty("lastWritingSurface", "visual");
+        QTRY_COMPARE(layout->property("effectiveLayoutMode").toInt(), 2);
+        const QString draft = "Keep **unsaved** writing.\n";
+        editor->setProperty("text", draft);
+        QVERIFY(QMetaObject::invokeMethod(window.data(), "toggleWorkspacePane", Q_ARG(QVariant, "organizer")));
+        QTRY_VERIFY(drawer->property("opened").toBool());
+        backend.library()->setProperty("rootFolder", QUrl::fromLocalFile(directory.path()));
+        QCoreApplication::processEvents();
+        QVERIFY(drawer->property("opened").toBool());
+        QVERIFY(QMetaObject::invokeMethod(window.data(), "requestOpen", Q_ARG(QVariant, QUrl::fromLocalFile(file.fileName()))));
+        QTRY_VERIFY(prompt->property("opened").toBool());
+        QVERIFY(QMetaObject::invokeMethod(prompt, "cancelRequested"));
+        QVERIFY(drawer->property("opened").toBool());
+        QCOMPARE(editor->property("text").toString(), draft);
+        QVERIFY(QMetaObject::invokeMethod(drawer, "close"));
+        QTRY_VERIFY(!drawer->property("opened").toBool());
+        QVERIFY(QMetaObject::invokeMethod(window.data(), "openSearch", Q_ARG(QVariant, false), Q_ARG(QVariant, false)));
+        QTRY_VERIFY(search->isVisible());
+        QTRY_COMPARE(layout->property("effectiveLayoutMode").toInt(), 0);
+        QCOMPARE(editor->property("text").toString(), draft);
+        QVERIFY(backend.modified());
+        backend.discardRecovery();
+    }
+
     void initTestCase() {
         QCoreApplication::setOrganizationName("FomawriteTests");
         QCoreApplication::setApplicationName("FomawriteTests");
@@ -777,6 +958,7 @@ private slots:
         QScopedPointer<QObject> window(component.create()); QVERIFY2(window, qPrintable(component.errorString()));
         auto *commands = window->findChild<QObject *>("workspaceCommands");
         auto *settings = window->findChild<QObject *>("workspaceSettings");
+        auto *layout = window->findChild<QObject *>("workspaceLayout");
         auto *editor = window->findChild<QObject *>("sourceEditor");
         auto *chip = window->findChild<QObject *>("editorWordCountChip");
         QVERIFY(commands && settings && editor && chip);
@@ -784,9 +966,9 @@ private slots:
         QVERIFY(editor->setProperty("text", source));
         QVERIFY(editor->setProperty("cursorPosition", 13));
         const bool canUndo = editor->property("canUndo").toBool();
-        const int originalLayout = settings->property("layoutMode").toInt();
-        const bool originalLibrary = settings->property("libraryVisible").toBool();
-        const bool originalOrganizer = settings->property("organizerVisible").toBool();
+        const int originalLayout = layout->property("layoutMode").toInt();
+        const bool originalLibrary = layout->property("filesVisible").toBool();
+        const bool originalOrganizer = layout->property("organizerVisible").toBool();
         const int originalStyle = backend.outputStyle();
         const QString originalAppearance = settings->property("writingAppearance").toString();
         const QString originalTheme = backend.themePreset();
@@ -798,7 +980,7 @@ private slots:
             QCOMPARE(editor->property("text").toString(), source);
             QCOMPARE(editor->property("cursorPosition").toInt(), 13);
             QCOMPARE(editor->property("canUndo").toBool(), canUndo);
-            QCOMPARE(settings->property("layoutMode").toInt(), originalLayout);
+            QCOMPARE(layout->property("layoutMode").toInt(), originalLayout);
             QCOMPARE(backend.outputStyle(), originalStyle);
             QCOMPARE(chip->property("visible").toBool(), QString::fromLatin1(entry.second) != QStringLiteral("manuscript"));
         }
@@ -816,8 +998,8 @@ private slots:
             backend.setThemePreset(QStringLiteral("studio"));
             QVERIFY(QMetaObject::invokeMethod(commands, "run", Q_ARG(QVariant, "writingEditorial")));
             QVERIFY(QMetaObject::invokeMethod(commands, "run", Q_ARG(QVariant, "editor")));
-            QVERIFY(settings->setProperty("libraryVisible", true));
-            QVERIFY(settings->setProperty("organizerVisible", true));
+            QVERIFY(layout->setProperty("filesVisible", true));
+            QVERIFY(layout->setProperty("organizerVisible", true));
             QVERIFY(window->setProperty("width", 1440));
             QVERIFY(window->setProperty("height", 900));
             QVERIFY(editor->setProperty("text", QStringLiteral(
@@ -850,9 +1032,9 @@ private slots:
             QVERIFY(quickWindow->grabWindow().save(darkPath));
         }
         QVERIFY(settings->setProperty("writingAppearance", originalAppearance));
-        QVERIFY(settings->setProperty("layoutMode", originalLayout));
-        QVERIFY(settings->setProperty("libraryVisible", originalLibrary));
-        QVERIFY(settings->setProperty("organizerVisible", originalOrganizer));
+        QVERIFY(layout->setProperty("layoutMode", originalLayout));
+        QVERIFY(layout->setProperty("filesVisible", originalLibrary));
+        QVERIFY(layout->setProperty("organizerVisible", originalOrganizer));
         backend.setThemePreset(originalTheme);
         backend.discardRecovery();
     }
@@ -900,8 +1082,9 @@ private slots:
         QQmlComponent component(&engine, QUrl::fromLocalFile(QFINDTESTDATA("../src/Main.qml")));
         QScopedPointer<QObject> window(component.create()); QVERIFY2(window, qPrintable(component.errorString()));
         auto *settings = window->findChild<QObject *>("workspaceSettings");
-        settings->setProperty("libraryVisible", true);
-        settings->setProperty("organizerVisible", false);
+        auto *layout = window->findChild<QObject *>("workspaceLayout");
+        layout->setProperty("filesVisible", true);
+        layout->setProperty("organizerVisible", false);
         auto *pane = window->findChild<QQuickItem *>("libraryPane");
         auto *field = window->findChild<QQuickItem *>("libraryFilter");
         QVERIFY(pane); QVERIFY(field);
@@ -2889,6 +3072,7 @@ private slots:
         QScopedPointer<QObject> window(component.create());
         QVERIFY(window);
         auto *settings = window->findChild<QObject *>("workspaceSettings");
+        auto *layout = window->findChild<QObject *>("workspaceLayout");
         auto *pane = window->findChild<QObject *>("libraryPane");
         QVERIFY(settings && pane);
         auto native = [&](const char *id) { return window->findChild<QObject *>(QStringLiteral("native_") + id); };
@@ -2898,16 +3082,17 @@ private slots:
 #else
         QSKIP("Native menus are macOS-specific");
 #endif
-        settings->setProperty("libraryVisible", true);
-        settings->setProperty("organizerVisible", true);
+        layout->setProperty("filesVisible", true);
+        layout->setProperty("organizerVisible", true);
         QVERIFY(QMetaObject::invokeMethod(libraryAction, "triggered"));
-        QVERIFY(!settings->property("libraryVisible").toBool());
+        QVERIFY(!layout->property("filesVisible").toBool());
         QCOMPARE(libraryAction->property("text").toString(), QStringLiteral("Show Library"));
-        QVERIFY(!native("organizer")->property("enabled").toBool());
-        settings->setProperty("libraryVisible", true);
+        QVERIFY(native("organizer")->property("enabled").toBool());
+        layout->setProperty("filesVisible", true);
         QCOMPARE(libraryAction->property("text").toString(), QStringLiteral("Hide Library"));
         window->setProperty("width", 800);
-        QTRY_VERIFY(!native("organizer")->property("enabled").toBool());
+        QTRY_VERIFY(native("organizer")->property("enabled").toBool());
+        QTRY_COMPARE(native("organizer")->property("text").toString(), QStringLiteral("Show Organizer"));
         window->setProperty("width", 1280);
         QTRY_VERIFY(native("organizer")->property("enabled").toBool());
         for (const auto &pair : {qMakePair("sortBar", "showSortBar"), qMakePair("filterBar", "showFilterBar"),
@@ -2946,14 +3131,14 @@ private slots:
         QVERIFY(QMetaObject::invokeMethod(native("navigationList"), "triggered"));
         QCOMPARE(backend.library()->property("navigationMode").toInt(), 1);
         QVERIFY(native("navigationList")->property("checked").toBool());
-        settings->setProperty("layoutMode", 0);
+        layout->setProperty("layoutMode", 0);
         QVERIFY(native("webPreview"));
         QVERIFY(QMetaObject::invokeMethod(native("webPreview"), "triggered"));
-        QCOMPARE(settings->property("layoutMode").toInt(), 1);
+        QCOMPARE(layout->property("layoutMode").toInt(), 1);
         QVERIFY(QMetaObject::invokeMethod(native("preview"), "triggered"));
-        QCOMPARE(settings->property("layoutMode").toInt(), 2);
+        QCOMPARE(layout->property("layoutMode").toInt(), 2);
         QVERIFY(QMetaObject::invokeMethod(native("split"), "triggered"));
-        QCOMPARE(settings->property("layoutMode").toInt(), 1);
+        QCOMPARE(layout->property("layoutMode").toInt(), 1);
         auto *pdfPreview = window->findChild<QObject *>("native_pdfPreview");
         QVERIFY(pdfPreview);
         QCOMPARE(pdfPreview->property("text").toString(), QStringLiteral("Paginated Preview…"));
@@ -3069,6 +3254,7 @@ private slots:
         backend.open(QUrl::fromLocalFile(sample.fileName()));
         auto *commands = window->findChild<QObject *>("workspaceCommands");
         auto *settings = window->findChild<QObject *>("workspaceSettings");
+        auto *layout = window->findChild<QObject *>("workspaceLayout");
         auto *editor = window->findChild<QObject *>("sourceEditor");
         QVERIFY(commands && settings && editor);
         auto run = [&](const char *id) { return QMetaObject::invokeMethod(commands, "run", Q_ARG(QVariant, QString::fromLatin1(id))); };
@@ -3102,6 +3288,7 @@ private slots:
         QVERIFY2(window, qPrintable(component.errorString()));
         auto *commands = window->findChild<QObject *>("workspaceCommands");
         auto *settings = window->findChild<QObject *>("workspaceSettings");
+        auto *layout = window->findChild<QObject *>("workspaceLayout");
         auto *editor = window->findChild<QObject *>("sourceEditor");
         auto *focusMenu = window->findChild<QObject *>("focusModeMenu");
         auto *sentence = window->findChild<QObject *>("native_sentence");
@@ -3177,6 +3364,7 @@ private slots:
         QVERIFY2(window, qPrintable(component.errorString()));
         auto *commands = window->findChild<QObject *>("workspaceCommands");
         auto *settings = window->findChild<QObject *>("workspaceSettings");
+        auto *layout = window->findChild<QObject *>("workspaceLayout");
         auto *editor = window->findChild<QObject *>("sourceEditor");
         auto *styleMenu = window->findChild<QObject *>("focusStyleCheckMenu");
         auto *custom = window->findChild<QObject *>("native_customStyleCheck");
@@ -3265,6 +3453,7 @@ private slots:
         QScopedPointer<QObject> window(component.create());
         QVERIFY2(window, qPrintable(component.errorString()));
         auto *settings = window->findChild<QObject *>("workspaceSettings");
+        auto *layout = window->findChild<QObject *>("workspaceLayout");
         auto *commands = window->findChild<QObject *>("workspaceCommands");
         auto *fillers = window->findChild<QObject *>("native_fillersStyleCheck");
         auto *custom = window->findChild<QObject *>("native_customStyleCheck");
@@ -3363,6 +3552,7 @@ private slots:
         backend.open(QUrl::fromLocalFile(documentPath));
 
         auto *settings = window->findChild<QObject *>("workspaceSettings");
+        auto *layout = window->findChild<QObject *>("workspaceLayout");
         auto *editor = window->findChild<QObject *>("sourceEditor");
         auto *menu = window->findChild<QObject *>("authorsMenu");
         auto *setup = window->findChild<QObject *>("authorsSetupAction");
@@ -3686,6 +3876,7 @@ private slots:
         QTemporaryDir directory;
         QVERIFY(directory.isValid());
         FileLibrary library;
+        library.setNavigationMode(0);
         library.setRootFolder(QUrl::fromLocalFile(directory.path()));
         QVERIFY(library.createFolder("Notes"));
         const QUrl draft = library.createDocument("Draft");
@@ -3748,6 +3939,7 @@ private slots:
         backend.open(QUrl::fromLocalFile(file.fileName()));
         auto *editor = window->findChild<QObject *>("sourceEditor");
         auto *settings = window->findChild<QObject *>("workspaceSettings");
+        auto *layout = window->findChild<QObject *>("workspaceLayout");
         const QString original = editor->property("text").toString();
         settings->setProperty("writingSize", 22);
         settings->setProperty("paragraphFocus", true);
@@ -3800,6 +3992,7 @@ private slots:
         auto *editor = window->findChild<QObject *>("sourceEditor");
         auto *preview = window->findChild<QObject *>("renderedPreview");
         auto *settings = window->findChild<QObject *>("workspaceSettings");
+        auto *layout = window->findChild<QObject *>("workspaceLayout");
         auto *scroll = window->findChild<QObject *>("editorScroll");
         QVERIFY(editor && preview && settings && scroll);
         const QString markdown = "# Image\n\n![Test](asset.png)\n\n" + QString("Paragraph.\n\n").repeated(40);
@@ -3851,6 +4044,7 @@ private slots:
         auto *editor = window->findChild<QObject *>("sourceEditor");
         auto *commands = window->findChild<QObject *>("workspaceCommands");
         auto *settings = window->findChild<QObject *>("workspaceSettings");
+        auto *layout = window->findChild<QObject *>("workspaceLayout");
         auto *toolbarStatistic = window->findChild<QObject *>("toolbarStatistic");
         auto *statisticsDialog = window->findChild<QObject *>("statisticsDialog");
         QVERIFY(editor && commands && settings && toolbarStatistic && statisticsDialog);
@@ -3971,6 +4165,7 @@ private slots:
         QScopedPointer<QObject> window(component.create());
         QVERIFY(window);
         auto *settings = window->findChild<QObject *>("workspaceSettings");
+        auto *layout = window->findChild<QObject *>("workspaceLayout");
         auto *commands = window->findChild<QObject *>("workspaceCommands");
         auto *chrome = window->findChild<QObject *>("topChrome");
         auto *title = window->findChild<QObject *>("topChromeTitle");
@@ -4006,7 +4201,7 @@ private slots:
         QVERIFY(QMetaObject::invokeMethod(commands, "run", Q_ARG(QVariant, QStringLiteral("toolbarHide"))));
         QVERIFY(!leading->property("visible").toBool());
         QVERIFY(!trailing->property("visible").toBool());
-        QCOMPARE(chrome->property("height").toInt(), 44);
+        QCOMPARE(chrome->property("height").toInt(), 52);
         QVERIFY(title->property("visible").toBool());
 
 #ifdef Q_OS_MACOS
@@ -4410,10 +4605,11 @@ private slots:
         auto *visual = window->findChild<QObject *>("visualEditor");
         auto *pane = window->findChild<QObject *>("previewPane");
         auto *settings = window->findChild<QObject *>("workspaceSettings");
+        auto *layout = window->findChild<QObject *>("workspaceLayout");
         auto *quickWindow = qobject_cast<QQuickWindow *>(window.data());
         QVERIFY(editor && visual && pane && settings && quickWindow);
-        const int originalLayout = settings->property("layoutMode").toInt();
-        QVERIFY(settings->setProperty("layoutMode", 1));
+        const int originalLayout = layout->property("layoutMode").toInt();
+        QVERIFY(layout->setProperty("layoutMode", 1));
         QVERIFY(editor->setProperty("text", QStringLiteral("Plain sentence.\n")));
         QVERIFY(pane->setProperty("visualEditEnabled", true));
         QTRY_COMPARE(visual->property("text").toString(), QStringLiteral("Plain sentence.\n"));
@@ -4429,7 +4625,7 @@ private slots:
         QVERIFY(visual->setProperty("cursorPosition", 5));
         QTest::keyClick(quickWindow, Qt::Key_Return);
         QCOMPARE(editor->property("text").toString(), QStringLiteral("- List item\n"));
-        QVERIFY(settings->setProperty("layoutMode", originalLayout));
+        QVERIFY(layout->setProperty("layoutMode", originalLayout));
         backend.discardRecovery();
     }
 
@@ -4570,6 +4766,9 @@ private slots:
         QQmlComponent component(&engine, QUrl::fromLocalFile(QFINDTESTDATA("../src/Main.qml")));
         QScopedPointer<QObject> window(component.create());
         QVERIFY2(window, qPrintable(component.errorString()));
+        // Native tests restore the last window size; this test begins at the documented wide default.
+        window->setProperty("width", 1280);
+        window->setProperty("height", 820);
         auto *hub = window->findChild<QObject *>(QStringLiteral("exportHub"));
         auto *destination = window->findChild<QObject *>(QStringLiteral("exportDestinationButton"));
         auto *cancel = window->findChild<QObject *>(QStringLiteral("exportCancelButton"));
@@ -4594,6 +4793,7 @@ private slots:
                 && exportPreview && exportSource && pane && visual);
         QVERIFY(QMetaObject::invokeMethod(hub, "open"));
         QTRY_VERIFY(hub->property("visible").toBool());
+        QTRY_VERIFY(hub->property("opened").toBool());
         QCOMPARE(destination->property("text").toString(), QStringLiteral("Save PDF…"));
         QVERIFY(!horizontalBar->property("visible").toBool());
         QTRY_VERIFY(optionsBand->property("width").toReal() >= 220);
@@ -4612,6 +4812,10 @@ private slots:
         QTRY_VERIFY(hub->property("width").toReal() <= initialDialogWidth - 30);
         const auto handles = bands->findChildren<QQuickItem *>(QStringLiteral("exportBandHandle"));
         QVERIFY(handles.size() == 2);
+        QTRY_VERIFY(qAbs(horizontalViewport->property("width").toReal() - (hub->property("width").toReal() - 40)) < 1);
+        QTRY_VERIFY(qAbs(optionsBand->property("width").toReal() + stylesBand->property("width").toReal()
+                        + previewBand->property("width").toReal() + handles[0]->width() + handles[1]->width()
+                        - bands->property("width").toReal()) < 1);
         const qreal initialOptionsWidth = optionsBand->property("width").toReal();
         const QPoint handlePoint = handles.first()->mapToScene(QPointF(handles.first()->width() / 2, handles.first()->height() / 2)).toPoint();
         QTest::mousePress(quickWindow, Qt::LeftButton, Qt::NoModifier, handlePoint);
@@ -4664,7 +4868,7 @@ private slots:
         QVERIFY(previewBand->property("visible").toBool());
         QVERIFY(hub->property("width").toReal() <= window->property("width").toReal() - 31);
         QVERIFY(hub->property("height").toReal() <= window->property("height").toReal() - 31);
-        QVERIFY(pane->setProperty("visualEditEnabled", true));
+        QVERIFY(QMetaObject::invokeMethod(window.data(), "selectWritingMode", Q_ARG(QVariant, "visual")));
         QTRY_VERIFY(visual->property("visible").toBool());
         const QFont visualFont = qvariant_cast<QFont>(visual->property("font"));
         QVERIFY(visualFont.pixelSize() >= 18);
@@ -4714,17 +4918,24 @@ private slots:
         QScopedPointer<QObject> window(component.create());
         QVERIFY2(window, qPrintable(component.errorString()));
         auto *settings = window->findChild<QObject *>(QStringLiteral("workspaceSettings"));
+        auto *layout = window->findChild<QObject *>("workspaceLayout");
         auto *source = window->findChild<QObject *>(QStringLiteral("sourceEditor"));
         auto *pane = window->findChild<QObject *>(QStringLiteral("previewPane"));
         auto *sourceButton = pane ? pane->findChild<QObject *>(QStringLiteral("visualEditSourceButton")) : nullptr;
         QVERIFY(settings && source && pane && sourceButton);
         const QString markdown = QStringLiteral("# Heading\n\nA safe paragraph.\n");
         QVERIFY(source->setProperty("text", markdown));
-        QVERIFY(settings->setProperty("layoutMode", 1));
+        QVERIFY(layout->setProperty("layoutMode", 1));
         QVERIFY(pane->setProperty("visualEditEnabled", true));
         QVERIFY(pane->property("visualEditEnabled").toBool());
+        QVERIFY(QMetaObject::invokeMethod(pane, "layoutRequested", Q_ARG(int, 2)));
+        QCOMPARE(layout->property("layoutMode").toInt(), 2);
+        QVERIFY(pane->property("visualEditEnabled").toBool());
+        QVERIFY(QMetaObject::invokeMethod(pane, "layoutRequested", Q_ARG(int, 1)));
+        QCOMPARE(layout->property("layoutMode").toInt(), 1);
+        QVERIFY(pane->property("visualEditEnabled").toBool());
         QVERIFY(QMetaObject::invokeMethod(sourceButton, "clicked"));
-        QCOMPARE(settings->property("layoutMode").toInt(), 0);
+        QCOMPARE(layout->property("layoutMode").toInt(), 0);
         QVERIFY(!pane->property("visualEditEnabled").toBool());
         QCOMPARE(window->property("lastWritingSurface").toString(), QStringLiteral("source"));
         QCOMPARE(source->property("text").toString(), markdown);
@@ -4883,16 +5094,19 @@ private slots:
 
         QObject *editor = window->findChild<QObject *>(QStringLiteral("sourceEditor"));
         QVERIFY(editor);
-        QCOMPARE(editor->property("font").value<QFont>().pixelSize(), 16);
+        auto *settings = window->findChild<QObject *>("workspaceSettings");
+        settings->setProperty("writingAppearance", "editorial");
+        settings->setProperty("writingSize", 16);
+        QCOMPARE(editor->property("font").value<QFont>().pixelSize(), 19);
 
         // `omarchy display text size 16` sets the GNOME factor to 16/12.
         backend.setTextScale(16.0 / 12.0);
-        QCOMPARE(window->property("editorFontPixelSize").toInt(), 21);
-        QCOMPARE(editor->property("font").value<QFont>().pixelSize(), 21);
+        QCOMPARE(window->property("editorFontPixelSize").toInt(), 25);
+        QCOMPARE(editor->property("font").value<QFont>().pixelSize(), 25);
 
         backend.setTextScale(9.0 / 12.0);
-        QCOMPARE(window->property("editorFontPixelSize").toInt(), 12);
-        QCOMPARE(editor->property("font").value<QFont>().pixelSize(), 12);
+        QCOMPARE(window->property("editorFontPixelSize").toInt(), 14);
+        QCOMPARE(editor->property("font").value<QFont>().pixelSize(), 14);
     }
 
     void preservesMarkdownAndProtectsUnsavedOpen() {

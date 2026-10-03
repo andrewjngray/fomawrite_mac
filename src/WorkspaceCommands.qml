@@ -7,6 +7,7 @@ QtObject {
     id: root
     objectName: "workspaceCommands"
     required property var settings
+    required property var layoutState
     required property var library
     required property var libraryPane
     required property var window
@@ -121,15 +122,15 @@ QtObject {
         if (["duplicate", "rename", "move", "reveal"].indexOf(id) >= 0) return backend.fileUrl.toString() !== "";
         if (["quickOpen", "refreshTags"].indexOf(id) >= 0) return library.rootFolder.toString() !== "";
         if (id === "spelling") return window.isMac && editor.length > 0;
-        if (id === "organizer") return settings.libraryVisible && window.width >= 1000;
+        if (id === "organizer") return true;
         if (id === "larger") return settings.writingSize < 32;
         if (id === "smaller") return settings.writingSize > 12;
         return entry(id) !== null;
     }
     function isChecked(id) {
         switch (id) {
-        case "library": return settings.libraryVisible;
-        case "organizer": return settings.organizerVisible;
+        case "library": return layoutState.effectiveFilesVisible;
+        case "organizer": return layoutState.effectiveOrganizerVisible;
         case "sortBar": return libraryPane.showSortBar;
         case "filterBar": return libraryPane.showFilterBar;
         case "sortName": return library.sortMode === 0;
@@ -145,10 +146,10 @@ QtObject {
         case "excerpts": return libraryPane.showExcerpts;
         case "navigationTree": return library.navigationMode === 0;
         case "navigationList": return library.navigationMode === 1;
-        case "editor": return settings.layoutMode === 0;
-        case "split": return settings.layoutMode === 1;
-        case "preview": return settings.layoutMode === 2;
-        case "togglePreview": return settings.layoutMode !== 0;
+        case "editor": return layoutState.layoutMode === 0;
+        case "split": return layoutState.layoutMode === 1;
+        case "preview": return layoutState.layoutMode === 2;
+        case "togglePreview": return layoutState.layoutMode !== 0;
         case "webPreview": return true;
         case "titleBarFade": return settings.titleBarMode === 0;
         case "titleBarAlways": return settings.titleBarMode === 1;
@@ -186,8 +187,8 @@ QtObject {
         if (!isEnabled(id)) return;
         switch (id) {
         default: commandRequested(id); break;
-        case "library": settings.libraryVisible = !settings.libraryVisible; break;
-        case "organizer": settings.organizerVisible = !settings.organizerVisible; break;
+        case "library": window.toggleWorkspacePane("files"); break;
+        case "organizer": window.toggleWorkspacePane("organizer"); break;
         case "sortBar": libraryPane.showSortBar = !libraryPane.showSortBar; break;
         case "filterBar": libraryPane.showFilterBar = !libraryPane.showFilterBar; break;
         case "sortName": library.sortMode = 0; break;
@@ -209,12 +210,12 @@ QtObject {
         case "writingManuscript": settings.writingAppearance = "manuscript"; break;
         case "writingEditorial": settings.writingAppearance = "editorial"; break;
         case "writingBook": settings.writingAppearance = "book"; break;
-        case "editor": settings.layoutMode = 0; break;
-        case "split": settings.layoutMode = 1; break;
-        case "preview": settings.layoutMode = 2; break;
-        case "togglePreview": settings.layoutMode = settings.layoutMode === 0 ? 1 : 0; break;
+        case "editor": window.selectWritingMode("source"); break;
+        case "split": layoutState.layoutMode = 1; break;
+        case "preview": window.selectWritingMode("preview"); break;
+        case "togglePreview": layoutState.layoutMode = layoutState.layoutMode === 0 ? 1 : 0; break;
         case "reloadPreview": preview.reload(); break;
-        case "webPreview": if (settings.layoutMode === 0) settings.layoutMode = 1; break;
+        case "webPreview": if (layoutState.layoutMode === 0) layoutState.layoutMode = 1; break;
         case "titleBarFade": settings.titleBarMode = 0; break;
         case "titleBarAlways": settings.titleBarMode = 1; break;
         case "toolbarFade": settings.toolbarVisibilityMode = 0; break;

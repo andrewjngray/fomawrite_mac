@@ -93,7 +93,7 @@ public:
     Q_INVOKABLE int markdownAnchorPosition(const QString &markdown, const QString &anchor) const;
     Q_INVOKABLE QString tableOfContents(const QString &markdown) const;
     Q_INVOKABLE void stylePreview(QObject *textDocument);
-    Q_INVOKABLE void styleVisualEditor(QObject *textDocument, int textSize);
+    Q_INVOKABLE void styleVisualEditor(QObject *textDocument, int textSize, const QString &typeface = QString());
     Q_INVOKABLE QVariantMap wrapSelection(int start, int end, const QString &before, const QString &after);
     Q_INVOKABLE QVariantMap replaceText(int start, int end, const QString &replacement);
     // A conservative snapshot for the visual editor. `source` is the exact
@@ -291,7 +291,7 @@ private:
     QString m_status;
     int m_wordCount = 0;
     bool m_systemDarkMode = true;
-    QString m_themePreset = "system";
+    QString m_themePreset = "studio";
     bool m_darkMode = true;
     qreal m_textScale = 1.0;
     bool m_loading = false;

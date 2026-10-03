@@ -18,6 +18,7 @@
 #include <QStandardPaths>
 #include <QDir>
 #include <QJsonObject>
+#include <QJSValue>
 #include <QCryptographicHash>
 #include <QMessageBox>
 #include <QScreen>
@@ -27,6 +28,9 @@
 #include "backend.h"
 #include "systemtheme.h"
 #ifdef FOMAWRITE_CONTEXT_SMOKE
+#include <QQuickItem>
+#include <QQuickWindow>
+#include <QImage>
 #include <QTemporaryDir>
 #include <QSettings>
 #include <QPrintDialog>
@@ -127,7 +131,7 @@ int main(int argc, char *argv[]) {
     app.setOrganizationName(QStringLiteral("AndrewGray"));
     app.setOrganizationDomain(QStringLiteral("andrewjngray.github.io"));
     app.setApplicationDisplayName(QStringLiteral("Fomawrite"));
-    app.setApplicationVersion(QStringLiteral("0.2.0-rc1"));
+    app.setApplicationVersion(QStringLiteral("0.3.0-dev1"));
 #ifdef FOMAWRITE_CONTEXT_SMOKE
     // A separately compiled integration test runs the real window manager with
     // disposable settings and documents, never the user's workspace.
@@ -207,6 +211,13 @@ int main(int argc, char *argv[]) {
                 {"screen", w->screen() ? w->screen()->name() : QString()}, {"state", int(w->windowState())},
                 {"active", lastActiveWindow == w},
                 {"root", session->backend->library()->property("rootFolder").toUrl().toString()}};
+            // QML var properties may carry their map as a QJSValue. Save desired
+            // pane state, independently of the currently contracted geometry.
+            QVariant paneState = w->property("workspacePaneState");
+            if (paneState.metaType() == QMetaType::fromType<QJSValue>())
+                paneState = paneState.value<QJSValue>().toVariant();
+            const QJsonValue paneStateJson = QJsonValue::fromVariant(paneState);
+            if (paneStateJson.isObject()) entry["paneState"] = paneStateJson;
 #ifdef Q_OS_MACOS
             const auto native = macWorkspaceState(w);
             entry["group"] = native.value("group").toString();
@@ -397,6 +408,17 @@ int main(int argc, char *argv[]) {
         w->setScreen(target);
         const QRect saved(entry["x"].toInt(),entry["y"].toInt(),entry["width"].toInt(1100),entry["height"].toInt(720));
         w->setGeometry(WorkspaceStore::visibleGeometry(saved,target->availableGeometry(),QSize(w->minimumWidth(),w->minimumHeight())));
+        // Older checkpoints have no paneState; preserve the QML migration/defaults.
+        if (entry["paneState"].isObject()) {
+            auto paneState = entry["paneState"].toObject();
+            // Clamp a restored preview preference to this display, rather than
+            // the temporarily narrow restored window. Runtime contraction is QML-only.
+            if (paneState["previewWidth"].isDouble())
+                paneState["previewWidth"] = qBound(320.0, paneState["previewWidth"].toDouble(),
+                    double(qMax(320, target->availableGeometry().width() - 480)));
+            QMetaObject::invokeMethod(w, "restoreWorkspacePaneState",
+                                      Q_ARG(QVariant, paneState.toVariantMap()));
+        }
         restored->checkpoint=entry;
         const int state=entry["state"].toInt();
         if (state==Qt::WindowMinimized || state==Qt::WindowFullScreen || state==Qt::WindowMaximized) {

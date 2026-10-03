@@ -3,6 +3,10 @@
         <file>LibraryPane.qml</file>
         <file>LibraryContextMenu.qml</file>
         <file>WorkspaceCommands.qml</file>
+        <file>WorkspaceLayout.qml</file>
+        <file>WorkspaceHeader.qml</file>
+        <file>ToolbarButton.qml</file>
+        <file>ToolbarGroup.qml</file>
         <file>NativeCommandMenuItem.qml</file>
         <file>RecentFilesMenu.qml</file>
         <file>ChromeButton.qml</file>

@@ -35,3 +35,9 @@ The project repository is [andrewjngray/fomawrite_mac](https://github.com/andrew
 ## Attribution
 
 The upstream Omawrite code is copyright David Heinemeier Hansson and remains under the [MIT license](LICENSE). Bundled iA Writer Mono fonts are copyright Information Architects Inc., based on IBM Plex, and remain under the [SIL Open Font License](fonts/OFL.txt).
+
+## Current workspace review build
+
+The approved workspace redesign is in **0.3.0-dev1**, macOS bundle **0.3.0 (97)**. Use `dist/Fomawrite Dev.app` for review, or the packaged `dist/Fomawrite.app` for the same features with bundled Qt dependencies. The Applications copy is refreshed at handoff. Choose **Aa → Studio writing layout** to apply the complete reference appearance without replacing stored preferences automatically.
+
+See [Cycle 97 verification](research/cycle-97/README.md), the [review exercise](research/usability/cycle-97.md), and the [workspace standards and next cycles](docs/workspace-ui-redesign-plan.md). This is a local review candidate; the older GitHub RC1 download does not contain this UI.

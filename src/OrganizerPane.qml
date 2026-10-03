@@ -20,59 +20,110 @@ Rectangle {
     signal searchRequested(string query, bool contents, url folder)
     signal openRequested(url file)
     color: backend.palette.organizer
+    function chooseLocation() { locationDialog.open() }
     function activate(entry) {
         if (entry.directory) library.rootFolder = entry.url;
         else openRequested(entry.url);
     }
     LibraryContextMenu { id: contextMenu; library: root.library; commands: root.commands; darkMode: root.darkMode }
+    component OrganizerEntry: RowLayout {
+        id: shortcutRow
+        required property var entryData
+        property string shortcutKind: ""
+        Layout.fillWidth: true
+        spacing: 0
+        HoverHandler { id: rowHover }
+        ChromeButton {
+            id: shortcutButton
+            Layout.fillWidth: true
+            Layout.minimumWidth: 0
+            text: shortcutRow.entryData.name
+            iconName: shortcutRow.entryData.directory ? "folder" : "editor"
+            iconColor: shortcutRow.entryData.available
+                ? (shortcutRow.entryData.directory ? backend.palette.folder : backend.palette.muted)
+                : backend.palette.muted
+            alignLeft: true
+            darkMode: root.darkMode
+            checked: shortcutRow.entryData.available && (shortcutRow.entryData.directory
+                ? shortcutRow.entryData.url.toString() === root.library.rootFolder.toString()
+                : shortcutRow.entryData.url.toString() === root.currentFile.toString())
+            opacity: shortcutRow.entryData.available ? 1 : 0.55
+            Accessible.checkable: true
+            Accessible.checked: checked
+            hint: shortcutRow.entryData.url.toString() + (shortcutRow.entryData.available ? "" : " — unavailable")
+            Accessible.name: text
+            Accessible.description: shortcutRow.entryData.available
+                ? (shortcutRow.entryData.directory ? "Folder shortcut" : "Document shortcut") : "Unavailable location"
+            tooltipDelay: 2000
+            onClicked: {
+                if (!shortcutRow.entryData.available) return
+                if (shortcutRow.shortcutKind === "location") root.library.rootFolder = shortcutRow.entryData.url
+                else root.activate(shortcutRow.entryData)
+            }
+            Keys.onMenuPressed: contextMenu.showFor(this, shortcutRow.entryData, shortcutRow.shortcutKind === "location", Qt.point(0, height))
+        }
+        ChromeButton {
+            visible: shortcutRow.shortcutKind === "location" || shortcutRow.shortcutKind === "favorite"
+            implicitWidth: 24
+            iconName: "close"
+            darkMode: root.darkMode
+            opacity: rowHover.hovered || shortcutButton.activeFocus || activeFocus ? 1 : 0
+            hint: (shortcutRow.shortcutKind === "location" ? "Remove location shortcut " : "Remove favorite ") + shortcutRow.entryData.name
+            Accessible.name: hint
+            onClicked: {
+                if (shortcutRow.shortcutKind === "location") root.library.removeLocation(shortcutRow.entryData.url)
+                else root.library.toggleFavorite(shortcutRow.entryData.url)
+            }
+        }
+        TapHandler {
+            acceptedButtons: Qt.RightButton
+            onTapped: (eventPoint) => contextMenu.showFor(shortcutButton, shortcutRow.entryData, shortcutRow.shortcutKind === "location", eventPoint.position)
+        }
+    }
     ScrollView {
-        anchors.fill: parent
         id: organizerScroll
-        anchors.margins: 12
+        anchors.fill: parent
+        anchors.margins: 8
         contentWidth: availableWidth
+        clip: true
         ColumnLayout {
             width: organizerScroll.availableWidth
             spacing: 2
             RowLayout {
-                Label { text: "Locations"; font.pixelSize: 12; font.bold: false; color: backend.palette.muted; Layout.fillWidth: true }
-                ChromeButton { darkMode: root.darkMode; iconName: "plus"; Accessible.name: "Add library location"; onClicked: locationDialog.open() }
+                Layout.fillWidth: true
+                Layout.bottomMargin: 6
+                Label {
+                    text: "Locations"
+                    font.family: Qt.application.font.family
+                    font.pixelSize: 12
+                    font.weight: Font.Medium
+                    color: backend.palette.muted
+                    Layout.leftMargin: 8
+                    Layout.fillWidth: true
+                }
+                ChromeButton { darkMode: root.darkMode; iconName: "plus"; hint: "Add library location"; onClicked: locationDialog.open() }
             }
             Repeater {
                 model: root.library.locations
-                delegate: RowLayout {
+                delegate: OrganizerEntry {
                     required property var modelData
-                    Layout.fillWidth: true
-                    ChromeButton {
-                        text: modelData.name
-                        iconName: modelData.directory ? "folder" : "editor"
-                        alignLeft: true
-                        darkMode: root.darkMode
-                        enabled: true
-                        checked: modelData.url.toString() === root.library.rootFolder.toString()
-                        Layout.fillWidth: true
-                        onClicked: if (modelData.available) root.library.rootFolder = modelData.url
-                        hint: modelData.url.toString()
-                        Accessible.name: text
-                        tooltipDelay: 2000
-                        TapHandler {
-                            acceptedButtons: Qt.RightButton
-                            onTapped: (eventPoint) => contextMenu.showFor(parent, modelData, true, eventPoint.position)
-                        }
-                        Keys.onMenuPressed: contextMenu.showFor(this, modelData, true, Qt.point(0, height))
-                    }
-                    ChromeButton { darkMode: root.darkMode; iconName: "close"; Accessible.name: "Remove location shortcut " + modelData.name; onClicked: root.library.removeLocation(modelData.url) }
+                    entryData: modelData
+                    shortcutKind: "location"
                 }
             }
             ChromeButton {
                 objectName: "favoritesDisclosure"
                 Layout.topMargin: 14
+                Layout.bottomMargin: 6
                 Layout.fillWidth: true
                 text: "Favorites"
                 hint: (sectionSettings.favoritesExpanded ? "Collapse" : "Expand") + " Favorites"
                 iconName: sectionSettings.favoritesExpanded ? "down" : "right"
+                iconColor: backend.palette.muted
                 alignLeft: true
                 darkMode: root.darkMode
                 font.pixelSize: 12
+                font.weight: Font.Medium
                 onClicked: sectionSettings.favoritesExpanded = !sectionSettings.favoritesExpanded
             }
             ColumnLayout {
@@ -82,71 +133,88 @@ Rectangle {
                 spacing: 2
                 Repeater {
                     model: root.library.favorites
-                    delegate: RowLayout {
+                    delegate: OrganizerEntry {
                         required property var modelData
-                        Layout.fillWidth: true
-                        ChromeButton {
-                            text: modelData.name
-                            iconName: modelData.directory ? "folder" : "editor"
-                            alignLeft: true
-                            darkMode: root.darkMode
-                            Layout.fillWidth: true
-                            enabled: true
-                            onClicked: if (modelData.available) root.activate(modelData)
-                            hint: modelData.url.toString()
-                            Accessible.name: text
-                            tooltipDelay: 2000
-                        TapHandler {
-                            acceptedButtons: Qt.RightButton
-                            onTapped: (eventPoint) => contextMenu.showFor(parent, modelData, false, eventPoint.position)
-                        }
-                        Keys.onMenuPressed: contextMenu.showFor(this, modelData, false, Qt.point(0, height))
-                        }
-                        ChromeButton { darkMode: root.darkMode; iconName: "close"; Accessible.name: "Remove favorite " + modelData.name; onClicked: root.library.toggleFavorite(modelData.url) }
+                        entryData: modelData
+                        shortcutKind: "favorite"
                     }
                 }
-                ChromeButton { text: "Favorite folder"; iconName: "plus"; alignLeft: true; darkMode: root.darkMode; Layout.fillWidth: true; onClicked: root.library.toggleFavorite(root.library.rootFolder) }
+                ChromeButton { text: "Favorite folder"; iconName: "plus"; alignLeft: true; darkMode: root.darkMode; Layout.fillWidth: true; onClicked: root.library.toggleFavorite(root.library.rootFolder); enabled: root.library.rootFolder.toString() !== "" }
                 ChromeButton { text: "Favorite document"; iconName: "plus"; alignLeft: true; darkMode: root.darkMode; Layout.fillWidth: true; enabled: root.currentFile.toString() !== ""; onClicked: root.library.toggleFavorite(root.currentFile) }
             }
-            Label { text: "Smart folders"; color: backend.palette.muted; Layout.topMargin: 14 }
+            Label {
+                text: "Smart folders"
+                color: backend.palette.muted
+                font.family: Qt.application.font.family
+                font.pixelSize: 12
+                font.weight: Font.Medium
+                Layout.leftMargin: 8
+                Layout.topMargin: 16
+                Layout.bottomMargin: 6
+            }
             Repeater {
                 model: root.library.savedSearches
                 delegate: ChromeButton {
                     required property var modelData
-                    Layout.fillWidth: true; alignLeft: true; iconName: "search"; darkMode: root.darkMode
-                    text: modelData.query; hint: "Search saved files: " + modelData.query
+                    Layout.fillWidth: true
+                    alignLeft: true
+                    iconName: "search"
+                    darkMode: root.darkMode
+                    text: modelData.query
+                    hint: "Search saved files: " + modelData.query
                     onClicked: root.searchRequested(modelData.query, modelData.contents, modelData.root)
                 }
             }
-            Label { text: "Save queries in Quick Open to add smart folders."; visible: root.library.savedSearches.length === 0; wrapMode: Text.Wrap; Layout.fillWidth: true; color: backend.palette.muted; font.pixelSize: 11 }
-            RowLayout {
-                Label { text: "Tags"; color: backend.palette.muted; Layout.fillWidth: true }
-                ChromeButton { text: "Refresh"; hint: "Scan saved files for tags"; darkMode: root.darkMode; onClicked: root.library.refreshTags() }
+            Label {
+                text: "Save queries in Quick Open to add smart folders."
+                visible: root.library.savedSearches.length === 0
+                wrapMode: Text.Wrap
+                Layout.fillWidth: true
+                Layout.leftMargin: 8
+                Layout.rightMargin: 8
+                color: backend.palette.muted
+                font.family: Qt.application.font.family
+                font.pixelSize: 12
             }
-            Label { text: root.library.tagStatus; wrapMode: Text.Wrap; Layout.fillWidth: true; color: backend.palette.muted; font.pixelSize: 10 }
+            RowLayout {
+                Layout.fillWidth: true
+                Layout.topMargin: 16
+                Layout.bottomMargin: 6
+                Label { text: "Tags"; font.family: Qt.application.font.family; font.pixelSize: 12; font.weight: Font.Medium; color: backend.palette.muted; Layout.leftMargin: 8; Layout.fillWidth: true }
+                ChromeButton { iconName: "refresh"; hint: "Scan saved files for tags"; darkMode: root.darkMode; onClicked: root.library.refreshTags() }
+            }
+            Label { text: root.library.tagStatus; wrapMode: Text.Wrap; Layout.fillWidth: true; Layout.leftMargin: 8; Layout.rightMargin: 8; color: backend.palette.muted; font.family: Qt.application.font.family; font.pixelSize: 12 }
             Repeater {
                 model: root.library.tagIndex
                 delegate: ChromeButton {
                     required property var modelData
-                    Layout.fillWidth: true; alignLeft: true; darkMode: root.darkMode
+                    Layout.fillWidth: true
+                    alignLeft: true
+                    iconName: "tag"
+                    darkMode: root.darkMode
                     text: "#" + modelData.tag + " (" + modelData.count + ")"
-                    onClicked: root.searchRequested("#" + modelData.tag,true,root.library.rootFolder)
+                    hint: "Search saved files for #" + modelData.tag
+                    onClicked: root.searchRequested("#" + modelData.tag, true, root.library.rootFolder)
                 }
             }
             RowLayout {
+                Layout.fillWidth: true
                 Layout.topMargin: 14
+                Layout.bottomMargin: 6
                 ChromeButton {
                     objectName: "recentsDisclosure"
                     Layout.fillWidth: true
                     text: "Recents"
                     hint: (sectionSettings.recentsExpanded ? "Collapse" : "Expand") + " Recents"
                     iconName: sectionSettings.recentsExpanded ? "down" : "right"
+                    iconColor: backend.palette.muted
                     alignLeft: true
                     darkMode: root.darkMode
                     font.pixelSize: 12
+                    font.weight: Font.Medium
                     onClicked: sectionSettings.recentsExpanded = !sectionSettings.recentsExpanded
                 }
-                ChromeButton { darkMode: root.darkMode; iconName: "close"; Accessible.name: "Clear recent file shortcuts"; onClicked: root.library.clearRecentFiles() }
+                ChromeButton { id: recentActions; darkMode: root.darkMode; iconName: "more"; hint: "Recent file options"; onClicked: recentMenu.open() }
             }
             ColumnLayout {
                 objectName: "recentsContents"
@@ -155,30 +223,20 @@ Rectangle {
                 spacing: 2
                 Repeater {
                     model: root.library.recentFiles
-                    delegate: ChromeButton {
-                        darkMode: root.darkMode
+                    delegate: OrganizerEntry {
                         required property var modelData
-                        Layout.fillWidth: true
-                        implicitHeight: 30
-                        font.pixelSize: 14
-                        font.bold: false
-                        text: modelData.name
-                        iconName: modelData.directory ? "folder" : "editor"
-                        alignLeft: true
-                        enabled: true
-                        onClicked: if (modelData.available) root.openRequested(modelData.url)
-                        hint: modelData.url.toString()
-                        Accessible.name: text
-                        tooltipDelay: 2000
-                        TapHandler {
-                            acceptedButtons: Qt.RightButton
-                            onTapped: (eventPoint) => contextMenu.showFor(parent, modelData, false, eventPoint.position)
-                        }
-                        Keys.onMenuPressed: contextMenu.showFor(this, modelData, false, Qt.point(0, height))
+                        entryData: modelData
                     }
                 }
             }
         }
+    }
+    CompactMenu {
+        id: recentMenu
+        parent: recentActions
+        y: recentActions.height + 3
+        darkMode: root.darkMode
+        CompactMenuItem { text: "Clear recent file shortcuts"; onTriggered: root.library.clearRecentFiles() }
     }
     Dialogs.FolderDialog {
         id: locationDialog

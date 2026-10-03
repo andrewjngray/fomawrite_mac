@@ -6,13 +6,13 @@ Menu {
     property bool darkMode: false
     delegate: CompactMenuItem {}
     width: 224
-    padding: 5
-    font.family: Qt.platform.os === "osx" ? Qt.application.font.family : "Helvetica Neue"
+    padding: 6
+    font.family: Qt.application.font.family
     font.pixelSize: 13
     popupType: Popup.Item
     background: Rectangle {
-        radius: 10
-        color: backend.palette.panel
+        radius: 8
+        color: backend.palette.popover || backend.palette.panel
         border.color: backend.palette.border
         border.width: 1
     }

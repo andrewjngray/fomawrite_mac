@@ -1264,3 +1264,44 @@ Changes: explicit New Tab/New Window creates an additional editor for a saved fi
 Verification: `./bin/build` and all **118 tests pass**. The QML menu regression covers target-specific actions, dialogs, file mutations, Trash, clipboard formats, exports and presentation controls while retaining an unrelated unsaved draft. `./bin/test-window-routing` verifies the actual production window manager with native Cocoa windows and disposable data: separate windows, correct tab group, ordinary-open reuse, all three print-dialog cancellations, and Finder/share request dispatch. No print job or sharing transmission occurred. See the [action-by-action audit](../research/cycle-89/README.md).
 
 Artifacts and limits: the updated package is `dist/Fomawrite.app`; running Applications/Dev bundles await normal close before refresh. Third-party share completion, Finder selection, export destination-picker interaction and VoiceOver remain manual checks. Independent views do not live-sync text; conflicts require Reload, an explicit decision to keep a version, or Save As. [Review exercise](../research/usability/cycle-89.md).
+
+
+## Cycle 90 — workspace UI design planning
+
+Status: planning only, 3 October 2026. Andrew requested a comprehensive Ulysses-inspired design pass before implementation. Read the [workspace UI redesign plan](workspace-ui-redesign-plan.md) for the proposed Cycles 90–97, standards, review gates and definition of done.
+
+Completed planning: reviewed the supplied three-app composition and current code; obtained independent structure and visual-design reviews; specified pane-owned headers, blue-folder standards, round/capsule controls, writing appearances and desired-versus-effective layout state. The separate interactive concept explores presentation and panel visibility; it is not a runnable app build or proof of native behavior.
+
+Verification: checked the proposal against existing command paths, workspace persistence and source/undo protections. No app source changed and no build, test, install or push was performed for this planning pass. Cycle 89 remains the code baseline, and Cycle 88 acceptance remains open.
+
+Next review: approve the complete composition and compact behavior, then explicitly authorize implementation. The first implementation work is component and native-titlebar feasibility before changing the installed app.
+
+## Cycles 90–96 — approved workspace implementation
+
+Status: Andrew approved the complete workspace direction after the Cycle 90 planning pass. The work is integrated as one candidate; the cycle labels describe implementation scope and do not imply seven separate accepted releases. The original planning-only record above remains historical.
+
+| Cycle | Changes |
+| --- | --- |
+| 90 — Design foundation | Approved complete composition, blue folders, pane ownership and responsive collapse rules. |
+| 91 — Shared components | Added round toolbar actions and capsule groups, semantic surface/control palette roles and consistent navigation/control states. |
+| 92 — Column-owned shell | Replaced toolbar width arithmetic with a 52-pixel header aligned to actual organizer, files and document panes. Guarded document history, Find, formatting, Appearance, Export and Workspace routes remain reachable. |
+| 93 — Responsive column state | Added independent desired/effective visibility and widths, ordered auxiliary contraction, split fallback, 48-pixel restoration hysteresis, temporary navigation drawers and versioned per-window checkpoint state. Divider resizing stores user changes rather than temporary contraction. |
+| 94 — Writing finish | Refined Editorial/Manuscript/Book measure and insets, set source line height to 150%, kept explicit Source / Visual Edit / Preview choices and the document statistics control, and removed permanent duplicate formatting actions. Existing stored theme and writing choices remain; new installations default to Studio and Editorial. |
+| 95 — Navigation finish | Refined organizer sections and contextual removal, retained blue folder identity, normalized compact rows and two-line file previews, and kept folder/file search and history scopes distinct. |
+| 96 — Supporting UI sweep | Applied shared control treatment to menus, search actions, outline, preview and dialog buttons while preserving Export's independent vertical panes, horizontal access and fixed footer. |
+
+Verification: production build and **122 regression tests pass** (zero failures/skips). Native production-main checks pass pane alignment/resizing, per-window checkpoint independence, New Window/Tab and source/undo preservation. App-only wide/compact/Book/dark captures were inspected. See the [Cycle 97 evidence record](../research/cycle-97/README.md) for actual results and limits.
+
+Known gaps: Andrew's complete composition/writing acceptance, VoiceOver, display scaling, inactive-window states, full screen and the broader native tab/window restoration matrix remain to be reviewed. Visual Edit remains a bounded source projection; general image/list/table editing, parser/output parity and public distribution are separate work. Private writing and pre-existing dirty sample files are untouched by this cycle.
+
+## Cycle 97 — workspace candidate and acceptance handoff
+
+Candidate identity: application version `0.3.0-dev1`; macOS bundle version `0.3.0`, build `97`. This is an acceptance candidate, not a parity or public-release declaration.
+
+Planned scope: complete the appropriate automated checks, native resize/navigation/editing verification, synthetic screenshots, bundle identity comparison and documentation for the approved Cycles 90–96. Checkpoints must preserve Markdown bytes, undo, dirty/recovery state, active writing surface and per-window layout intent. Package/Dev/Applications status must be recorded individually after preparation; a shared version label alone does not prove equal executables.
+
+Tests and native verification: `./bin/build`, all 122 tests, native workspace integration, focused appearance and control checks passed within the recorded scope. Export fixture synchronization/window-size issues and a transient frontmost native draft mismatch are documented with their reruns. See [research/cycle-97](../research/cycle-97/README.md).
+
+Runnable artifacts: refreshed `dist/Fomawrite Dev.app`, ordinary `dist/Fomawrite.app`, and `/Applications/Fomawrite.app`, all version 0.3.0/build 97. All pass strict signatures; packaged/installed executables match. Dev has the same source with local Qt linkage. Previous Applications copy backed up. [Optional review exercise](../research/usability/cycle-97.md).
+
+Next recommended scopes: Cycle 98 user feedback and accessibility/display-scale/tab acceptance; Cycle 99 safe visual blocks and image/list/table projection; Cycle 100 bounded workflow/parser/export gaps from the acceptance ledger; optional Cycle 101 distribution after acceptance. Each remains a separately scoped increment.

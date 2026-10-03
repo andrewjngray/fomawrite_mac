@@ -14,6 +14,9 @@ Rectangle {
     property url documentBaseUrl
     property bool darkMode: false
     property string typeface: "Helvetica Neue"
+    property string visualTypeface: typeface
+    property int visualTopInset: 32
+    property int visualSideInset: 24
     property int textSize: 17
     // Editing should remain legible even when a compact output style is selected.
     property int visualTextSize: Math.max(18, textSize)
@@ -29,6 +32,7 @@ Rectangle {
     property string visualSourceSnapshot: ""
     property bool synchronizingVisualText: false
     signal scrollFractionChanged(real fraction)
+    function focusVisualEditor() { visualText.forceActiveFocus(); }
     function scrollToFraction(fraction) { previewScroll.contentY = Math.max(0, previewScroll.contentHeight - previewScroll.height) * fraction; }
     function jumpToAnchor(anchor) {
         var position = renderer.previewAnchorPosition(previewText.textDocument, decodeURIComponent(anchor));
@@ -51,6 +55,7 @@ Rectangle {
     }
     onTextSizeChanged: { refreshTimer.restart(); if (visualEditEnabled) visualRefreshTimer.restart(); }
     onVisualTextSizeChanged: if (visualEditEnabled) visualRefreshTimer.restart()
+    onVisualTypefaceChanged: if (visualEditEnabled) visualRefreshTimer.restart()
     onTypefaceChanged: { refreshTimer.restart(); if (visualEditEnabled) visualRefreshTimer.restart(); }
     onDarkModeChanged: { refreshTimer.restart(); if (visualEditEnabled) visualRefreshTimer.restart(); }
     function refresh() {
@@ -87,7 +92,7 @@ Rectangle {
         visualSourceSnapshot = projection.source || "";
         visualSnapshot = projection.visualText || "";
         visualText.text = visualSnapshot;
-        Qt.callLater(function() { if (root.visualEditEnabled) root.renderer.styleVisualEditor(visualText.textDocument, root.visualTextSize); });
+        Qt.callLater(function() { if (root.visualEditEnabled) root.renderer.styleVisualEditor(visualText.textDocument, root.visualTextSize, root.visualTypeface); });
         first = Math.max(0, Math.min(first, visualSnapshot.length));
         last = Math.max(0, Math.min(last, visualSnapshot.length));
         if (first === last)
@@ -154,10 +159,12 @@ Rectangle {
         id: previewScroll
         objectName: "previewScroll"
         anchors.fill: parent
-        anchors.bottomMargin: root.showFooter ? 34 : 0
+        anchors.bottomMargin: root.showFooter ? 48 : 0
         clip: true
         contentWidth: width
-        contentHeight: Math.max(height, Math.max(previewText.implicitHeight, visualText.implicitHeight) + 100)
+        contentHeight: Math.max(height, root.visualEditEnabled
+            ? visualText.y + visualText.implicitHeight + 64
+            : Math.max(previewText.implicitHeight, visualText.implicitHeight) + 100)
         boundsBehavior: Flickable.StopAtBounds
         onContentYChanged: root.scrollFractionChanged(contentY / Math.max(1, contentHeight - height))
         ScrollBar.vertical: ScrollBar {}
@@ -180,16 +187,16 @@ Rectangle {
             selectionColor: backend.palette.selection
             selectedTextColor: "white"
             onLinkActivated: function(link) { if (String(link).charAt(0) === "#") root.jumpToAnchor(String(link).slice(1)); else root.linkRequested(link); }
-            Accessible.name: "Rendered Markdown preview"
+            Accessible.name: "Preview: read-only rendered Markdown"
             visible: !root.visualEditEnabled
         }
         TextEdit {
             id: visualText
             objectName: root.visualEditorObjectName
             visible: root.visualEditEnabled
-            x: previewText.x
-            y: previewText.y
-            width: previewText.width
+            x: Math.max(root.visualSideInset, (previewScroll.width - 720) / 2)
+            y: root.visualTopInset
+            width: Math.max(100, Math.min(720, previewScroll.width - root.visualSideInset * 2))
             height: implicitHeight
             textFormat: TextEdit.PlainText
             wrapMode: TextEdit.Wrap
@@ -199,7 +206,7 @@ Rectangle {
             color: backend.palette.text
             selectionColor: backend.palette.selection
             selectedTextColor: "white"
-            font.family: root.typeface
+            font.family: root.visualTypeface
             font.pixelSize: root.visualTextSize
             onTextChanged: root.applyVisualTextChange()
             onInputMethodComposingChanged: if (!inputMethodComposing) root.applyVisualTextChange()
@@ -224,7 +231,7 @@ Rectangle {
                 root.insertVisualBreak(event.modifiers & Qt.ShiftModifier);
                 event.accepted = true;
             }
-            Accessible.name: "Visual Markdown editor"
+            Accessible.name: "Visual Edit: editable Markdown text"
             Accessible.description: "Edits supported text and simple paragraph breaks while keeping Markdown source canonical"
         }
         Label {
@@ -237,32 +244,79 @@ Rectangle {
             lineHeight: 1.5
         }
     }
+    component FooterButton: ChromeButton {
+        id: footerButton
+        tonal: true
+        implicitHeight: 32
+        // Measure unelided text independently of the width assigned by the
+        // layout. A control's fitted contentItem width is not its text width.
+        implicitWidth: Math.max(text === "Visual Edit" ? 92 : text === "Source" ? 68 : 52,
+                                footerLabelMetrics.width + 16)
+        Layout.minimumWidth: implicitWidth
+        Layout.preferredWidth: implicitWidth
+        Layout.maximumWidth: implicitWidth
+        Layout.minimumHeight: 32
+        font.pixelSize: 12
+        TextMetrics {
+            id: footerLabelMetrics
+            text: footerButton.text
+            font: footerButton.font
+        }
+        contentItem: Text {
+            id: footerLabel
+            text: footerButton.text
+            font: footerButton.font
+            color: backend.palette.text
+            opacity: footerButton.enabled ? 1 : 0.45
+            horizontalAlignment: Text.AlignHCenter
+            verticalAlignment: Text.AlignVCenter
+            elide: Text.ElideRight
+        }
+        background: Rectangle {
+            radius: 6
+            color: footerButton.down ? backend.palette.controlPressed
+                : footerButton.checked ? backend.palette.controlSelected
+                : footerButton.hovered && footerButton.enabled ? backend.palette.controlHover
+                : backend.palette.control
+            border.width: footerButton.activeFocus ? 2 : 1
+            border.color: footerButton.activeFocus ? backend.palette.focus : backend.palette.controlBorder
+            opacity: footerButton.enabled ? 1 : 0.55
+        }
+    }
     Rectangle {
         anchors.left: parent.left; anchors.right: parent.right; anchors.bottom: parent.bottom
         visible: root.showFooter
-        height: 34; color: backend.palette.panel
+        height: 48; color: backend.palette.panel
         Rectangle { width: parent.width; height: 1; color: backend.palette.border }
         RowLayout {
             anchors.fill: parent; anchors.leftMargin: 12; anchors.rightMargin: 12
+            spacing: 4
             Label {
-                text: root.visualEditEnabled ? root.visualStatus : root.renderer.outputTemplateName
-                font.pixelSize: 11
+                visible: root.width >= 560
+                text: root.visualEditEnabled ? root.visualStatus : "Preview · " + root.renderer.outputTemplateName
+                font.family: Qt.application.font.family
+                font.pixelSize: 12
                 color: backend.palette.muted
                 elide: Text.ElideRight
-                Layout.maximumWidth: Math.max(120, parent.width - 270)
+                Layout.fillWidth: true
+                Layout.minimumWidth: 0
+                Accessible.name: text
+                ToolTip.visible: statusHover.hovered
+                ToolTip.text: text
+                HoverHandler { id: statusHover }
             }
             Item { Layout.fillWidth: true }
-            ChromeButton {
+            FooterButton {
                 objectName: "visualEditToggle"
                 visible: root.allowVisualEdit
                 text: "Visual Edit"
-                hint: "Edit supported rendered text"
+                hint: root.visualEditEnabled ? "Switch to read-only Preview" : "Switch to Visual Edit for supported text"
                 darkMode: root.darkMode
                 checkable: true
                 checked: root.visualEditEnabled
                 onClicked: root.visualEditEnabled = !root.visualEditEnabled
             }
-            ChromeButton {
+            FooterButton {
                 objectName: "visualEditSourceButton"
                 visible: root.visualEditEnabled
                 text: "Source"
@@ -270,8 +324,8 @@ Rectangle {
                 darkMode: root.darkMode
                 onClicked: root.sourceEditRequested()
             }
-            ChromeButton { text: "Split"; hint: "Split layout"; darkMode: root.darkMode; tonal: root.tonalLayoutButtons; checked: root.layoutMode === 1; onClicked: root.layoutRequested(1) }
-            ChromeButton { text: "Full"; hint: "Preview layout"; darkMode: root.darkMode; tonal: root.tonalLayoutButtons; checked: root.layoutMode === 2; onClicked: root.layoutRequested(2) }
+            FooterButton { text: "Split"; hint: "Show Source and Preview side by side"; darkMode: root.darkMode; checked: root.layoutMode === 1; onClicked: root.layoutRequested(1) }
+            FooterButton { text: "Full"; hint: root.visualEditEnabled ? "Show Visual Edit across the document area" : "Show read-only Preview across the document area"; darkMode: root.darkMode; checked: root.layoutMode === 2; onClicked: root.layoutRequested(2) }
         }
     }
 

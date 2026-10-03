@@ -38,7 +38,7 @@ ApplicationWindow {
     readonly property string editorFontFamily: activeWritingAppearance === "editorial" ? Qt.application.font.family
         : activeWritingAppearance === "book" ? "Georgia" : "iA Writer Mono S"
     readonly property int editorFontPixelSize: scaledSize(workspaceSettings.writingSize
-        + (activeWritingAppearance === "manuscript" ? 0 : 3))
+        + (activeWritingAppearance === "manuscript" ? 1 : activeWritingAppearance === "book" ? 4 : 3))
     readonly property int editorWidth: Math.min(
         activeWritingAppearance === "manuscript"
             ? Math.round(writerFontMetrics.averageCharacterWidth * 65) : scaledSize(720),
@@ -142,6 +142,70 @@ ApplicationWindow {
         else if (editor.activeFocus) lastWritingSurface = "source"
     }
 
+    WorkspaceLayout {
+        id: workspaceLayout
+        objectName: "workspaceLayout"
+        availableWidth: Math.max(0, win.width - 24)
+        activeSurface: win.lastWritingSurface
+    }
+    Connections {
+        target: workspaceLayout
+        function onVisualEditEnabledChanged() { previewPane.visualEditEnabled = workspaceLayout.visualEditEnabled; }
+    }
+    readonly property var workspacePaneState: workspaceLayout.saveState()
+    function restoreWorkspacePaneState(state) { workspaceLayout.restoreState(state); }
+    function openAnchoredMenu(menu, anchor) {
+        var point = anchor.mapToItem(win.contentItem, 0, anchor.height + 5);
+        menu.parent = win.contentItem;
+        menu.x = Math.max(8, Math.min(win.width - menu.width - 8, point.x));
+        menu.y = Math.max(8, Math.min(win.contentItem.height - menu.implicitHeight - 8, point.y));
+        menu.open();
+    }
+    function hideWorkspacePane(pane) {
+        if (pane === "organizer") workspaceLayout.organizerVisible = false;
+        else workspaceLayout.filesVisible = false;
+        navigationDrawer.close();
+        if (editorPane.visible) editor.forceActiveFocus();
+            else if (previewPane.visualEditEnabled) previewPane.focusVisualEditor();
+    }
+    function toggleWorkspacePane(pane) {
+        var effective = pane === "organizer" ? workspaceLayout.effectiveOrganizerVisible : workspaceLayout.effectiveFilesVisible;
+        if (effective) { hideWorkspacePane(pane); return; }
+        if (pane === "organizer") workspaceLayout.organizerVisible = true;
+        else workspaceLayout.filesVisible = true;
+        Qt.callLater(function() {
+            var docked = pane === "organizer" ? workspaceLayout.effectiveOrganizerVisible : workspaceLayout.effectiveFilesVisible;
+            if (!docked) {
+                navigationDrawer.paneName = pane;
+                navigationDrawer.open();
+            }
+        });
+    }
+    function selectWritingMode(mode) {
+        workspaceLayout.visualEditEnabled = mode === "visual";
+        previewPane.visualEditEnabled = workspaceLayout.visualEditEnabled;
+        if (mode === "source") {
+            workspaceLayout.layoutMode = 0;
+            lastWritingSurface = "source";
+            Qt.callLater(function() { editor.forceActiveFocus(); editorFlick.ensureCursorVisible(); });
+        } else {
+            workspaceLayout.layoutMode = 2;
+            lastWritingSurface = mode === "visual" ? "visual" : "source";
+            if (mode === "visual") Qt.callLater(function() { previewPane.focusVisualEditor(); });
+        }
+    }
+    function applyStudioWorkspace() {
+        backend.themePreset = "studio";
+        workspaceSettings.writingAppearance = "editorial";
+        workspaceSettings.writingSize = 16;
+        workspaceSettings.toolbarVisibilityMode = 1;
+        workspaceLayout.restoreDefaults();
+        workspaceLayout.layoutMode = 0;
+        workspaceLayout.visualEditEnabled = false;
+        libraryPane.showExcerpts = true;
+        libraryPane.dateMode = 1;
+    }
+
     Settings {
         id: workspaceSettings
         objectName: "workspaceSettings"
@@ -150,7 +214,7 @@ ApplicationWindow {
         property bool organizerVisible: true
         property int layoutMode: 1
         property int writingSize: 16
-        property string writingAppearance: "manuscript"
+        property string writingAppearance: "editorial"
         property int appearanceRevision: 0
         property bool showMarkup: true
         property string reviewWords: ""
@@ -196,6 +260,7 @@ ApplicationWindow {
     WorkspaceCommands {
         id: workspaceCommands
         settings: workspaceSettings
+        layoutState: workspaceLayout
         library: backend.library
         libraryPane: libraryPane
         window: win
@@ -241,128 +306,36 @@ ApplicationWindow {
         exportHub.open();
     }
 
-    ToolBar {
+    WorkspaceHeader {
         id: topChrome
-        objectName: "topChrome"
-        property bool keyboardReveal: false
-        readonly property bool writingClusterExpanded: workspaceSettings.libraryVisible ? win.width >= 1010 : win.width >= 800
-        readonly property bool revealRequested: chromeHover.hovered || keyboardReveal
-        readonly property real titleContentOpacity: workspaceSettings.titleBarMode === 1 || revealRequested ? 1 : 0
-        readonly property real toolbarContentOpacity: workspaceSettings.toolbarVisibilityMode === 1 || revealRequested ? 1 : 0
-        readonly property bool toolbarContentVisible: workspaceSettings.toolbarVisibilityMode !== 2
-        padding: 0
-        topPadding: 0
-        bottomPadding: 0
         anchors.top: parent.top
         width: parent.width
-        height: 44
-        z: 20
-        background: Rectangle {
-            color: backend.palette.panel
-            MouseArea { anchors.fill: parent; onPressed: win.startSystemMove(); onDoubleClicked: win.visibility === Window.Maximized ? win.showNormal() : win.showMaximized() }
-        }
-        HoverHandler { id: chromeHover }
-        // Align the toolbar groups with the panes below, including native window controls.
-        RowLayout {
-            anchors.fill: parent
-            anchors.leftMargin: win.isMac ? 84 : 8
-            anchors.rightMargin: 10
-            spacing: 5
-            RowLayout {
-                id: toolbarLeading
-                objectName: "topChromeToolbarLeading"
-                visible: topChrome.toolbarContentVisible
-                opacity: topChrome.toolbarContentOpacity
-                spacing: 5
-                Behavior on opacity { NumberAnimation { duration: 160 } }
-                ChromeButton { objectName: "topChromeLibraryButton"; iconName: "library"; hint: "Show or hide library"; darkMode: win.darkMode; checkable: true; checked: workspaceSettings.libraryVisible; onClicked: workspaceCommands.run("library") }
-                ChromeButton { iconName: "organizer"; hint: "Show or hide organizer"; darkMode: win.darkMode; visible: workspaceSettings.libraryVisible; enabled: workspaceCommands.isEnabled("organizer"); onClicked: workspaceCommands.run("organizer") }
-                Item { visible: organizerPane.visible; Layout.preferredWidth: Math.max(0, organizerPane.width - (win.isMac ? 164 : 88)) }
-                RowLayout {
-                    visible: libraryPane.visible
-                    Layout.preferredWidth: libraryPane.width - 10
-                    Layout.minimumWidth: libraryPane.width - 10
-                    Layout.maximumWidth: libraryPane.width - 10
-                    ChromeButton { iconName: "folder"; font.pixelSize: 15; font.bold: false; text: backend.library.rootName || "Choose folder"; hint: "Choose library folder"; darkMode: win.darkMode; Layout.fillWidth: true; onClicked: libraryPane.chooseFolder() }
-                    ChromeButton { iconName: "plus"; hint: "New document"; darkMode: win.darkMode; onClicked: libraryPane.newDocument() }
-                    ChromeButton { iconName: "down"; hint: "Library options"; darkMode: win.darkMode; onClicked: libraryPane.showOptions(this) }
-                }
-            }
-            Label {
-                objectName: "topChromeTitle"
-                Accessible.description: backend.status
-                text: backend.fileName
-                color: backend.palette.muted
-                font.pixelSize: 15
-                font.weight: Font.Normal
-                elide: Text.ElideMiddle
-                horizontalAlignment: Text.AlignLeft
-                Layout.fillWidth: true
-                opacity: topChrome.titleContentOpacity
-                Behavior on opacity { NumberAnimation { duration: 160 } }
-            }
-            RowLayout {
-                id: toolbarTrailing
-                objectName: "topChromeToolbarTrailing"
-                visible: topChrome.toolbarContentVisible
-                opacity: topChrome.toolbarContentOpacity
-                spacing: 5
-                Behavior on opacity { NumberAnimation { duration: 160 } }
-                RowLayout {
-                    id: compactWritingControls
-                    objectName: "compactWritingControls"
-                    spacing: 1
-                    ChromeButton {
-                        objectName: "compactBoldButton"
-                        visible: topChrome.writingClusterExpanded
-                        text: "B"
-                        font.bold: true
-                        hint: "Bold selection"
-                        darkMode: win.darkMode
-                        onClicked: win.tryWrapSelection("**", "**")
-                    }
-                    ChromeButton {
-                        objectName: "compactItalicButton"
-                        visible: topChrome.writingClusterExpanded
-                        text: "I"
-                        font.italic: true
-                        hint: "Italic selection"
-                        darkMode: win.darkMode
-                        onClicked: win.tryWrapSelection("*", "*")
-                    }
-                    ChromeButton {
-                        id: compactLinkButton
-                        objectName: "compactLinkButton"
-                        visible: topChrome.writingClusterExpanded
-                        text: "Link"
-                        hint: "Insert link with destination and title"
-                        darkMode: win.darkMode
-                        onClicked: win.openLinkEditor(this)
-                    }
-                    ChromeButton {
-                        id: compactParagraphButton
-                        objectName: "compactParagraphButton"
-                        visible: topChrome.writingClusterExpanded
-                        text: "¶"
-                        hint: "Paragraph formatting"
-                        darkMode: win.darkMode
-                        onClicked: win.openQuickFormat(this)
-                    }
-                    ChromeButton {
-                        id: compactFormatButton
-                        objectName: "compactFormatButton"
-                        visible: !topChrome.writingClusterExpanded
-                        text: "Format"
-                        hint: "Writing format controls"
-                        darkMode: win.darkMode
-                        onClicked: win.openQuickFormat(this)
-                    }
-                }
-                ChromeButton { iconName: "outline"; hint: "Document outline"; darkMode: win.darkMode; onClicked: workspaceCommands.run("outline") }
-                ChromeButton { text: "Aa"; hint: "Writing options"; darkMode: win.darkMode; onClicked: writingOptions.open() }
-                ChromeButton { iconName: "search"; hint: "Find in document"; darkMode: win.darkMode; onClicked: win.openSearch(false, false) }
-                ChromeButton { iconName: "preview"; hint: "Show or hide preview"; darkMode: win.darkMode; checked: workspaceSettings.layoutMode !== 0; onClicked: workspaceCommands.run("togglePreview") }
-                ChromeButton { objectName: "exportHubButton"; text: "Export"; hint: "Export or share document"; darkMode: win.darkMode; onClicked: win.openExportHub("pdf") }
+        window: win
+        settings: workspaceSettings
+        layoutState: workspaceLayout
+        organizerSlot: organizerSlot
+        filesSlot: filesSlot
+        editorPane: editorPane
+        previewPane: previewPane
+        onActionRequested: function(action, anchor) {
+            switch (action) {
+            case "addLocation": organizerPane.chooseLocation(); break;
+            case "hideOrganizer": win.hideWorkspacePane("organizer"); break;
+            case "hideFiles": win.hideWorkspacePane("files"); break;
+            case "chooseFolder": libraryPane.chooseFolder(); break;
+            case "newDocument": libraryPane.newDocument(); break;
+            case "libraryOptions": win.openAnchoredMenu(libraryActions, anchor); break;
+            case "back": win.requestHistory(-1); break;
+            case "forward": win.requestHistory(1); break;
+            case "find": win.openSearch(false, false); break;
+            case "bold": win.tryWrapSelection("**", "**"); break;
+            case "italic": win.tryWrapSelection("*", "*"); break;
+            case "link": win.openLinkEditor(anchor); break;
+            case "format": win.openQuickFormat(anchor); break;
+            case "appearance": win.openAnchoredMenu(writingOptions, anchor); break;
+            case "workspace": win.openAnchoredMenu(workspaceMenu, anchor); break;
+            case "export": win.openExportHub("pdf"); break;
+            case "hidePreview": win.selectWritingMode("source"); break;
             }
         }
     }
@@ -384,7 +357,7 @@ ApplicationWindow {
     DocumentOutline {
         id: outlineDrawer
         onJumpRequested: function(position) {
-            if (workspaceSettings.layoutMode === 2) workspaceSettings.layoutMode = 1;
+            if (workspaceLayout.layoutMode === 2) workspaceLayout.layoutMode = 1;
             editor.cursorPosition = position;
             editor.forceActiveFocus();
             editorFlick.ensureCursorVisible();
@@ -564,62 +537,135 @@ ApplicationWindow {
         }
     }
 
-    Menu {
+    CompactMenu {
         id: formatQuickMenu
         objectName: "quickFormatMenu"
-        width: 210
-        MenuItem { text: "Body"; onTriggered: win.editMarkdown("body") }
-        MenuItem { text: "Heading 1"; onTriggered: win.editMarkdown("heading1") }
-        MenuItem { text: "Heading 2"; onTriggered: win.editMarkdown("heading2") }
-        MenuItem { text: "Heading 3"; onTriggered: win.editMarkdown("heading3") }
+        width: 230
+        CompactMenuItem { text: "Bold"; onTriggered: win.tryWrapSelection("**", "**") }
+        CompactMenuItem { text: "Italic"; onTriggered: win.tryWrapSelection("*", "*") }
+        CompactMenuItem { text: "Link…"; onTriggered: win.tryInsertLink() }
         MenuSeparator {}
-        MenuItem { text: "Blockquote"; onTriggered: win.editMarkdown("quote") }
-        MenuItem { text: "Bullet List"; onTriggered: win.editMarkdown("bullet") }
-        MenuItem { text: "Ordered List"; onTriggered: win.editMarkdown("ordered") }
-        MenuItem { text: "Task List"; onTriggered: win.editMarkdown("task") }
+        CompactMenuItem { text: "Body"; onTriggered: win.editMarkdown("body") }
+        CompactMenuItem { text: "Heading 1"; onTriggered: win.editMarkdown("heading1") }
+        CompactMenuItem { text: "Heading 2"; onTriggered: win.editMarkdown("heading2") }
+        CompactMenuItem { text: "Heading 3"; onTriggered: win.editMarkdown("heading3") }
+        MenuSeparator {}
+        CompactMenuItem { text: "Blockquote"; onTriggered: win.editMarkdown("quote") }
+        CompactMenuItem { text: "Bullet List"; onTriggered: win.editMarkdown("bullet") }
+        CompactMenuItem { text: "Ordered List"; onTriggered: win.editMarkdown("ordered") }
+        CompactMenuItem { text: "Task List"; onTriggered: win.editMarkdown("task") }
     }
 
-    Menu {
+    CompactMenu {
         id: formatPopover
         x: Math.max(0, editorPane.x + 12)
         y: Math.max(0, win.contentItem.height - height - 38)
-        MenuItem { objectName: "saveButton"; text: "Save"; onTriggered: backend.save() }
-        MenuItem { objectName: "openButton"; text: "Open…"; onTriggered: backend.openDialog() }
-        MenuItem { text: "Open by Path…"; onTriggered: openPathDialog.open() }
+        CompactMenuItem { objectName: "saveButton"; text: "Save"; onTriggered: backend.save() }
+        CompactMenuItem { objectName: "openButton"; text: "Open…"; onTriggered: backend.openDialog() }
+        CompactMenuItem { text: "Open by Path…"; onTriggered: openPathDialog.open() }
         MenuSeparator {}
-        MenuItem { text: "Strikethrough"; onTriggered: workspaceCommands.run("strike") }
-        MenuItem { text: "Inline code"; onTriggered: workspaceCommands.run("inlineCode") }
+        CompactMenuItem { text: "Strikethrough"; onTriggered: workspaceCommands.run("strike") }
+        CompactMenuItem { text: "Inline code"; onTriggered: workspaceCommands.run("inlineCode") }
     }
-    Menu {
+    CompactMenu {
         id: writingOptions
         objectName: "writingOptions"
-        width: 250
+        width: 270
+        CompactMenuItem { text: "Studio writing layout"; onTriggered: win.applyStudioWorkspace() }
+        MenuSeparator {}
         x: Math.max(0, win.width - width - 160)
         y: 44
-        Menu { title: "Theme"
-            MenuItem { objectName: "themeSystem"; text: "Follow system (reset)"; checkable: true; checked: backend.themePreset === "system"; onTriggered: backend.themePreset = "system" }
-            MenuItem { objectName: "themeLight"; text: "Light"; checkable: true; checked: backend.themePreset === "light"; onTriggered: backend.themePreset = "light" }
-            MenuItem { objectName: "themeDark"; text: "Dark"; checkable: true; checked: backend.themePreset === "dark"; onTriggered: backend.themePreset = "dark" }
-            MenuItem { objectName: "themePaper"; text: "Warm paper"; checkable: true; checked: backend.themePreset === "paper"; onTriggered: backend.themePreset = "paper" }
-            MenuItem { objectName: "themeStudio"; text: "Studio"; checkable: true; checked: backend.themePreset === "studio"; onTriggered: backend.themePreset = "studio" }
+        CompactMenu { title: "Theme"
+            CompactMenuItem { objectName: "themeSystem"; text: "Follow system (reset)"; checkable: true; checked: backend.themePreset === "system"; onTriggered: backend.themePreset = "system" }
+            CompactMenuItem { objectName: "themeLight"; text: "Light"; checkable: true; checked: backend.themePreset === "light"; onTriggered: backend.themePreset = "light" }
+            CompactMenuItem { objectName: "themeDark"; text: "Dark"; checkable: true; checked: backend.themePreset === "dark"; onTriggered: backend.themePreset = "dark" }
+            CompactMenuItem { objectName: "themePaper"; text: "Warm paper"; checkable: true; checked: backend.themePreset === "paper"; onTriggered: backend.themePreset = "paper" }
+            CompactMenuItem { objectName: "themeStudio"; text: "Studio"; checkable: true; checked: backend.themePreset === "studio"; onTriggered: backend.themePreset = "studio" }
         }
-        Menu { title: "Writing appearance"
-            MenuItem { text: "Manuscript"; checkable: true; checked: win.activeWritingAppearance === "manuscript"; onTriggered: workspaceCommands.run("writingManuscript") }
-            MenuItem { text: "Editorial"; checkable: true; checked: win.activeWritingAppearance === "editorial"; onTriggered: workspaceCommands.run("writingEditorial") }
-            MenuItem { text: "Book"; checkable: true; checked: win.activeWritingAppearance === "book"; onTriggered: workspaceCommands.run("writingBook") }
+        CompactMenu { title: "Writing appearance"
+            CompactMenuItem { text: "Manuscript"; checkable: true; checked: win.activeWritingAppearance === "manuscript"; onTriggered: workspaceCommands.run("writingManuscript") }
+            CompactMenuItem { text: "Editorial"; checkable: true; checked: win.activeWritingAppearance === "editorial"; onTriggered: workspaceCommands.run("writingEditorial") }
+            CompactMenuItem { text: "Book"; checkable: true; checked: win.activeWritingAppearance === "book"; onTriggered: workspaceCommands.run("writingBook") }
         }
         MenuSeparator {}
-        MenuItem { text: "Show Markdown syntax"; checkable: true; checked: workspaceSettings.showMarkup; onTriggered: workspaceCommands.run("markup") }
-        MenuItem { text: "Paragraph focus"; checkable: true; checked: workspaceSettings.paragraphFocus; onTriggered: workspaceCommands.run("paragraph") }
-        MenuItem { text: "Typewriter scrolling"; checkable: true; checked: workspaceSettings.typewriter; onTriggered: workspaceCommands.run("typewriter") }
+        CompactMenuItem { text: "Show Markdown syntax"; checkable: true; checked: workspaceSettings.showMarkup; onTriggered: workspaceCommands.run("markup") }
+        CompactMenuItem { text: "Paragraph focus"; checkable: true; checked: workspaceSettings.paragraphFocus; onTriggered: workspaceCommands.run("paragraph") }
+        CompactMenuItem { text: "Typewriter scrolling"; checkable: true; checked: workspaceSettings.typewriter; onTriggered: workspaceCommands.run("typewriter") }
         MenuSeparator {}
-        MenuItem { text: "Larger text"; enabled: workspaceSettings.writingSize < 32; onTriggered: workspaceCommands.run("larger") }
-        MenuItem { text: "Smaller text"; enabled: workspaceSettings.writingSize > 12; onTriggered: workspaceCommands.run("smaller") }
-        MenuItem { text: "Reset text size"; onTriggered: workspaceCommands.run("resetSize") }
+        CompactMenuItem { text: "Larger text"; enabled: workspaceSettings.writingSize < 32; onTriggered: workspaceCommands.run("larger") }
+        CompactMenuItem { text: "Smaller text"; enabled: workspaceSettings.writingSize > 12; onTriggered: workspaceCommands.run("smaller") }
+        CompactMenuItem { text: "Reset text size"; onTriggered: workspaceCommands.run("resetSize") }
         MenuSeparator {}
-        MenuItem { text: "Template: Modern"; checkable: true; checked: backend.outputStyle === 0; onTriggered: workspaceCommands.run("sans") }
-        MenuItem { text: "Template: Classic"; checkable: true; checked: backend.outputStyle === 1; onTriggered: workspaceCommands.run("serif") }
-        MenuItem { text: "Template: Manuscript"; checkable: true; checked: backend.outputStyle === 2; onTriggered: workspaceCommands.run("mono") }
+        CompactMenuItem { text: "Template: Modern"; checkable: true; checked: backend.outputStyle === 0; onTriggered: workspaceCommands.run("sans") }
+        CompactMenuItem { text: "Template: Classic"; checkable: true; checked: backend.outputStyle === 1; onTriggered: workspaceCommands.run("serif") }
+        CompactMenuItem { text: "Template: Manuscript"; checkable: true; checked: backend.outputStyle === 2; onTriggered: workspaceCommands.run("mono") }
+    }
+
+    CompactMenu {
+        id: workspaceMenu
+        objectName: "workspaceMenu"
+        width: 258
+        CompactMenuItem { objectName: "workspaceOrganizer"; text: "Organizer"; checkable: true; checked: workspaceLayout.effectiveOrganizerVisible; onTriggered: win.toggleWorkspacePane("organizer") }
+        CompactMenuItem { objectName: "workspaceFiles"; text: "Files"; checkable: true; checked: workspaceLayout.effectiveFilesVisible; onTriggered: win.toggleWorkspacePane("files") }
+        MenuSeparator {}
+        CompactMenuItem { text: "Source"; checkable: true; checked: workspaceLayout.layoutMode === 0; onTriggered: win.selectWritingMode("source") }
+        CompactMenuItem { text: "Visual Edit"; checkable: true; checked: workspaceLayout.visualEditEnabled; onTriggered: win.selectWritingMode("visual") }
+        CompactMenuItem { text: "Preview"; checkable: true; checked: workspaceLayout.layoutMode === 2 && !workspaceLayout.visualEditEnabled; onTriggered: win.selectWritingMode("preview") }
+        CompactMenuItem { text: "Source and preview side by side"; checkable: true; checked: workspaceLayout.layoutMode === 1; onTriggered: workspaceLayout.layoutMode = 1 }
+        MenuSeparator {}
+        CompactMenuItem { text: "Document outline"; onTriggered: workspaceCommands.run("outline") }
+        CompactMenuItem { text: "Document statistics"; onTriggered: workspaceCommands.run("statistics") }
+        CompactMenuItem { text: "Export and share…"; onTriggered: win.openExportHub("pdf") }
+        MenuSeparator {}
+        CompactMenuItem { objectName: "studioWorkspaceAction"; text: "Studio writing layout"; onTriggered: win.applyStudioWorkspace() }
+        CompactMenuItem { text: "Restore column widths"; onTriggered: { workspaceLayout.organizerWidth=208; workspaceLayout.fileWidth=288; workspaceLayout.previewWidth=420; } }
+        CompactMenuItem { text: "Show toolbar"; checkable: true; checked: workspaceSettings.toolbarVisibilityMode !== 2; onTriggered: workspaceCommands.run(workspaceSettings.toolbarVisibilityMode === 2 ? "toolbarAlways" : "toolbarHide") }
+    }
+    CompactMenu {
+        id: libraryActions
+        width: 246
+        CompactMenuItem { text: "Search files…"; onTriggered: win.openQuickSearchState("", false, backend.library.rootFolder, false) }
+        CompactMenuItem { text: "Choose folder…"; onTriggered: libraryPane.chooseFolder() }
+        CompactMenuItem { text: "New document…"; onTriggered: libraryPane.newDocument() }
+        CompactMenuItem { text: "New folder…"; onTriggered: libraryPane.newFolder() }
+        MenuSeparator {}
+        CompactMenuItem { text: "Previous folder"; enabled: backend.library.canGoBack; onTriggered: backend.library.navigateHistory(-1) }
+        CompactMenuItem { text: "Next folder"; enabled: backend.library.canGoForward; onTriggered: backend.library.navigateHistory(1) }
+        MenuSeparator {}
+        CompactMenuItem { text: "Document previews"; checkable: true; checked: libraryPane.showExcerpts; onTriggered: workspaceCommands.run("excerpts") }
+        CompactMenuItem { text: "Sort by name"; onTriggered: workspaceCommands.run("sortName") }
+        CompactMenuItem { text: "Sort by modified date"; onTriggered: workspaceCommands.run("sortModified") }
+        CompactMenuItem { text: "More folder options…"; onTriggered: libraryPane.showOptions(topChrome) }
+    }
+    Drawer {
+        id: navigationDrawer
+        objectName: "workspaceNavigationDrawer"
+        property string paneName: "files"
+        width: Math.min(340, win.width - 80)
+        height: win.contentItem.height
+        edge: Qt.LeftEdge
+        modal: true
+        closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
+        background: Rectangle { color: navigationDrawer.paneName === "organizer" ? backend.palette.organizer : backend.palette.library }
+        onAboutToShow: {
+            var pane = paneName === "organizer" ? organizerPane : libraryPane;
+            pane.parent = navigationBody;
+        }
+        onClosed: {
+            organizerPane.parent = organizerSlot;
+            libraryPane.parent = filesSlot;
+            if (editorPane.visible) editor.forceActiveFocus();
+            else if (previewPane.visualEditEnabled) previewPane.focusVisualEditor();
+        }
+        contentItem: ColumnLayout {
+            spacing: 0
+            RowLayout {
+                Layout.fillWidth: true; Layout.preferredHeight: 52; Layout.leftMargin: 12; Layout.rightMargin: 12
+                Label { text: navigationDrawer.paneName === "organizer" ? "Organizer" : "Files"; color: backend.palette.text; font.weight: Font.Medium; Layout.fillWidth: true }
+                ToolbarButton { iconName: "close"; hint: "Close navigation"; onClicked: navigationDrawer.close() }
+            }
+            Item { id: navigationBody; Layout.fillWidth: true; Layout.fillHeight: true }
+        }
     }
 
     Material.theme: darkMode ? Material.Dark : Material.Light
@@ -845,7 +891,10 @@ ApplicationWindow {
 
     function openDocumentTarget(url, fragment) {
         var opened = backend.open(url);
-        if (opened && fragment !== "") navigateDocumentFragment(fragment);
+        if (opened) {
+            navigationDrawer.close();
+            if (fragment !== "") navigateDocumentFragment(fragment);
+        }
         return opened;
     }
 
@@ -857,7 +906,7 @@ ApplicationWindow {
         // previous folder or reports an error for a now-missing current root.
         // Do not show a query against the wrong or unavailable library.
         if (backend.library.rootFolder.toString() !== root.toString() || backend.library.error !== "") {
-            workspaceSettings.libraryVisible = true; // LibraryPane shows the concrete refusal.
+            workspaceLayout.filesVisible = true; // LibraryPane shows the concrete refusal.
             return false;
         }
         quickOpenDialog.creationMode = creating;
@@ -898,7 +947,7 @@ ApplicationWindow {
     }
 
     function requestCreateDocument(name, inNewWindow) {
-        workspaceSettings.libraryVisible = true;
+        workspaceLayout.filesVisible = true;
         if (inNewWindow) {
             var file = backend.library.createDocument(name);
             if (file.toString() !== "") backend.openInNewWindow(file);
@@ -911,7 +960,7 @@ ApplicationWindow {
     }
 
     function showCurrentFileInLibrary() {
-        workspaceSettings.libraryVisible = true;
+        workspaceLayout.filesVisible = true;
         libraryPane.showCurrentFile();
     }
 
@@ -938,6 +987,10 @@ ApplicationWindow {
         }
     }
 
+    Connections {
+        target: backend
+    }
+
     FontMetrics {
         id: writerFontMetrics
         font.family: win.editorFontFamily
@@ -960,7 +1013,12 @@ ApplicationWindow {
 
     function openSearch(withReplace, useSelection) {
         var selected = editor.selectedText;
-        if (workspaceSettings.layoutMode === 2) workspaceSettings.layoutMode = 1;
+        // Find edits canonical source, including when a narrow split has fallen back to Visual Edit.
+        if (workspaceLayout.effectiveLayoutMode === 2) {
+            workspaceLayout.visualEditEnabled = false;
+            lastWritingSurface = "source";
+            workspaceLayout.layoutMode = workspaceLayout.availableWidth >= 800 ? 1 : 0;
+        }
         searchOpen = true;
         replaceOpen = withReplace;
         if (useSelection && selected.length > 0) searchField.text = selected;
@@ -1492,7 +1550,7 @@ ApplicationWindow {
                         objectName: "goLocation_" + index
                         text: modelData.name + (modelData.available ? "" : " (Unavailable)")
                         enabled: modelData.available
-                        onTriggered: { backend.library.rootFolder = modelData.url; workspaceSettings.libraryVisible = true; }
+                        onTriggered: { backend.library.rootFolder = modelData.url; workspaceLayout.filesVisible = true; }
                     }
                     onObjectAdded: function(index, object) { locationsMenu.insertItem(index, object); }
                     onObjectRemoved: function(index, object) { locationsMenu.removeItem(object); }
@@ -1986,7 +2044,7 @@ ApplicationWindow {
                     errorText = backend.library.error;
                     return;
                 }
-                workspaceSettings.libraryVisible = true;
+                workspaceLayout.filesVisible = true;
                 openPathDialog.close();
             } else {
                 openPathDialog.close();
@@ -2190,82 +2248,112 @@ ApplicationWindow {
     }
 
     SplitView {
+        id: workspaceSplit
+        objectName: "workspaceSplit"
+        property var resizeStart: null
+        onResizingChanged: {
+            if (resizing) {
+                resizeStart = { organizer: organizerSlot.width, files: filesSlot.width, preview: previewPane.width };
+            } else if (resizeStart) {
+                var actual = { organizer: organizerSlot.width, files: filesSlot.width, preview: previewPane.width };
+                if (organizerSlot.visible && Math.abs(actual.organizer - resizeStart.organizer) > 1)
+                    workspaceLayout.updateWidth("organizer", actual.organizer);
+                if (filesSlot.visible && Math.abs(actual.files - resizeStart.files) > 1)
+                    workspaceLayout.updateWidth("files", actual.files);
+                if (previewPane.visible && editorPane.visible && Math.abs(actual.preview - resizeStart.preview) > 1)
+                    workspaceLayout.updateWidth("preview", actual.preview);
+                resizeStart = null;
+                // SplitView replaces preferred-size bindings during an explicit drag.
+                organizerSlot.SplitView.preferredWidth = Qt.binding(function() { return workspaceLayout.effectiveOrganizerWidth; });
+                filesSlot.SplitView.preferredWidth = Qt.binding(function() { return workspaceLayout.effectiveFileWidth; });
+                previewPane.SplitView.preferredWidth = Qt.binding(function() { return workspaceLayout.effectivePreviewWidth; });
+            }
+        }
         anchors.top: topChrome.bottom
         anchors.topMargin: win.tabInset
         anchors.bottom: parent.bottom
         anchors.left: parent.left
         anchors.right: parent.right
         orientation: Qt.Horizontal
-        handle: Rectangle {
-            implicitWidth: 1
-            color: SplitHandle.hovered || SplitHandle.pressed ? "#426da7" : (backend.palette.border)
+        handle: Item {
+            implicitWidth: 8
+            Rectangle { anchors.centerIn: parent; width: 1; height: parent.height; color: SplitHandle.hovered || SplitHandle.pressed ? backend.palette.focus : backend.palette.border }
+            HoverHandler { cursorShape: Qt.SplitHCursor }
         }
-        OrganizerPane {
-            commands: workspaceCommands
-            id: organizerPane
-            onSearchRequested: function(query, contents, folder) {
-                backend.library.rootFolder = folder;
-                quickQuery.text = query; quickContents.checked = contents; quickOpenDialog.open();
+        Item {
+            id: organizerSlot
+            objectName: "organizerSlot"
+            visible: workspaceLayout.effectiveOrganizerVisible
+            SplitView.preferredWidth: workspaceLayout.effectiveOrganizerWidth
+            SplitView.minimumWidth: 184
+            SplitView.maximumWidth: 288
+            OrganizerPane {
+                id: organizerPane
+                anchors.fill: parent
+                commands: workspaceCommands
+                library: backend.library
+                currentFile: backend.fileUrl
+                darkMode: win.darkMode
+                onSearchRequested: function(query, contents, folder) { backend.library.rootFolder=folder; quickQuery.text=query; quickContents.checked=contents; navigationDrawer.close(); quickOpenDialog.open(); }
+                onOpenRequested: function(file) { win.requestOpen(file); }
             }
-            library: backend.library
-            currentFile: backend.fileUrl
-            darkMode: win.darkMode
-            visible: workspaceSettings.libraryVisible && workspaceSettings.organizerVisible && win.width >= 1000
-            SplitView.preferredWidth: 210
-            SplitView.minimumWidth: 160
-            SplitView.maximumWidth: 300
-            onOpenRequested: function(file) { win.requestOpen(file); }
         }
-        LibraryPane {
-            id: libraryPane
-            commands: workspaceCommands
-            onCreateRequested: function(name, inNewWindow) { win.requestCreateDocument(name, inNewWindow); }
-            library: backend.library
-            currentFile: backend.fileUrl
-            darkMode: win.darkMode
-            visible: workspaceSettings.libraryVisible
-            SplitView.preferredWidth: 290
-            SplitView.minimumWidth: 180
+        Item {
+            id: filesSlot
+            objectName: "filesSlot"
+            visible: workspaceLayout.effectiveFilesVisible
+            SplitView.preferredWidth: workspaceLayout.effectiveFileWidth
+            SplitView.minimumWidth: 240
             SplitView.maximumWidth: 420
-            onOpenRequested: function(file) { win.requestOpen(file); }
+            LibraryPane {
+                id: libraryPane
+                anchors.fill: parent
+                commands: workspaceCommands
+                library: backend.library
+                currentFile: backend.fileUrl
+                darkMode: win.darkMode
+                onCreateRequested: function(name, inNewWindow) { win.requestCreateDocument(name, inNewWindow); }
+                onOpenRequested: function(file) { win.requestOpen(file); }
+            }
         }
         Rectangle {
             id: editorPane
             objectName: "editorPane"
             color: backend.palette.page
-            visible: workspaceSettings.layoutMode !== 2
+            visible: workspaceLayout.effectiveLayoutMode !== 2
             SplitView.fillWidth: true
-            SplitView.minimumWidth: 260
+            SplitView.minimumWidth: workspaceLayout.effectiveLayoutMode === 1 ? 480 : 320
 
-        Rectangle {
-            id: editorWordCountChip
-            objectName: "editorWordCountChip"
-            visible: win.activeWritingAppearance !== "manuscript"
-            anchors.top: parent.top
-            anchors.topMargin: 12
-            anchors.right: parent.right
-            anchors.rightMargin: 18
-            width: Math.max(94, chipLabel.implicitWidth + 24)
-            height: 28
-            radius: 14
-            color: backend.palette.library
-            border.color: backend.palette.border
-            z: 2
+        RowLayout {
+            id: documentMeta
+            anchors.top: parent.top; anchors.left: parent.left; anchors.right: parent.right
+            anchors.leftMargin: 24; anchors.rightMargin: 24; height: 48
             Label {
-                id: chipLabel
-                anchors.centerIn: parent
-                text: win.compactStatistic("words")
+                objectName: "topChromeTitle"
+                text: backend.fileName
                 color: backend.palette.muted
                 font.pixelSize: 12
+                elide: Text.ElideMiddle
+                opacity: topChrome.titleContentOpacity
+                Layout.fillWidth: true
+                Accessible.description: backend.fileUrl.toString()
             }
-            TapHandler { onTapped: workspaceCommands.run("statistics") }
-            Accessible.name: "Document word count: " + chipLabel.text
+            ChromeButton {
+                id: editorWordCountChip
+                objectName: "editorWordCountChip"
+                visible: win.activeWritingAppearance !== "manuscript"
+                text: win.compactStatistic("words")
+                tonal: true
+                hint: "Document statistics"
+                Accessible.name: "Document word count: " + text
+                onClicked: workspaceCommands.run("statistics")
+            }
         }
 
         Flickable {
             id: editorFlick
             onContentYChanged: {
-                if (!workspaceSettings.synchronizedScroll || win.synchronizingScroll || workspaceSettings.layoutMode !== 1) return;
+                if (!workspaceSettings.synchronizedScroll || win.synchronizingScroll || workspaceLayout.effectiveLayoutMode !== 1) return;
                 win.synchronizingScroll = true;
                 previewPane.scrollToFraction(contentY / Math.max(1, contentHeight - height));
                 win.synchronizingScroll = false;
@@ -2275,7 +2363,7 @@ ApplicationWindow {
             anchors.leftMargin: 24
             anchors.rightMargin: 24
             anchors.bottomMargin: 34
-            anchors.topMargin: win.searchOpen ? searchPane.height + 24 : 0
+            anchors.topMargin: win.searchOpen ? searchPane.height + 24 : documentMeta.height
             clip: true
             contentWidth: width
             contentHeight: Math.max(height, editor.y + editor.implicitHeight + (workspaceSettings.typewriter ? height / 2 : 220))
@@ -2471,7 +2559,7 @@ ApplicationWindow {
             Accessible.name: "Markdown editor"
                 x: Math.round((editorFlick.width - width) / 2)
                 y: workspaceSettings.typewriter ? editorFlick.height / 2
-                    : win.activeWritingAppearance === "manuscript" ? 10 : win.scaledSize(72)
+                    : win.scaledSize(editorPane.height < 600 ? 24 : 36)
                 width: win.editorWidth
                 height: Math.max(editorFlick.height - y - 96, implicitHeight + 20)
                 text: ""
@@ -2763,31 +2851,18 @@ ApplicationWindow {
         }
 
         Rectangle {
-            anchors.left: parent.left
-            anchors.right: parent.right
-            anchors.bottom: parent.bottom
-            height: 34
-            color: backend.palette.panel
+            anchors.left: parent.left; anchors.right: parent.right; anchors.bottom: parent.bottom
+            height: 38
+            color: backend.palette.page
             Rectangle { width: parent.width; height: 1; color: backend.palette.border }
             RowLayout {
-                anchors.fill: parent
-                anchors.leftMargin: 6
-                anchors.rightMargin: 10
-                spacing: 2
-                ChromeButton { visible: workspaceSettings.toolbarMode !== 1; text: "Bold"; hint: "Bold selection"; darkMode: win.darkMode; onClicked: win.tryWrapSelection("**", "**") }
-                ChromeButton { visible: workspaceSettings.toolbarMode !== 1; text: "Italic"; hint: "Italic selection"; darkMode: win.darkMode; onClicked: win.tryWrapSelection("*", "*") }
-                ChromeButton { visible: workspaceSettings.toolbarMode !== 1; text: "Link"; hint: "Insert link"; darkMode: win.darkMode; onClicked: win.tryInsertLink() }
-                ChromeButton { visible: workspaceSettings.toolbarMode !== 1; text: "More"; hint: "More formatting"; darkMode: win.darkMode; onClicked: formatPopover.open() }
-                Item { visible: workspaceSettings.toolbarMode !== 1; Layout.fillWidth: true }
-                ChromeButton {
-                    objectName: "toolbarStatistic"
-                    text: workspaceSettings.toolbarMode === 1 ? win.compactToolbarStatistics() : win.compactStatistic("words")
-                    hint: workspaceSettings.toolbarMode === 1 ? win.compactToolbarStatistics() : "Document statistics"
-                    darkMode: win.darkMode
-                    Layout.fillWidth: workspaceSettings.toolbarMode === 1
-                    Layout.maximumWidth: workspaceSettings.toolbarMode === 1 ? editorPane.width - 20 : implicitWidth
-                    onClicked: workspaceCommands.run("statistics")
-                }
+                anchors.fill: parent; anchors.leftMargin: 12; anchors.rightMargin: 12; spacing: 6
+                Label { visible: workspaceSettings.toolbarMode !== 1; text: "Source"; color: backend.palette.muted; font.pixelSize: 12 }
+                ChromeButton { visible: workspaceSettings.toolbarMode !== 1; text: win.activeWritingAppearance === "editorial" ? "Editorial" : win.activeWritingAppearance === "book" ? "Book" : "Manuscript"; hint: "Writing appearance"; onClicked: win.openAnchoredMenu(writingOptions, this) }
+                Item { Layout.fillWidth: true }
+                ChromeButton { objectName: "toolbarStatistic"; visible: workspaceSettings.toolbarMode === 1; text: win.compactToolbarStatistics(); hint: text; Layout.fillWidth: true; onClicked: workspaceCommands.run("statistics") }
+                ChromeButton { objectName: "sourceVisualEditButton"; visible: workspaceSettings.toolbarMode !== 1; text: "Visual Edit"; tonal: true; hint: "Edit supported rendered text"; onClicked: win.selectWritingMode("visual") }
+                ChromeButton { visible: workspaceSettings.toolbarMode !== 1; text: "Split"; tonal: true; checked: workspaceLayout.layoutMode === 1; hint: "Source and preview side by side"; onClicked: workspaceLayout.layoutMode = workspaceLayout.layoutMode === 1 ? 0 : 1 }
             }
         }
 
@@ -2811,7 +2886,8 @@ ApplicationWindow {
 
             background: Rectangle {
                 radius: 9
-                color: win.darkMode ? "#22221f" : "#fffef2"
+                color: backend.palette.popover
+                border.color: backend.palette.border
             }
 
             RowLayout {
@@ -2888,7 +2964,7 @@ ApplicationWindow {
                     text: win.searchMatches.length === 0
                         ? "0/0"
                         : (win.searchMatchIndex + 1) + "/" + win.searchMatches.length
-                    color: win.darkMode ? win.textColor : "#62635f"
+                    color: backend.palette.text
                     font.pixelSize: win.scaledSize(16)
                 }
 
@@ -2911,24 +2987,27 @@ ApplicationWindow {
                 Rectangle {
                     Layout.preferredWidth: 1
                     Layout.preferredHeight: 34
-                    color: win.darkMode ? "#6f6f62" : "#d5d56e"
+                    color: backend.palette.border
                 }
 
                 SearchIconButton {
                     iconName: "up"
-                    iconColor: win.darkMode ? win.textColor : "#62635f"
+                    Accessible.name: "Previous match"
+                    iconColor: backend.palette.text
                     onClicked: win.moveSearch(-1)
                 }
 
                 SearchIconButton {
                     iconName: "down"
-                    iconColor: win.darkMode ? win.textColor : "#62635f"
+                    Accessible.name: "Next match"
+                    iconColor: backend.palette.text
                     onClicked: win.moveSearch(1)
                 }
 
                 SearchIconButton {
                     iconName: "close"
-                    iconColor: win.darkMode ? win.textColor : "#62635f"
+                    Accessible.name: "Close find"
+                    iconColor: backend.palette.text
                     onClicked: win.closeSearch()
                 }
             }
@@ -2939,7 +3018,7 @@ ApplicationWindow {
             id: previewPane
             renderer: win.appBackend
             onScrollFractionChanged: function(fraction) {
-                if (!workspaceSettings.synchronizedScroll || win.synchronizingScroll || workspaceSettings.layoutMode !== 1) return;
+                if (!workspaceSettings.synchronizedScroll || win.synchronizingScroll || workspaceLayout.effectiveLayoutMode !== 1) return;
                 win.synchronizingScroll = true;
                 editorFlick.contentY = Math.max(0, editorFlick.contentHeight - editorFlick.height) * fraction;
                 win.synchronizingScroll = false;
@@ -2957,14 +3036,24 @@ ApplicationWindow {
             onEditorUndoRequested: editor.undo()
             onEditorRedoRequested: editor.redo()
             darkMode: win.darkMode
-            visible: workspaceSettings.layoutMode !== 0
-            SplitView.fillWidth: workspaceSettings.layoutMode === 2
-            SplitView.preferredWidth: Math.max(260, (win.width - (organizerPane.visible ? organizerPane.width : 0) - (libraryPane.visible ? libraryPane.width : 0)) / 2)
-            SplitView.minimumWidth: 220
+            visible: workspaceLayout.effectiveLayoutMode !== 0
+            SplitView.fillWidth: workspaceLayout.effectiveLayoutMode === 2
+            SplitView.preferredWidth: workspaceLayout.effectivePreviewWidth
+            SplitView.minimumWidth: 320
             typeface: backend.outputFont
             textSize: Math.max(12, backend.outputPointSize * 4 / 3 + workspaceSettings.writingSize - 19)
-            layoutMode: workspaceSettings.layoutMode
-            onLayoutRequested: function(mode) { workspaceCommands.run(["editor", "split", "preview"][mode]); }
+            layoutMode: workspaceLayout.effectiveLayoutMode
+            visualEditEnabled: workspaceLayout.visualEditEnabled
+            onVisualEditEnabledChanged: workspaceLayout.visualEditEnabled = visualEditEnabled
+            visualTypeface: win.editorFontFamily
+            visualTextSize: Math.max(18, win.editorFontPixelSize)
+            visualTopInset: height < 600 ? 32 : 64
+            onLayoutRequested: function(mode) {
+                // Split/Full change arrangement; the explicit Preview command changes editing mode.
+                workspaceLayout.layoutMode = mode;
+                if (mode === 2 && visualEditEnabled)
+                    Qt.callLater(function() { previewPane.focusVisualEditor(); });
+            }
             onLinkRequested: function(link) {
                 var resolved = backend.resolveDocumentLink(link);
                 if (/^file:.*\.(md|markdown|mdown|txt|text)(#.*)?$/i.test(String(resolved)))
@@ -2976,6 +3065,9 @@ ApplicationWindow {
     }
 
     Component.onCompleted: {
+        workspaceLayout.filesVisible = workspaceSettings.libraryVisible;
+        workspaceLayout.organizerVisible = workspaceSettings.organizerVisible;
+        workspaceLayout.layoutMode = workspaceSettings.layoutMode;
         if (workspaceSettings.appearanceRevision < 1) {
             if (workspaceSettings.writingSize === 20) workspaceSettings.writingSize = 16;
             workspaceSettings.appearanceRevision = 1;

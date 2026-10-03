@@ -1,0 +1,35 @@
+{
+  "application_version": "0.3.0-dev1",
+  "previous_app_backup": "/private/tmp/Fomawrite-before-build97-20261003-154232.app",
+  "bundles": [
+    {
+      "path": "/Users/andrewgray/repo/projects/fomawrite_mac/build/Fomawrite.app",
+      "bundle_id": "io.github.andrewjngray.fomawrite",
+      "version": "0.3.0",
+      "build": "97",
+      "executable_sha256": "797e37a74b7bc97c3f8bd66b789f1e7880b765c9197887e61235fad50c323884"
+    },
+    {
+      "path": "/Users/andrewgray/repo/projects/fomawrite_mac/dist/Fomawrite Dev.app",
+      "bundle_id": "io.github.andrewjngray.fomawrite.dev",
+      "version": "0.3.0",
+      "build": "97",
+      "executable_sha256": "9dcf158c8c2c95d6429b702c4bdd602eb4a31df072bac45aa6a6ffc420f4b39f"
+    },
+    {
+      "path": "/Users/andrewgray/repo/projects/fomawrite_mac/dist/Fomawrite.app",
+      "bundle_id": "io.github.andrewjngray.fomawrite",
+      "version": "0.3.0",
+      "build": "97",
+      "executable_sha256": "1f96a59c9ebeff239b28074984e9687bab0e05c292b3a848c4ca20071dae4508"
+    },
+    {
+      "path": "/Applications/Fomawrite.app",
+      "bundle_id": "io.github.andrewjngray.fomawrite",
+      "version": "0.3.0",
+      "build": "97",
+      "executable_sha256": "1f96a59c9ebeff239b28074984e9687bab0e05c292b3a848c4ca20071dae4508"
+    }
+  ],
+  "note": "Dev uses local Qt; packaged and Applications copies bundle Qt. Deployment rewrites linkage and signatures, so Dev and packaged executable hashes differ."
+}
