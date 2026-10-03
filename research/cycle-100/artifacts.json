@@ -1,0 +1,52 @@
+{
+  "recorded_at": "2026-10-03T19:56:05.843377",
+  "application_version": "0.3.0-dev2",
+  "dev_refresh": "Pending normal save/close of running Dev copy; replacement staged.",
+  "artifacts": [
+    {
+      "role": "build",
+      "path": "/Users/andrewgray/repo/projects/fomawrite_mac/build/Fomawrite.app",
+      "bundle_id": "io.github.andrewjngray.fomawrite",
+      "version": "0.3.0",
+      "build": "100",
+      "sha256": "9ef62c6c5365a420b5b6f687d823aa7c0d7638b0fefacd18b84133309663efc5",
+      "strict_signature": false
+    },
+    {
+      "role": "demo",
+      "path": "/Users/andrewgray/repo/projects/fomawrite_mac/dist/Fomawrite.app",
+      "bundle_id": "io.github.andrewjngray.fomawrite",
+      "version": "0.3.0",
+      "build": "100",
+      "sha256": "50edda42ba17252c2339ffdc2300a805e2a06a21a9e718d3d75925d209f32a0a",
+      "strict_signature": true
+    },
+    {
+      "role": "applications",
+      "path": "/Applications/Fomawrite.app",
+      "bundle_id": "io.github.andrewjngray.fomawrite",
+      "version": "0.3.0",
+      "build": "100",
+      "sha256": "50edda42ba17252c2339ffdc2300a805e2a06a21a9e718d3d75925d209f32a0a",
+      "strict_signature": true
+    },
+    {
+      "role": "dev-current",
+      "path": "/Users/andrewgray/repo/projects/fomawrite_mac/dist/Fomawrite Dev.app",
+      "bundle_id": "io.github.andrewjngray.fomawrite.dev",
+      "version": "0.3.0",
+      "build": "97",
+      "sha256": "9dcf158c8c2c95d6429b702c4bdd602eb4a31df072bac45aa6a6ffc420f4b39f",
+      "strict_signature": true
+    },
+    {
+      "role": "dev-ready",
+      "path": "/private/tmp/Fomawrite-Dev-build100-ready.app",
+      "bundle_id": "io.github.andrewjngray.fomawrite.dev",
+      "version": "0.3.0",
+      "build": "100",
+      "sha256": "d59c84543592e3df385500f3a7cc9e09e417c88b9fabce74f3a1274fc46c87a5",
+      "strict_signature": true
+    }
+  ]
+}

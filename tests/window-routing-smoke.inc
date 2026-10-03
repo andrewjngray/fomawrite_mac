@@ -32,6 +32,7 @@ const auto smokeWaitFor = [&](std::function<bool()> ready, std::function<void()>
     });
     timer->start();
 };
+#include "cycle100-navigation-native.inc"
 std::function<void(int)> smokePrint;
 smokePrint = [&](int index) {
     const QStringList labels{"Print Rendered Document…", "Print Markdown Source…", "Paginated Preview…"};
@@ -113,11 +114,152 @@ bool smokeWorkspaceModified = false;
 bool smokeWorkspaceUndo = false;
 int smokeWorkspaceSelectionStart = 0;
 int smokeWorkspaceSelectionEnd = 0;
+// These checks exercise Qt's native accessibility interfaces and actual shortcut
+// dispatch. They do not stand in for listening to VoiceOver or changing displays.
+const auto smokeContainsFocus = [](QWindow *window, const QString &objectName) {
+    auto *quick = qobject_cast<QQuickWindow *>(window);
+    auto *root = window->findChild<QQuickItem *>(objectName);
+    for (auto *item = quick ? quick->activeFocusItem() : nullptr; item; item = item->parentItem())
+        if (item == root) return true;
+    return false;
+};
+const auto smokeKey = [](QWindow *window, Qt::Key key, Qt::KeyboardModifiers modifiers = Qt::NoModifier) {
+    QKeyEvent press(QEvent::KeyPress, key, modifiers);
+    QCoreApplication::sendEvent(window, &press);
+    QKeyEvent release(QEvent::KeyRelease, key, modifiers);
+    QCoreApplication::sendEvent(window, &release);
+};
+const auto smokeTabRoundTrip = [&](std::function<void()> next) {
+#ifdef Q_OS_MACOS
+    smokeWorkspaceTab->backend->nativeWindowAction(QStringLiteral("detach"));
+    smokeWaitFor([&] { return macWorkspaceState(smokeWorkspaceTab->window).isEmpty()
+                               && macWorkspaceState(smokeWorkspaceOriginal->window).isEmpty(); }, [&, next] {
+        if (!smokeCheck(smokePaneState(smokeWorkspaceOriginal->window) == smokeOriginalPanes
+                       && smokePaneState(smokeWorkspaceTab->window) == smokeTabPanes,
+                       "detaching a native tab preserves both independent pane layouts")) return;
+        restoreMacWorkspaceTabs({smokeWorkspaceOriginal->window, smokeWorkspaceTab->window});
+        smokeWaitFor([&] {
+            const QString group = macWorkspaceState(smokeWorkspaceOriginal->window).value("group").toString();
+            return !group.isEmpty() && group == macWorkspaceState(smokeWorkspaceTab->window).value("group").toString();
+        }, [&, next] {
+            if (!smokeCheck(macWorkspaceState(smokeWorkspaceSecond->window).isEmpty()
+                           && smokePaneState(smokeWorkspaceOriginal->window) == smokeOriginalPanes
+                           && smokePaneState(smokeWorkspaceTab->window) == smokeTabPanes
+                           && smokePaneState(smokeWorkspaceSecond->window) == smokeSecondPanes,
+                           "production native tab restoration keeps separate-window layouts independent")) return;
+            next();
+        });
+    });
+#else
+    next();
+#endif
+};
+std::function<void(std::function<void()>)> smokeAcceptance;
+smokeAcceptance = [&](std::function<void()> next) {
+    auto *window = smokeWorkspaceSecond->window.data();
+    auto *workspaceButton = window->findChild<QQuickItem *>(QStringLiteral("topChromeLibraryButton"));
+    auto *access = QAccessible::queryAccessibleInterface(workspaceButton);
+    if (!smokeCheck(access && access->role() == QAccessible::Button
+                    && access->text(QAccessible::Name) == QStringLiteral("Workspace columns and document modes"),
+                    "workspace control exposes its button role and descriptive accessible name")) return;
+    auto *source = window->findChild<QQuickItem *>(QStringLiteral("sourceEditor"));
+    auto *sourceAccess = QAccessible::queryAccessibleInterface(source);
+    if (!smokeCheck(sourceAccess && sourceAccess->text(QAccessible::Name) == QStringLiteral("Markdown editor")
+                   && sourceAccess->textInterface(), "source editor exposes named accessible text interface")) return;
+    source->forceActiveFocus();
+    smokeKey(window, Qt::Key_F6);
+    QTimer::singleShot(100, &app, [&, next] {
+        auto *window = smokeWorkspaceSecond->window.data();
+        if (!smokeCheck(smokeContainsFocus(window, QStringLiteral("previewPane")), "F6 moves keyboard focus from Source into Preview")) return;
+        smokeKey(window, Qt::Key_F6);
+        QTimer::singleShot(100, &app, [&, next] {
+            auto *window = smokeWorkspaceSecond->window.data();
+            if (!smokeCheck(smokeContainsFocus(window, QStringLiteral("topChrome")), "F6 reaches the workspace toolbar")) return;
+            smokeKey(window, Qt::Key_F6, Qt::ShiftModifier);
+            QTimer::singleShot(100, &app, [&, next] {
+                auto *window = smokeWorkspaceSecond->window.data();
+                if (!smokeCheck(smokeContainsFocus(window, QStringLiteral("previewPane")), "Shift+F6 traverses workspace regions in reverse")) return;
+                QMetaObject::invokeMethod(window, "focusWorkspaceRegion", Q_ARG(QVariant, QStringLiteral("files")));
+                window->resize(720, 820);
+                QTimer::singleShot(180, &app, [&, next] {
+                    auto *window = smokeWorkspaceSecond->window.data();
+                    auto *quick = qobject_cast<QQuickWindow *>(window);
+                    if (!smokeCheck(quick->activeFocusItem() && quick->activeFocusItem()->isVisible()
+                        && smokeContainsFocus(window, QStringLiteral("editorPane")),
+                        "contraction transfers keyboard focus out of a hidden Files pane")) return;
+                    auto *settings = window->findChild<QObject *>(QStringLiteral("workspaceSettings"));
+                    settings->setProperty("toolbarVisibilityMode", 0);
+                    QMetaObject::invokeMethod(window, "focusWorkspaceRegion", Q_ARG(QVariant, QStringLiteral("toolbar")));
+                    auto *chrome = window->findChild<QObject *>(QStringLiteral("topChrome"));
+                    if (!smokeCheck(chrome->property("keyboardReveal").toBool()
+                                    && chrome->property("toolbarContentOpacity").toDouble() == 1,
+                                    "keyboard toolbar focus reveals faded actions")) return;
+                    QMetaObject::invokeMethod(window, "toggleWorkspacePane", Q_ARG(QVariant, QStringLiteral("files")));
+                    auto *drawer = window->findChild<QObject *>(QStringLiteral("workspaceNavigationDrawer"));
+                    smokeWaitFor([drawer] { return drawer->property("opened").toBool(); }, [&, drawer, next] {
+                        auto *window = smokeWorkspaceSecond->window.data();
+                        auto *close = window->findChild<QQuickItem *>(QStringLiteral("navigationCloseButton"));
+                        auto *closeAccess = QAccessible::queryAccessibleInterface(close);
+                        if (!smokeCheck(close && close->hasActiveFocus() && closeAccess
+                            && closeAccess->text(QAccessible::Name) == QStringLiteral("Close navigation"),
+                            "compact navigation opens with a named, focused Close control")) return;
+                        smokeKey(window, Qt::Key_Escape);
+                        smokeWaitFor([drawer] { return !drawer->property("visible").toBool(); }, [&, next] {
+                            auto *window = smokeWorkspaceSecond->window.data();
+                            auto *button = window->findChild<QQuickItem *>(QStringLiteral("topChromeLibraryButton"));
+                            if (!smokeCheck(button->hasActiveFocus(), "Escape closes compact navigation and restores its initiating keyboard focus")) return;
+                            window->findChild<QObject *>(QStringLiteral("workspaceSettings"))->setProperty("toolbarVisibilityMode", 1);
+                            window->resize(1440, 820);
+                            smokeWorkspaceTab->window->raise(); smokeWorkspaceTab->window->requestActivate();
+                            QTimer::singleShot(240, &app, [&, next] {
+                                auto *window = smokeWorkspaceSecond->window.data();
+                                if (!smokeCheck(!window->isActive() && smokeWorkspaceTab->window->isActive(),
+                                                "separate native tab window can become active without altering the inactive workspace")) return;
+                                if (!smokeCheck(smokeHeadersAlign(window) && smokePaneState(window) == smokeSecondPanes,
+                                                "inactive workspace keeps aligned columns and requested state")) return;
+                                auto *inactiveButton = window->findChild<QObject *>(QStringLiteral("topChromeLibraryButton"));
+                                if (!smokeCheck(!inactiveButton->property("focusIndicated").toBool(),
+                                                "inactive window suppresses the active keyboard focus ring")) return;
+                                if (!smokeCaptureWorkspace(window, QStringLiteral("workspace-inactive.png"))) return;
+                                window->raise(); window->requestActivate();
+                                QMetaObject::invokeMethod(window, "toggleFullScreen");
+                                smokeWaitFor([window] { return window->visibility() == QWindow::FullScreen; }, [&, next] {
+                                    QTimer::singleShot(900, &app, [&, next] {
+                                        auto *window = smokeWorkspaceSecond->window.data();
+                                        if (!smokeCheck(smokeHeadersAlign(window) && smokePaneState(window) == smokeSecondPanes,
+                                                        "native full screen preserves aligned headers and requested pane state")) return;
+                                        if (!smokeCaptureWorkspace(window, QStringLiteral("workspace-fullscreen.png"))) return;
+                                        QMetaObject::invokeMethod(window, "toggleFullScreen");
+                                        smokeWaitFor([window] { return window->visibility() == QWindow::Windowed; }, [&, next] {
+                                            QTimer::singleShot(900, &app, [&, next] {
+                                                auto *window = smokeWorkspaceSecond->window.data();
+                                                if (!smokeCheck(smokeHeadersAlign(window) && smokePaneState(window) == smokeSecondPanes,
+                                                                "leaving native full screen restores the workspace composition")) return;
+                                                auto *editor = window->findChild<QObject *>(QStringLiteral("sourceEditor"));
+                                                if (!smokeCheck(editor->property("text").toString() == smokeWorkspaceText
+                                                    && editor->property("selectionStart").toInt() == smokeWorkspaceSelectionStart
+                                                    && editor->property("selectionEnd").toInt() == smokeWorkspaceSelectionEnd
+                                                    && editor->property("canUndo").toBool() && smokeWorkspaceSecond->backend->modified(),
+                                                    "keyboard navigation, activation and full screen preserve the draft, selection and Undo")) return;
+                                                smokeTabRoundTrip(next);
+                                            });
+                                        });
+                                    });
+                                });
+                            });
+                        });
+                    });
+                });
+            });
+        });
+    });
+};
 std::function<void(int)> smokeResizeWorkspace;
 smokeResizeWorkspace = [&](int index) {
     const QList<int> widths{1440, 1120, 900, 720, 1440};
     auto *window = smokeWorkspaceSecond->window.data();
     if (index == widths.size()) {
+        smokeAcceptance([&] {
         smokeWorkspaceSecond->backend->setThemePreset(QStringLiteral("dark"));
         QTimer::singleShot(200, &app, [&] {
             if (!smokeCheck(smokeHeadersAlign(smokeWorkspaceSecond->window), "dark headers retain pane alignment")) return;
@@ -135,6 +277,7 @@ smokeResizeWorkspace = [&](int index) {
                 if (!smokeCheck(!smokeWorkspaceSecond->backend->modified(), "reload disposable QA source before native Quit")) return;
                 smokePrint(0);
             });
+        });
         });
         return;
     }
@@ -249,8 +392,14 @@ QTimer::singleShot(200, &app, [&] {
 #endif
             createWindow(smokeFile);
             if (!smokeCheck(sessions.size() == 3, "ordinary opening still focuses an existing editor")) return;
-            smokeWorkspace(original, second, tab);
+            smokeNavigation(original, second, tab, [&, original, second, tab] {
+                // Let documentLoaded's deferred cursor reset finish before this
+                // independent acceptance fixture creates its selected draft.
+                QTimer::singleShot(120, &app, [&, original, second, tab] {
+                    smokeWorkspace(original, second, tab);
+                });
+            });
         });
     });
 });
-QTimer::singleShot(30000, &app, [&] { qCritical("Window routing/workspace integration test timed out"); app.exit(2); });
+QTimer::singleShot(45000, &app, [&] { qCritical("Window routing/workspace integration test timed out"); app.exit(2); });

@@ -1305,3 +1305,37 @@ Tests and native verification: `./bin/build`, all 122 tests, native workspace in
 Runnable artifacts: refreshed `dist/Fomawrite Dev.app`, ordinary `dist/Fomawrite.app`, and `/Applications/Fomawrite.app`, all version 0.3.0/build 97. All pass strict signatures; packaged/installed executables match. Dev has the same source with local Qt linkage. Previous Applications copy backed up. [Optional review exercise](../research/usability/cycle-97.md).
 
 Next recommended scopes: Cycle 98 user feedback and accessibility/display-scale/tab acceptance; Cycle 99 safe visual blocks and image/list/table projection; Cycle 100 bounded workflow/parser/export gaps from the acceptance ledger; optional Cycle 101 distribution after acceptance. Each remains a separately scoped increment.
+
+## Cycle 98 — workspace keyboard and native acceptance
+
+Planned scope: complete feasible workspace acceptance checks and fix concrete keyboard/focus regressions before expanding Visual Edit.
+
+Changes: F6/Shift+F6 now traverse visible workspace regions without consuming writing Tab input. Compact navigation takes focus on Close and restores its initiating control on Escape. Automatic contraction rescues focus from a hidden pane. Toolbar focus rings belong to the active window, with neutral selection treatment when inactive. The shared workspace standards and in-app shortcut help document these rules.
+
+Verification: the production-main native fixture compiles and passes **111 assertions across Cycles 98 and 100**, including QAccessible button/text interfaces, actual keyboard shortcuts, compact navigation, dark/inactive state, full-screen entry/exit, native tab detach/regroup, independent per-window pane checkpoints and exact draft/selection/Undo preservation. Five synthetic app-only captures were inspected. [Evidence](../research/cycle-98/README.md), [native log](../research/cycle-98/native-workspace.log), [optional exercise](../research/usability/cycle-98.md).
+
+Known gaps: listening to physical VoiceOver, actual macOS display setting changes/multiple displays, arbitrary-workspace quit/relaunch and Andrew's normal writing review remain open. The fixture boundary now waits for document-load cursor reset before preparing its independent selected draft; production cursor behavior was not weakened.
+
+Runnable artifact target: stable `dist/Fomawrite Dev.app`, ordinary/demo `dist/Fomawrite.app` and `/Applications/Fomawrite.app`, all intended for the combined `0.3.0-dev2` / `0.3.0 (100)` handoff. The aggregate gate passes below; package and Applications are refreshed. Dev awaits safe close.
+
+## Cycle 99 — bounded visual blocks, images, tables and lists
+
+Planned scope: make supported Visual Edit structures more useful while preserving canonical Markdown and exact source edits.
+
+Changes: project simple tables into readable rows and allow edits within mapped cells; allow safe inline-code body edits; show local image thumbnails and edit image alt text without rewriting its destination/title; continue a supported list at the end of an item, reset a continued task to unchecked and exit an empty item. Replacements respect grapheme boundaries and support an empty document. The visual caret scrolls into view during typing; unsupported operations retain a visible Source route.
+
+Verification scope: mapping and integrated editor fixtures cover exact UTF-8 source, Unicode/graphemes, image metadata preservation, table/code boundaries, list Return/exit, canonical Undo/Redo, unsupported edits and caret behavior. **134 integrated tests and native Visual Edit checks pass**, recorded in the [Cycle 99 record](../research/cycle-99/README.md) and combined Cycle 100 handoff.
+
+Known gaps: arbitrary multiline paste, splitting within a list item, complex/nested table/list grammar, spatial image placement and a full editable image/table grid remain Source work. This is a bounded projection, not general WYSIWYG or complete Ulysses/Typora parity. Runnable artifacts are the combined build-100 targets above. Optional exercise: edit a table cell, image alt text and task list in the Cycle 99 sample, Undo each action, and compare the exact Markdown.
+
+## Cycle 100 — heading links across open windows and integrated handoff
+
+Planned scope: close the specific Cycle 58 navigation gaps after the workspace acceptance pass, then identify and refresh the review artifacts.
+
+Changes: preserve heading fragments through ordinary open routing and explicit new views; navigate to headings in another window's live Markdown without reloading either buffer; report missing/invalid headings without moving the caret; retain the unsaved-source Cancel guard. Queued preview completions now carry a revision so a stale parse cannot consume a newer pending heading or raise a false missing-heading message.
+
+Verification: cross-window encoded Unicode headings, unsaved targets, missing feedback, source Cancel and exact Undo pass in the integrated native fixture. Focused navigation regressions also pass. See the [Cycle 100 record](../research/cycle-100/README.md).
+
+**Final integrated gate: passed.** `./bin/build` and all **134 tests** pass, with zero failures/skips. Native Visual Edit/navigation checks pass **5/0/0** including setup/cleanup; the workspace fixture passes 111 assertions. Application `0.3.0-dev2`, macOS `0.3.0 (100)`, is packaged and installed in Applications; both pass strict local signatures and executable hashes match. The Dev replacement is ready but its running copy canceled normal quit, so replacement awaits save/close. [Bundle identities](../research/cycle-100/artifacts.json). No public release or notarization is implied.
+
+Next: review the combined build during normal writing and complete physical accessibility/display checks. Product Cycle 102 should address the highest-value image/table/list ergonomics from that review, with exact-source safeguards. Cycle 101 remains an optional distribution decision. Broader parser/output/interoperability gaps remain in the acceptance ledger.

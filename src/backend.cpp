@@ -910,6 +910,9 @@ QVariantMap Backend::visualProjection() const {
         case SourceVisualMapping::BlockKind::Paragraph: return QStringLiteral("paragraph");
         case SourceVisualMapping::BlockKind::Heading: return QStringLiteral("heading");
         case SourceVisualMapping::BlockKind::ListItem: return QStringLiteral("listItem");
+        case SourceVisualMapping::BlockKind::Image: return QStringLiteral("image");
+        case SourceVisualMapping::BlockKind::TableRow: return QStringLiteral("tableRow");
+        case SourceVisualMapping::BlockKind::TableDelimiter: return QStringLiteral("tableDelimiter");
         case SourceVisualMapping::BlockKind::SourceOnly: return QStringLiteral("sourceOnly");
         }
         return QStringLiteral("sourceOnly");
@@ -922,7 +925,16 @@ QVariantMap Backend::visualProjection() const {
                                   {"visualLength", block.visual.length},
                                   {"editable", block.editable}});
     }
-    return {{"source", source}, {"visualText", mapping.visualText()}, {"blocks", blocks}};
+    QVariantList images;
+    for (const auto &image : mapping.imageObjects()) {
+        const QUrl resolved = documentBaseUrl().resolved(QUrl(image.destination));
+        const QString localPreview = resolved.isLocalFile() && QFileInfo(resolved.toLocalFile()).isFile()
+            ? resolved.toString() : QString();
+        images.append(QVariantMap{{"visualStart", image.visual.start}, {"visualLength", image.visual.length},
+                                  {"altText", image.altText}, {"destination", image.destination},
+                                  {"previewUrl", localPreview}});
+    }
+    return {{"source", source}, {"visualText", mapping.visualText()}, {"blocks", blocks}, {"images", images}};
 }
 
 bool Backend::applyVisualEdit(int start, int length, const QString &replacement,
@@ -931,7 +943,19 @@ bool Backend::applyVisualEdit(int start, int length, const QString &replacement,
             || replacement.contains(QRegularExpression(QStringLiteral("[\\\\`*_\\[\\]<>\\r]"))))
         return false;
     const SourceVisualMapping mapping = SourceVisualMapping::create(expectedSource);
-    const auto edit = mapping.sourceEditForVisualReplacement({start, length}, replacement);
+    if (start > mapping.visualText().size() || length > mapping.visualText().size() - start) return false;
+    // TextEdit's minimal diff may contain only the changed accent or emoji
+    // modifier. Expand that diff to complete graphemes before source mapping.
+    int first = start, last = start + length;
+    QTextBoundaryFinder boundary(QTextBoundaryFinder::Grapheme, mapping.visualText());
+    boundary.setPosition(first);
+    if (first > 0 && first < mapping.visualText().size() && !boundary.isAtBoundary()) first = boundary.toPreviousBoundary();
+    boundary.setPosition(last);
+    if (last > 0 && last < mapping.visualText().size() && !boundary.isAtBoundary()) last = boundary.toNextBoundary();
+    if (first < 0 || last < 0) return false;
+    const QString expanded = mapping.visualText().mid(first, start - first) + replacement
+        + mapping.visualText().mid(start + length, last - start - length);
+    const auto edit = mapping.sourceEditForVisualReplacement({first, last - first}, expanded);
     if (!edit.has_value()) return false;
     const qint64 now = QDateTime::currentMSecsSinceEpoch();
     const bool continueTyping = length == 0 && !replacement.isEmpty()
@@ -949,6 +973,24 @@ bool Backend::applyVisualEdit(int start, int length, const QString &replacement,
     m_lastVisualEditAt = now;
     m_lastVisualEditEnd = edit->source.start + edit->replacement.size();
     return true;
+}
+
+QVariantMap Backend::applyVisualBreak(int position, bool softBreak, const QString &expectedSource) {
+    if (!m_document || expectedSource != currentDocumentText()) return {{"applied", false}};
+    const auto mapping = SourceVisualMapping::create(expectedSource);
+    const auto change = mapping.sourceEditForVisualBreak(position, softBreak);
+    if (!change) return {{"applied", false}};
+    QTextCursor cursor(m_document);
+    cursor.setPosition(change->edit.source.start);
+    cursor.setPosition(change->edit.source.end(), QTextCursor::KeepAnchor);
+    cursor.beginEditBlock();
+    cursor.insertText(change->edit.replacement);
+    cursor.endEditBlock();
+    // A structural break starts a new undo unit; following typing must not
+    // merge into the edit that created a new list item or paragraph.
+    m_lastVisualResultSource.clear();
+    m_lastVisualEditEnd = -1;
+    return {{"applied", true}, {"cursor", change->visualCursor}};
 }
 
 QVariantMap Backend::wrapSelection(int start, int end, const QString &before, const QString &after) {
@@ -1406,6 +1448,13 @@ void Backend::styleVisualEditor(QObject *textDocument, int textSize, const QStri
     auto *quick = qobject_cast<QQuickTextDocument *>(textDocument);
     if (!quick || !quick->textDocument() || quick->textDocument() == m_document) return;
     QTextDocument *visual = quick->textDocument();
+    // This document is a projection only; canonical source owns Undo/Redo.
+    visual->setUndoRedoEnabled(false);
+    QTextCursor spacing(visual);
+    spacing.select(QTextCursor::Document);
+    QTextBlockFormat format;
+    format.setLineHeight(150, QTextBlockFormat::ProportionalHeight);
+    spacing.mergeBlockFormat(format);
     if (m_visualHighlighter && m_visualHighlighter->document() != visual)
         delete m_visualHighlighter.data();
     if (!m_visualHighlighter)
@@ -1514,7 +1563,7 @@ bool Backend::open(const QUrl &url) {
     documentUrl.setFragment(QString());
     const QString canonical = QFileInfo(documentUrl.toLocalFile()).canonicalFilePath();
     const bool sameDocument = !canonical.isEmpty() && canonical == QFileInfo(m_fileUrl.toLocalFile()).canonicalFilePath();
-    if (!sameDocument && focusExistingDocument && focusExistingDocument(documentUrl)) return false;
+    if (!sameDocument && focusExistingDocument && focusExistingDocument(url)) return false;
     if (!documentUrl.isLocalFile()) {
         setStatus(QStringLiteral("Only local files can be opened."));
         return false;
@@ -1882,7 +1931,9 @@ bool Backend::openInNewTab(const QUrl &url) {
             return false;
         }
     }
-    emit newTabRequested(QUrl::fromLocalFile(info.canonicalFilePath()));
+    QUrl target = QUrl::fromLocalFile(info.canonicalFilePath());
+    target.setFragment(url.fragment(QUrl::FullyDecoded), QUrl::DecodedMode);
+    emit newTabRequested(target);
     return true;
 }
 
@@ -1899,7 +1950,9 @@ bool Backend::openInNewWindow(const QUrl &url) {
             return false;
         }
     }
-    emit newWindowRequested(QUrl::fromLocalFile(info.canonicalFilePath()));
+    QUrl target = QUrl::fromLocalFile(info.canonicalFilePath());
+    target.setFragment(url.fragment(QUrl::FullyDecoded), QUrl::DecodedMode);
+    emit newWindowRequested(target);
     return true;
 }
 

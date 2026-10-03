@@ -28,15 +28,34 @@ Rectangle {
     signal sourceEditRequested()
     property bool visualEditorFocused: visualText.activeFocus
     property string visualStatus: ""
+    property string visualNotice: ""
+    onVisualStatusChanged: {
+        visualNotice = visualEditEnabled && visualStatus.indexOf("Source") >= 0
+                && visualStatus.indexOf("Edit text,") !== 0 ? visualStatus : "";
+    }
+    property var visualImages: []
+    readonly property var activeVisualImage: {
+        for (var i = 0; i < visualImages.length; ++i) {
+            var image = visualImages[i];
+            if (visualText.cursorPosition >= image.visualStart
+                    && visualText.cursorPosition <= image.visualStart + image.visualLength)
+                return image;
+        }
+        return null;
+    }
     property string visualSnapshot: ""
     property string visualSourceSnapshot: ""
     property bool synchronizingVisualText: false
     signal scrollFractionChanged(real fraction)
     function focusVisualEditor() { visualText.forceActiveFocus(); }
     function scrollToFraction(fraction) { previewScroll.contentY = Math.max(0, previewScroll.contentHeight - previewScroll.height) * fraction; }
+    signal anchorNavigationFailed(string anchor)
     function jumpToAnchor(anchor) {
-        var position = renderer.previewAnchorPosition(previewText.textDocument, decodeURIComponent(anchor));
-        if (position < 0) return false;
+        var decoded;
+        try { decoded = decodeURIComponent(anchor); }
+        catch (error) { root.anchorNavigationFailed(anchor); return false; }
+        var position = renderer.previewAnchorPosition(previewText.textDocument, decoded);
+        if (position < 0) { root.anchorNavigationFailed(decoded); return false; }
         previewScroll.contentY = Math.max(0, Math.min(previewScroll.contentHeight - previewScroll.height, previewText.positionToRectangle(position).y));
         return true;
     }
@@ -48,6 +67,7 @@ Rectangle {
     signal linkRequested(url link)
     color: backend.palette.page
     property string renderedMarkdown: ""
+    property int previewRefreshRevision: 0
     onMarkdownChanged: {
         refreshTimer.restart()
         if (visualEditEnabled)
@@ -61,10 +81,13 @@ Rectangle {
     function refresh() {
         // Reparse when font size/theme changes too: normalized HTML contains
         // explicit formatting from the previous preview pass.
+        var revision = ++previewRefreshRevision;
         renderedMarkdown = "";
         Qt.callLater(function() {
+            if (revision !== root.previewRefreshRevision) return;
             renderedMarkdown = renderer.previewMarkdown(markdown);
             Qt.callLater(function() {
+                if (revision !== root.previewRefreshRevision) return;
                 root.renderer.stylePreview(previewText.textDocument);
                 if (root.pendingAnchor !== "") {
                     var anchor = root.pendingAnchor;
@@ -77,12 +100,20 @@ Rectangle {
     function reload() {
         // Force a fresh Markdown parse even when the source has not changed.
         refreshTimer.stop();
+        // Invalidate queued parse/style completions before clearing the text.
+        // Otherwise an old completion can consume a new pending heading while
+        // its replacement preview is still empty.
+        ++previewRefreshRevision;
         renderedMarkdown = "";
         Qt.callLater(refresh);
     }
     function loadVisualProjection(selectionStart, selectionEnd) {
         if (!visualEditEnabled)
             return;
+        if (visualText.inputMethodComposing) {
+            visualRefreshTimer.restart();
+            return;
+        }
         // Keep the field's own post-edit selection across a canonical refresh.
         // This is also bounded for source/external changes that shorten text.
         var first = selectionStart === undefined ? visualText.selectionStart : selectionStart;
@@ -91,8 +122,13 @@ Rectangle {
         synchronizingVisualText = true;
         visualSourceSnapshot = projection.source || "";
         visualSnapshot = projection.visualText || "";
+        visualImages = projection.images || [];
         visualText.text = visualSnapshot;
-        Qt.callLater(function() { if (root.visualEditEnabled) root.renderer.styleVisualEditor(visualText.textDocument, root.visualTextSize, root.visualTypeface); });
+        Qt.callLater(function() {
+            if (!root.visualEditEnabled) return;
+            if (visualText.inputMethodComposing) { visualRefreshTimer.restart(); return; }
+            root.renderer.styleVisualEditor(visualText.textDocument, root.visualTextSize, root.visualTypeface);
+        });
         first = Math.max(0, Math.min(first, visualSnapshot.length));
         last = Math.max(0, Math.min(last, visualSnapshot.length));
         if (first === last)
@@ -100,6 +136,20 @@ Rectangle {
         else
             visualText.select(first, last);
         synchronizingVisualText = false;
+        Qt.callLater(ensureVisualCursorVisible);
+    }
+    function ensureVisualCursorVisible() {
+        if (!visualEditEnabled || !visualText.activeFocus || synchronizingVisualText)
+            return;
+        var caret = visualText.cursorRectangle;
+        var top = visualText.y + caret.y;
+        var bottom = top + caret.height;
+        var target = previewScroll.contentY;
+        if (top < target + 20) target = top - 20;
+        else if (bottom > target + previewScroll.height - 20)
+            target = bottom - previewScroll.height + 20;
+        previewScroll.contentY = Math.max(0, Math.min(target,
+            Math.max(0, previewScroll.contentHeight - previewScroll.height)));
     }
     function visualDiff(before, after) {
         var prefix = 0;
@@ -112,6 +162,16 @@ Rectangle {
                && before.charAt(beforeEnd - 1) === after.charAt(afterEnd - 1)) {
             --beforeEnd;
             --afterEnd;
+        }
+        // Minimal string diffs can split a UTF-16 surrogate pair when two
+        // emoji share their high surrogate. Include the whole code point.
+        if (prefix > 0 && prefix < before.length
+                && before.charCodeAt(prefix) >= 0xDC00 && before.charCodeAt(prefix) <= 0xDFFF)
+            --prefix;
+        if (beforeEnd < before.length && beforeEnd > prefix
+                && before.charCodeAt(beforeEnd) >= 0xDC00 && before.charCodeAt(beforeEnd) <= 0xDFFF) {
+            ++beforeEnd;
+            ++afterEnd;
         }
         return { start: prefix, length: beforeEnd - prefix,
                  replacement: after.slice(prefix, afterEnd) };
@@ -133,19 +193,21 @@ Rectangle {
         }
     }
     function insertVisualBreak(shift) {
-        var position = visualText.cursorPosition;
-        var inserted = shift ? "\n" : "\n\n";
-        if (visualText.selectionStart === visualText.selectionEnd
-                && root.renderer.applyVisualEdit(position, 0, inserted, root.visualSourceSnapshot)) {
-            root.visualStatus = "Paragraph break applied to Markdown source.";
-            root.loadVisualProjection(position + inserted.length, position + inserted.length);
+        if (visualText.selectionStart !== visualText.selectionEnd) {
+            visualStatus = "Use Source to replace a selection with a new block.";
+            return;
+        }
+        var result = renderer.applyVisualBreak(visualText.cursorPosition, !!shift, visualSourceSnapshot);
+        if (result.applied) {
+            visualStatus = "Break applied to Markdown source.";
+            loadVisualProjection(result.cursor, result.cursor);
         } else {
-            root.visualStatus = "This break needs Source editing to preserve Markdown.";
+            visualStatus = "This break needs Source editing to preserve Markdown.";
         }
     }
     onVisualEditEnabledChanged: {
         visualStatus = visualEditEnabled
-            ? "Visual editing supports text and simple paragraph breaks. Other structures remain source-only."
+            ? "Edit text, simple table cells and image captions. Return continues simple lists; unsupported structures stay in Source."
             : "Rendered preview is read-only.";
         if (visualEditEnabled)
             Qt.callLater(loadVisualProjection);
@@ -160,6 +222,7 @@ Rectangle {
         objectName: "previewScroll"
         anchors.fill: parent
         anchors.bottomMargin: root.showFooter ? 48 : 0
+        anchors.topMargin: imageContext.visible ? imageContext.height : 0
         clip: true
         contentWidth: width
         contentHeight: Math.max(height, root.visualEditEnabled
@@ -209,7 +272,9 @@ Rectangle {
             font.family: root.visualTypeface
             font.pixelSize: root.visualTextSize
             onTextChanged: root.applyVisualTextChange()
-            onInputMethodComposingChanged: if (!inputMethodComposing) root.applyVisualTextChange()
+            onInputMethodComposingChanged: if (!inputMethodComposing) { root.applyVisualTextChange(); visualRefreshTimer.restart(); }
+            onCursorRectangleChanged: Qt.callLater(root.ensureVisualCursorVisible)
+            onActiveFocusChanged: if (activeFocus) Qt.callLater(root.ensureVisualCursorVisible)
             Keys.priority: Keys.BeforeItem
             Keys.onPressed: function(event) {
                 if (!(event.modifiers & Qt.ControlModifier))
@@ -232,7 +297,7 @@ Rectangle {
                 event.accepted = true;
             }
             Accessible.name: "Visual Edit: editable Markdown text"
-            Accessible.description: "Edits supported text and simple paragraph breaks while keeping Markdown source canonical"
+            Accessible.description: "Edits supported text, image descriptions and simple table cells. Return continues simple lists. Other structures use Source."
         }
         Label {
             anchors.centerIn: parent
@@ -242,6 +307,111 @@ Rectangle {
             color: backend.palette.muted
             font.pixelSize: 15
             lineHeight: 1.5
+        }
+    }
+    Rectangle {
+        id: imageContext
+        objectName: "visualImageContext"
+        visible: root.visualEditEnabled && root.activeVisualImage !== null
+        anchors.left: parent.left; anchors.right: parent.right; anchors.top: parent.top
+        height: 44
+        color: backend.palette.panel
+        RowLayout {
+            anchors.fill: parent; anchors.margins: 6; spacing: 8
+            Label {
+                text: "Image · " + (root.activeVisualImage ? root.activeVisualImage.altText || "No description" : "")
+                elide: Text.ElideRight
+                color: backend.palette.text
+                font.pixelSize: 12
+                Layout.fillWidth: true
+                Layout.minimumWidth: 0
+            }
+            ChromeButton {
+                objectName: "visualImageInspectButton"
+                text: "Inspect image…"; tonal: true
+                hint: "Preview image and its Markdown destination"
+                onClicked: imageInspector.open()
+            }
+        }
+    }
+    Popup {
+        id: imageInspector
+        objectName: "visualImageInspector"
+        parent: Overlay.overlay
+        anchors.centerIn: parent
+        width: Math.min(440, parent ? parent.width - 32 : 440)
+        padding: 20
+        modal: true; focus: true
+        closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
+        background: Rectangle { color: backend.palette.panel; radius: 12; border.color: backend.palette.border }
+        onClosed: if (root.visualEditEnabled && root.visible) root.focusVisualEditor()
+        contentItem: ColumnLayout {
+            spacing: 12
+            Label { text: "Image"; font.pixelSize: 18; font.bold: true; color: backend.palette.text }
+            Image {
+                id: inspectedImage
+                objectName: "visualImageThumbnail"
+                Layout.fillWidth: true; Layout.preferredHeight: 180
+                source: root.activeVisualImage ? root.activeVisualImage.previewUrl || "" : ""
+                sourceSize.width: 760; sourceSize.height: 360
+                fillMode: Image.PreserveAspectFit
+                Accessible.name: root.activeVisualImage ? root.activeVisualImage.altText || "Image preview" : "Image preview"
+            }
+            Label {
+                visible: inspectedImage.status !== Image.Ready
+                text: inspectedImage.status === Image.Loading ? "Loading image…" : "Preview unavailable. Remote images remain in the document."
+                wrapMode: Text.WordWrap; Layout.fillWidth: true
+                color: backend.palette.muted; font.pixelSize: 12
+            }
+            Label {
+                text: root.activeVisualImage ? root.activeVisualImage.destination : ""
+                wrapMode: Text.WrapAnywhere; Layout.fillWidth: true
+                color: backend.palette.muted; font.pixelSize: 12
+            }
+            Label {
+                text: "Edit an existing description in Visual Edit. Use Source to add or remove a description, or change the destination."
+                wrapMode: Text.WordWrap; Layout.fillWidth: true
+                color: backend.palette.text; font.pixelSize: 13
+            }
+            RowLayout {
+                Item { Layout.fillWidth: true }
+                ChromeButton { text: "Edit in Source"; tonal: true; onClicked: { imageInspector.close(); root.sourceEditRequested(); } }
+                ChromeButton { text: "Done"; tonal: true; onClicked: imageInspector.close() }
+            }
+        }
+    }
+    Rectangle {
+        id: visualNoticePanel
+        objectName: "visualEditNotice"
+        visible: root.visualEditEnabled && root.visualNotice !== ""
+        anchors.left: parent.left; anchors.right: parent.right
+        anchors.bottom: parent.bottom
+        anchors.margins: 12
+        anchors.bottomMargin: root.showFooter ? 58 : 12
+        height: visualNoticeText.implicitHeight + 60
+        z: 4
+        radius: 8
+        color: backend.palette.panel
+        border.color: backend.palette.controlBorder
+        Label {
+            id: visualNoticeText
+            anchors.top: parent.top; anchors.left: parent.left; anchors.right: parent.right
+            anchors.margins: 12
+            text: root.visualNotice
+            wrapMode: Text.WordWrap
+            font.pixelSize: 13
+            color: backend.palette.text
+            Accessible.name: text
+        }
+        Row {
+            anchors.right: parent.right; anchors.bottom: parent.bottom
+            anchors.margins: 8; spacing: 6
+            ChromeButton {
+                objectName: "visualNoticeSourceButton"
+                text: "Edit in Source"; tonal: true
+                onClicked: { root.visualNotice = ""; root.sourceEditRequested(); }
+            }
+            ChromeButton { text: "Dismiss"; tonal: true; onClicked: root.visualNotice = "" }
         }
     }
     component FooterButton: ChromeButton {

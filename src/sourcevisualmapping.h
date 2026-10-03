@@ -5,7 +5,7 @@
 #include <optional>
 
 // A deliberately conservative, UTF-16-offset mapping between canonical
-// Markdown source and text that a future visual editor may edit.  This is not
+// Markdown source and text that the visual editor may edit.  This is not
 // a Markdown serializer: source() is retained exactly, and only text that can
 // be mapped without touching surrounding syntax is marked editable.
 class SourceVisualMapping {
@@ -21,7 +21,7 @@ public:
         }
     };
 
-    enum class BlockKind { Paragraph, Heading, ListItem, SourceOnly };
+    enum class BlockKind { Paragraph, Heading, ListItem, Image, TableRow, TableDelimiter, SourceOnly };
 
     struct Block {
         BlockKind kind = BlockKind::SourceOnly;
@@ -37,7 +37,7 @@ public:
 
     // Formatting stays separate from edit mappings, so a visual client can
     // style the projection without inferring Markdown source from it.
-    enum class VisualFormatKind { Heading, Strong, Emphasis, LinkLabel };
+    enum class VisualFormatKind { Heading, Strong, Emphasis, LinkLabel, InlineCode, TableHeader };
 
     struct VisualFormatSpan {
         VisualFormatKind kind = VisualFormatKind::Emphasis;
@@ -46,9 +46,23 @@ public:
         int headingLevel = 0;
     };
 
+    struct ImageObject {
+        Span source;
+        Span visual;
+        Span altSource;
+        Span destinationSource;
+        QString altText;
+        QString destination;
+    };
+
     struct SourceEdit {
         Span source;
         QString replacement;
+    };
+
+    struct VisualBreakEdit {
+        SourceEdit edit;
+        int visualCursor = 0;
     };
 
     static SourceVisualMapping create(const QString &source);
@@ -63,6 +77,8 @@ public:
     const QVector<Mapping> &mappings() const { return m_mappings; }
     const QVector<VisualFormatSpan> &visualFormatSpans() const { return m_visualFormatSpans; }
 
+    const QVector<ImageObject> &imageObjects() const { return m_imageObjects; }
+
     // A selection maps only when every selected UTF-16 unit is represented and
     // its counterpart is contiguous. Syntax markers, block prefixes and
     // source-only blocks deliberately return an invalid span.
@@ -70,10 +86,16 @@ public:
     Span sourceSpanForVisual(Span visual) const;
 
     // Produces one bounded source replacement only when the visual range is
-    // wholly inside a single editable mapping. A line break is allowed only
-    // inside a paragraph when reprojection preserves every visible character.
+    // wholly inside a single editable mapping. The candidate must reproject
+    // exactly and remain mapped; grapheme boundaries cannot be split. A line
+    // break is allowed only inside a paragraph with the same visible result.
     std::optional<SourceEdit> sourceEditForVisualReplacement(
         Span visual, const QString &replacement) const;
+
+    // Return at the end of a simple list item continues its exact marker style;
+    // an empty item exits the list. Other structural changes stay in Source.
+    std::optional<VisualBreakEdit> sourceEditForVisualBreak(
+        int visualPosition, bool softBreak = false) const;
 
 private:
     void appendMapped(int sourceStart, const QString &text);
@@ -90,4 +112,5 @@ private:
     QVector<Block> m_blocks;
     QVector<Mapping> m_mappings;
     QVector<VisualFormatSpan> m_visualFormatSpans;
+    QVector<ImageObject> m_imageObjects;
 };

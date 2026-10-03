@@ -19,18 +19,19 @@ After Cycle 84, the [editor surface redesign](editor-surface-redesign.md) refocu
 
 The [17 September staged development plan](development-plan.md) turns the [iA menu parity log](ia-menu-parity-2026-09-17.md) into proposed Cycles 14–28: menu access, safe file/editing commands, navigation, richer documents/output, native lifecycle, then advanced writing tools. Codex remains the visual reference. Full functional parity includes explicit validation of hidden submenu behavior and is not claimed by matching labels.
 
-The [3 October workspace UI plan](workspace-ui-redesign-plan.md) is approved and Cycles 90–96 are integrated in the Cycle 97 candidate: `0.3.0-dev1`, macOS bundle `0.3.0` build `97`. It adds column-owned headers, shared controls and palette roles, independent responsive pane state, per-window persistence, writing presentation and navigation/supporting-surface refinements. Build, 122 regression tests and recorded native checks pass; Andrew's broad acceptance, Cycle 88's outstanding review and earlier functional gaps remain open. See the [candidate record](../research/cycle-97/README.md).
+The [3 October workspace UI plan](workspace-ui-redesign-plan.md) was approved and implemented across Cycles 90–97. Cycles 98–100 extend that candidate toward the next review target: `0.3.0-dev2`, macOS bundle `0.3.0` build `100`. The source includes the bounded changes below; all 134 regression tests and native Visual Edit checks pass. Demo/package and Applications are build 100; the running Dev copy awaits save/close for replacement, as recorded in the [Cycle 100 handoff](../research/cycle-100/README.md). Earlier historical results above remain unchanged.
 
-## Next bounded work after the workspace candidate
+## Follow-through after the workspace candidate
 
-| Cycle | Recommended scope | Gate |
+| Cycle | Implemented bounded scope | Evidence and limits |
 | --- | --- | --- |
-| 98 | Incorporate Andrew's writing feedback; review keyboard/VoiceOver, inactive/dark states, display scaling, full screen, native tabs and independent-window restoration. | Record the acceptance matrix and resolve specific regressions before expanding editing scope. |
-| 99 | Extend safe visual projection for blocks, images, lists and tables in small increments. | Exact Markdown round trips, Unicode/paste/Undo fixtures and explicit Source fallback for unsupported edits. General WYSIWYG support is not presumed. |
-| 100 | Select the most useful workflow, parser or export gaps from the [acceptance ledger](release-acceptance.md) and inventories. | Define a bounded feature and validate its real workflow; matching menu labels is insufficient. |
-| 101 | Distribution, if Andrew wants it: signing/notarization, another-machine installation and release packaging. | Accepted product build and verified public-distribution artifacts. Current local signing does not close this gate. |
+| 98 | F6/Shift+F6 pane navigation; compact Drawer focus and Escape restoration; hidden-pane focus rescue; inactive toolbar focus treatment. | Integrated native fixture passes 111 assertions across Cycles 98/100, including full screen, tab detach/restoration, independent pane checkpoints and exact draft/Undo preservation. Physical VoiceOver, display scaling and arbitrary-workspace relaunch remain acceptance checks. |
+| 99 | Safe simple table-cell and inline-code edits; local image thumbnails with alt-text editing; end-of-item list Return, unchecked task continuation and empty-item exit; grapheme-safe replacements, empty-document input and caret visibility. | Source edits are mapped and validated without whole-document conversion. All 134 integrated tests and focused native Visual Edit checks pass. Arbitrary multiline paste, splitting within a list item, complex/nested structures, spatial image placement and general WYSIWYG retain Source fallback. |
+| 100 | Transfer heading fragments to an already-open window/tab; resolve against its live draft; display missing-heading feedback; reject stale preview-refresh callbacks. | Native cross-window Unicode heading, dirty-buffer preservation, source Cancel and Undo pass. Broader parser/output and cross-application clipboard gaps remain open. |
 
-These are recommendations for separate scopes, not a promise that the broader parity backlog will be complete in four cycles.
+The next product cycle is **102 — review-led block editing ergonomics**. First use the combined build for normal writing and record image/table/list friction, keyboard reading order and physical display behavior. Then improve the most useful structural interactions in small increments: clearer image-object placement and keyboard access, table structure/navigation, and safe edits within lists. Each increment needs exact-source, Unicode, Undo/Redo, narrow/dark and native checks before expansion.
+
+**Cycle 101 remains an optional distribution track**, only if Andrew wants it: Developer ID signing/notarization, another-machine installation and release packaging. Local build/installation work does not authorize a public release or close this gate. The [acceptance ledger](release-acceptance.md) retains earlier workflow/parser/export and hardware gaps; these cycles do not imply complete competitor parity.
 
 ## Milestones
 

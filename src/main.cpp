@@ -28,6 +28,8 @@
 #include "backend.h"
 #include "systemtheme.h"
 #ifdef FOMAWRITE_CONTEXT_SMOKE
+#include <QAccessible>
+#include <QKeyEvent>
 #include <QQuickItem>
 #include <QQuickWindow>
 #include <QImage>
@@ -131,7 +133,7 @@ int main(int argc, char *argv[]) {
     app.setOrganizationName(QStringLiteral("AndrewGray"));
     app.setOrganizationDomain(QStringLiteral("andrewjngray.github.io"));
     app.setApplicationDisplayName(QStringLiteral("Fomawrite"));
-    app.setApplicationVersion(QStringLiteral("0.3.0-dev1"));
+    app.setApplicationVersion(QStringLiteral("0.3.0-dev2"));
 #ifdef FOMAWRITE_CONTEXT_SMOKE
     // A separately compiled integration test runs the real window manager with
     // disposable settings and documents, never the user's workspace.
@@ -266,7 +268,11 @@ int main(int argc, char *argv[]) {
             if (session->backend && session->backend != except && session->window
                 && QFileInfo(session->backend->fileUrl().toLocalFile()).canonicalFilePath() == path) {
                 if (session->window->windowState() == Qt::WindowMinimized) session->window->showNormal();
-                session->window->raise(); session->window->requestActivate(); return true;
+                session->window->raise(); session->window->requestActivate();
+                if (!url.fragment().isEmpty())
+                    QMetaObject::invokeMethod(session->window, "navigateDocumentFragment",
+                        Q_ARG(QVariant, url.fragment(QUrl::FullyEncoded)));
+                return true;
             }
         }
         return false;
@@ -363,7 +369,10 @@ int main(int argc, char *argv[]) {
                 else if (sessions.isEmpty()) { app.allowExit = true; app.quit(); }
             });
         });
-        if (!url.isEmpty() && !backend->modified()) backend->open(url);
+        if (!url.isEmpty() && !backend->modified() && backend->open(url)
+                && !url.fragment().isEmpty())
+            QMetaObject::invokeMethod(session->window, "navigateDocumentFragment",
+                Q_ARG(QVariant, url.fragment(QUrl::FullyEncoded)));
         backend->focusExistingDocument = [&, backend](const QUrl &target) { return focusExisting(target, backend); };
         if (explicitView && session->window) {
             if (previousActive && previousActive != session->window)

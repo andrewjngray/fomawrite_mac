@@ -101,6 +101,7 @@ public:
     Q_INVOKABLE QVariantMap visualProjection() const;
     // Applies one inline visual replacement only when expectedSource is still
     // the current canonical source and the mapping can produce one source edit.
+    Q_INVOKABLE QVariantMap applyVisualBreak(int position, bool softBreak, const QString &expectedSource);
     Q_INVOKABLE bool applyVisualEdit(int start, int length, const QString &replacement,
                                      const QString &expectedSource);
     Q_INVOKABLE QVariantMap editMarkdown(const QString &action, int start, int end);

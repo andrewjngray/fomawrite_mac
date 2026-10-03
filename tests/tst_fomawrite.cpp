@@ -32,11 +32,24 @@
 #include "backend.h"
 #include "markdownhighlighter.h"
 #include "sourcevisualmapping.h"
+#include "visualtexthighlighter.h"
 
 class FomawriteTest : public QObject {
     Q_OBJECT
 
 private slots:
+    void visualFormatsComposeWithoutChangingSource();
+    void visualImagesExposeBoundedMetadata();
+    void visualTablesEditCellsWithoutRewritingSyntax();
+    void visualTablesKeepAmbiguousRowsInSource();
+    void visualFencesHonorMarkerAndLength();
+    void visualInlineCodePreservesDelimitersAndUnicode();
+    void visualListsContinueAndExitWithoutLosingMarkers();
+    void visualEmptyParagraphsAndStructuralEditsStaySafe();
+    void navigationFragmentsKeepSnapshotsAndReportMissing();
+    void explicitDocumentViewsPreserveFragments();
+    void visualObjectsKeepMarkdownUndoAndLocalImages();
+    void visualEditingKeepsCaretVisibleAndUnicodeIntact();
     void workspaceLayoutResponsiveOrderAndHysteresis() {
         QQmlEngine engine;
         QQmlComponent component(&engine, QUrl::fromLocalFile(QFINDTESTDATA("../src/WorkspaceLayout.qml")));
@@ -4466,7 +4479,7 @@ private slots:
         const auto numbered = SourceVisualMapping::create(QStringLiteral("12. Numbered item\n"));
         QVERIFY(numbered.visualText().startsWith(QStringLiteral("12. Numbered item")));
         QVERIFY(!numbered.sourceEditForVisualReplacement({0, 3}, QStringLiteral("x")).has_value());
-        QVERIFY(mapping.visualText().contains(QStringLiteral("| Name | Value |")));
+        QVERIFY(mapping.visualText().contains(QString::fromUtf8("Name  │  Value")));
         QVERIFY(mapping.visualText().contains(QStringLiteral("**literal**")));
 
         const int labelStart = source.indexOf(QStringLiteral("a link"));
@@ -4496,7 +4509,7 @@ private slots:
         }
         int sourceOnlyBlocks = 0;
         for (const auto &block : mapping.blocks()) if (!block.editable) ++sourceOnlyBlocks;
-        QVERIFY(sourceOnlyBlocks >= 8);
+        QVERIFY(sourceOnlyBlocks >= 7);
     }
 
     void visualSourceMappingProtectsInlineSyntaxAndCrLf() {
@@ -4512,13 +4525,13 @@ private slots:
             + QChar(0x5c) + QStringLiteral("*stars") + QChar(0x5c) + QStringLiteral("*\n");
         const auto protectedMapping = SourceVisualMapping::create(protectedSource);
         QCOMPARE(protectedMapping.roundTripSource(), protectedSource);
-        QCOMPARE(protectedMapping.blocks().size(), 1);
+        QCOMPARE(protectedMapping.blocks().size(), 2);
         QVERIFY(!protectedMapping.blocks().first().editable);
         QVERIFY(!protectedMapping.visualSpanForSource({0, 4}).isValid());
         const auto tableAndTask = SourceVisualMapping::create(
             QStringLiteral("Name | Value\n--- | ---\n- [ ] unfinished\n"));
-        QCOMPARE(tableAndTask.blocks().size(), 3);
-        QVERIFY(!tableAndTask.blocks().at(0).editable);
+        QCOMPARE(tableAndTask.blocks().size(), 4);
+        QVERIFY(tableAndTask.blocks().at(0).editable);
         QVERIFY(!tableAndTask.blocks().at(1).editable);
         QVERIFY(tableAndTask.blocks().at(2).editable);
     }
@@ -4646,7 +4659,7 @@ private slots:
         QCOMPARE(projection.value("visualText").toString(),
                  QStringLiteral("Heading\nPlain bold text.\n| table | value |\n"));
         const QVariantList blocks = projection.value("blocks").toList();
-        QCOMPARE(blocks.size(), 3);
+        QCOMPARE(blocks.size(), 4);
         QCOMPARE(blocks.at(0).toMap().value("kind").toString(), QStringLiteral("heading"));
         QVERIFY(blocks.at(0).toMap().value("editable").toBool());
         QCOMPARE(blocks.at(2).toMap().value("kind").toString(), QStringLiteral("sourceOnly"));
@@ -5181,6 +5194,10 @@ private slots:
 private:
     QTemporaryDir m_settingsDirectory;
 };
+
+#include "cycle100-navigation.inc"
+#include "cycle99-integration.inc"
+#include "sourcevisualmapping-cycle99.inc"
 
 QTEST_MAIN(FomawriteTest)
 #include "tst_fomawrite.moc"

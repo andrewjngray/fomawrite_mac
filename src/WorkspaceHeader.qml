@@ -20,6 +20,7 @@ Item {
     readonly property bool toolbarContentVisible: settings.toolbarVisibilityMode !== 2
     readonly property bool writingClusterExpanded: documentHeader.width - documentHeader.nativeInset >= 490
     signal actionRequested(string action, var anchor)
+    function focusWorkspaceControl() { workspaceButton.forceActiveFocus(Qt.TabFocusReason); }
     height: 52
     z: 20
     Rectangle {
@@ -104,6 +105,7 @@ Item {
                 ToolbarButton { objectName: "exportHubButton"; visible: documentHeader.width - documentHeader.nativeInset >= 420; iconName: "export"; hint: "Export and share"; onClicked: root.actionRequested("export", this) }
             }
             ToolbarButton {
+                id: workspaceButton
                 objectName: "topChromeLibraryButton"
                 iconName: "workspace"; hint: "Workspace columns and document modes"
                 // This reveal control remains reachable even when the toolbar is hidden.

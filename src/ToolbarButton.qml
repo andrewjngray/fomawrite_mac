@@ -1,5 +1,6 @@
 import QtQuick
 import QtQuick.Controls
+import QtQuick.Window
 
 // Header actions share a 32px target. Groups supply the resting capsule.
 Button {
@@ -10,6 +11,8 @@ Button {
     property bool darkMode: false
     property color iconColor: backend.palette.text
     property int tooltipDelay: 700
+    readonly property bool windowActive: !Window.window || Window.window.active
+    readonly property bool focusIndicated: activeFocus && windowActive
     readonly property color restColor: backend.palette.control || backend.palette.field
     readonly property color hoverColor: backend.palette.controlHover || backend.palette.hover
     readonly property color pressedColor: backend.palette.controlPressed || backend.palette.selectedRow
@@ -67,11 +70,11 @@ Button {
     background: Rectangle {
         radius: control.grouped ? 4 : height / 2
         color: control.down ? control.pressedColor
-            : control.checked ? control.selectedColor
+            : control.checked ? (control.windowActive ? control.selectedColor : backend.palette.selectedRow)
             : control.hovered && control.enabled ? control.hoverColor
             : control.grouped ? "transparent" : control.restColor
-        border.width: control.activeFocus ? 2 : control.grouped ? 0 : 1
-        border.color: control.activeFocus ? backend.palette.focus : backend.palette.border
+        border.width: control.focusIndicated ? 2 : control.grouped ? 0 : 1
+        border.color: control.focusIndicated ? backend.palette.focus : backend.palette.border
         opacity: control.enabled ? 1 : 0.55
     }
 }

@@ -1,8 +1,8 @@
 # Fomawrite workspace UI redesign plan
 
-Planning date: 3 October 2026. Original planning baseline: `52af519`. Status: Andrew approved implementation; Cycles 90–96 are integrated in the Cycle 97 candidate. The candidate is version `0.3.0-dev1`, macOS bundle version `0.3.0`, build `97`. Build, 122 regression tests and the recorded native workspace checks pass; Dev, package and Applications are refreshed. Andrew’s broad acceptance remains pending.
+Planning date: 3 October 2026. Original planning baseline: `52af519`. Andrew approved implementation; Cycles 90–97 established the workspace candidate, and Cycles 98–100 add bounded acceptance fixes, richer Visual Edit and cross-window heading navigation. The next review target is `0.3.0-dev2`, macOS `0.3.0 (100)`. The native integration fixture passes 111 assertions; **134 regression tests and native Visual Edit checks pass. Demo/package and Applications are refreshed; Dev awaits safe close**, recorded in the [Cycle 100 handoff](../research/cycle-100/README.md). Andrew's broad acceptance remains pending.
 
-The next pass should make Fomawrite feel like a composed writing workspace. Andrew's preferred reference is the Ulysses window in his three-app comparison: a quiet gray organizer, clean document list, warm writing canvas, and clearly grouped controls belonging to each column. Preserve Fomawrite's blue folders, local Markdown files and existing editing protections.
+The approved direction makes Fomawrite a composed writing workspace. Andrew's preferred reference is the Ulysses window in his three-app comparison: a quiet gray organizer, clean document list, warm writing canvas, and clearly grouped controls belonging to each column. Preserve Fomawrite's blue folders, local Markdown files and existing editing protections.
 
 The largest change is structural. Pane ownership, layout state and reusable controls now have separate implementations. The standards and acceptance matrix below remain the reference for reviewing the complete workspace.
 
@@ -13,17 +13,20 @@ The approved direction is implemented as one integrated candidate, with the cycl
 | Cycle | Implemented scope | Remaining acceptance |
 | --- | --- | --- |
 | 90 — Design foundation | Approved composition, pane ownership, blue folders, control vocabulary and responsive fit rules. | Judge the result in the native app against the complete composition. |
-| 91 — Shared components | Semantic palette roles, round toolbar actions, capsule groups and navigation/control states. | VoiceOver, contrast, inactive windows and actual display-scale review. |
-| 92 — Column-owned shell | A shared 52-pixel header follows real pane geometry; document history, formatting and workspace controls belong to the document column. | Native title-bar dragging, full screen, tabs and compact interaction matrix. |
-| 93 — Responsive column state | Independent desired visibility, remembered widths, temporary navigation drawers, ordered contraction, 48-pixel restoration margin and per-window checkpoint state. | Quit/reopen, tab detach and repeated native divider/resize checks. |
+| 91 — Shared components | Semantic palette roles, round toolbar actions, capsule groups and navigation/control states. | Physical VoiceOver, full contrast audit and actual display-scale review. Cycle 98 verifies the inactive toolbar focus treatment. |
+| 92 — Column-owned shell | A shared 52-pixel header follows real pane geometry; document history, formatting and workspace controls belong to the document column. | Cycle 98 verifies native full screen and tabs; title-bar/traffic-light feel and broader compact review remain human acceptance. |
+| 93 — Responsive column state | Independent desired visibility, remembered widths, temporary navigation drawers, ordered contraction, 48-pixel restoration margin and per-window checkpoint state. | Cycle 98 verifies native contraction, tab detach/regroup and independent checkpoints. Arbitrary-workspace quit/reopen and physical multi-display checks remain. |
 | 94 — Writing finish | Editorial, Manuscript and Book presentation, explicit Source / Visual Edit / Preview choices, word-count control and 150% source line height. The permanent duplicate formatting footer is removed. | Long-document caret/scroll behavior, Undo/Redo and Andrew's writing review. |
 | 95 — Navigation finish | Organizer hierarchy, contextual removal, blue folder icons, compact and two-line preview rows, scoped folder/file controls. | Long/Unicode names, unavailable locations and keyboard traversal. |
 | 96 — Supporting UI sweep | Shared control treatment extends to compact menus, search actions, outline, preview and dialog buttons; existing Export band scrolling remains. | Complete supporting-surface inventory at narrow widths and in dark mode. |
 | 97 — Candidate handoff | Version identification, regression and native verification, evidence and review checklist. | Verified candidate is built and synchronized to Dev, package and Applications; Andrew’s broad acceptance remains pending. See the Cycle 97 evidence record. |
+| 98 — Keyboard/native acceptance | F6/Shift+F6 region traversal, compact Drawer focus/return, hidden-pane focus rescue and inactive toolbar rings. | 111 native assertions across Cycles 98/100 pass, with synthetic dark/inactive/full-screen captures. Physical VoiceOver/display scaling remain. |
+| 99 — Safe visual structures | Simple table cells, inline code, image alt text/local thumbnails, list-end Return/task continuation/empty-item exit, grapheme safety and caret tracking. | All 134 tests and native Visual Edit checks pass. Complex structures, arbitrary multiline paste, splitting within a list item and spatial image/grid editing remain Source work. |
+| 100 — Open-document links | Cross-window fragment transfer into live Markdown, missing-heading feedback and stale-preview completion protection. | Native fragment/dirty/Cancel/Undo checks pass. The final suite passes; package and Applications are build 100. Dev awaits save/close. |
 
 Existing stored theme and writing choices take precedence. New installations start with Studio and Editorial; existing users can choose **Studio writing layout** explicitly. Layout preferences are per window and do not live-mirror another window. Source remains canonical plain UTF-8 Markdown; Visual Edit still protects unsupported structures. Private sample documents and pre-existing dirty files are outside this cycle's edits.
 
-The next bounded work is Cycle 98 user feedback and accessibility/display-scale/tab acceptance, Cycle 99 safe visual blocks and image/list/table projection, Cycle 100 selected workflow/parser/export gaps from the acceptance ledger, then optional Cycle 101 distribution. Each requires its own scope and evidence. See the [Cycle 97 record](../research/cycle-97/README.md) and [review exercise](../research/usability/cycle-97.md).
+The next product cycle is **102 — review-led block editing ergonomics**: review the combined build in normal writing, then improve the most useful image/table/list interactions while preserving exact-source checks and visible unsupported-edit fallback. Complete physical VoiceOver/display and arbitrary-workspace relaunch acceptance alongside that work. **Cycle 101 remains an optional distribution decision**, not an automatic public release. Current evidence: [Cycle 98](../research/cycle-98/README.md), [Cycle 99](../research/cycle-99/README.md), [Cycle 100](../research/cycle-100/README.md).
 
 ## Scope and evidence
 
@@ -32,7 +35,7 @@ The next bounded work is Cycle 98 user feedback and accessibility/display-scale/
 - Existing guidance: [editor surface work](editor-surface-redesign.md), [dialog guide](dialog-style-guide.md), [build log](build-cycles.md), [acceptance ledger](release-acceptance.md).
 - Baseline validation: Cycle 89 records 118 passing tests and native window-routing checks. Those are historical results, not tests rerun for this document. Installed, packaged and Dev copies must be identified by commit before future comparisons; their presence alone does not establish that they match.
 - The interactive concept demonstrates composition, blue folders, control grouping and writing appearances. Its simplified widths, breakpoints and appearance selector are illustrative; the written fit rules govern implementation. It is not native layout, complete feature or accessibility acceptance.
-- The original planning pass produced a plan and illustrative concept without changing app code. Andrew subsequently authorized the implementation checkpoint above; current verification and deployment status belong in the Cycle 97 record.
+- The original planning pass produced a plan and illustrative concept without changing app code. Andrew subsequently authorized the implementation checkpoint above; current verification and deployment status belong in the Cycle 100 handoff; the Cycle 97 record preserves its earlier verified checkpoint.
 
 ## What exists and what must change
 
@@ -130,6 +133,8 @@ The window's current 720-pixel minimum remains initially. A lower window minimum
 
 **Temporary navigation:** restoring an auxiliary pane when it cannot dock opens an opaque temporary navigation panel. Escape or its close action dismisses it; selecting a file closes it only after guarded navigation succeeds. A canceled unsaved-change prompt must leave the previous document and navigation state intact. Keyboard focus returns predictably; overlays require proper accessibility and focus handling.
 
+**Keyboard regions (Cycle 98):** F6 and Shift+F6 cycle visible Organizer, Files, Source, Preview and toolbar regions. Tab remains writing input in Source. Pane contraction rescues focus from a newly hidden region; modal navigation takes focus on Close and Escape restores the initiating control if it remains available. A keyboard-focused toolbar reveals faded controls, and inactive windows suppress the active focus ring. These shortcuts do not change saved layout intent.
+
 **Growing again:** restore only panes that were temporarily hidden, including the requested split document layout without silently toggling Visual Edit. Never reopen a manually collapsed pane. Use a small restoration margin, initially 48 pixels, to avoid repeated hide/show near a boundary.
 
 Do not introduce horizontal scrolling for the whole writing workspace. Export is a different task surface: its horizontal band scrolling at narrow widths is an intentional existing behavior and must remain available.
@@ -154,7 +159,7 @@ Markdown markers should recede without disappearing or making caret placement my
 
 The mode names must say what they do: **Source** for Markdown, **Visual Edit** for the supported editing projection, **Preview** for read-only rendered output. Split is a layout choice, not an editing mode. Replace the present mixed labels only through a documented migration that preserves current state. Formatting controls must target the active editable surface or visibly explain why an operation is unavailable.
 
-Full editable image cards, arbitrary nested lists/tables and Ulysses-style annotations are a separate source-mapping project. A prettier writing surface must not imply those features already work. Preview/export typography may intentionally differ from writing typography; do not force export styles to change when the editor appearance changes.
+Cycle 99 adds image alt-text editing with local thumbnails and bounded table/list interactions. Full spatial image cards, arbitrary nested lists/tables and Ulysses-style annotations remain separate source-mapping work. A prettier writing surface must not imply those features already work. Preview/export typography may intentionally differ from writing typography; do not force export styles to change when the editor appearance changes.
 
 ## Sweep through supporting surfaces
 
@@ -192,9 +197,9 @@ Use GPT-6.1 Sol for the main implementation and test work, with scoped tasks and
 
 ## Implementation safeguards
 
-- `Main.qml` currently simulates header alignment using pane-width arithmetic. Replace that coupling rather than layering more offsets on top.
-- `ChromeButton.qml` is used for toolbar actions and organizer rows. Do not globally turn it into a circle: separate those roles, preserving accessibility and hover/focus behavior.
-- Organizer visibility currently depends on library visibility and a 1000-pixel cutoff. Replace this with the explicit desired/effective state model.
+- The planning baseline used pane-width arithmetic in `Main.qml`. The shared header now follows actual pane geometry; preserve that relationship rather than adding independent offsets.
+- Keep toolbar actions and organizer rows separate: `ToolbarButton.qml` owns round header controls, while `ChromeButton.qml` retains row/text geometry. Preserve accessibility and hover/focus behavior in both.
+- Keep Organizer visibility independent of Files. The explicit desired/effective state model replaces the old combined visibility and fixed 1000-pixel cutoff.
 - `win.requestHistory()` handles document navigation, cursor restoration and unsaved-change prompts. Toolbar history must use it; folder history stays independent.
 - `sourceFormattingAllowed()` protects against formatting a stale source selection while Visual Edit is focused. All new controls must respect the same active-surface rules.
 - `Backend::applyDocumentTypography()` disables and reenables undo for a freshly loaded document. Do not call it to apply live line spacing to an active draft. Design a separate presentation-only mechanism and verify undo preservation.

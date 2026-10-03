@@ -1,108 +1,266 @@
 #include "sourcevisualmapping.h"
 
 #include <QRegularExpression>
+#include <QTextBoundaryFinder>
 
 namespace {
-bool isSourceOnlyLine(const QString &line, bool inFence) {
-    if (inFence) return true;
+struct SourceLine { int start; QString text; bool newline; };
+struct Fence { QChar marker; int length = 0; };
+Fence openingFence(const QString &line) {
+    static const QRegularExpression expression(QStringLiteral("^ {0,3}(`{3,}|~{3,})(.*)$"));
+    const auto match = expression.match(line);
+    if (!match.hasMatch()) return {};
+    const QString marker = match.captured(1);
+    if (marker.front() == QLatin1Char('`') && match.captured(2).contains(QLatin1Char('`'))) return {};
+    return {marker.front(), int(marker.size())};
+}
+bool closesFence(const QString &line, const Fence &fence) {
+    static const QRegularExpression expression(QStringLiteral("^ {0,3}(`{3,}|~{3,})[ \\t]*$"));
+    const auto match = expression.match(line);
+    return match.hasMatch() && match.captured(1).front() == fence.marker
+        && match.capturedLength(1) >= fence.length;
+}
+
+// Only exact-length, single-line code spans are projected. Whitespace
+// normalization and unmatched/mixed delimiters remain visible in Source.
+bool hasSafeCodeSpans(const QString &line) {
+    for (int cursor = 0; cursor < line.size();) {
+        if (line.at(cursor) != QLatin1Char('`')) { ++cursor; continue; }
+        int count = 1;
+        while (cursor + count < line.size() && line.at(cursor + count) == QLatin1Char('`')) ++count;
+        int search = cursor + count;
+        int closing = -1;
+        while (search < line.size()) {
+            const int next = line.indexOf(QLatin1Char('`'), search);
+            if (next < 0) break;
+            int run = 1;
+            while (next + run < line.size() && line.at(next + run) == QLatin1Char('`')) ++run;
+            if (run == count) { closing = next; break; }
+            search = next + run;
+        }
+        if (closing <= cursor + count) return false;
+        const QString body = line.mid(cursor + count, closing - cursor - count);
+        if (body.front().isSpace() || body.back().isSpace()) return false;
+        cursor = closing + count;
+    }
+    return true;
+}
+
+bool isSourceOnlyLine(const QString &line) {
     static const QRegularExpression unsupported(
-        QStringLiteral("^\\s*(?:<!--|<!|\\[\\^|!\\[|\\|| {4,}|~~~|```)|\\[\\^|\\[[^\\]]+\\]\\[[^\\]]*\\]|^\\s*\\[[^\\]]+\\]:"));
+        QStringLiteral("^\\s*(?:<!--|<!|\\[\\^| {4,}|~~~|```)|\\[\\^|!\\[|\\[[^\\]]+\\]\\[[^\\]]*\\]|^\\s*\\[[^\\]]+\\]:"));
     static const QRegularExpression ambiguousInlineLink(
         QStringLiteral("\\[[^\\]]+\\]\\([^\\n)]*\\("));
-    // Markdown tables need not have a leading pipe. Keep every pipe-bearing
-    // line source-only until the visual editor has a table-aware parser.
-    return line.contains(QChar(0x60)) || line.contains(QChar(0x5c))
+    return !hasSafeCodeSpans(line) || line.contains(QChar(0x5c))
         || line.contains(QChar(0x3c)) || line.contains(QChar(0x7c))
         || ambiguousInlineLink.match(line).hasMatch() || unsupported.match(line).hasMatch();
 }
-bool isFence(const QString &line) {
-    static const QRegularExpression fence(QStringLiteral("^\\s*(?:```|~~~)"));
-    return fence.match(line).hasMatch();
-}
 
-// Quote and task markers are deliberately generated and unmapped. The body
-// can then be edited without ever serializing or changing Markdown syntax.
-// Nested and mixed block structures remain source-only for now.
-bool isSafeQuoteBody(const QString &body) {
+bool isSafeBody(const QString &body) {
     static const QRegularExpression nestedOrBlock(
         QStringLiteral("^(?:>|[-+*]\\s|\\d+[.)]\\s|#{1,6}\\s|\\[[ xX]\\]\\s|!\\[|\\[\\^|---$|\\*\\*\\*$)"));
-    return !body.isEmpty() && !nestedOrBlock.match(body).hasMatch();
+    return !nestedOrBlock.match(body).hasMatch();
 }
 
-bool isSafeTaskBody(const QString &body) {
-    static const QRegularExpression nestedOrBlock(
-        QStringLiteral("^(?:>|[-+*]\\s|\\d+[.)]\\s|#{1,6}\\s|\\[[ xX]\\]\\s|!\\[|\\[\\^|---$|\\*\\*\\*$)"));
-    return !body.isEmpty() && !nestedOrBlock.match(body).hasMatch();
+QVector<SourceVisualMapping::Span> tableCells(const QString &line) {
+    if (!line.contains(QLatin1Char('|')) || line.contains(QLatin1Char('\\'))
+        || line.contains(QLatin1Char('`')) || line.startsWith(QStringLiteral("    "))
+        || line.contains(QLatin1Char('<')) || line.contains(QStringLiteral("!["))
+        || line.contains(QStringLiteral("[^"))) return {};
+    int first = 0, end = line.size();
+    while (first < end && line.at(first).isSpace()) ++first;
+    while (end > first && line.at(end - 1).isSpace()) --end;
+    if (first == end) return {};
+    if (line.at(first) == QLatin1Char('|')) ++first;
+    if (end > first && line.at(end - 1) == QLatin1Char('|')) --end;
+    QVector<SourceVisualMapping::Span> cells;
+    int start = first;
+    for (int cursor = first; cursor <= end; ++cursor) {
+        if (cursor != end && line.at(cursor) != QLatin1Char('|')) continue;
+        int a = start, b = cursor;
+        while (a < b && line.at(a).isSpace()) ++a;
+        while (b > a && line.at(b - 1).isSpace()) --b;
+        const QString text = line.mid(a, b - a);
+        static const QRegularExpression ambiguous(QStringLiteral("\\[[^\\]]+\\]\\[[^\\]]*\\]|\\[[^\\]]+\\]\\([^)]*\\("));
+        if (ambiguous.match(text).hasMatch()) return {};
+        cells.append({a, b - a});
+        start = cursor + 1;
+    }
+    return cells;
+}
+bool tableDelimiter(const QString &line, int columns) {
+    const auto cells = tableCells(line);
+    if (cells.size() != columns || columns == 0) return false;
+    static const QRegularExpression delimiter(QStringLiteral("^:?-{3,}:?$"));
+    for (const auto &cell : cells)
+        if (!delimiter.match(line.mid(cell.start, cell.length)).hasMatch()) return false;
+    return true;
+}
+bool graphemeBoundary(const QString &text, int position) {
+    if (position < 0 || position > text.size()) return false;
+    if (position == 0 || position == text.size()) return true;
+    QTextBoundaryFinder finder(QTextBoundaryFinder::Grapheme, text);
+    finder.setPosition(position);
+    return finder.isAtBoundary();
+}
+bool validUtf16(const QString &text) {
+    for (int i = 0; i < text.size(); ++i) {
+        if (text.at(i).isHighSurrogate()) {
+            if (++i >= text.size() || !text.at(i).isLowSurrogate()) return false;
+        } else if (text.at(i).isLowSurrogate()) return false;
+    }
+    return true;
 }
 }
 
 SourceVisualMapping SourceVisualMapping::create(const QString &source) {
     SourceVisualMapping result;
     result.m_source = source;
-
+    QVector<SourceLine> lines;
     int offset = 0;
-    bool inFence = false;
     while (offset < source.size()) {
         const int newline = source.indexOf(QLatin1Char('\n'), offset);
         const bool hasNewline = newline >= 0;
         const int end = hasNewline ? newline : source.size();
         int contentEnd = end;
         if (contentEnd > offset && source.at(contentEnd - 1) == QLatin1Char('\r')) --contentEnd;
-        const QString line = source.mid(offset, contentEnd - offset);
-        const bool fenceLine = isFence(line);
+        lines.append({offset, source.mid(offset, contentEnd - offset), hasNewline});
+        offset = hasNewline ? newline + 1 : source.size();
+    }
+    Fence fence;
+    bool inHtmlComment = false;
+    int tableColumns = 0;
+    int tableDelimiterIndex = -1;
+    for (int index = 0; index < lines.size(); ++index) {
+        const auto &entry = lines.at(index);
+        const QString &line = entry.text;
+        offset = entry.start;
+        const bool hasNewline = entry.newline;
+        if (inHtmlComment) {
+            result.appendSourceOnly(offset, line, hasNewline);
+            if (line.contains(QStringLiteral("-->")))
+                inHtmlComment = line.lastIndexOf(QStringLiteral("<!--")) > line.lastIndexOf(QStringLiteral("-->"));
+            continue;
+        }
+        if (fence.length > 0) {
+            result.appendSourceOnly(offset, line, hasNewline);
+            if (closesFence(line, fence)) fence = {};
+            continue;
+        }
+        if (line.contains(QStringLiteral("<!--"))) {
+            inHtmlComment = line.lastIndexOf(QStringLiteral("<!--")) > line.lastIndexOf(QStringLiteral("-->"));
+            tableColumns = 0;
+            result.appendSourceOnly(offset, line, hasNewline);
+            continue;
+        }
+        const Fence opening = openingFence(line);
+        if (opening.length > 0) {
+            fence = opening;
+            tableColumns = 0;
+            result.appendSourceOnly(offset, line, hasNewline);
+            continue;
+        }
 
-        if (isSourceOnlyLine(line, inFence)) {
+        const auto cells = tableCells(line);
+        const bool tableHeader = tableColumns == 0 && !cells.isEmpty() && index + 1 < lines.size()
+            && tableDelimiter(lines.at(index + 1).text, cells.size());
+        if (tableHeader) {
+            tableColumns = cells.size();
+            tableDelimiterIndex = index + 1;
+        }
+        const bool delimiter = index == tableDelimiterIndex;
+        if (tableColumns > 0 && line.contains(QLatin1Char('|'))) {
+            if (cells.size() != tableColumns) {
+                result.appendSourceOnly(offset, line, hasNewline);
+                continue;
+            }
+            const int visualStart = result.m_visual.size();
+            for (int column = 0; column < cells.size(); ++column) {
+                if (column > 0) result.m_visual += QString::fromUtf8("  │  ");
+                const auto &cell = cells.at(column);
+                if (delimiter) {
+                    result.m_visual += QString::fromUtf8("────");
+                } else {
+                    const int cellVisualStart = result.m_visual.size();
+                    result.appendInline(offset + cell.start, line.mid(cell.start, cell.length));
+                    if (cell.length == 0)
+                        result.m_mappings.append(Mapping{{offset + cell.start, 0}, {cellVisualStart, 0}});
+                }
+            }
+            const int visualLength = result.m_visual.size() - visualStart;
+            if (tableHeader) result.appendVisualFormat(VisualFormatKind::TableHeader, visualStart);
+            result.appendNewline(hasNewline);
+            result.m_blocks.append({delimiter ? BlockKind::TableDelimiter : BlockKind::TableRow,
+                                    {offset, int(line.size())}, {visualStart, visualLength}, !delimiter});
+            continue;
+        }
+        tableColumns = 0;
+
+        static const QRegularExpression image(QStringLiteral(
+            "^( {0,3})!\\[([^\\[\\]\\\\]*)\\]\\((?:<([^<>\\r\\n]+)>|([^\\s()<>\\\\]+))(?:[ \\t]+(?:\"[^\"\\\\]*\"|'[^'\\\\]*'))?\\)[ \\t]*$"));
+        const auto imageMatch = image.match(line);
+        if (imageMatch.hasMatch()) {
+            const int visualStart = result.m_visual.size();
+            result.m_visual += QString::fromUtf8("▧ ");
+            const QString alt = imageMatch.captured(2);
+            if (alt.isEmpty()) result.m_visual += QStringLiteral("Image");
+            else result.appendMapped(offset + imageMatch.capturedStart(2), alt);
+            const int visualLength = result.m_visual.size() - visualStart;
+            const int destinationCapture = imageMatch.capturedStart(3) >= 0 ? 3 : 4;
+            result.m_imageObjects.append({{offset, int(line.size())}, {visualStart, visualLength},
+                {offset + int(imageMatch.capturedStart(2)), int(alt.size())},
+                {offset + int(imageMatch.capturedStart(destinationCapture)), int(imageMatch.capturedLength(destinationCapture))},
+                alt, imageMatch.captured(destinationCapture)});
+            result.appendNewline(hasNewline);
+            result.m_blocks.append({BlockKind::Image, {offset, int(line.size())}, {visualStart, visualLength}, !alt.isEmpty()});
+            continue;
+        }
+
+        static const QRegularExpression thematicBreak(QStringLiteral(
+            "^ {0,3}(?:(?:\\*[ \\t]*){3,}|(?:-[ \\t]*){3,}|(?:_[ \\t]*){3,})$"));
+        if (isSourceOnlyLine(line) || thematicBreak.match(line).hasMatch()) {
             result.appendSourceOnly(offset, line, hasNewline);
         } else if (line.isEmpty()) {
             result.appendEditableLine(BlockKind::Paragraph, offset, line, 0, hasNewline);
         } else {
-            static const QRegularExpression heading(QStringLiteral("^( {0,3}(#{1,6})[ \t]+)"));
-            static const QRegularExpression list(QStringLiteral("^(\\s*(?:[-+*]|\\d+[.)])\\s+)"));
+            static const QRegularExpression heading(QStringLiteral("^( {0,3}(#{1,6})[ \\t]+)"));
+            static const QRegularExpression list(QStringLiteral("^(( {0,3})([-+*]|\\d+[.)])[ \\t]+)"));
             static const QRegularExpression quote(QStringLiteral("^> (.*)$"));
             static const QRegularExpression quoteLike(QStringLiteral("^\\s*>"));
-            static const QRegularExpression task(
-                QStringLiteral("^((?:[-+*]|\\d+[.)])\\s+\\[([ xX])\\]\\s+)(.*)$"));
-            static const QRegularExpression taskLike(
-                QStringLiteral("^\\s*(?:[-+*]|\\d+[.)])\\s+\\[[ xX]\\]"));
+            static const QRegularExpression task(QStringLiteral("^(( {0,3})(?:[-+*]|\\d+[.)])[ \\t]+\\[([ xX])\\][ \\t]+)(.*)$"));
+            static const QRegularExpression taskLike(QStringLiteral("^\\s*(?:[-+*]|\\d+[.)])\\s+\\[[ xX]\\]"));
             const auto headingMatch = heading.match(line);
             const auto listMatch = list.match(line);
             const auto quoteMatch = quote.match(line);
             const auto taskMatch = task.match(line);
-            if (quoteLike.match(line).hasMatch() && !quoteMatch.hasMatch()) {
-                result.appendSourceOnly(offset, line, hasNewline);
-            } else if (quoteMatch.hasMatch() && !isSafeQuoteBody(quoteMatch.captured(1))) {
-                result.appendSourceOnly(offset, line, hasNewline);
-            } else if (taskLike.match(line).hasMatch() && !taskMatch.hasMatch()) {
-                result.appendSourceOnly(offset, line, hasNewline);
-            } else if (taskMatch.hasMatch() && !isSafeTaskBody(taskMatch.captured(3))) {
+            if ((quoteLike.match(line).hasMatch() && !quoteMatch.hasMatch())
+                    || (quoteMatch.hasMatch() && !isSafeBody(quoteMatch.captured(1)))
+                    || (taskLike.match(line).hasMatch() && !taskMatch.hasMatch())
+                    || (taskMatch.hasMatch() && !isSafeBody(taskMatch.captured(4)))) {
                 result.appendSourceOnly(offset, line, hasNewline);
             } else if (quoteMatch.hasMatch()) {
-                result.appendEditableLine(BlockKind::Paragraph, offset, line, 2, hasNewline, 0,
-                                          QString::fromUtf8("❝ "));
+                result.appendEditableLine(BlockKind::Paragraph, offset, line, 2, hasNewline, 0, QString::fromUtf8("❝ "));
             } else if (taskMatch.hasMatch()) {
-                const bool checked = taskMatch.captured(2).compare(QStringLiteral("x"), Qt::CaseInsensitive) == 0;
-                result.appendEditableLine(BlockKind::ListItem, offset, line,
-                                          taskMatch.capturedLength(1), hasNewline, 0,
-                                          checked ? QString::fromUtf8("☑ ") : QString::fromUtf8("☐ "));
+                const bool checked = taskMatch.captured(3).compare(QStringLiteral("x"), Qt::CaseInsensitive) == 0;
+                result.appendEditableLine(BlockKind::ListItem, offset, line, taskMatch.capturedLength(1), hasNewline, 0,
+                    taskMatch.captured(2) + (checked ? QString::fromUtf8("☑ ") : QString::fromUtf8("☐ ")));
             } else if (headingMatch.hasMatch()) {
-                result.appendEditableLine(BlockKind::Heading, offset, line,
-                                          headingMatch.capturedLength(1), hasNewline,
+                result.appendEditableLine(BlockKind::Heading, offset, line, headingMatch.capturedLength(1), hasNewline,
                                           headingMatch.capturedLength(2));
             } else if (listMatch.hasMatch()) {
-                // Show the list marker in Visual Edit without mapping it back
-                // to source. Editing the body can never rewrite the marker.
-                const QString marker = listMatch.captured(1).trimmed();
-                const QString visualMarker = marker.at(0).isDigit()
-                    ? marker + QLatin1Char(' ') : QString::fromUtf8("• ");
-                result.appendEditableLine(BlockKind::ListItem, offset, line,
-                                          listMatch.capturedLength(1), hasNewline, 0, visualMarker);
+                const QString marker = listMatch.captured(3);
+                const QString visualMarker = listMatch.captured(2) + (marker.at(0).isDigit()
+                    ? marker + QLatin1Char(' ') : QString::fromUtf8("• "));
+                result.appendEditableLine(BlockKind::ListItem, offset, line, listMatch.capturedLength(1), hasNewline, 0, visualMarker);
             } else {
                 result.appendEditableLine(BlockKind::Paragraph, offset, line, 0, hasNewline);
             }
         }
-        if (fenceLine) inFence = !inFence;
-        offset = hasNewline ? newline + 1 : source.size();
     }
+    // TextEdit has a caret after a final newline, including an empty document.
+    // Give that plain paragraph an insertion anchor, except inside an unclosed fence.
+    if ((source.isEmpty() || source.endsWith(QLatin1Char('\n'))) && fence.length == 0 && !inHtmlComment)
+        result.appendEditableLine(BlockKind::Paragraph, source.size(), QString(), 0, false);
     return result;
 }
 
@@ -131,6 +289,26 @@ void SourceVisualMapping::appendInline(int sourceStart, const QString &text) {
         const auto linkMatch = link.match(tail);
         const auto strongMatch = strong.match(tail);
         const auto emphasisMatch = emphasis.match(tail);
+        if (tail.startsWith(QLatin1Char('`'))) {
+            int delimiterLength = 1;
+            while (delimiterLength < tail.size() && tail.at(delimiterLength) == QLatin1Char('`')) ++delimiterLength;
+            int closing = delimiterLength;
+            while (closing < tail.size()) {
+                closing = tail.indexOf(QLatin1Char('`'), closing);
+                if (closing < 0) break;
+                int run = 1;
+                while (closing + run < tail.size() && tail.at(closing + run) == QLatin1Char('`')) ++run;
+                if (run == delimiterLength) break;
+                closing += run;
+            }
+            if (closing > delimiterLength) {
+                const int visualStart = m_visual.size();
+                appendMapped(sourceStart + cursor + delimiterLength, tail.mid(delimiterLength, closing - delimiterLength));
+                appendVisualFormat(VisualFormatKind::InlineCode, visualStart);
+                cursor += closing + delimiterLength;
+                continue;
+            }
+        }
         if (linkMatch.hasMatch()) {
             const int labelStart = cursor + linkMatch.capturedStart(1);
             const int visualStart = m_visual.size();
@@ -182,6 +360,8 @@ void SourceVisualMapping::appendEditableLine(BlockKind kind, int sourceStart, co
     const int visualStart = m_visual.size();
     m_visual += visualPrefix;
     appendInline(sourceStart + contentOffset, text.mid(contentOffset));
+    if (contentOffset == text.size())
+        m_mappings.append(Mapping{{sourceStart + contentOffset, 0}, {int(m_visual.size()), 0}});
     const int visualLength = m_visual.size() - visualStart;
     if (kind == BlockKind::Heading)
         appendVisualFormat(VisualFormatKind::Heading, visualStart, headingLevel);
@@ -214,7 +394,9 @@ SourceVisualMapping::Span SourceVisualMapping::visualSpanForSource(Span requeste
 std::optional<SourceVisualMapping::SourceEdit> SourceVisualMapping::sourceEditForVisualReplacement(
         Span visual, const QString &replacement) const {
     if (!visual.isValid() || visual.end() > m_visual.size()
-            || replacement.contains(QChar(0x0d))) return std::nullopt;
+            || replacement.contains(QChar(0x0d)) || !validUtf16(replacement)
+            || !graphemeBoundary(m_visual, visual.start)
+            || !graphemeBoundary(m_visual, visual.end())) return std::nullopt;
     const bool lineBreak = replacement.contains(QLatin1Char('\n'));
     if (lineBreak && (visual.length != 0
             || m_source.contains(QLatin1Char('\r'))
@@ -224,24 +406,29 @@ std::optional<SourceVisualMapping::SourceEdit> SourceVisualMapping::sourceEditFo
         if (visual.start < mapping.visual.start || visual.end() > mapping.visual.end()) continue;
         const int offset = visual.start - mapping.visual.start;
         const SourceEdit edit{{mapping.source.start + offset, visual.length}, replacement};
+        if (!graphemeBoundary(m_source, edit.source.start)
+                || !graphemeBoundary(m_source, edit.source.end())) return std::nullopt;
         if (lineBreak) {
             bool plainParagraph = false;
             for (const Block &block : m_blocks) {
                 if (block.kind == BlockKind::Paragraph && block.editable
                         && block.source.start <= edit.source.start
-                        && edit.source.start <= block.source.end()
-                        && block.source.length > 0) {
+                        && edit.source.start <= block.source.end()) {
                     plainParagraph = true;
                     break;
                 }
             }
             if (!plainParagraph) return std::nullopt;
-            QString candidate = m_source;
-            candidate.insert(edit.source.start, replacement);
-            const SourceVisualMapping projected = create(candidate);
-            QString expectedVisual = m_visual;
-            expectedVisual.insert(visual.start, replacement);
-            if (projected.visualText() != expectedVisual) return std::nullopt;
+        }
+        QString candidate = m_source;
+        candidate.replace(edit.source.start, edit.source.length, replacement);
+        const SourceVisualMapping projected = create(candidate);
+        QString expectedVisual = m_visual;
+        expectedVisual.replace(visual.start, visual.length, replacement);
+        if (projected.visualText() != expectedVisual) return std::nullopt;
+        if (!lineBreak && !replacement.isEmpty()) {
+            const Span newRange = projected.visualSpanForSource({edit.source.start, int(replacement.size())});
+            if (!newRange.isValid() || newRange.start != visual.start) return std::nullopt;
         }
         return edit;
     }
@@ -268,4 +455,54 @@ SourceVisualMapping::Span SourceVisualMapping::sourceSpanForVisual(Span requeste
         previousSource = mappedSource + (last - first);
     }
     return previousVisual == requested.end() ? Span{sourceStart, previousSource - sourceStart} : Span{};
+}
+
+std::optional<SourceVisualMapping::VisualBreakEdit> SourceVisualMapping::sourceEditForVisualBreak(
+        int visualPosition, bool softBreak) const {
+    if (!graphemeBoundary(m_visual, visualPosition)) return std::nullopt;
+    const QString paragraphBreak = softBreak ? QStringLiteral("\n") : QStringLiteral("\n\n");
+    if (const auto edit = sourceEditForVisualReplacement({visualPosition, 0}, paragraphBreak))
+        return VisualBreakEdit{*edit, visualPosition + int(paragraphBreak.size())};
+    if (softBreak) return std::nullopt;
+    for (const Block &block : m_blocks) {
+        if (block.kind != BlockKind::ListItem || !block.editable
+                || visualPosition != block.visual.end()) continue;
+        const QString line = m_source.mid(block.source.start, block.source.length);
+        static const QRegularExpression item(QStringLiteral(
+            "^( {0,3})([-+*]|[0-9]{1,9}[.)])([ \\t]+)(?:\\[([ xX])\\]([ \\t]+))?(.*)$"));
+        const auto match = item.match(line);
+        if (!match.hasMatch()) return std::nullopt;
+        SourceEdit edit;
+        int nextSourceStart;
+        if (match.captured(6).isEmpty()) {
+            edit = {block.source, QString()};
+            nextSourceStart = block.source.start;
+        } else {
+            QString marker = match.captured(2);
+            if (marker.front().isDigit()) {
+                const QString digits = marker.left(marker.size() - 1);
+                bool valid = false;
+                const int number = digits.toInt(&valid);
+                if (!valid || number >= 999999999) return std::nullopt;
+                marker = QString::number(number + 1).rightJustified(digits.size(), QLatin1Char('0')) + marker.back();
+            }
+            QString prefix = match.captured(1) + marker + match.captured(3);
+            if (!match.captured(4).isEmpty()) prefix += QStringLiteral("[ ]") + match.captured(5);
+            // Keep this file's line ending convention, including a final item.
+            const bool crlf = m_source.mid(block.source.end(), 2) == QStringLiteral("\r\n")
+                || (block.source.end() == m_source.size() && m_source.contains(QStringLiteral("\r\n")));
+            const QString newline = crlf ? QStringLiteral("\r\n") : QStringLiteral("\n");
+            edit = {{block.source.end(), 0}, newline + prefix};
+            nextSourceStart = block.source.end() + newline.size();
+        }
+        QString candidate = m_source;
+        candidate.replace(edit.source.start, edit.source.length, edit.replacement);
+        const auto projected = create(candidate);
+        for (const auto &nextBlock : projected.blocks()) {
+            if (nextBlock.source.start == nextSourceStart && nextBlock.editable)
+                return VisualBreakEdit{edit, nextBlock.visual.end()};
+        }
+        return std::nullopt;
+    }
+    return std::nullopt;
 }

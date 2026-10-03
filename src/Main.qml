@@ -57,6 +57,7 @@ ApplicationWindow {
     property int searchMatchIndex: -1
     property url pendingOpenUrl
     property string pendingOpenFragment: ""
+    property string navigationNotice: ""
     property string pendingAction: ""
     property bool replaceOpen: false
     property bool awaitingPendingSave: false
@@ -135,6 +136,66 @@ ApplicationWindow {
         }
         return false;
     }
+    // F6 offers an explicit route out of the text editor, where Tab is writing input.
+    function firstWorkspaceControl(item) {
+        if (!item || !item.visible || !item.enabled) return null;
+        if (item.activeFocusOnTab) return item;
+        for (var i = 0; i < item.children.length; ++i) {
+            var child = firstWorkspaceControl(item.children[i]);
+            if (child) return child;
+        }
+        return null;
+    }
+    function focusWorkspaceRegion(region) {
+        if (region === "source" && editorPane.visible) {
+            editor.forceActiveFocus(Qt.TabFocusReason);
+            editorFlick.ensureCursorVisible();
+            return;
+        }
+        if (region === "preview" && previewPane.visible && previewPane.visualEditEnabled) {
+            previewPane.focusVisualEditor();
+            return;
+        }
+        var pane = region === "organizer" ? organizerPane
+            : region === "files" ? libraryPane : region === "preview" ? previewPane : null;
+        var target = pane ? firstWorkspaceControl(pane) : null;
+        if (target) target.forceActiveFocus(Qt.TabFocusReason);
+        else topChrome.focusWorkspaceControl();
+    }
+    function focusWritingSurface() {
+        focusWorkspaceRegion(previewPane.visible && (!editorPane.visible || lastWritingSurface === "visual")
+                             ? "preview" : "source");
+    }
+    readonly property bool workspaceOwnsKeyboard: !navigationDrawer.visible && (!activeFocusItem
+        || isInside(activeFocusItem, workspaceSplit) || isInside(activeFocusItem, topChrome))
+    function cycleWorkspaceFocus(reverse) {
+        var regions = [];
+        if (organizerSlot.visible) regions.push("organizer");
+        if (filesSlot.visible) regions.push("files");
+        if (editorPane.visible) regions.push("source");
+        if (previewPane.visible) regions.push("preview");
+        regions.push("toolbar");
+        var current = isInside(activeFocusItem, organizerPane) ? "organizer"
+            : isInside(activeFocusItem, libraryPane) ? "files"
+            : isInside(activeFocusItem, editorPane) ? "source"
+            : isInside(activeFocusItem, previewPane) ? "preview" : "toolbar";
+        var index = regions.indexOf(current);
+        focusWorkspaceRegion(regions[(index + (reverse ? regions.length - 1 : 1)) % regions.length]);
+    }
+    function rescueHiddenWorkspaceFocus() {
+        if (navigationDrawer.visible) return;
+        var item = activeFocusItem;
+        if (item && !item.visible && (isInside(item, workspaceSplit) || isInside(item, topChrome)))
+            focusWritingSurface();
+    }
+    Shortcut {
+        sequence: "F6"; context: Qt.WindowShortcut; enabled: win.workspaceOwnsKeyboard
+        onActivated: win.cycleWorkspaceFocus(false)
+    }
+    Shortcut {
+        sequence: "Shift+F6"; context: Qt.WindowShortcut; enabled: win.workspaceOwnsKeyboard
+        onActivated: win.cycleWorkspaceFocus(true)
+    }
     property string lastWritingSurface: "source"
     onActiveFocusItemChanged: {
         topChrome.keyboardReveal = isInside(activeFocusItem, topChrome)
@@ -151,6 +212,9 @@ ApplicationWindow {
     Connections {
         target: workspaceLayout
         function onVisualEditEnabledChanged() { previewPane.visualEditEnabled = workspaceLayout.visualEditEnabled; }
+        function onEffectiveOrganizerVisibleChanged() { Qt.callLater(win.rescueHiddenWorkspaceFocus); }
+        function onEffectiveFilesVisibleChanged() { Qt.callLater(win.rescueHiddenWorkspaceFocus); }
+        function onEffectiveLayoutModeChanged() { Qt.callLater(win.rescueHiddenWorkspaceFocus); }
     }
     readonly property var workspacePaneState: workspaceLayout.saveState()
     function restoreWorkspacePaneState(state) { workspaceLayout.restoreState(state); }
@@ -165,8 +229,7 @@ ApplicationWindow {
         if (pane === "organizer") workspaceLayout.organizerVisible = false;
         else workspaceLayout.filesVisible = false;
         navigationDrawer.close();
-        if (editorPane.visible) editor.forceActiveFocus();
-            else if (previewPane.visualEditEnabled) previewPane.focusVisualEditor();
+        focusWritingSurface();
     }
     function toggleWorkspacePane(pane) {
         var effective = pane === "organizer" ? workspaceLayout.effectiveOrganizerVisible : workspaceLayout.effectiveFilesVisible;
@@ -351,6 +414,40 @@ ApplicationWindow {
             ToolTip.visible: statusHover.hovered
             ToolTip.text: backend.status
             HoverHandler { id: statusHover }
+        }
+    }
+
+    Timer { id: navigationNoticeTimer; interval: 7000; onTriggered: win.navigationNotice = "" }
+    Rectangle {
+        objectName: "navigationNotice"
+        visible: win.navigationNotice !== ""
+        z: 20
+        anchors.horizontalCenter: parent.horizontalCenter
+        anchors.bottom: parent.bottom
+        anchors.bottomMargin: 28
+        width: Math.min(440, parent.width - 32)
+        height: navigationNoticeLabel.implicitHeight + 28
+        radius: 8
+        color: backend.palette.panel
+        border.color: backend.palette.border
+        Label {
+            id: navigationNoticeLabel
+            anchors.left: parent.left; anchors.right: noticeDismiss.left
+            anchors.leftMargin: 14; anchors.rightMargin: 8
+            anchors.verticalCenter: parent.verticalCenter
+            text: win.navigationNotice
+            wrapMode: Text.WordWrap
+            color: backend.palette.text
+            font.pixelSize: 13
+            Accessible.name: text
+        }
+        ToolbarButton {
+            id: noticeDismiss
+            anchors.right: parent.right; anchors.rightMargin: 6
+            anchors.verticalCenter: parent.verticalCenter
+            text: "×"
+            hint: "Dismiss navigation message"
+            onClicked: win.navigationNotice = ""
         }
     }
 
@@ -641,28 +738,34 @@ ApplicationWindow {
         id: navigationDrawer
         objectName: "workspaceNavigationDrawer"
         property string paneName: "files"
+        property var previousFocusItem: null
         width: Math.min(340, win.width - 80)
         height: win.contentItem.height
         edge: Qt.LeftEdge
         modal: true
+        focus: true
         closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
         background: Rectangle { color: navigationDrawer.paneName === "organizer" ? backend.palette.organizer : backend.palette.library }
         onAboutToShow: {
+            previousFocusItem = win.activeFocusItem;
             var pane = paneName === "organizer" ? organizerPane : libraryPane;
             pane.parent = navigationBody;
         }
+        onOpened: navigationCloseButton.forceActiveFocus(Qt.PopupFocusReason)
         onClosed: {
             organizerPane.parent = organizerSlot;
             libraryPane.parent = filesSlot;
-            if (editorPane.visible) editor.forceActiveFocus();
-            else if (previewPane.visualEditEnabled) previewPane.focusVisualEditor();
+            if (previousFocusItem && previousFocusItem.visible && previousFocusItem.enabled)
+                previousFocusItem.forceActiveFocus(Qt.PopupFocusReason);
+            else win.focusWritingSurface();
+            previousFocusItem = null;
         }
         contentItem: ColumnLayout {
             spacing: 0
             RowLayout {
                 Layout.fillWidth: true; Layout.preferredHeight: 52; Layout.leftMargin: 12; Layout.rightMargin: 12
                 Label { text: navigationDrawer.paneName === "organizer" ? "Organizer" : "Files"; color: backend.palette.text; font.weight: Font.Medium; Layout.fillWidth: true }
-                ToolbarButton { iconName: "close"; hint: "Close navigation"; onClicked: navigationDrawer.close() }
+                ToolbarButton { id: navigationCloseButton; objectName: "navigationCloseButton"; iconName: "close"; hint: "Close navigation"; onClicked: navigationDrawer.close() }
             }
             Item { id: navigationBody; Layout.fillWidth: true; Layout.fillHeight: true }
         }
@@ -874,15 +977,30 @@ ApplicationWindow {
                  fragment: hash < 0 ? "" : value.slice(hash + 1) };
     }
 
+    function showNavigationNotice(message) {
+        navigationNotice = message;
+        navigationNoticeTimer.restart();
+    }
+
     function navigateDocumentFragment(fragment) {
         if (fragment === "") return false;
-        var decoded = fragment;
-        try { decoded = decodeURIComponent(fragment); } catch (error) { return false; }
+        var decoded;
+        try { decoded = decodeURIComponent(fragment); }
+        catch (error) {
+            showNavigationNotice("This link contains an invalid heading address.");
+            return false;
+        }
         var position = backend.markdownAnchorPosition(editor.text, decoded);
-        if (position < 0) return false;
+        if (position < 0) {
+            showNavigationNotice("Heading “" + decoded + "” was not found in this document.");
+            return false;
+        }
+        navigationNotice = "";
+        // Anchor navigation never reloads an existing view, including a dirty
+        // destination. Resolve against the text that is actually open there.
         Qt.callLater(function() {
             editor.cursorPosition = position;
-            editor.forceActiveFocus();
+            if (editor.visible) editor.forceActiveFocus();
             editorFlick.ensureCursorVisible();
         });
         previewPane.navigateToAnchor(fragment);
@@ -890,7 +1008,11 @@ ApplicationWindow {
     }
 
     function openDocumentTarget(url, fragment) {
-        var opened = backend.open(url);
+        navigationNotice = "";
+        // Keep the fragment until the session manager has had the opportunity
+        // to focus an already-open document and navigate in that destination.
+        var target = String(url) + (fragment !== "" ? "#" + fragment : "");
+        var opened = backend.open(target);
         if (opened) {
             navigationDrawer.close();
             if (fragment !== "") navigateDocumentFragment(fragment);
@@ -2211,7 +2333,7 @@ ApplicationWindow {
         standardButtons: Dialog.Close
         anchors.centerIn: parent
         contentItem: Label {
-            text: win.isMac ? "⌘S  Save\n⇧⌘S  Save As\n⌘O  Open\n⌘N  New Window\n⌘W  Close Window\n⌘F  Find\n⌥⌘F  Find and Replace\n⌘B  Bold\n⌘I  Italic\n⌘K  Link\n⌘P  Print\n⌃⌘F  Fullscreen\n⌘?  Shortcuts" : "Ctrl+S  Save\nCtrl+Shift+S  Save As\nCtrl+O  Open\nCtrl+N  New Window\nCtrl+F  Find\nCtrl+H  Find and Replace\nCtrl+B  Bold\nCtrl+I  Italic\nCtrl+K  Link\nCtrl+P  Print\nF11 / Super+F  Fullscreen\nCtrl+?  Shortcuts"
+            text: win.isMac ? "⌘S  Save\n⇧⌘S  Save As\n⌘O  Open\n⌘N  New Window\n⌘W  Close Window\n⌘F  Find\n⌥⌘F  Find and Replace\n⌘B  Bold\n⌘I  Italic\n⌘K  Link\n⌘P  Print\n⌃⌘F  Fullscreen\nF6 / ⇧F6  Next / previous workspace pane\n⌘?  Shortcuts" : "Ctrl+S  Save\nCtrl+Shift+S  Save As\nCtrl+O  Open\nCtrl+N  New Window\nCtrl+F  Find\nCtrl+H  Find and Replace\nCtrl+B  Bold\nCtrl+I  Italic\nCtrl+K  Link\nCtrl+P  Print\nF11 / Super+F  Fullscreen\nF6 / Shift+F6  Next / previous workspace pane\nCtrl+?  Shortcuts"
             lineHeight: 1.5
         }
     }
@@ -3053,6 +3175,9 @@ ApplicationWindow {
                 workspaceLayout.layoutMode = mode;
                 if (mode === 2 && visualEditEnabled)
                     Qt.callLater(function() { previewPane.focusVisualEditor(); });
+            }
+            onAnchorNavigationFailed: function(anchor) {
+                win.showNavigationNotice("Heading or anchor “" + anchor + "” was not found in this document.");
             }
             onLinkRequested: function(link) {
                 var resolved = backend.resolveDocumentLink(link);
