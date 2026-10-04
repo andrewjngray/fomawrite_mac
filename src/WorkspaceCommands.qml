@@ -99,7 +99,7 @@ QtObject {
         { id: "fullscreen", title: "Full Screen" },
         { id: "sentence", title: "Sentence Focus", toggle: true },
         { id: "paragraph", title: "Paragraph Focus", toggle: true },
-        { id: "typewriter", title: "Typewriter Scrolling", toggle: true },
+        { id: "typewriter", title: "Typewriter Scrolling (Source)", toggle: true },
         { id: "fillersStyleCheck", title: "Fillers", toggle: true },
         { id: "customStyleCheck", title: "Custom", toggle: true },
         { id: "strike", title: "Strikethrough" },
@@ -121,6 +121,7 @@ QtObject {
         return item.title;
     }
     function isEnabled(id) {
+        if (["strike", "inlineCode", "pageBreak"].indexOf(id) >= 0) return window.canFormatSource;
         if (["duplicate", "rename", "move", "reveal"].indexOf(id) >= 0) return backend.fileUrl.toString() !== "";
         if (["quickOpen", "refreshTags"].indexOf(id) >= 0) return library.rootFolder.toString() !== "";
         if (id === "spelling") return window.isMac && editor.length > 0;
@@ -248,8 +249,8 @@ QtObject {
         case "typewriter": settings.typewriter = !settings.typewriter; typewriterChanged(); break;
         case "fillersStyleCheck": settings.styleCheckFillers = !settings.styleCheckFillers; break;
         case "customStyleCheck": settings.styleCheckCustom = !settings.styleCheckCustom; break;
-        case "strike": editor.wrapSelection("~~", "~~"); break;
-        case "inlineCode": editor.wrapSelection("`", "`"); break;
+        case "strike": window.tryWrapSelection("~~", "~~"); break;
+        case "inlineCode": window.tryWrapSelection("`", "`"); break;
         }
     }
 }

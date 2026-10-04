@@ -1,6 +1,14 @@
 # What’s New in Fomawrite
 
-Build 112 adds:
+Build 116 adds:
+
+- Source formatting controls that respect the focused field and cannot change an old selection while you use Find, filters or rendered writing;
+- one Insert/Edit link dialog with optional titles, safe Cancel and a warning when the document changes while a link is open;
+- Tab and Shift-Tab navigation through supported Visual Edit table cells without changing their Markdown;
+- explicit Source-only wording for Typewriter scrolling;
+- wider checks of everyday writing, resizing and narrow export controls in the local app bundles.
+
+Build 112 added:
 
 - independent Source and Preview zoom controls, with percentage presets and reset;
 - optional Link zoom: enabling it matches both sides to the chosen pane, then changes them together;

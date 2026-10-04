@@ -218,6 +218,7 @@ int runDocumentViewCheck(QApplication &app, const QString &outputDirectory) {
     QJsonArray scenarios;
     QJsonArray dailyWritingChecks;
     QJsonArray paneZoomChecks;
+    QJsonArray editorAcceptanceChecks;
     QJsonArray paneZoomReadings;
     QJsonArray paneZoomDividerEvents;
     QJsonArray screenshots;
@@ -240,6 +241,7 @@ int runDocumentViewCheck(QApplication &app, const QString &outputDirectory) {
         report.insert("scenarios", scenarios);
         report.insert("dailyWritingChecks", dailyWritingChecks);
         report.insert("paneZoomChecks", paneZoomChecks);
+        report.insert("editorAcceptanceChecks", editorAcceptanceChecks);
         report.insert("paneZoomReadings", paneZoomReadings);
         report.insert("paneZoomDividerEvents", paneZoomDividerEvents);
         report.insert("screenshots", screenshots);
@@ -252,7 +254,7 @@ int runDocumentViewCheck(QApplication &app, const QString &outputDirectory) {
             return 2;
         }
         qInfo().noquote() << "Document view check:" << (failures.isEmpty() ? "PASS" : "FAIL")
-                          << scenarios.size() << "footer states," << dailyWritingChecks.size() << "daily-writing checks," << paneZoomChecks.size() << "pane-zoom checks; report:" << file.fileName();
+                          << scenarios.size() << "footer states," << dailyWritingChecks.size() << "daily-writing checks," << paneZoomChecks.size() << "pane-zoom checks," << editorAcceptanceChecks.size() << "editor acceptance checks; report:" << file.fileName();
         for (const QString &failure : failures) qWarning().noquote() << failure;
         return failures.isEmpty() ? 0 : 1;
     };
@@ -261,7 +263,7 @@ int runDocumentViewCheck(QApplication &app, const QString &outputDirectory) {
             QStringLiteral("FooterButton.qml"), QStringLiteral("PreviewPane.qml"),
             QStringLiteral("WorkspaceLayout.qml"), QStringLiteral("WorkspaceCommands.qml"), QStringLiteral("AboutDialog.qml"),
             QStringLiteral("DocumentFindBar.qml"), QStringLiteral("DocumentOutline.qml"),
-            QStringLiteral("PaneZoomState.qml"), QStringLiteral("PaneZoomControls.qml"), QStringLiteral("WorkspaceHeader.qml")}) {
+            QStringLiteral("PaneZoomState.qml"), QStringLiteral("PaneZoomControls.qml"), QStringLiteral("WorkspaceHeader.qml"), QStringLiteral("LinkEditor.qml"), QStringLiteral("LinkSyntax.js"), QStringLiteral("ExportHub.qml"), QStringLiteral("SquareDialogButton.qml")}) {
         const QString hash = fileHash(":/" + name);
         check(!hash.isEmpty(), "Bundled resource missing: " + name);
         resources.insert(name, hash);
@@ -1057,6 +1059,8 @@ int runDocumentViewCheck(QApplication &app, const QString &outputDirectory) {
             });
         }
     }
+
+#include "editoracceptancecheck.inc"
 
     if (auto *about = window->findChild<QObject *>("aboutDialog")) {
         check(QMetaObject::invokeMethod(about, "open"), "Cannot open bundled About dialog");

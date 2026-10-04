@@ -55,6 +55,20 @@ public:
         QString destination;
     };
 
+    struct TableCell {
+        int tableStart = -1;
+        int row = 0; // Physical row: header 0, delimiter 1, first body row 2.
+        int column = 0;
+        Span source;
+        Span visual;
+    };
+
+    enum class TableNavigationStatus { OutsideTable, Moved, Boundary, UnsupportedSelection };
+    struct TableNavigation {
+        TableNavigationStatus status = TableNavigationStatus::OutsideTable;
+        int cursor = -1;
+    };
+
     struct SourceEdit {
         Span source;
         QString replacement;
@@ -78,6 +92,11 @@ public:
     const QVector<VisualFormatSpan> &visualFormatSpans() const { return m_visualFormatSpans; }
 
     const QVector<ImageObject> &imageObjects() const { return m_imageObjects; }
+    const QVector<TableCell> &tableCellObjects() const { return m_tableCells; }
+
+    // Navigation is a read-only query. It never jumps over an unsupported row,
+    // crosses a table boundary, or converts a multi-cell selection into input.
+    TableNavigation navigateTable(Span selection, bool backwards) const;
 
     // A selection maps only when every selected UTF-16 unit is represented and
     // its counterpart is contiguous. Syntax markers, block prefixes and
@@ -114,4 +133,5 @@ private:
     QVector<Mapping> m_mappings;
     QVector<VisualFormatSpan> m_visualFormatSpans;
     QVector<ImageObject> m_imageObjects;
+    QVector<TableCell> m_tableCells;
 };

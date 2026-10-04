@@ -21,6 +21,8 @@ Drag the divider between Source and Preview to resize the columns. Double-click 
 
 Find and Replace, Undo and Redo, headings, lists, tasks, emphasis, links, code, tables and other common Markdown commands operate on the source. Clear Styles deliberately refuses complex or ambiguous selections rather than risking damage.
 
+Click Source before using Markdown formatting. Its toolbar, keyboard shortcuts and Format menu act on that Source selection; they are unavailable while Find, filters, link fields, Preview or Visual Edit owns focus. Typewriter scrolling applies to Source only.
+
 Manual word completions use words from the current document. Writing Review and the opt-in Custom and Fillers style checks ignore code and URL syntax. Fillers currently checks the whole words “very”, “really”, “quite” and “just”. These checks never rewrite your text.
 
 Authorship annotations are manual assertions stored beside saved Markdown in a hidden sidecar. The local Authors profile does not label text automatically or prove provenance.
@@ -34,6 +36,16 @@ Open **View → Document Outline** or choose Document outline from the workspace
 ## Visual list editing
 
 In Visual Edit, Return can split a simple bullet, numbered or task item at a safe caret position. The new item keeps its marker style; a new task starts unchecked. Return on an empty item leaves the list. Splits inside emphasis, links or code and ambiguous nested/continued items stay unchanged; use Source for those structures. Undo and Redo preserve the original Markdown.
+
+## Links
+
+Select ordinary text in Source, or place the caret inside a supported inline link, then choose the link toolbar button or **Format → Add Link**. Enter the text, destination and optional title. **Insert** creates a link; **Save** updates an existing one. A local destination may contain spaces. The change is one Undo operation.
+
+**Cancel** or Escape returns to the original Source selection without changing it. If the document changes while the dialog is open, application is refused and your entries stay visible: cancel and reopen the link against the current text. Complex links, code, images and multiline selections remain Source-editing work.
+
+## Visual table navigation
+
+Within a supported table cell in Visual Edit, **Tab** moves to the next cell and **Shift-Tab** to the previous one, including empty cells. Navigation alone never changes the Markdown or creates an Undo step. At a table boundary or unsupported row the caret stays in place. Use **F6** to leave the writing surface and Source to add/remove rows or columns. Typing in a supported cell uses the existing safe mapping and normal Undo/Redo.
 
 ## Safety and privacy
 

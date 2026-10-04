@@ -101,6 +101,8 @@ public:
     // A conservative snapshot for the visual editor. `source` is the exact
     // canonical Markdown that callers must return to applyVisualEdit().
     Q_INVOKABLE QVariantMap visualProjection() const;
+    Q_INVOKABLE QVariantMap navigateVisualTable(int start, int end, bool backwards,
+                                                const QString &expectedSource) const;
     // Applies one inline visual replacement only when expectedSource is still
     // the current canonical source and the mapping can produce one source edit.
     Q_INVOKABLE QVariantMap applyVisualBreak(int position, bool softBreak, const QString &expectedSource);

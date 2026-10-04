@@ -7,6 +7,7 @@ import Qt.labs.platform as Platform
 import QtQuick.Layouts
 import QtQuick.Window
 import "EditorMutations.js" as EditorMutations
+import "LinkSyntax.js" as LinkSyntax
 
 ApplicationWindow {
     id: win
@@ -232,6 +233,30 @@ ApplicationWindow {
         }
         return false;
     }
+    // Source owns formatting only while editing, or while traversing its
+    // explicit formatting controls. An unrelated field never borrows a stale
+    // Source selection merely because the editor remains visible.
+    property bool sourceFormattingOwned: false
+    readonly property bool canFormatSource: editorPane.visible && sourceFormattingOwned
+        && !editor.readOnly && !editor.inputMethodComposing
+    function isSourceFormattingChrome(item) {
+        var current = item;
+        while (current) {
+            if (current.sourceFormattingControl === true) return true;
+            current = current.parent;
+        }
+        for (var menu of [formatQuickMenu, formatPopover]) {
+            if (menu && menu.visible && menu.contentItem && isInside(item, menu.contentItem.parent))
+                return true;
+        }
+        return false;
+    }
+    function updateSourceFormattingOwner() {
+        var item = activeFocusItem;
+        if (editorPane.visible && isInside(item, editor)) sourceFormattingOwned = true;
+        else if (!isSourceFormattingChrome(item)) sourceFormattingOwned = false;
+    }
+
     // F6 offers an explicit route out of the text editor, where Tab is writing input.
     function firstWorkspaceControl(item) {
         if (!item || !item.visible || !item.enabled) return null;
@@ -248,8 +273,10 @@ ApplicationWindow {
             editorFlick.ensureCursorVisible();
             return;
         }
-        if (region === "preview" && previewPane.visible && previewPane.visualEditEnabled) {
-            previewPane.focusVisualEditor();
+        if (region === "preview" && previewPane.visible) {
+            // Read-only Preview has no per-pane footer to receive tab focus.
+            // Enter the visible writing surface explicitly in both modes.
+            previewPane.focusRenderedSurface();
             return;
         }
         var pane = region === "organizer" ? organizerPane
@@ -314,6 +341,7 @@ ApplicationWindow {
     onActiveFocusItemChanged: {
         topChrome.keyboardReveal = isInside(activeFocusItem, topChrome);
         updateWritingSurfaceFromFocus();
+        updateSourceFormattingOwner();
     }
 
     WorkspaceLayout {
@@ -327,7 +355,10 @@ ApplicationWindow {
         function onVisualEditEnabledChanged() { previewPane.visualEditEnabled = workspaceLayout.visualEditEnabled; }
         function onEffectiveOrganizerVisibleChanged() { Qt.callLater(win.rescueHiddenWorkspaceFocus); }
         function onEffectiveFilesVisibleChanged() { Qt.callLater(win.rescueHiddenWorkspaceFocus); }
-        function onEffectiveLayoutModeChanged() { Qt.callLater(win.rescueHiddenWorkspaceFocus); }
+        function onEffectiveLayoutModeChanged() {
+            if (workspaceLayout.effectiveLayoutMode === 2) win.sourceFormattingOwned = false;
+            Qt.callLater(win.rescueHiddenWorkspaceFocus);
+        }
     }
     readonly property var workspacePaneState: workspaceLayout.saveState()
     // The approved presentation is adopted once, including checkpointed windows.
@@ -548,7 +579,7 @@ ApplicationWindow {
             case "exportHtml": win.openExportHub("html"); break;
             case "printPreview": backend.printPreview(); break;
             case "exportPdf": win.openExportHub("pdf"); break;
-            case "pageBreak": editor.replaceSelectionWith("\n\n<!-- pagebreak -->\n\n"); break;
+            case "pageBreak": win.tryInsertSourceSnippet("\n\n<!-- pagebreak -->\n\n"); break;
             case "writingReview": analysisDialog.open(); break;
             case "spelling": spellingDialog.open(); break;
             case "authorship": authorshipDialog.ranges=backend.authorshipRanges(); authorshipDialog.open(); break;
@@ -727,128 +758,31 @@ ApplicationWindow {
         }
     }
 
-    Popup {
+    LinkEditor {
         id: linkEditor
-        objectName: "linkEditor"
-        property int selectionStart: 0
-        property int selectionEnd: 0
-        property string label: ""
-        property string url: "https://"
-        property string title: ""
-        property string error: ""
-        property bool editingExisting: false
-        property string originalMarkdown: ""
-        property string originalLabel: ""
-        property string originalUrl: ""
-        property string originalTitle: ""
-        width: Math.min(340, win.width - 16)
-        padding: 12
-        modal: false
-        focus: true
-        closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
-        background: Rectangle {
-            color: backend.palette.panel
-            border.color: backend.palette.border
-            radius: 8
-        }
-        function applyLink() {
-            var destination = linkEditorUrl.text.trim();
-            var labelText = linkEditorLabel.text;
-            var titleText = linkEditorTitle.text;
-            if (destination.length === 0) {
-                error = "A link destination is required.";
-                linkEditorUrl.forceActiveFocus();
-                return;
-            }
-            if (/[\r\n]/.test(destination) || /[\r\n]/.test(titleText)) {
-                error = "Link destinations and titles cannot contain line breaks.";
-                return;
-            }
-            if (labelText.length === 0)
-                labelText = "link text";
-            if (editingExisting && labelText === originalLabel
-                    && destination === originalUrl && titleText === originalTitle) {
-                close();
-                editor.forceActiveFocus();
-                return;
-            }
-            var markdown = "[" + editor.escapeMarkdownLinkText(labelText) + "]("
-                    + editor.escapeMarkdownLinkDestination(destination);
-            if (titleText.trim().length > 0)
-                markdown += " \"" + titleText.trim().replace(/\\/g, "\\\\").replace(/\"/g, "\\\"") + "\"";
-            markdown += ")";
-            editor.replaceAtomic(selectionStart, selectionEnd, markdown);
-            close();
-            editor.forceActiveFocus();
-        }
-        contentItem: ColumnLayout {
-            spacing: 8
-            Label { text: "Insert link"; font.bold: true; Accessible.role: Accessible.Heading }
-            Label { text: "Text" }
-            TextField {
-                id: linkEditorLabel
-                objectName: "linkEditorLabel"
-                Layout.fillWidth: true
-                text: linkEditor.label
-                placeholderText: "link text"
-                Accessible.name: "Link text"
-                onAccepted: linkEditor.applyLink()
-            }
-            Label { text: "Destination" }
-            TextField {
-                id: linkEditorUrl
-                objectName: "linkEditorUrl"
-                Layout.fillWidth: true
-                text: linkEditor.url
-                placeholderText: "https://"
-                inputMethodHints: Qt.ImhUrlCharactersOnly
-                Accessible.name: "Link destination"
-                onAccepted: linkEditor.applyLink()
-            }
-            Label { text: "Title (optional)" }
-            TextField {
-                id: linkEditorTitle
-                objectName: "linkEditorTitle"
-                Layout.fillWidth: true
-                text: linkEditor.title
-                placeholderText: "Shown by supporting readers"
-                Accessible.name: "Link title, optional"
-                onAccepted: linkEditor.applyLink()
-            }
-            Label {
-                visible: linkEditor.error.length > 0
-                Layout.fillWidth: true
-                text: linkEditor.error
-                color: "#c74040"
-                wrapMode: Text.Wrap
-                Accessible.name: text
-            }
-            RowLayout {
-                Layout.fillWidth: true
-                Item { Layout.fillWidth: true }
-                Button { text: "Cancel"; Accessible.name: "Cancel link insertion"; onClicked: linkEditor.close() }
-                Button { text: "Insert"; Accessible.name: "Insert link"; onClicked: linkEditor.applyLink() }
-            }
-        }
+        hostWindow: win
+        sourceEditor: editor
+        sourceViewport: editorFlick
+        documentBackend: backend
     }
 
     CompactMenu {
         id: formatQuickMenu
         objectName: "quickFormatMenu"
         width: 230
-        CompactMenuItem { text: "Bold"; onTriggered: win.tryWrapSelection("**", "**") }
-        CompactMenuItem { text: "Italic"; onTriggered: win.tryWrapSelection("*", "*") }
-        CompactMenuItem { text: "Link…"; onTriggered: win.tryInsertLink() }
+        CompactMenuItem { enabled: win.canFormatSource; text: "Bold"; onTriggered: win.tryWrapSelection("**", "**") }
+        CompactMenuItem { enabled: win.canFormatSource; text: "Italic"; onTriggered: win.tryWrapSelection("*", "*") }
+        CompactMenuItem { enabled: win.canFormatSource; text: "Link…"; onTriggered: win.tryInsertLink() }
         MenuSeparator {}
-        CompactMenuItem { text: "Body"; onTriggered: win.editMarkdown("body") }
-        CompactMenuItem { text: "Heading 1"; onTriggered: win.editMarkdown("heading1") }
-        CompactMenuItem { text: "Heading 2"; onTriggered: win.editMarkdown("heading2") }
-        CompactMenuItem { text: "Heading 3"; onTriggered: win.editMarkdown("heading3") }
+        CompactMenuItem { enabled: win.canFormatSource; text: "Body"; onTriggered: win.editMarkdown("body") }
+        CompactMenuItem { enabled: win.canFormatSource; text: "Heading 1"; onTriggered: win.editMarkdown("heading1") }
+        CompactMenuItem { enabled: win.canFormatSource; text: "Heading 2"; onTriggered: win.editMarkdown("heading2") }
+        CompactMenuItem { enabled: win.canFormatSource; text: "Heading 3"; onTriggered: win.editMarkdown("heading3") }
         MenuSeparator {}
-        CompactMenuItem { text: "Blockquote"; onTriggered: win.editMarkdown("quote") }
-        CompactMenuItem { text: "Bullet List"; onTriggered: win.editMarkdown("bullet") }
-        CompactMenuItem { text: "Ordered List"; onTriggered: win.editMarkdown("ordered") }
-        CompactMenuItem { text: "Task List"; onTriggered: win.editMarkdown("task") }
+        CompactMenuItem { enabled: win.canFormatSource; text: "Blockquote"; onTriggered: win.editMarkdown("quote") }
+        CompactMenuItem { enabled: win.canFormatSource; text: "Bullet List"; onTriggered: win.editMarkdown("bullet") }
+        CompactMenuItem { enabled: win.canFormatSource; text: "Ordered List"; onTriggered: win.editMarkdown("ordered") }
+        CompactMenuItem { enabled: win.canFormatSource; text: "Task List"; onTriggered: win.editMarkdown("task") }
     }
 
     CompactMenu {
@@ -859,8 +793,8 @@ ApplicationWindow {
         CompactMenuItem { objectName: "openButton"; text: "Open…"; onTriggered: backend.openDialog() }
         CompactMenuItem { text: "Open by Path…"; onTriggered: openPathDialog.open() }
         MenuSeparator {}
-        CompactMenuItem { text: "Strikethrough"; onTriggered: workspaceCommands.run("strike") }
-        CompactMenuItem { text: "Inline code"; onTriggered: workspaceCommands.run("inlineCode") }
+        CompactMenuItem { enabled: win.canFormatSource; text: "Strikethrough"; onTriggered: workspaceCommands.run("strike") }
+        CompactMenuItem { enabled: win.canFormatSource; text: "Inline code"; onTriggered: workspaceCommands.run("inlineCode") }
     }
     CompactMenu {
         id: writingOptions
@@ -886,7 +820,7 @@ ApplicationWindow {
         MenuSeparator {}
         CompactMenuItem { text: "Show Markdown syntax"; checkable: true; checked: workspaceSettings.showMarkup; onTriggered: workspaceCommands.run("markup") }
         CompactMenuItem { text: "Paragraph focus"; checkable: true; checked: workspaceSettings.paragraphFocus; onTriggered: workspaceCommands.run("paragraph") }
-        CompactMenuItem { text: "Typewriter scrolling"; checkable: true; checked: workspaceSettings.typewriter; onTriggered: workspaceCommands.run("typewriter") }
+        CompactMenuItem { text: "Typewriter scrolling (Source)"; checkable: true; checked: workspaceSettings.typewriter; onTriggered: workspaceCommands.run("typewriter") }
         MenuSeparator {}
         CompactMenuItem { text: "Larger text"; enabled: paneZoom.activeZoom < paneZoom.maximumZoom; onTriggered: workspaceCommands.run("larger") }
         CompactMenuItem { text: "Smaller text"; enabled: paneZoom.activeZoom > paneZoom.minimumZoom; onTriggered: workspaceCommands.run("smaller") }
@@ -1050,11 +984,7 @@ ApplicationWindow {
     }
 
     function sourceFormattingAllowed() {
-        if (previewPane.visualEditEnabled && lastWritingSurface === "visual") {
-            previewPane.visualStatus = "Choose Source before applying Markdown formatting."
-            return false
-        }
-        return true
+        return canFormatSource;
     }
 
     function tryWrapSelection(before, after) {
@@ -1062,7 +992,15 @@ ApplicationWindow {
     }
 
     function tryInsertLink() {
-        if (sourceFormattingAllowed()) editor.insertLink()
+        if (sourceFormattingAllowed()) openLinkEditor(null)
+    }
+
+    function tryInsertSourceSnippet(replacement) {
+        if (!sourceFormattingAllowed()) return;
+        var start = editor.selectionStart;
+        var end = editor.selectionEnd;
+        editor.forceActiveFocus();
+        editor.replaceAtomic(start, end, replacement);
     }
 
     function editMarkdown(action) {
@@ -1072,65 +1010,24 @@ ApplicationWindow {
         if (result.start !== undefined) editor.select(result.start, result.end);
     }
 
-    function decodeSimpleMarkdownLinkPart(value) {
-        return value.replace(/\\(.)/g, "$1");
-    }
-
+    function decodeSimpleMarkdownLinkPart(value) { return LinkSyntax.decode(value); }
     function simpleInlineLinkAt(selectionStart, selectionEnd) {
-        var lineStart = editor.text.lastIndexOf("\n", selectionStart - 1) + 1;
-        var lineEnd = editor.text.indexOf("\n", selectionEnd);
-        if (lineEnd < 0) lineEnd = editor.text.length;
-        var line = editor.text.slice(lineStart, lineEnd);
-        // Deliberately support only ordinary inline links. Images, wikilinks,
-        // nested syntax and multiline forms stay on the safe insertion path.
-        var pattern = /\[((?:\\.|[^\]\\\r\n])*)\]\(((?:\\.|[^\s()\\\r\n])*)(?:\s+"((?:\\.|[^"\\\r\n])*)")?\)/g;
-        var match;
-        while ((match = pattern.exec(line)) !== null) {
-            var start = lineStart + match.index;
-            var end = start + match[0].length;
-            var before = start > 0 ? editor.text.charAt(start - 1) : "";
-            if (before === "!" || before === "[" || before === "\\")
-                continue;
-            if (selectionStart >= start && selectionEnd <= end) {
-                return {
-                    start: start,
-                    end: end,
-                    markdown: match[0],
-                    label: decodeSimpleMarkdownLinkPart(match[1]),
-                    url: decodeSimpleMarkdownLinkPart(match[2]),
-                    title: match[3] === undefined ? "" : decodeSimpleMarkdownLinkPart(match[3])
-                };
-            }
-        }
-        return null;
+        return LinkSyntax.analyze(editor.text, selectionStart, selectionEnd).existing || null;
     }
-
     function openLinkEditor(button) {
-        if (!sourceFormattingAllowed()) return
-        var selectionStart = Math.min(editor.selectionStart, editor.selectionEnd);
-        var selectionEnd = Math.max(editor.selectionStart, editor.selectionEnd);
-        var existing = simpleInlineLinkAt(selectionStart, selectionEnd);
-        linkEditor.editingExisting = existing !== null;
-        linkEditor.originalMarkdown = existing ? existing.markdown : "";
-        linkEditor.originalLabel = existing ? existing.label : "";
-        linkEditor.originalUrl = existing ? existing.url : "";
-        linkEditor.originalTitle = existing ? existing.title : "";
-        linkEditor.selectionStart = existing ? existing.start : selectionStart;
-        linkEditor.selectionEnd = existing ? existing.end : selectionEnd;
-        linkEditor.label = existing ? existing.label : editor.text.slice(selectionStart, selectionEnd);
-        linkEditor.url = existing ? existing.url : (backend.clipboardUrl() || "https://");
-        linkEditor.title = existing ? existing.title : "";
-        linkEditor.error = "";
-        var point = button.mapToItem(win.contentItem, 0, button.height);
-        linkEditor.x = Math.max(8, Math.min(win.contentItem.width - linkEditor.width - 8,
-                                            point.x + button.width - linkEditor.width));
-        linkEditor.y = Math.min(win.contentItem.height - linkEditor.height - 8,
-                                 Math.max(48, point.y + 6));
-        linkEditor.open();
-        Qt.callLater(function() { linkEditorLabel.forceActiveFocus(); linkEditorLabel.selectAll(); });
+        if (!sourceFormattingAllowed()) return;
+        var start = Math.min(editor.selectionStart, editor.selectionEnd);
+        var end = Math.max(editor.selectionStart, editor.selectionEnd);
+        var context = LinkSyntax.analyze(editor.text, start, end);
+        if (context.error) { win.showNavigationNotice(context.error); return; }
+        win.cancelDocumentViewportTransition();
+        var point = button ? button.mapToItem(win.contentItem, button.width, button.height)
+            : editorPane.mapToItem(win.contentItem, Math.min(editorPane.width - 16, 440), 16);
+        linkEditor.showFor(start, end, context.existing || null, point);
     }
 
     function openQuickFormat(button) {
+        if (!sourceFormattingAllowed()) return;
         var point = button.mapToItem(win.contentItem, 0, button.height);
         formatQuickMenu.x = Math.max(8, Math.min(win.contentItem.width - formatQuickMenu.width - 8,
                                                   point.x + button.width - formatQuickMenu.width));
@@ -1477,18 +1374,21 @@ ApplicationWindow {
     Shortcut {
         sequence: "Ctrl+B"
         context: Qt.WindowShortcut
+        enabled: win.canFormatSource
         onActivated: win.tryWrapSelection("**", "**")
     }
 
     Shortcut {
         sequence: "Ctrl+I"
         context: Qt.WindowShortcut
+        enabled: win.canFormatSource
         onActivated: win.tryWrapSelection("*", "*")
     }
 
     Shortcut {
         sequence: "Ctrl+K"
         context: Qt.WindowShortcut
+        enabled: win.canFormatSource
         onActivated: win.tryInsertLink()
     }
 
@@ -1680,10 +1580,10 @@ ApplicationWindow {
             Platform.Menu {
                 objectName: "editTransformations"
                 title: "Transformations"
-                Platform.MenuItem { objectName: "editUppercase"; text: "Make Upper Case"; enabled: win.editTarget === editor && editor.selectedText.length > 0; onTriggered: win.editMarkdown("uppercase") }
-                Platform.MenuItem { objectName: "editLowercase"; text: "Make Lower Case"; enabled: win.editTarget === editor && editor.selectedText.length > 0; onTriggered: win.editMarkdown("lowercase") }
-                Platform.MenuItem { objectName: "editCapitalize"; text: "Capitalize"; enabled: win.editTarget === editor && editor.selectedText.length > 0; onTriggered: win.editMarkdown("capitalize") }
-                Platform.MenuItem { objectName: "editTitleCase"; text: "Make Title Case"; enabled: win.editTarget === editor && editor.selectedText.length > 0; onTriggered: win.editMarkdown("titlecase") }
+                Platform.MenuItem { objectName: "editUppercase"; text: "Make Upper Case"; enabled: win.canFormatSource && editor.selectedText.length > 0; onTriggered: win.editMarkdown("uppercase") }
+                Platform.MenuItem { objectName: "editLowercase"; text: "Make Lower Case"; enabled: win.canFormatSource && editor.selectedText.length > 0; onTriggered: win.editMarkdown("lowercase") }
+                Platform.MenuItem { objectName: "editCapitalize"; text: "Capitalize"; enabled: win.canFormatSource && editor.selectedText.length > 0; onTriggered: win.editMarkdown("capitalize") }
+                Platform.MenuItem { objectName: "editTitleCase"; text: "Make Title Case"; enabled: win.canFormatSource && editor.selectedText.length > 0; onTriggered: win.editMarkdown("titlecase") }
             }
             Platform.Menu {
                 title: "Speech"
@@ -1695,57 +1595,59 @@ ApplicationWindow {
             Platform.MenuItem { objectName: "editExportAuthorship"; text: "Export Authorship Metadata…"; onTriggered: authorshipExportDialog.open() }
         }
         Platform.Menu {
+            objectName: "nativeFormatMenu"
             title: "Format"
+            enabled: win.canFormatSource
             Platform.Menu {
                 title: "Headings"
-                Platform.MenuItem { text: "Heading 1"; onTriggered: win.editMarkdown("heading1") }
-                Platform.MenuItem { text: "Heading 2"; onTriggered: win.editMarkdown("heading2") }
-                Platform.MenuItem { text: "Heading 3"; onTriggered: win.editMarkdown("heading3") }
-                Platform.MenuItem { text: "Heading 4"; onTriggered: win.editMarkdown("heading4") }
-                Platform.MenuItem { text: "Heading 5"; onTriggered: win.editMarkdown("heading5") }
-                Platform.MenuItem { text: "Heading 6"; onTriggered: win.editMarkdown("heading6") }
+                Platform.MenuItem { enabled: win.canFormatSource; text: "Heading 1"; onTriggered: win.editMarkdown("heading1") }
+                Platform.MenuItem { enabled: win.canFormatSource; text: "Heading 2"; onTriggered: win.editMarkdown("heading2") }
+                Platform.MenuItem { enabled: win.canFormatSource; text: "Heading 3"; onTriggered: win.editMarkdown("heading3") }
+                Platform.MenuItem { enabled: win.canFormatSource; text: "Heading 4"; onTriggered: win.editMarkdown("heading4") }
+                Platform.MenuItem { enabled: win.canFormatSource; text: "Heading 5"; onTriggered: win.editMarkdown("heading5") }
+                Platform.MenuItem { enabled: win.canFormatSource; text: "Heading 6"; onTriggered: win.editMarkdown("heading6") }
             }
             Platform.Menu {
                 title: "Lists"
-                Platform.MenuItem { text: "List"; onTriggered: win.editMarkdown("bullet") }
-                Platform.MenuItem { text: "Task List"; onTriggered: win.editMarkdown("task") }
-                Platform.MenuItem { text: "Ordered List"; onTriggered: win.editMarkdown("ordered") }
-                Platform.MenuItem { text: "Ordered Task List"; onTriggered: win.editMarkdown("orderedTask") }
+                Platform.MenuItem { enabled: win.canFormatSource; text: "List"; onTriggered: win.editMarkdown("bullet") }
+                Platform.MenuItem { enabled: win.canFormatSource; text: "Task List"; onTriggered: win.editMarkdown("task") }
+                Platform.MenuItem { enabled: win.canFormatSource; text: "Ordered List"; onTriggered: win.editMarkdown("ordered") }
+                Platform.MenuItem { enabled: win.canFormatSource; text: "Ordered Task List"; onTriggered: win.editMarkdown("orderedTask") }
                 Platform.MenuSeparator {}
-                Platform.MenuItem { text: "Mark Task as Completed"; onTriggered: win.editMarkdown("toggleTask") }
+                Platform.MenuItem { enabled: win.canFormatSource; text: "Mark Task as Completed"; onTriggered: win.editMarkdown("toggleTask") }
             }
-            Platform.MenuItem { text: "Blockquote"; onTriggered: win.editMarkdown("quote") }
-            Platform.MenuItem { text: "Body"; onTriggered: win.editMarkdown("body") }
+            Platform.MenuItem { enabled: win.canFormatSource; text: "Blockquote"; onTriggered: win.editMarkdown("quote") }
+            Platform.MenuItem { enabled: win.canFormatSource; text: "Body"; onTriggered: win.editMarkdown("body") }
             Platform.Menu {
                 title: "Structure"
-                Platform.MenuItem { text: "Indent"; onTriggered: win.editMarkdown("indent") }
-                Platform.MenuItem { text: "Outdent"; onTriggered: win.editMarkdown("outdent") }
-                Platform.MenuItem { text: "Move Line Up"; onTriggered: win.editMarkdown("lineUp") }
-                Platform.MenuItem { text: "Move Line Down"; onTriggered: win.editMarkdown("lineDown") }
+                Platform.MenuItem { enabled: win.canFormatSource; text: "Indent"; onTriggered: win.editMarkdown("indent") }
+                Platform.MenuItem { enabled: win.canFormatSource; text: "Outdent"; onTriggered: win.editMarkdown("outdent") }
+                Platform.MenuItem { enabled: win.canFormatSource; text: "Move Line Up"; onTriggered: win.editMarkdown("lineUp") }
+                Platform.MenuItem { enabled: win.canFormatSource; text: "Move Line Down"; onTriggered: win.editMarkdown("lineDown") }
             }
             Platform.MenuSeparator {}
-            Platform.MenuItem { text: "Bold"; onTriggered: win.tryWrapSelection("**", "**") }
-            Platform.MenuItem { text: "Italic"; onTriggered: win.tryWrapSelection("*", "*") }
+            Platform.MenuItem { enabled: win.canFormatSource; text: "Bold"; onTriggered: win.tryWrapSelection("**", "**") }
+            Platform.MenuItem { enabled: win.canFormatSource; text: "Italic"; onTriggered: win.tryWrapSelection("*", "*") }
             NativeCommand { commandId: "strike" }
-            Platform.MenuItem { text: "Highlight"; onTriggered: win.tryWrapSelection("==", "==") }
+            Platform.MenuItem { enabled: win.canFormatSource; text: "Highlight"; onTriggered: win.tryWrapSelection("==", "==") }
             Platform.MenuSeparator {}
             NativeCommand { commandId: "inlineCode"; text: "Code" }
-            Platform.MenuItem { text: "Code Block"; onTriggered: win.editMarkdown("codeBlock") }
+            Platform.MenuItem { enabled: win.canFormatSource; text: "Code Block"; onTriggered: win.editMarkdown("codeBlock") }
             Platform.MenuSeparator {}
-            Platform.MenuItem { text: "Add Link"; onTriggered: win.tryInsertLink() }
-            Platform.MenuItem { text: "Add Wikilink"; onTriggered: win.tryWrapSelection("[[", "]]") }
-            Platform.MenuItem { text: "Add Footnote"; onTriggered: editor.replaceAtomic(editor.selectionStart, editor.selectionEnd, "[^note]\n\n[^note]: Note text") }
-            Platform.MenuItem { text: "Add Content Block"; onTriggered: editor.replaceAtomic(editor.selectionStart, editor.selectionEnd, "\n/chapter.md\n") }
-            Platform.MenuItem { text: "Add Hashtag"; onTriggered: editor.replaceAtomic(editor.selectionStart, editor.selectionEnd, "#tag") }
+            Platform.MenuItem { enabled: win.canFormatSource; text: "Add Link"; onTriggered: win.tryInsertLink() }
+            Platform.MenuItem { enabled: win.canFormatSource; text: "Add Wikilink"; onTriggered: win.tryWrapSelection("[[", "]]") }
+            Platform.MenuItem { enabled: win.canFormatSource; text: "Add Footnote"; onTriggered: win.tryInsertSourceSnippet("[^note]\n\n[^note]: Note text") }
+            Platform.MenuItem { enabled: win.canFormatSource; text: "Add Content Block"; onTriggered: win.tryInsertSourceSnippet("\n/chapter.md\n") }
+            Platform.MenuItem { enabled: win.canFormatSource; text: "Add Hashtag"; onTriggered: win.tryInsertSourceSnippet("#tag") }
             Platform.MenuSeparator {}
-            Platform.MenuItem { text: "Add Date"; onTriggered: win.editMarkdown("date") }
-            Platform.MenuItem { text: "Add Table"; onTriggered: win.editMarkdown("table") }
-            Platform.MenuItem { text: "Add Table of Contents"; onTriggered: editor.replaceAtomic(editor.selectionStart, editor.selectionEnd, backend.tableOfContents(editor.text)) }
+            Platform.MenuItem { enabled: win.canFormatSource; text: "Add Date"; onTriggered: win.editMarkdown("date") }
+            Platform.MenuItem { enabled: win.canFormatSource; text: "Add Table"; onTriggered: win.editMarkdown("table") }
+            Platform.MenuItem { enabled: win.canFormatSource; text: "Add Table of Contents"; onTriggered: win.tryInsertSourceSnippet(backend.tableOfContents(editor.text)) }
             Platform.MenuSeparator {}
-            Platform.MenuItem { text: "Add Horizontal Rule"; onTriggered: win.editMarkdown("rule") }
-            Platform.MenuItem { text: "Add Page Break"; onTriggered: editor.replaceSelectionWith("\n\n<!-- pagebreak -->\n\n") }
+            Platform.MenuItem { enabled: win.canFormatSource; text: "Add Horizontal Rule"; onTriggered: win.editMarkdown("rule") }
+            Platform.MenuItem { enabled: win.canFormatSource; text: "Add Page Break"; onTriggered: win.tryInsertSourceSnippet("\n\n<!-- pagebreak -->\n\n") }
             Platform.MenuSeparator {}
-            Platform.MenuItem { text: "Clear Styles"; enabled: editor.selectedText.length > 0; onTriggered: win.editMarkdown("clearStyles") }
+            Platform.MenuItem { enabled: win.canFormatSource && editor.selectedText.length > 0; text: "Clear Styles"; onTriggered: win.editMarkdown("clearStyles") }
         }
         Platform.Menu {
             objectName: "authorsMenu"
@@ -1908,7 +1810,7 @@ ApplicationWindow {
                 title: "Enable Focus Mode"
                 NativeCommand { commandId: "sentence"; text: "Sentence" }
                 NativeCommand { commandId: "paragraph"; text: "Paragraph" }
-                NativeCommand { commandId: "typewriter"; text: "Typewriter" }
+                NativeCommand { commandId: "typewriter"; text: "Typewriter (Source)" }
             }
             Platform.Menu {
                 objectName: "focusStyleCheckMenu"
@@ -2038,10 +1940,12 @@ ApplicationWindow {
         target: backend
 
         function onDocumentLoaded() {
+            win.sourceFormattingOwned = false;
             win.cancelDocumentViewportTransition();
             Qt.callLater(function() {
                 editor.cursorPosition = 0;
                 editorFlick.contentY = 0;
+                win.updateSourceFormattingOwner();
             });
         }
 
@@ -3007,7 +2911,10 @@ ApplicationWindow {
                 // Reflowing an inactive Source pane must not pull the preview
                 // back to an old caret through synchronized scrolling.
                 onCursorRectangleChanged: if (activeFocus && editorPane.visible) editorFlick.ensureCursorVisible()
-                onActiveFocusChanged: if (activeFocus) Qt.callLater(win.updateWritingSurfaceFromFocus)
+                onActiveFocusChanged: if (activeFocus) {
+                    Qt.callLater(win.updateWritingSurfaceFromFocus);
+                    Qt.callLater(win.updateSourceFormattingOwner);
+                }
                 onCursorPositionChanged: backend.setFocusPosition(cursorPosition, workspaceSettings.paragraphFocus, workspaceSettings.sentenceFocus)
 
                 function replaceSelectionWith(replacement) {

@@ -40,6 +40,9 @@ if len(daily_checks) < 7 or any(not check.get('passed') for check in daily_check
 zoom_checks = report.get('paneZoomChecks', [])
 if len(zoom_checks) < 5 or any(not check.get('passed') for check in zoom_checks):
     failures.append('The shipped app did not pass all independent-pane zoom checks')
+acceptance_checks = report.get('editorAcceptanceChecks', [])
+if len(acceptance_checks) < 6 or any(not check.get('passed') for check in acceptance_checks):
+    failures.append('The shipped app did not pass all editor acceptance checks')
 if report.get('platform') != 'cocoa':
     failures.append('Expected native Cocoa window verification')
 if Path(report.get('executable', '')).resolve() != executable.resolve():
@@ -52,7 +55,7 @@ for name, actual in report.get('resourceSha256', {}).items():
         failures.append(f'Embedded {name} differs from checkout')
 for name in ('Main.qml', 'DocumentFooter.qml', 'WorkspaceLayout.qml', 'WorkspaceCommands.qml',
              'DocumentFindBar.qml', 'DocumentOutline.qml', 'PaneZoomState.qml',
-             'PaneZoomControls.qml', 'WorkspaceHeader.qml'):
+             'PaneZoomControls.qml', 'WorkspaceHeader.qml', 'LinkEditor.qml', 'LinkSyntax.js', 'ExportHub.qml', 'SquareDialogButton.qml'):
     if name not in report.get('resourceSha256', {}):
         failures.append(f'No embedded hash for {name}')
 expected_version = re.search(r'setApplicationVersion\(QStringLiteral\("([^"]+)"\)\)',
@@ -72,11 +75,12 @@ verification = {'passed': not failures, 'failures': failures, 'app': str(app),
                 'executableSha256': report.get('executableSha256'),
                 'resourceSha256': report.get('resourceSha256'),
                 'statesChecked': len(report.get('scenarios', [])),
-                'dailyWritingChecks': len(daily_checks), 'paneZoomChecks': len(zoom_checks)}
+                'dailyWritingChecks': len(daily_checks), 'paneZoomChecks': len(zoom_checks),
+                'editorAcceptanceChecks': len(acceptance_checks)}
 (output / 'bundle-verification.json').write_text(json.dumps(verification, indent=2) + '\n')
 if failures:
     print('\n'.join(failures), file=sys.stderr)
     sys.exit(1)
 print(f"Verified {app}: {expected_version}, build {info['CFBundleVersion']}; "
-      f"{verification['statesChecked']} footer states, {len(daily_checks)} daily-writing checks and {len(zoom_checks)} pane-zoom checks; "
+      f"{verification['statesChecked']} footer states, {len(daily_checks)} daily-writing checks and {len(zoom_checks)} pane-zoom checks, {len(acceptance_checks)} editor acceptance checks; "
       f"embedded UI matches checkout.")

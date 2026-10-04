@@ -195,6 +195,7 @@ Window {
     id: fixture; width: 1100; height: 180; visible: true
     property bool isMac: false
     property string lastWritingSurface: "source"
+    property bool canFormatSource: false
     QtObject { id: preferences; property int titleBarMode: 1; property int toolbarVisibilityMode: 1; property int writingSize: 16 }
     QtObject { id: state }
     QtObject {

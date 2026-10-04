@@ -7,6 +7,6 @@ ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
 TEST_BUILD="$(mktemp -d /private/tmp/fomawrite-window-tests.XXXXXX)"
 trap 'rm -rf "$TEST_BUILD"' EXIT
 cd "$TEST_BUILD"
-"$QMAKE" "$ROOT/fomawrite.pro" 'DEFINES+=FOMAWRITE_CONTEXT_SMOKE' 'CONFIG-=app_bundle'
+"$QMAKE" "$ROOT/fomawrite.pro" 'DEFINES+=FOMAWRITE_CONTEXT_SMOKE' 'CONFIG-=app_bundle' "OBJECTIVE_SOURCES+=$ROOT/tests/window-routing-activation.mm"
 make -j"$JOBS"
 ./Fomawrite

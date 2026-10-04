@@ -131,6 +131,8 @@ SourceVisualMapping SourceVisualMapping::create(const QString &source) {
     bool inHtmlComment = false;
     int tableColumns = 0;
     int tableDelimiterIndex = -1;
+    int tableHeaderIndex = -1;
+    int tableStart = -1;
     for (int index = 0; index < lines.size(); ++index) {
         const auto &entry = lines.at(index);
         const QString &line = entry.text;
@@ -167,6 +169,8 @@ SourceVisualMapping SourceVisualMapping::create(const QString &source) {
         if (tableHeader) {
             tableColumns = cells.size();
             tableDelimiterIndex = index + 1;
+            tableHeaderIndex = index;
+            tableStart = offset;
         }
         const bool delimiter = index == tableDelimiterIndex;
         if (tableColumns > 0 && line.contains(QLatin1Char('|'))) {
@@ -185,6 +189,9 @@ SourceVisualMapping SourceVisualMapping::create(const QString &source) {
                     result.appendInline(offset + cell.start, line.mid(cell.start, cell.length));
                     if (cell.length == 0)
                         result.m_mappings.append(Mapping{{offset + cell.start, 0}, {cellVisualStart, 0}});
+                    result.m_tableCells.append({tableStart, index - tableHeaderIndex, column,
+                        {offset + cell.start, cell.length},
+                        {cellVisualStart, int(result.m_visual.size()) - cellVisualStart}});
                 }
             }
             const int visualLength = result.m_visual.size() - visualStart;
@@ -563,4 +570,38 @@ std::optional<SourceVisualMapping::VisualBreakEdit> SourceVisualMapping::sourceE
         return std::nullopt;
     }
     return std::nullopt;
+}
+
+SourceVisualMapping::TableNavigation SourceVisualMapping::navigateTable(Span selection, bool backwards) const {
+    if (!selection.isValid() || selection.end() > m_visual.size())
+        return {TableNavigationStatus::UnsupportedSelection};
+    int current = -1;
+    for (int index = 0; index < m_tableCells.size(); ++index) {
+        const auto &cell = m_tableCells.at(index);
+        if (selection.start >= cell.visual.start && selection.end() <= cell.visual.end()) {
+            current = index;
+            break;
+        }
+    }
+    if (current < 0) {
+        for (const auto &block : m_blocks) {
+            if (block.kind != BlockKind::TableRow && block.kind != BlockKind::TableDelimiter) continue;
+            if (selection.start <= block.visual.end() && selection.end() >= block.visual.start)
+                return {TableNavigationStatus::UnsupportedSelection};
+        }
+        return {};
+    }
+    if (!graphemeBoundary(m_visual, selection.start) || !graphemeBoundary(m_visual, selection.end()))
+        return {TableNavigationStatus::UnsupportedSelection};
+    const int next = current + (backwards ? -1 : 1);
+    if (next < 0 || next >= m_tableCells.size()) return {TableNavigationStatus::Boundary};
+    const auto &from = m_tableCells.at(current);
+    const auto &to = m_tableCells.at(next);
+    if (from.tableStart != to.tableStart) return {TableNavigationStatus::Boundary};
+    const int rowGap = qAbs(from.row - to.row);
+    // The separator is the only row we may skip. A malformed row forms a
+    // deliberate navigation boundary even when later rows are editable again.
+    if (rowGap > 1 && !(rowGap == 2 && qMin(from.row, to.row) == 0))
+        return {TableNavigationStatus::Boundary};
+    return {TableNavigationStatus::Moved, to.visual.start};
 }

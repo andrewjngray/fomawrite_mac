@@ -5,7 +5,13 @@ Button {
     id: control
     property bool primary: false
     property bool darkMode: true
-    property color labelColor: primary ? "#ffffff" : backend.palette.text
+    // Use readable ink on both the dark accent and the light dark-theme accent.
+    function linearChannel(value) {
+        return value <= 0.04045 ? value / 12.92 : Math.pow((value + 0.055) / 1.055, 2.4)
+    }
+    readonly property real accentLuminance: 0.2126 * linearChannel(activeColor.r)
+        + 0.7152 * linearChannel(activeColor.g) + 0.0722 * linearChannel(activeColor.b)
+    property color labelColor: primary ? (accentLuminance > 0.179 ? "#000000" : "#ffffff") : backend.palette.text
     property color activeColor: backend.palette.focus
     property real textScale: 1
 

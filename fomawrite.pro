@@ -47,3 +47,5 @@ HEADERS += src/markdownextensions.h
 QT += network
 SOURCES += src/workspace.cpp
 HEADERS += src/workspace.h
+
+DISTFILES += src/editoracceptancecheck.inc

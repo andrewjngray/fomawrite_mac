@@ -43,6 +43,7 @@ Rectangle {
                 && visualStatus.indexOf("Edit text,") !== 0 ? visualStatus : "";
     }
     property var visualImages: []
+    property var visualTableCells: []
     readonly property var activeVisualImage: {
         for (var i = 0; i < visualImages.length; ++i) {
             var image = visualImages[i];
@@ -180,6 +181,7 @@ Rectangle {
         visualSourceSnapshot = projection.source || "";
         visualSnapshot = projection.visualText || "";
         visualImages = projection.images || [];
+        visualTableCells = projection.tableCells || [];
         visualText.text = visualSnapshot;
         visualRefreshInFlight = true;
         Qt.callLater(function() {
@@ -255,6 +257,24 @@ Rectangle {
             visualStatus = "That range is source-only or changed elsewhere. Edit it in Source.";
             loadVisualProjection(change.start, change.start);
         }
+    }
+    function navigateVisualTable(backwards) {
+        if (visualText.inputMethodComposing) return false;
+        var result = renderer.navigateVisualTable(visualText.selectionStart, visualText.selectionEnd,
+                                                  backwards, visualSourceSnapshot);
+        if (!result.handled) return false;
+        if (result.reason === "moved") {
+            visualText.cursorPosition = result.cursor;
+            visualStatus = "Table cell. Tab and Shift+Tab move between cells; F6 leaves the editor.";
+            ensureVisualCursorVisible();
+        } else if (result.reason === "boundary") {
+            visualStatus = "Table boundary. F6 leaves the editor; use Source to change its structure.";
+        } else if (result.reason === "stale") {
+            visualStatus = "The table changed elsewhere. Wait for the view to refresh or use Source.";
+        } else {
+            visualStatus = "Place the caret in one table cell to navigate. Use Source for structural selections.";
+        }
+        return true;
     }
     function insertVisualBreak(shift) {
         if (visualText.selectionStart !== visualText.selectionEnd) {
@@ -352,6 +372,11 @@ Rectangle {
             Keys.priority: Keys.BeforeItem
             Keys.onPressed: function(event) {
                 root.viewportInteraction();
+                if ((event.key === Qt.Key_Tab || event.key === Qt.Key_Backtab)
+                        && !(event.modifiers & (Qt.ControlModifier | Qt.AltModifier | Qt.MetaModifier))) {
+                    event.accepted = root.navigateVisualTable(event.key === Qt.Key_Backtab || !!(event.modifiers & Qt.ShiftModifier));
+                    if (event.accepted) return;
+                }
                 if (!(event.modifiers & Qt.ControlModifier))
                     return;
                 if (event.key === Qt.Key_Y
@@ -374,7 +399,7 @@ Rectangle {
                 event.accepted = true;
             }
             Accessible.name: "Visual Edit: editable Markdown text"
-            Accessible.description: "Edits supported text, image descriptions and simple table cells. Return splits or continues simple list items. Other structures use Source."
+            Accessible.description: "Edits supported text, image descriptions and simple table cells. Tab and Shift+Tab move between table cells; F6 leaves the editor. Return splits or continues simple list items. Other structures use Source."
         }
         Label {
             anchors.centerIn: parent

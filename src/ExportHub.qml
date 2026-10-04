@@ -73,10 +73,12 @@ Dialog {
             geometryInitialized = true
         }
     }
-    x: Math.max(16, Math.min(requestedX, parent.width - Math.min(requestedWidth, parent.width - 32) - 16))
-    y: Math.max(16, Math.min(requestedY, parent.height - Math.min(requestedHeight, parent.height - 32) - 16))
-    width: Math.max(0, Math.min(requestedWidth, parent.width - x - 16))
-    height: Math.max(0, Math.min(requestedHeight, parent.height - y - 16))
+    // Popup positioning may adjust x/y while a window resizes. Keep size
+    // independent of that adjustment so it cannot feed back into positioning.
+    width: Math.max(0, Math.min(requestedWidth, parent.width - 32))
+    height: Math.max(0, Math.min(requestedHeight, parent.height - 32))
+    x: Math.max(16, Math.min(requestedX, parent.width - width - 16))
+    y: Math.max(16, Math.min(requestedY, parent.height - height - 16))
     padding: 0
     standardButtons: Dialog.NoButton
     background: Rectangle { color: backend.palette.panel; border.color: backend.palette.border; radius: 12 }

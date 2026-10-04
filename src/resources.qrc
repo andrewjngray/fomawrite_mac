@@ -12,6 +12,8 @@
         <file>WorkspaceFooter.qml</file>
         <file>DocumentFooter.qml</file>
         <file>DocumentFindBar.qml</file>
+        <file>LinkEditor.qml</file>
+        <file>LinkSyntax.js</file>
         <file>AboutDialog.qml</file>
         <file>FooterButton.qml</file>
         <file>NativeCommandMenuItem.qml</file>

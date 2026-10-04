@@ -124,6 +124,22 @@ const auto smokeContainsFocus = [](QWindow *window, const QString &objectName) {
         if (item == root) return true;
     return false;
 };
+const auto smokeFocusDiagnostic = [](QWindow *window, const char *phase) {
+    auto *quick = qobject_cast<QQuickWindow *>(window);
+    auto *focused = quick ? quick->activeFocusItem() : nullptr;
+    qInfo() << "FOCUS DIAGNOSTIC:" << phase << "active" << window->isActive()
+            << "applicationState" << QGuiApplication::applicationState()
+            << "focusWindowIsTarget" << (QGuiApplication::focusWindow() == window)
+            << "focusItem" << (focused ? focused->objectName() : QStringLiteral("<none>"))
+            << "focusItemActive" << (focused && focused->hasActiveFocus())
+            << "workspaceOwnsKeyboard" << window->property("workspaceOwnsKeyboard");
+    for (auto *object : window->findChildren<QObject *>()) {
+        const auto sequence = object->property("sequence").toString();
+        if (sequence.contains("F6"))
+            qInfo() << "FOCUS SHORTCUT:" << sequence << "enabled" << object->property("enabled")
+                    << "context" << object->property("context");
+    }
+};
 const auto smokeKey = [](QWindow *window, Qt::Key key, Qt::KeyboardModifiers modifiers = Qt::NoModifier) {
     QKeyEvent press(QEvent::KeyPress, key, modifiers);
     QCoreApplication::sendEvent(window, &press);
@@ -155,9 +171,23 @@ const auto smokeTabRoundTrip = [&](std::function<void()> next) {
     next();
 #endif
 };
+void smokeActivateApplication(QWindow *window);
+int smokeActivationAttempts = 0;
 std::function<void(std::function<void()>)> smokeAcceptance;
 smokeAcceptance = [&](std::function<void()> next) {
     auto *window = smokeWorkspaceSecond->window.data();
+    if (!window->isActive() || QGuiApplication::focusWindow() != window
+        || QGuiApplication::applicationState() != Qt::ApplicationActive) {
+        if (++smokeActivationAttempts > 20) {
+            smokeFocusDiagnostic(window, "native keyboard activation timed out");
+            smokeCheck(false, "native keyboard fixture activates its application and target window");
+            return;
+        }
+        smokeActivateApplication(window);
+        QTimer::singleShot(100, &app, [&, next] { smokeAcceptance(next); });
+        return;
+    }
+    if (!smokeCheck(true, "native keyboard fixture has active application and target window")) return;
     auto *workspaceButton = window->findChild<QQuickItem *>(QStringLiteral("topChromeLibraryButton"));
     auto *access = QAccessible::queryAccessibleInterface(workspaceButton);
     if (!smokeCheck(access && access->role() == QAccessible::Button
@@ -168,9 +198,11 @@ smokeAcceptance = [&](std::function<void()> next) {
     if (!smokeCheck(sourceAccess && sourceAccess->text(QAccessible::Name) == QStringLiteral("Markdown editor")
                    && sourceAccess->textInterface(), "source editor exposes named accessible text interface")) return;
     source->forceActiveFocus();
+    smokeFocusDiagnostic(window, "before Source F6");
     smokeKey(window, Qt::Key_F6);
     QTimer::singleShot(100, &app, [&, next] {
         auto *window = smokeWorkspaceSecond->window.data();
+        smokeFocusDiagnostic(window, "after Source F6");
         if (!smokeCheck(smokeContainsFocus(window, QStringLiteral("previewPane")), "F6 moves keyboard focus from Source into Preview")) return;
         smokeKey(window, Qt::Key_F6);
         QTimer::singleShot(100, &app, [&, next] {

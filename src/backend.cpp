@@ -943,7 +943,30 @@ QVariantMap Backend::visualProjection() const {
                                   {"altText", image.altText}, {"destination", image.destination},
                                   {"previewUrl", localPreview}});
     }
-    return {{"source", source}, {"visualText", mapping.visualText()}, {"blocks", blocks}, {"images", images}};
+    QVariantList cells;
+    for (const auto &cell : mapping.tableCellObjects()) {
+        cells.append(QVariantMap{{"tableStart", cell.tableStart}, {"row", cell.row}, {"column", cell.column},
+            {"sourceStart", cell.source.start}, {"sourceLength", cell.source.length},
+            {"visualStart", cell.visual.start}, {"visualLength", cell.visual.length}});
+    }
+    return {{"source", source}, {"visualText", mapping.visualText()}, {"blocks", blocks}, {"images", images}, {"tableCells", cells}};
+}
+
+QVariantMap Backend::navigateVisualTable(int start, int end, bool backwards, const QString &expectedSource) const {
+    if (!m_document || expectedSource != currentDocumentText())
+        return {{"handled", true}, {"reason", "stale"}};
+    const auto mapping = SourceVisualMapping::create(expectedSource);
+    if (start < 0 || end < 0 || start > mapping.visualText().size() || end > mapping.visualText().size())
+        return {{"handled", true}, {"reason", "selection"}};
+    const auto navigation = mapping.navigateTable({qMin(start, end), qAbs(end - start)}, backwards);
+    using Status = SourceVisualMapping::TableNavigationStatus;
+    switch (navigation.status) {
+    case Status::OutsideTable: return {{"handled", false}};
+    case Status::Moved: return {{"handled", true}, {"reason", "moved"}, {"cursor", navigation.cursor}};
+    case Status::Boundary: return {{"handled", true}, {"reason", "boundary"}};
+    case Status::UnsupportedSelection: return {{"handled", true}, {"reason", "selection"}};
+    }
+    return {{"handled", false}};
 }
 
 bool Backend::applyVisualEdit(int start, int length, const QString &replacement,
@@ -1641,17 +1664,34 @@ int Backend::navigateHistory(int direction) {
 
 QUrl Backend::sourceLinkAt(int position) const {
     const QString text = currentDocumentText();
-    // Ordinary inline Markdown destinations and autolinks. Reference links and
-    // destinations with nested parentheses remain explicit future work.
-    const QRegularExpression link(QStringLiteral(R"link((?<!!)\[[^\]\n]*\]\(([^\s)]+)\)|<(https?://[^>]+|mailto:[^>]+)>)link"));
+    // Keep the same bounded inline grammar as LinkSyntax.js: escaped labels,
+    // bare or angle destinations and an optional quoted title. Reference and
+    // nested inline forms are left to explicit Source editing.
+    const QRegularExpression link(QStringLiteral(R"link((?<![!\[\\])\[((?:\\.|[^\[\]\\\r\n])*)\]\((?:<((?:\\.|[^<>\\\r\n])*)>|((?:\\.|[^\s()\\\r\n])*))(?:[ \t]+(?:"((?:\\.|[^"\\\r\n])*)"|'((?:\\.|[^'\\\r\n])*)'))?[ \t]*\))link"));
+    const auto decode = [](const QString &value) {
+        QString result;
+        const QString punctuation = QStringLiteral("!\"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~");
+        for (qsizetype i = 0; i < value.size(); ++i) {
+            if (value.at(i) == QLatin1Char('\\') && i + 1 < value.size() && punctuation.contains(value.at(i + 1))) ++i;
+            result += value.at(i);
+        }
+        return result;
+    };
     auto matches = link.globalMatch(text);
     while (matches.hasNext()) {
         const auto match = matches.next();
         if (position < match.capturedStart() || position >= match.capturedEnd()) continue;
-        const QString destination = match.captured(1).isEmpty() ? match.captured(2) : match.captured(1);
-        if (destination.contains('(')) return {};
+        const QString destination = decode(match.capturedStart(2) >= 0 ? match.captured(2) : match.captured(3));
+        if (destination.isEmpty()) return {};
         const QUrl resolved = resolveDocumentLink(destination);
         if (resolved.isLocalFile() || resolved.scheme() == "http" || resolved.scheme() == "https" || resolved.scheme() == "mailto") return resolved;
+        return {};
+    }
+    const QRegularExpression autolink(QStringLiteral(R"link(<(https?://[^>\r\n]+|mailto:[^>\r\n]+)>)link"));
+    matches = autolink.globalMatch(text);
+    while (matches.hasNext()) {
+        const auto match = matches.next();
+        if (position >= match.capturedStart() && position < match.capturedEnd()) return resolveDocumentLink(match.captured(1));
     }
     const QRegularExpression wiki(QStringLiteral(R"wiki(\[\[([^\]\n]+)\]\])wiki"));
     matches = wiki.globalMatch(text);
