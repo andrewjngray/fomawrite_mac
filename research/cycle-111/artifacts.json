@@ -1,0 +1,76 @@
+{
+  "version": "0.3.0-dev10",
+  "build": "111",
+  "verifiedAt": "2026-10-04T06:04:33.375614+00:00",
+  "sourceCommit": "ae49ddc0c69fdfd595335bb87fe5500286ce4635",
+  "bundles": [
+    {
+      "passed": true,
+      "failures": [],
+      "app": "/Users/andrewgray/repo/projects/fomawrite_mac/dist/Fomawrite Dev.app",
+      "version": "0.3.0-dev10",
+      "build": "111",
+      "bundleIdentifier": "io.github.andrewjngray.fomawrite.dev",
+      "executableSha256": "4d0fd5f67045668bed38feef173db2a215b09a163a4890d3808a0511835cddb2",
+      "resourceSha256": {
+        "AboutDialog.qml": "12017d5a492af70ffa10843ae236f26b56128d4af152876ff76a548ceef869f5",
+        "DocumentFindBar.qml": "7e3f64f90104ba403b222bce94ede7cce77e534394b669ad0b9f10210c77887b",
+        "DocumentFooter.qml": "a25ab4298cd31d9dbb8f67f0960d12c295151af4f80f5e9c3ba99cc178f88846",
+        "DocumentOutline.qml": "6428a2f0cf1f14fe02d36799d706e52478ad2eb9e5baa200ad75992b76300f20",
+        "FooterButton.qml": "c7fa2c48acf137903db010239619d33aaa7a28475babdb7bf381640cb087ef5e",
+        "Main.qml": "7ad46ef926a9f0274893c5c8b20a4fd063954ee090828fc3a773bfb95cba14cc",
+        "PreviewPane.qml": "62e4ec90fbc8b5d67505d2c311555ebdd87f3b6138700b6026f6bc501a863c5b",
+        "WorkspaceCommands.qml": "545f51421765460d359488ad0652f6674629a40ce49cda074ac969174779a2e1",
+        "WorkspaceLayout.qml": "e2a67baa21504a1677d16e5e556862062c0598f28fe15dafd793e3d1865755aa"
+      },
+      "statesChecked": 124,
+      "dailyWritingChecks": 7
+    },
+    {
+      "passed": true,
+      "failures": [],
+      "app": "/Users/andrewgray/repo/projects/fomawrite_mac/dist/Fomawrite.app",
+      "version": "0.3.0-dev10",
+      "build": "111",
+      "bundleIdentifier": "io.github.andrewjngray.fomawrite",
+      "executableSha256": "317e2cb7fafdd5d88d541d4caf95427650f6b60234d8ce0ef25a3c53a6c3f2fb",
+      "resourceSha256": {
+        "AboutDialog.qml": "12017d5a492af70ffa10843ae236f26b56128d4af152876ff76a548ceef869f5",
+        "DocumentFindBar.qml": "7e3f64f90104ba403b222bce94ede7cce77e534394b669ad0b9f10210c77887b",
+        "DocumentFooter.qml": "a25ab4298cd31d9dbb8f67f0960d12c295151af4f80f5e9c3ba99cc178f88846",
+        "DocumentOutline.qml": "6428a2f0cf1f14fe02d36799d706e52478ad2eb9e5baa200ad75992b76300f20",
+        "FooterButton.qml": "c7fa2c48acf137903db010239619d33aaa7a28475babdb7bf381640cb087ef5e",
+        "Main.qml": "7ad46ef926a9f0274893c5c8b20a4fd063954ee090828fc3a773bfb95cba14cc",
+        "PreviewPane.qml": "62e4ec90fbc8b5d67505d2c311555ebdd87f3b6138700b6026f6bc501a863c5b",
+        "WorkspaceCommands.qml": "545f51421765460d359488ad0652f6674629a40ce49cda074ac969174779a2e1",
+        "WorkspaceLayout.qml": "e2a67baa21504a1677d16e5e556862062c0598f28fe15dafd793e3d1865755aa"
+      },
+      "statesChecked": 124,
+      "dailyWritingChecks": 7
+    },
+    {
+      "passed": true,
+      "failures": [],
+      "app": "/Applications/Fomawrite.app",
+      "version": "0.3.0-dev10",
+      "build": "111",
+      "bundleIdentifier": "io.github.andrewjngray.fomawrite",
+      "executableSha256": "317e2cb7fafdd5d88d541d4caf95427650f6b60234d8ce0ef25a3c53a6c3f2fb",
+      "resourceSha256": {
+        "AboutDialog.qml": "12017d5a492af70ffa10843ae236f26b56128d4af152876ff76a548ceef869f5",
+        "DocumentFindBar.qml": "7e3f64f90104ba403b222bce94ede7cce77e534394b669ad0b9f10210c77887b",
+        "DocumentFooter.qml": "a25ab4298cd31d9dbb8f67f0960d12c295151af4f80f5e9c3ba99cc178f88846",
+        "DocumentOutline.qml": "6428a2f0cf1f14fe02d36799d706e52478ad2eb9e5baa200ad75992b76300f20",
+        "FooterButton.qml": "c7fa2c48acf137903db010239619d33aaa7a28475babdb7bf381640cb087ef5e",
+        "Main.qml": "7ad46ef926a9f0274893c5c8b20a4fd063954ee090828fc3a773bfb95cba14cc",
+        "PreviewPane.qml": "62e4ec90fbc8b5d67505d2c311555ebdd87f3b6138700b6026f6bc501a863c5b",
+        "WorkspaceCommands.qml": "545f51421765460d359488ad0652f6674629a40ce49cda074ac969174779a2e1",
+        "WorkspaceLayout.qml": "e2a67baa21504a1677d16e5e556862062c0598f28fe15dafd793e3d1865755aa"
+      },
+      "statesChecked": 124,
+      "dailyWritingChecks": 7
+    }
+  ],
+  "publicReleaseChanged": false,
+  "verification": "124 footer states and 7 daily-writing workflows per actual bundle; 159 full-suite tests; 11 focused native checks; 4 expanded Find checks"
+}
