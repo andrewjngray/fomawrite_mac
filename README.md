@@ -46,8 +46,8 @@ The upstream Omawrite code is copyright David Heinemeier Hansson and remains und
 
 ## Current workspace review build
 
-The current review target is **0.3.0-dev11**, macOS bundle **0.3.0 (112)**. Source and Preview now have independent, saved zoom controls, optional linked zoom and a readable Preview baseline. Repeated zoom/reset preserves the reading passage; the document divider supports dragging and double-click balance. Screen magnification leaves Markdown and exported typography unchanged. The daily-writing improvements from Cycles109–111 and stationary footer remain included.
+The current review build is **0.3.0-dev12**, macOS bundle **0.3.0 (116)**. All 173 regression tests and 13 focused native checks pass; Dev, ordinary/demo and Applications copies are refreshed and pass their app checks and strict signatures. It adds formatting that follows Source focus, a safer Insert/Edit link dialog, keyboard navigation through supported visual table cells, and wider actual-executable writing/resize checks. Independent pane zoom, reading anchors, divider balance, Find/Replace, outline navigation and the stationary footer remain included.
 
-Use `dist/Fomawrite Dev.app`, `/Applications/Fomawrite.app` or the ordinary/demo package `dist/Fomawrite.app` after the recorded refresh. [Cycle112](research/cycle-112/README.md) records exact bundle identities, verification and limits. The old public GitHub RC1 remains an earlier release.
+Use the refreshed `dist/Fomawrite Dev.app`, ordinary/demo `dist/Fomawrite.app` or `/Applications/Fomawrite.app`; see the [Cycle116 handoff](research/cycle-116/README.md) for verified identities and limits. Confirm the running version/path in About. Native app activation was blocked in a separate wider smoke test, leaving its later keyboard/full-screen/print/share checks open. The old public GitHub RC1 remains an earlier release.
 
 Visual Edit preserves canonical Markdown and keeps explicit Source fallback for complex/nested structures and unsupported multiline operations. [The workspace plan](docs/workspace-ui-redesign-plan.md) records the design direction and remaining acceptance work.

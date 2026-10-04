@@ -1,0 +1,68 @@
+{
+  "version": "0.3.0-dev12",
+  "build": "116",
+  "verifiedAt": "2026-10-04T08:10:16.960287+00:00",
+  "sourceCommit": "9368d27740641c5055084eeba6b324a43b22e4c8",
+  "publicReleaseChanged": false,
+  "verification": {
+    "fullRegression": {
+      "passed": 173,
+      "failed": 0,
+      "skipped": 0
+    },
+    "focusedNative": {
+      "passed": 13,
+      "failed": 0,
+      "skipped": 0,
+      "includesSetupAndCleanup": true
+    },
+    "perBundle": "124 footer states, 7 daily-writing workflows, 5 pane-zoom workflows and 6 editor acceptance groups; strict signatures and matching embedded UI",
+    "input": "Synthetic Qt mouse and keyboard events in isolated windows",
+    "widerWindowSmoke": {
+      "assertionsPassed": 79,
+      "status": "blocked",
+      "reason": "macOS refused foreground activation of the command-line test process; later real shortcut, full-screen and remaining native scenarios were not reached"
+    }
+  },
+  "bundles": [
+    {
+      "copy": "Dev",
+      "passed": true,
+      "version": "0.3.0-dev12",
+      "build": "116",
+      "bundleIdentifier": "io.github.andrewjngray.fomawrite.dev",
+      "executableSha256": "7589cdf6a8077b92c4442f66104e39abde297060b88c4a5045fd334c37007b59",
+      "statesChecked": 124,
+      "dailyWritingChecks": 7,
+      "paneZoomChecks": 5,
+      "editorAcceptanceChecks": 6,
+      "qmlWarnings": 0
+    },
+    {
+      "copy": "demo",
+      "passed": true,
+      "version": "0.3.0-dev12",
+      "build": "116",
+      "bundleIdentifier": "io.github.andrewjngray.fomawrite",
+      "executableSha256": "d8e6c0a8b3fd434f846334e34ee902250677248a079ae58de6522ee6608488a5",
+      "statesChecked": 124,
+      "dailyWritingChecks": 7,
+      "paneZoomChecks": 5,
+      "editorAcceptanceChecks": 6,
+      "qmlWarnings": 0
+    },
+    {
+      "copy": "Applications",
+      "passed": true,
+      "version": "0.3.0-dev12",
+      "build": "116",
+      "bundleIdentifier": "io.github.andrewjngray.fomawrite",
+      "executableSha256": "d8e6c0a8b3fd434f846334e34ee902250677248a079ae58de6522ee6608488a5",
+      "statesChecked": 124,
+      "dailyWritingChecks": 7,
+      "paneZoomChecks": 5,
+      "editorAcceptanceChecks": 6,
+      "qmlWarnings": 0
+    }
+  ]
+}

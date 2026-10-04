@@ -1451,3 +1451,38 @@ Changes: shared header control and zoom state, one-time legacy Source-size migra
 Validation: **163 regression tests and 8 focused native checks pass**. The real executable passes 124 footer states, seven daily-writing workflows and five pane-zoom workflows, including strict 2px anchor bounds (measured 0px). Final artifact identities: see [Cycle112](../research/cycle-112/README.md). Target: `0.3.0-dev11`, macOS `0.3.0 (112)`, stable Dev, ordinary demo/package and Applications. [Optional exercise](../research/usability/cycle-112.md). Native verification uses synthetic Qt input in isolated app windows; physical mouse/keyboard, VoiceOver and display-scale acceptance remain open.
 
 Andrew’s zoom request supersedes the proposed Cycle112 focus-safety scope. Formatting focus safety and safe link editing remain the next bounded improvements, followed by everyday-writing acceptance and review-led image/table/list ergonomics. Public distribution remains separate.
+
+
+## Cycle 113 — formatting follows Source focus
+
+Planned scope: prevent toolbar, keyboard and native formatting commands from editing an old Source selection while another field or writing surface owns focus.
+
+Changes: a shared Source-ownership guard covers wrapping, block commands, direct insertions, transformations and formatting enabled states. Actual Source focus establishes ownership; deliberate formatting controls retain it, while Find/Replace, outline/filter/link fields, navigation, Preview and Visual Edit revoke it. Hidden Source, read-only state and active composition block formatting. Keyboard traversal into Source formatting preserves its selection. Typewriter labels now explicitly identify their Source-only scope; file navigation stays available independently.
+
+Validation: new positive/negative formatting regressions and Dev/demo/Applications actual-executable focus checks pass. The final integrated gate passes 173 regressions and 13 focused native checks (11 workflows plus setup/cleanup); all three copies pass their actual-bundle/resource/signature checks. [Cycle116 handoff](../research/cycle-116/README.md). [Cycle113 scope](../research/cycle-113/README.md). Target: `0.3.0-dev12`, macOS `0.3.0 (116)`. Physical IME/accessibility acceptance remains separate.
+
+## Cycle 114 — safe inline-link editing
+
+Planned scope: make the existing link popup consistent and prevent stale dialog targets from replacing unrelated writing.
+
+Changes: a shared Insert/Edit link dialog with labelled text, destination and optional title fields, consistent actions, explicit errors and one-step replacement. All Source link-entry routes share the dialog. A captured document session rejects intervening edits, file changes and reloads, even when text is later restored; entered fields remain available after refusal. Explicit Cancel/Escape restores the safe original Source selection and reading position. Outside-click dismissal respects the clicked destination. Supported ordinary inline links retain decoded fields and untouched syntax when saved without changes; ambiguous syntax stays in Source.
+
+Validation: four focused syntax/dialog regression slots pass, as do Dev/demo/Applications actual-executable link/Cancel/Undo and narrow/dark stale-session groups. The full integrated gate passes as recorded in the combined handoff. [Scope and limits](../research/cycle-114/README.md). Runnable target is the combined build116 after verified refresh; no broad Markdown link-grammar or cross-app parity claim is included.
+
+## Cycle 115 — actual-executable daily-writing acceptance
+
+Planned scope: extend the existing isolated installed-bundle checker to verify everyday writing interactions and continuous resizing in the executable Andrew will run.
+
+Changes: six acceptance groups cover formatting focus, link insert/edit/cancel/Undo, stale-link refusal in narrow dark layout, real table Tab navigation, continuous 720–1440px by 520–800px resizing with workspace restoration, and access to all narrow export bands through horizontal scrolling plus Cancel. They supplement existing footer, daily-writing and pane-zoom checks. Reports identify the executable and compare embedded resources/version with the checkout. The wider keyboard-routing pass also repairs F6/Shift-F6 skipping read-only Preview after footer consolidation; traversal now focuses the actual rendered surface and retains Source selection.
+
+Validation: All three review copies each pass 124 footer states, seven writing workflows, five zoom workflows and all six added groups. Resource/version comparisons and strict signatures pass with zero QML warnings. The integrated suite passes 173 regressions and 13 focused native checks (11 workflows plus setup/cleanup). The separate native-window smoke passes 79 assertions, then macOS refuses app activation; later native keyboard/full-screen/Drawer/tab-detach and print/share scenarios remain unverified. [Cycle115](../research/cycle-115/README.md). Detailed logs, synthetic captures and raw reports remain local and ignored; only reviewed summaries belong in the public repository. Synthetic Qt input in an isolated app window does not replace physical mouse, IME, VoiceOver or display tests.
+
+## Cycle 116 — keyboard navigation within visual tables
+
+Planned scope: improve one bounded daily-writing task without expanding into a general editable grid: move among supported Markdown table cells in Visual Edit.
+
+Changes: Tab/Shift-Tab navigate supported cells in row order, including empty cells, preserving table alignment, spacing and source bytes. Navigation creates no edit or Undo unit. First/last cells and unsupported rows remain boundaries; cross-cell selections and stale projections are refused. Typing within the destination cell uses the existing validated source mapping and canonical Undo/Redo. F6 remains a route out of the writing surface.
+
+Validation and artifacts: all 173 regressions and 13 focused native checks pass (11 workflows plus setup/cleanup), along with every actual-bundle check in all three refreshed local copies. Tests cover CRLF, Unicode/graphemes, formatting, empty cells, unsupported separators/rows, selection, stale projections, typing and Undo/Redo at narrow/dark/larger zoom. Target `0.3.0-dev12`, macOS `0.3.0 (116)`, verified in stable Dev, ordinary/demo and Applications, with exact identities in the handoff. [Handoff](../research/cycle-116/README.md), [optional exercise](../research/usability/cycle-116.md).
+
+Remaining scope: Andrew’s normal composition review and physical input/accessibility/display checks; safe richer image placement, table row/column restructuring and complex list editing; broader parser/export/interoperability and multi-window acceptance. Public distribution remains a separate decision.
