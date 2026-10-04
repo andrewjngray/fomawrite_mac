@@ -64,7 +64,7 @@ void FomawriteTest::editingAndLayoutChoicesAreIndependent() {
     QVERIFY(visualEditor->isVisible() && f.preview->isVisible());
     QVERIFY(cycle118ReadPreview(f.window.data())); QTRY_COMPARE(f.layout->property("effectiveLayoutMode").toInt(), 2);
     QVERIFY(!sourceChoice->property("checked").toBool() && !visualChoice->property("checked").toBool());
-    QVERIFY(cycle102Click(f.quick, visualChoice)); QTRY_COMPARE(f.layout->property("effectiveLayoutMode").toInt(), 1);
+    QVERIFY(QMetaObject::invokeMethod(f.window.data(), "selectWritingMode", Q_ARG(QVariant, "visual"))); QTRY_COMPARE(f.layout->property("effectiveLayoutMode").toInt(), 1);
     QVERIFY(f.layout->property("visualEditEnabled").toBool());
     QVERIFY(QMetaObject::invokeMethod(f.editor, "undo")); QCOMPARE(f.editor->property("text").toString(), saved);
     QVERIFY(QMetaObject::invokeMethod(f.editor, "redo")); QCOMPARE(f.editor->property("text").toString(), draft);
@@ -86,7 +86,7 @@ void FomawriteTest::visualSplitEditsCanonicalSourceAndKeepsPreviewReadOnly() {
     QTRY_VERIFY(!f.window->property("changingDocumentView").toBool());
     QVERIFY(!f.preview->property("visualEditEnabled").toBool());
     auto *rendered = f.preview->findChild<QQuickItem *>("renderedPreview"); QVERIFY(rendered && rendered->isVisible());
-    QVERIFY(rendered->property("readOnly").toBool());
+    QVERIFY(!f.preview->property("allowVisualEdit").toBool());
     QTRY_COMPARE(visualPane->property("visualTextSize").toInt(), f.window->property("editorFontPixelSize").toInt());
     const int point = visual->property("text").toString().indexOf("café"); QVERIFY(point >= 0);
     visual->forceActiveFocus();

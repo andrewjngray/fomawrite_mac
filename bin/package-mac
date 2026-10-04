@@ -26,6 +26,60 @@ cp -RL "$QML_CORE" "$ROOT/dist/Fomawrite.app/Contents/Resources/qml/QtQml"
 xattr -cr "$ROOT/dist/Fomawrite.app"
 
 DYLD_FRAMEWORK_PATH="$("$QMAKE" -query QT_INSTALL_LIBS)" "$QT_BIN/macdeployqt" "$ROOT/dist/Fomawrite.app" -qmldir="$ROOT/src" -libpath="$("$QMAKE" -query QT_INSTALL_LIBS)" -no-codesign -no-strip
+# macdeployqt rewrites frameworks for the main executable, but WebEngine's
+# nested helper also loads those frameworks. Give every Mach-O its own local
+# framework search path and use @rpath references in both loading contexts.
+PACKAGE_CONTENTS="$ROOT/dist/Fomawrite.app/Contents"
+PACKAGE_FRAMEWORKS="$PACKAGE_CONTENTS/Frameworks"
+find "$PACKAGE_CONTENTS" -type f | while IFS= read -r binary; do
+    case "$(/usr/bin/file -b "$binary")" in *Mach-O*) ;; *) continue ;; esac
+    binary_directory="$(dirname "$binary")"
+    relative_directory="${binary_directory#"$PACKAGE_CONTENTS"/}"
+    loader_parent="$(printf '%s' "$relative_directory" | sed 's,[^/][^/]*,..,g')"
+    bundle_rpath="@loader_path/$loader_parent/Frameworks"
+    existing_rpaths="$(otool -l "$binary" | awk '/cmd LC_RPATH/ {rpath=1; next} rpath && /path / {sub(/^.*path /, ""); sub(/ \(offset.*$/, ""); print; rpath=0}')"
+    if ! printf '%s\n' "$existing_rpaths" | /usr/bin/grep -Fqx "$bundle_rpath"; then
+        install_name_tool -add_rpath "$bundle_rpath" "$binary"
+    fi
+    printf '%s\n' "$existing_rpaths" | while IFS= read -r old_rpath; do
+        case "$old_rpath" in /opt/homebrew/*|/usr/local/*) install_name_tool -delete_rpath "$old_rpath" "$binary" ;; esac
+    done
+    otool -L "$binary" | awk '/^[[:space:]]/ {sub(/^[[:space:]]+/, ""); sub(/ \(compatibility.*$/, ""); print}' | while IFS= read -r dependency; do
+        case "$dependency" in
+            @executable_path/../Frameworks/*.framework/*|@rpath/*.framework/*|/opt/homebrew/*.framework/*|/usr/local/*.framework/*)
+                framework_prefix="${dependency%%.framework/*}"
+                framework_name="${framework_prefix##*/}"
+                framework_tail="${dependency#*.framework/}"
+                bundled_dependency="$framework_name.framework/$framework_tail"
+                [ -f "$PACKAGE_FRAMEWORKS/$bundled_dependency" ] || {
+                    echo "Missing bundled dependency: $dependency ($binary)" >&2; exit 1;
+                }
+                install_name_tool -change "$dependency" "@rpath/$bundled_dependency" "$binary"
+                ;;
+            @executable_path/../Frameworks/*.dylib|/opt/homebrew/*.dylib|/usr/local/*.dylib)
+                bundled_dependency="${dependency##*/}"
+                [ -f "$PACKAGE_FRAMEWORKS/$bundled_dependency" ] || {
+                    echo "Missing bundled dependency: $dependency ($binary)" >&2; exit 1;
+                }
+                install_name_tool -change "$dependency" "@rpath/$bundled_dependency" "$binary"
+                ;;
+            /opt/homebrew/*|/usr/local/*)
+                echo "Unbundled host dependency: $dependency ($binary)" >&2; exit 1 ;;
+        esac
+    done || exit 1
+    library_id="$(otool -D "$binary" 2>/dev/null | sed -n '2p')"
+    case "$library_id" in
+        *.framework/*)
+            framework_prefix="${library_id%%.framework/*}"
+            framework_name="${framework_prefix##*/}"
+            install_name_tool -id "@rpath/$framework_name.framework/${library_id#*.framework/}" "$binary"
+            ;;
+        *.dylib) install_name_tool -id "@rpath/${library_id##*/}" "$binary" ;;
+    esac
+    if otool -L "$binary" | /usr/bin/grep -Eq '^[[:space:]]+(/opt/homebrew/|/usr/local/|@executable_path/../Frameworks/)'; then
+        echo "Non-portable bundled dependency remains: $binary" >&2; exit 1
+    fi
+done
 mkdir -p "$ROOT/dist/Fomawrite.app/Contents/Resources/licenses"
 cp "$ROOT/LICENSE" "$ROOT/dist/Fomawrite.app/Contents/Resources/licenses/Upstream-Omawrite-MIT.txt"
 cp "$ROOT/fonts/OFL.txt" "$ROOT/dist/Fomawrite.app/Contents/Resources/licenses/Fonts-OFL.txt"

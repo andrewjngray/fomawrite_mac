@@ -10,7 +10,8 @@ struct Cycle103SettingsSnapshot {
 #endif
         QSettings settings;
         for (const auto &key : settings.allKeys()) values.insert(key, settings.value(key));
-        settings.clear(); settings.sync();
+        settings.clear();
+        settings.setValue("workspace/autoHideChrome", false); settings.sync();
     }
     ~Cycle103SettingsSnapshot() {
         QGuiApplication::setFont(originalFont);

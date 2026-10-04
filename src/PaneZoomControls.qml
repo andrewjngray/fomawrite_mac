@@ -13,6 +13,7 @@ Item {
     readonly property int zoomPercent: pane === "source" ? zoomController.sourceZoom : zoomController.previewZoom
     readonly property string paneName: pane === "source" ? "Editor" : "Preview"
     readonly property string controlPrefix: controlsActive ? pane + "Zoom" : "inactive" + paneName + "Zoom"
+    readonly property bool menuOpen: zoomMenu.opened
     property var previousFocusItem: null
     objectName: controlPrefix + "Controls"
     implicitWidth: 120

@@ -49,3 +49,5 @@ SOURCES += src/workspace.cpp
 HEADERS += src/workspace.h
 
 DISTFILES += src/editoracceptancecheck.inc src/panechromeacceptancecheck.inc src/editinglayoutacceptancecheck.inc
+
+QT += pdfquick webenginequick

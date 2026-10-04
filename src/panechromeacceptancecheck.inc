@@ -21,9 +21,17 @@
             check(qAbs(bounds(control).left() - bounds(owner).left() - 12) <= 0.5
                   && bounds(control).right() <= bounds(owner).right() - 11.5, "Style control is not contained at its pane's leading edge: " + control->objectName());
         }
-        check(visual->isVisible() && bounds(visual).right() <= bounds(modeGroup).left() - 5.5,
-              "Visual Edit overlaps the stationary view capsule");
-        if (outputStyle->isVisible()) check(bounds(outputStyle).right() + 5.5 <= bounds(visual).left(), "Preview template overlaps Visual Edit");
+        auto *publishing = child("documentPublishingControls");
+        check(visual->isVisible() == sourcePane->isVisible(), "Editing capsule lost its editor pane");
+        if (visual->isVisible()) {
+            const qreal paneEnd = pane->isVisible() ? bounds(sourcePane).right() : bounds(modeGroup).left();
+            check(qAbs(bounds(visual).right() - paneEnd + 12) <= 1.5
+                  && bounds(appearance).right() + 7.5 <= bounds(visual).left(), "Editing capsule is not beneath its pane's trailing edge");
+        }
+        check(publishing && publishing->isVisible() == pane->isVisible(), "Publishing capsule lost its output pane");
+        if (publishing && publishing->isVisible())
+            check(bounds(outputStyle).right() + 7.5 <= bounds(publishing).left()
+                  && bounds(publishing).right() + 7.5 <= bounds(modeGroup).left(), "Publishing controls overlap output style or arrangement");
         check(qAbs(bounds(modeGroup).right() - window->width() + 12) <= 0.5, "View capsule moved from the right edge");
     };
     chromeCheck("pane-footer-divider-and-compact-menu-access", [&] {

@@ -261,10 +261,10 @@ void FomawriteTest::workspaceFocusCycleIncludesRenderedPreview() {
         QTRY_COMPARE(quick->activeFocusItem(), editingSurface);
         // The right-hand output Preview stays read-only with either left editor.
         QVERIFY(preview->property("allowVisualEdit").toBool() == false);
-        QVERIFY(cycle(false)); QTRY_COMPARE(quick->activeFocusItem(), rendered);
+        QVERIFY(cycle(false)); QTRY_VERIFY(within(quick->activeFocusItem(), rendered));
         QVERIFY(!window->property("canFormatSource").toBool());
         QVERIFY(cycle(false)); QTRY_VERIFY(within(quick->activeFocusItem(), header));
-        QVERIFY(cycle(true)); QTRY_COMPARE(quick->activeFocusItem(), rendered);
+        QVERIFY(cycle(true)); QTRY_VERIFY(within(quick->activeFocusItem(), rendered));
         QVERIFY(cycle(true)); QTRY_COMPARE(quick->activeFocusItem(), editingSurface);
         QCOMPARE(window->property("canFormatSource").toBool(), !visualEnabled);
         // Complete both wraparound directions without skipping the right pane.

@@ -16,7 +16,7 @@ QMap<QString, QRectF> cycle107ViewBounds(QQuickItem *footer) {
     QMap<QString, QRectF> result;
     for (const char *name : {"sourceModeButton", "visualEditToggle", "singleModeButton", "previewSplitButton"}) {
         auto *button = footer->findChild<QQuickItem *>(name);
-        if (!button || !button->isVisible()) return {};
+        if (!button) return {};
         result.insert(QString::fromLatin1(name), cycle103SceneBounds(button));
     }
     return result;
@@ -25,14 +25,17 @@ bool cycle107SameBounds(const QMap<QString, QRectF> &actual, const QMap<QString,
     if (actual.isEmpty() || actual.size() != expected.size()) return false;
     for (auto it = expected.cbegin(); it != expected.cend(); ++it) {
         const auto found = actual.value(it.key());
-        if (qAbs(found.left() - it.value().left()) > 0.1 || qAbs(found.top() - it.value().top()) > 0.1
+        const bool fixedAtWindowEdge = it.key() == "singleModeButton" || it.key() == "previewSplitButton";
+        if ((fixedAtWindowEdge && qAbs(found.left() - it.value().left()) > 0.1) || qAbs(found.top() - it.value().top()) > 0.1
                 || qAbs(found.width() - it.value().width()) > 0.1 || qAbs(found.height() - it.value().height()) > 0.1) {
             return false;
         }
     }
-    return true;
+    // Source/Visual moves together with its pane; their internal geometry is stable.
+    return qAbs((actual.value("visualEditToggle").left() - actual.value("sourceModeButton").left())
+        - (expected.value("visualEditToggle").left() - expected.value("sourceModeButton").left())) <= 0.1;
 }
-// Editing and layout are independent stationary groups. Style choices belong
+// Editing and layout are independent pane-owned groups. Style choices belong
 // to their visible pane; changing editing never changes the arrangement.
 bool cycle117PaneFooterAnchors(QObject *window) {
     auto *footer = window->findChild<QQuickItem *>("documentFooter");
@@ -50,9 +53,23 @@ bool cycle117PaneFooterAnchors(QObject *window) {
         if (qAbs(control.left() - region.left() - 12) > 0.5 || control.right() > region.right() - 11.5
             || control.width() < 34 || control.height() < 32) return false;
     }
-    const auto editingBounds = cycle103SceneBounds(editing), modeBounds = cycle103SceneBounds(modes);
-    if (!editing->isVisible() || editingBounds.right() > modeBounds.left() - 5.5) return false;
-    if (output->isVisible() && editingBounds.left() < cycle103SceneBounds(output).right() + 5.5) return false;
+    auto *publishing = footer->findChild<QQuickItem *>("documentPublishingControls");
+    if (!publishing || editing->isVisible() != sourcePane->isVisible()
+        || publishing->isVisible() != previewPane->isVisible()) return false;
+    const auto modeBounds = cycle103SceneBounds(modes);
+    if (qAbs(modeBounds.right() - cycle103SceneBounds(footer).right() + 12) > 0.5) return false;
+    if (editing->isVisible()) {
+        const auto editingBounds = cycle103SceneBounds(editing);
+        const qreal ownerEnd = previewPane->isVisible() ? cycle103SceneBounds(sourcePane).right() : modeBounds.left();
+        if (qAbs(editingBounds.right() - ownerEnd + 12) > 1.5
+            || editingBounds.left() < cycle103SceneBounds(appearance).right() + 7.5) return false;
+    }
+    if (publishing->isVisible()) {
+        const auto outputBounds = cycle103SceneBounds(output), publishBounds = cycle103SceneBounds(publishing);
+        if (outputBounds.right() + 7.5 > publishBounds.left()
+            || publishBounds.right() + 7.5 > modeBounds.left()
+            || publishBounds.left() < cycle103SceneBounds(previewPane).left() + 11.5) return false;
+    }
     return cycle106FooterControlsFit(window);
 }
 bool cycle107ViewLabelsReadable(QQuickItem *footer) {
@@ -249,6 +266,11 @@ void FomawriteTest::footerViewCyclesPreserveDraftSelectionAndWidths() {
             settings->setProperty("synchronizedScroll", synchronized);
             QVERIFY(cycle102Click(quick, split));
             QTRY_COMPARE(layout->property("effectiveLayoutMode").toInt(), 1);
+            // The browser refresh can outlast the layout-mode change. Establish
+            // the reading fixture after viewport restoration has completed.
+            QTRY_VERIFY(!window->property("changingDocumentView").toBool());
+            QTRY_VERIFY(!pane->property("viewportRefreshPending").toBool());
+            QVERIFY(cycle118FooterRenderBarrier(quick));
             QVERIFY(QMetaObject::invokeMethod(editor, "select", Q_ARG(int, selectionStart), Q_ARG(int, selectionEnd)));
             QTest::qWait(80);
             const QRectF caret = editor->property("cursorRectangle").toRectF();
@@ -318,7 +340,7 @@ void FomawriteTest::footerViewCyclesPreserveDraftSelectionAndWidths() {
 
     // A new document supersedes an in-flight view restoration. Loading a short
     // note after long visual content must leave no inherited blank scroll tail.
-    QVERIFY(cycle102Click(quick, visual));
+    QVERIFY(QMetaObject::invokeMethod(window.data(), "selectWritingMode", Q_ARG(QVariant, "visual")));
     QTRY_VERIFY(layout->property("visualEditEnabled").toBool());
     QTRY_VERIFY(!window->property("changingDocumentView").toBool());
     const QByteArray shortSource("# Short note\n\nA fresh document.\n");
@@ -367,7 +389,17 @@ void FomawriteTest::footerCompactStylesRemainReachableAcrossModes() {
         quick->resize(width, 520); QTest::qWait(60);
         for (const char *name : {"sourceModeButton", "singleModeButton", "visualEditToggle", "previewSplitButton", "previewOnly"}) {
             if (QString::fromLatin1(name) == "previewOnly") { QVERIFY(cycle118ReadPreview(window.data())); }
-            else { auto *mode = footer->findChild<QQuickItem *>(name); if (!mode->isEnabled()) continue; QVERIFY(cycle102Click(quick, mode)); }
+            else {
+                auto *mode = footer->findChild<QQuickItem *>(name);
+                if (layout->property("effectiveLayoutMode").toInt() == 2
+                    && (QString::fromLatin1(name) == "sourceModeButton" || QString::fromLatin1(name) == "visualEditToggle")) {
+                    QVERIFY(QMetaObject::invokeMethod(window.data(), "selectWritingMode",
+                        Q_ARG(QVariant, QString::fromLatin1(name) == "sourceModeButton" ? "source" : "visual")));
+                } else {
+                    if (!mode->isEnabled()) continue;
+                    QVERIFY(cycle102Click(quick, mode));
+                }
+            }
             QTRY_VERIFY(cycle117PaneFooterAnchors(window.data()));
             // Compact pane selectors keep a readable Aa label instead of an
             // ellipsis; narrow padding must leave the full text inside its hit area.

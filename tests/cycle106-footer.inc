@@ -50,7 +50,8 @@ bool cycle106FootersAlign(QObject *window) {
 bool cycle106FooterControlsFit(QObject *window) {
     QList<QPair<QString, QRectF>> visible;
     for (const char *name : {"libraryFilter", "sourceModeButton", "sourceAppearanceButton", "toolbarStatistic",
-                            "previewTemplateButton", "visualEditToggle", "previewSplitButton", "singleModeButton"}) {
+                            "previewTemplateButton", "visualEditToggle", "previewSplitButton", "singleModeButton",
+                            "webPublishingButton", "pdfPublishingButton"}) {
         auto *document = window->findChild<QQuickItem *>("documentFooter");
         auto *item = document ? document->findChild<QQuickItem *>(name) : nullptr;
         if (QString::fromLatin1(name) == "libraryFilter") item = window->findChild<QQuickItem *>(name);

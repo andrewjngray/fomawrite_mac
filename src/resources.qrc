@@ -25,6 +25,7 @@
         <file>OrganizerPane.qml</file>
         <file>DocumentOutline.qml</file>
         <file>PreviewPane.qml</file>
+        <file>PublishingPreview.qml</file>
         <file>ExportHub.qml</file>
         <file>StyleGallery.qml</file>
         <file alias="Main.qml">Main.qml</file>

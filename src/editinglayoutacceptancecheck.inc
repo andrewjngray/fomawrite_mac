@@ -32,7 +32,9 @@
         check(layout->property("effectiveLayoutMode").toInt() == 0 && layout->property("visualEditEnabled").toBool()
               && visualPane->isVisible() && !pane->isVisible(), "Narrow layout lost chosen Visual editor");
         capture("editing-visual-narrow-single"); window->resize(1280, 720); settle(100);
-        action("previewOnly", 2, true); action("visualEditToggle", 1, true);
+        action("previewOnly", 2, true);
+        QMetaObject::invokeMethod(window, "selectWritingMode", Q_ARG(QVariant, "visual"));
+        check(waitUntil(ready), "Preview Only editor return did not settle");
         check(pane->isVisible() && visualPane->isVisible(), "Preview Only return forgot chosen editor/layout");
     });
     editingLayoutCheck("visual-split-edit-readonly-output-and-single-undo", [&] {
@@ -42,7 +44,7 @@
         action("visualEditToggle", 0, true); action("previewSplitButton", 1, true);
         auto *visual = visualPane->findChild<QQuickItem *>("visualEditor");
         auto *rendered = pane->findChild<QQuickItem *>("renderedPreview");
-        if (!check(visual && rendered && rendered->property("readOnly").toBool(), "Output Preview is not read-only")) return;
+        if (!check(visual && rendered && !pane->property("allowVisualEdit").toBool(), "Output Preview is not read-only")) return;
         const int start = visual->property("text").toString().indexOf(QString::fromUtf8("café"));
         check(start >= 0, "Visual projection lost sample text"); visual->forceActiveFocus();
         QMetaObject::invokeMethod(visual, "select", Q_ARG(int, start), Q_ARG(int, start + 4));

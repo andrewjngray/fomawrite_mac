@@ -49,6 +49,26 @@ ApplicationWindow {
     function restoreWorkspaceCursor(position) {
         Qt.callLater(function() { editor.cursorPosition = Math.max(0, Math.min(position, editor.length)); editorFlick.ensureCursorVisible(); });
     }
+    property bool documentChromeHidden: false
+    readonly property bool documentChromeMenuOpen: sourceAppearanceMenu.opened || previewTemplateMenu.opened
+        || writingOptions.opened || workspaceMenu.opened || formatQuickMenu.opened || libraryActions.opened
+        || topChrome.zoomMenuOpen
+    function writingActivity() {
+        if (!workspaceSettings.autoHideChrome || documentChromeMenuOpen) return;
+        var item = activeFocusItem;
+        var keyboardChrome = item && (item.focusReason === Qt.TabFocusReason
+            || item.focusReason === Qt.BacktabFocusReason || item.focusReason === Qt.ShortcutFocusReason)
+            && (isInside(item, topChrome) || isInside(item, documentFooter));
+        if (keyboardChrome) return;
+        topChrome.keyboardReveal = false;
+        documentFooter.keyboardReveal = false;
+        documentChromeHidden = true;
+    }
+    function revealDocumentChrome() {
+        documentChromeHidden = false;
+        topChrome.keyboardReveal = true;
+        documentFooter.keyboardReveal = true;
+    }
     property bool synchronizingScroll: false
     property var documentViewportTransition: null
     property var zoomViewportCheckpoint: null
@@ -294,7 +314,7 @@ ApplicationWindow {
             : region === "files" ? libraryPane : region === "preview" ? previewPane : null;
         var target = pane ? firstWorkspaceControl(pane) : null;
         if (target) target.forceActiveFocus(Qt.TabFocusReason);
-        else topChrome.focusWorkspaceControl();
+        else { win.revealDocumentChrome(); topChrome.focusWorkspaceControl(); }
     }
     function focusWritingSurface() {
         focusWorkspaceRegion(editorPane.visible ? "source" : "preview");
@@ -335,6 +355,10 @@ ApplicationWindow {
         sequence: "Shift+F6"; context: Qt.WindowShortcut; enabled: win.workspaceOwnsKeyboard
         onActivated: win.cycleWorkspaceFocus(true)
     }
+    Shortcut {
+        sequence: "Alt+M"; context: Qt.WindowShortcut
+        onActivated: { win.revealDocumentChrome(); topChrome.focusWorkspaceControl(); }
+    }
     property string lastZoomPane: "source"
     property string lastWritingSurface: "source"
     function updateWritingSurfaceFromFocus() {
@@ -347,7 +371,11 @@ ApplicationWindow {
         else if (isInside(item, previewPane)) lastZoomPane = "preview";
     }
     onActiveFocusItemChanged: {
-        topChrome.keyboardReveal = isInside(activeFocusItem, topChrome);
+        // Pointer focus from a previous toolbar click must not pin the bars open.
+        var keyboardFocus = activeFocusItem && (activeFocusItem.focusReason === Qt.TabFocusReason
+            || activeFocusItem.focusReason === Qt.BacktabFocusReason || activeFocusItem.focusReason === Qt.ShortcutFocusReason);
+        topChrome.keyboardReveal = keyboardFocus && isInside(activeFocusItem, topChrome);
+        documentFooter.keyboardReveal = keyboardFocus && isInside(activeFocusItem, documentFooter);
         updateWritingSurfaceFromFocus();
         updateSourceFormattingOwner();
     }
@@ -534,6 +562,9 @@ ApplicationWindow {
         onParagraphFocusChanged: backend.setFocusPosition(editor.cursorPosition, paragraphFocus, sentenceFocus)
         property int titleBarMode: 1
         property int toolbarVisibilityMode: 1
+        property string publishingFormat: "web"
+        property bool autoHideChrome: true
+        onAutoHideChromeChanged: if (!autoHideChrome) win.documentChromeHidden = false
         property int toolbarMode: 0
         property bool toolbarCharacters: true
         property bool toolbarCharactersNoSpaces: true
@@ -614,6 +645,8 @@ ApplicationWindow {
 
     WorkspaceHeader {
         id: topChrome
+        activityHidden: workspaceSettings.autoHideChrome && win.documentChromeHidden
+        menuOpen: win.documentChromeMenuOpen
         documentName: win.appBackend.fileName
         documentModified: win.appBackend.modified
         zoomController: paneZoom
@@ -1672,6 +1705,14 @@ ApplicationWindow {
             NativeCommand { commandId: "library" }
             NativeCommand { commandId: "organizer" }
             Platform.MenuSeparator {}
+            Platform.MenuItem {
+                objectName: "nativeAutoHideDocumentChrome"
+                text: "Auto-Hide Document Bars"
+                checkable: true
+                checked: workspaceSettings.autoHideChrome
+                onTriggered: workspaceSettings.autoHideChrome = !workspaceSettings.autoHideChrome
+            }
+
             Platform.MenuItem { text: "Synchronized Scrolling"; checkable: true; checked: workspaceSettings.synchronizedScroll; onTriggered: workspaceSettings.synchronizedScroll = !workspaceSettings.synchronizedScroll }
             NativeCommand { commandId: "sortBar" }
             NativeCommand { commandId: "filterBar" }
@@ -2815,6 +2856,7 @@ ApplicationWindow {
                 // finger scrolling carries pixel-precise pixelDelta.
                 acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
                 onWheel: function(wheel) {
+                    win.writingActivity();
                     win.cancelDocumentViewportTransition();
                     scrollLinger.restart();
                     if (wheel.pixelDelta.y !== 0)
@@ -2825,7 +2867,7 @@ ApplicationWindow {
                 }
             }
 
-            onMovementStarted: { win.cancelDocumentViewportTransition(); wheelScroll.stop(); }
+            onMovementStarted: { win.writingActivity(); win.cancelDocumentViewportTransition(); wheelScroll.stop(); }
 
             function scrollByWheel(wheel) {
                 // High-resolution wheels report fractional notches; feed
@@ -3105,6 +3147,11 @@ ApplicationWindow {
 
                 Keys.priority: Keys.BeforeItem
                 Keys.onPressed: function(event) {
+                    if (event.key === Qt.Key_Alt) win.revealDocumentChrome();
+                    else if ((event.text.length > 0 && !(event.modifiers & (Qt.ControlModifier | Qt.MetaModifier)))
+                        || event.key === Qt.Key_Backspace || event.key === Qt.Key_Delete
+                        || event.key === Qt.Key_PageUp || event.key === Qt.Key_PageDown
+                        || event.key === Qt.Key_Up || event.key === Qt.Key_Down) win.writingActivity();
                     win.cancelDocumentViewportTransition();
                     if ((event.key === Qt.Key_C || event.key === Qt.Key_X) && (event.modifiers & Qt.ControlModifier)
                         && !(event.modifiers & (Qt.AltModifier | Qt.MetaModifier | Qt.ShiftModifier))) {
@@ -3159,6 +3206,7 @@ ApplicationWindow {
                     }
                 }
 
+                onPreeditTextChanged: if (activeFocus && preeditText.length) win.writingActivity()
                 onTextChanged: {
                     if (win.searchUpdating) return;
                     var contentChanged = backend.editorTextChanged();
@@ -3207,6 +3255,7 @@ ApplicationWindow {
             visualEditEnabled: workspaceLayout.visualEditEnabled
             suspendViewportUpdates: win.changingDocumentView
             onViewportInteraction: win.cancelDocumentViewportTransition()
+            onWritingActivity: win.writingActivity()
             renderer: win.appBackend
             markdown: editor.text
             documentBaseUrl: backend.documentBaseUrl
@@ -3251,8 +3300,10 @@ ApplicationWindow {
         }
     }
 
-        PreviewPane {
+        PublishingPreview {
             id: previewPane
+            publishingMode: workspaceSettings.publishingFormat
+            zoom: paneZoom.previewZoom / 100
             allowVisualEdit: false
             visualEditEnabled: false
             visualEditorObjectName: "outputPreviewVisualEditor"
@@ -3260,6 +3311,7 @@ ApplicationWindow {
             bottomInset: documentFooter.height
             suspendViewportUpdates: win.changingDocumentView
             onViewportInteraction: win.cancelDocumentViewportTransition()
+            onWritingActivity: win.writingActivity()
             renderer: win.appBackend
             onTemplateMenuRequested: function(anchor) { win.openAnchoredMenu(previewTemplateMenu, anchor); }
             onScrollFractionChanged: function(fraction) {
@@ -3367,6 +3419,8 @@ ApplicationWindow {
 
     DocumentFooter {
         id: documentFooter
+        activityHidden: workspaceSettings.autoHideChrome && win.documentChromeHidden
+        menuOpen: win.documentChromeMenuOpen
         objectName: "documentFooter"
         x: editorPane.visible ? editorPane.x : previewPane.x
         anchors.bottom: parent.bottom
@@ -3383,6 +3437,8 @@ ApplicationWindow {
         showStatus: !workspaceLayout.effectiveOrganizerVisible
         showStatistics: workspaceSettings.toolbarMode === 1
         statisticsText: win.compactToolbarStatistics()
+        publishingFormat: workspaceSettings.publishingFormat
+        onPublishingFormatRequested: function(format) { workspaceSettings.publishingFormat = format; }
         onLayoutRequested: function(mode) { win.setDocumentView(mode); }
         onEditingRequested: function(visual) { win.setEditingMode(visual); }
         onAppearanceMenuRequested: function(anchor) { win.openAnchoredMenu(sourceAppearanceMenu, anchor); }

@@ -21,6 +21,8 @@
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
 #include <QQmlError>
+#include <QQmlEngine>
+#include <QWheelEvent>
 #include <QQuickItem>
 #include <QQuickStyle>
 #include <QQuickWindow>
@@ -41,8 +43,9 @@ void applyMacWindowTheme(QWindow *window, bool followSystem, bool dark);
 namespace {
 const QStringList viewNames{QStringLiteral("sourceModeButton"), QStringLiteral("visualEditToggle"),
                            QStringLiteral("singleModeButton"), QStringLiteral("previewSplitButton")};
-const QStringList stationaryNames = viewNames;
-const QStringList controlNames = viewNames + QStringList{QStringLiteral("sourceAppearanceButton"), QStringLiteral("previewTemplateButton")};
+const QStringList stationaryNames{QStringLiteral("singleModeButton"), QStringLiteral("previewSplitButton")};
+const QStringList controlNames = viewNames + QStringList{QStringLiteral("sourceAppearanceButton"), QStringLiteral("previewTemplateButton"),
+    QStringLiteral("webPublishingButton"), QStringLiteral("pdfPublishingButton")};
 
 bool waitUntil(const std::function<bool()> &condition, int timeout = 3000) {
     QElapsedTimer timer;
@@ -182,6 +185,21 @@ bool enterText(QQuickWindow *window, QQuickItem *field, const QString &text) {
     return waitUntil([&] { return field->property("text").toString() == text; });
 }
 
+// Read actual publishing DOM geometry in the isolated application world.
+// The callback is scoped to this engine and does not enable document scripts.
+QVariant publishingDomResult(QQuickItem *field, const QString &script) {
+    auto *engine = qmlEngine(field);
+    if (!engine) return {};
+    engine->globalObject().setProperty("nativePublishingDomResult", QJSValue(QJSValue::UndefinedValue));
+    const QJSValue callback = engine->evaluate("(function(value) { nativePublishingDomResult = value; })");
+    if (!QMetaObject::invokeMethod(field, "runJavaScript", Q_ARG(QString, script), Q_ARG(uint, 1), Q_ARG(QJSValue, callback))) return {};
+    if (!waitUntil([&] { return !engine->globalObject().property("nativePublishingDomResult").isUndefined(); }, 3000)) return {};
+    return engine->globalObject().property("nativePublishingDomResult").toVariant();
+}
+QVariantMap publishingDomAnchor(QQuickItem *field) {
+    return publishingDomResult(field, "(function(){var a=document.body.querySelectorAll('p,h1,h2,h3,h4,h5,h6,pre,table,li,img');for(var i=0;i<a.length;i++){var r=a[i].getBoundingClientRect();if(r.bottom>0)return {index:i,offset:r.top};}return null;})()").toMap();
+}
+
 // Qt has no AppDataLocation setter. A unique, previously absent test-mode
 // namespace points into the temporary directory so the real recovery/storage
 // code runs unchanged. Only the link we created is removed, never a user folder.
@@ -265,7 +283,7 @@ int runDocumentViewCheck(QApplication &app, const QString &outputDirectory) {
     };
     QJsonObject resources;
     for (const QString &name : {QStringLiteral("Main.qml"), QStringLiteral("DocumentFooter.qml"),
-            QStringLiteral("FooterButton.qml"), QStringLiteral("PreviewPane.qml"), QStringLiteral("LibraryPane.qml"),
+            QStringLiteral("FooterButton.qml"), QStringLiteral("PublishingPreview.qml"), QStringLiteral("PreviewPane.qml"), QStringLiteral("LibraryPane.qml"),
             QStringLiteral("WorkspaceLayout.qml"), QStringLiteral("WorkspaceCommands.qml"), QStringLiteral("AboutDialog.qml"),
             QStringLiteral("DocumentFindBar.qml"), QStringLiteral("DocumentOutline.qml"),
             QStringLiteral("PaneZoomState.qml"), QStringLiteral("PaneZoomControls.qml"), QStringLiteral("WorkspaceHeader.qml"), QStringLiteral("LinkEditor.qml"), QStringLiteral("LinkSyntax.js"), QStringLiteral("ExportHub.qml"), QStringLiteral("SquareDialogButton.qml")}) {
@@ -335,6 +353,7 @@ int runDocumentViewCheck(QApplication &app, const QString &outputDirectory) {
     auto *settings = window->findChild<QObject *>("workspaceSettings");
     if (!check(footer && editor && layout && pane && sourceScroll && settings,
                "Shipped component tree is missing the common footer or writing surfaces")) return finish();
+    settings->setProperty("autoHideChrome", false);
     check(!window->findChild<QObject *>("sourceModeMenu"), "Obsolete Source dropdown found in shipped component tree");
     QMap<QString, QQuickItem *> buttons;
     for (const QString &name : controlNames) {
@@ -404,7 +423,8 @@ int runDocumentViewCheck(QApplication &app, const QString &outputDirectory) {
             auto *label = button->findChild<QQuickItem *>("footerButtonLabel");
             entry.insert("truncated", !label || label->property("truncated").toBool());
             controls.insert(name, entry);
-            const bool shouldBeVisible = name == "sourceAppearanceButton" ? mode != 2 : name == "previewTemplateButton" ? mode != 0 : true;
+            const bool shouldBeVisible = name == "sourceAppearanceButton" || name == "sourceModeButton" || name == "visualEditToggle" ? mode != 2
+                : name == "previewTemplateButton" || name == "webPublishingButton" || name == "pdfPublishingButton" ? mode != 0 : true;
             check(button->isVisible() == shouldBeVisible, step + ": wrong pane control visibility: " + name);
             if (!button->isVisible()) continue;
             check(QRectF(QPointF(), window->size()).contains(rect), step + ": control is clipped: " + name);
@@ -460,7 +480,9 @@ int runDocumentViewCheck(QApplication &app, const QString &outputDirectory) {
         settle(30);
     };
     const auto sourceSingle = [&] {
-        check(click(window, buttons.value("sourceModeButton")), "Cannot choose Source editing");
+        if (layout->property("effectiveLayoutMode").toInt() == 2)
+            check(QMetaObject::invokeMethod(window, "selectWritingMode", Q_ARG(QVariant, "source")), "Cannot return from reading to Source");
+        else check(click(window, buttons.value("sourceModeButton")), "Cannot choose Source editing");
         action("singleModeButton", 0, false);
     };
     for (int width : {1440, 1280, 960, 739, 720}) {
@@ -929,7 +951,11 @@ int runDocumentViewCheck(QApplication &app, const QString &outputDirectory) {
                 for (int round = 0; round < 2; ++round) {
                     action("previewOnly", 2, false);
                     check(zoomItem("preview", "MenuButton") && zoomItem("preview", "MenuButton")->isVisible(), "Full Preview has no percentage control");
-                    action("visualEditToggle", 1, true);
+                    check(QMetaObject::invokeMethod(window, "selectWritingMode", Q_ARG(QVariant, "visual")),
+                          "Cannot return from Preview Only to Visual Edit");
+                    check(waitUntil([&] { return layout->property("effectiveLayoutMode").toInt() == 1
+                        && layout->property("visualEditEnabled").toBool() && ready(); }),
+                          "Preview Only return did not restore Visual Split");
                     auto *visual = visualPane->findChild<QQuickItem *>("visualEditor");
                     check(visual && visualPane->property("visualTextSize").toInt() == window->property("editorFontPixelSize").toInt(),
                           "Visual Edit did not use the chosen editor magnification");
@@ -1006,8 +1032,8 @@ int runDocumentViewCheck(QApplication &app, const QString &outputDirectory) {
                     return result.toMap();
                 };
                 const QVariantMap sourceAnchor = readingAnchor(window, "captureSourceReadingAnchor");
-                const QVariantMap previewAnchor = readingAnchor(pane, "captureReadingAnchor");
-                check(sourceAnchor.value("position").toInt() > 0 && previewAnchor.value("position").toInt() > 0,
+                const QVariantMap previewAnchor = publishingDomAnchor(rendered);
+                check(sourceAnchor.value("position").toInt() > 0 && previewAnchor.contains("index") && previewAnchor.value("index").toInt() > 0,
                       "Reading-position fixture did not scroll both panes into the document");
                 QString anchorStage = "initial";
                 const auto assertAnchor = [&](QQuickItem *field, QQuickItem *scroll, const QVariantMap &anchor, const QString &name) {
@@ -1032,7 +1058,24 @@ int runDocumentViewCheck(QApplication &app, const QString &outputDirectory) {
                 };
                 const auto assertBothAnchors = [&] {
                     assertAnchor(editor, sourceScroll, sourceAnchor, "Source");
-                    assertAnchor(rendered, previewScroll, previewAnchor, "Preview");
+                    const QVariant currentTop = publishingDomResult(rendered,
+                        QString("(function(){var e=document.body.querySelectorAll('p,h1,h2,h3,h4,h5,h6,pre,table,li,img')[%1];return e?e.getBoundingClientRect().top:null;})()")
+                            .arg(previewAnchor.value("index").toInt()));
+                    if (!check(currentTop.isValid() && !currentTop.isNull(), "Cannot locate preserved publishing DOM reading anchor")) return;
+                    const qreal expectedOffset = previewAnchor.value("offset").toReal();
+                    const qreal actualOffset = currentTop.toReal();
+                    const qreal delta = actualOffset - expectedOffset;
+                    paneZoomReadings.append(QJsonObject{{"stage", anchorStage}, {"pane", "Preview"},
+                        {"domElementIndex", previewAnchor.value("index").toInt()}, {"expectedOffset", expectedOffset},
+                        {"actualOffset", actualOffset}, {"delta", delta},
+                        {"scrollY", previewScroll->property("contentY").toReal()},
+                        {"sourceZoom", percent("source")}, {"previewZoom", percent("preview")},
+                        {"transitionPending", window->property("changingDocumentView").toBool()},
+                        {"previewRefreshPending", pane->property("viewportRefreshPending").toBool()}});
+                    check(qAbs(delta) <= 2.0,
+                        QString("Preview DOM reading anchor moved at %1: element %2, expected offset %3, actual %4, delta %5, zoom %6/%7")
+                            .arg(anchorStage).arg(previewAnchor.value("index").toInt()).arg(expectedOffset).arg(actualOffset)
+                            .arg(delta).arg(percent("source")).arg(percent("preview")));
                 };
                 capture("zoom-scrolled-before");
                 for (const QString &target : {QStringLiteral("source"), QStringLiteral("preview")}) {
@@ -1080,6 +1123,90 @@ int runDocumentViewCheck(QApplication &app, const QString &outputDirectory) {
 #include "editoracceptancecheck.inc"
 #include "panechromeacceptancecheck.inc"
 #include "editinglayoutacceptancecheck.inc"
+
+    editingLayoutCheck("publishing-web-pdf-renderers-preserve-source", [&] {
+        window->resize(1280, 720);
+        layout->setProperty("organizerVisible", false); layout->setProperty("filesVisible", false);
+        settings->setProperty("autoHideChrome", false);
+        settings->setProperty("publishingFormat", "web");
+        const QString sample = QString::fromUtf8("# Actual publishing output\n\nA café paragraph keeps its Markdown.\n\n| Name | Value |\n| --- | --- |\n| Sample | 42 |\n");
+        if (!loadSample("Publishing output", sample)) return;
+        action("previewSplitButton", 1, false);
+        auto *web = pane->findChild<QQuickItem *>("renderedPreview");
+        auto *pdfScroll = pane->findChild<QQuickItem *>("previewScroll");
+        auto *webChoice = buttons.value("webPublishingButton"), *pdfChoice = buttons.value("pdfPublishingButton");
+        if (!check(web && pdfScroll && webChoice && pdfChoice, "Publishing renderer controls are missing")) return;
+        const int revision = backend.documentRevision();
+        const QVariantMap dom = publishingDomResult(web,
+            "({title:document.querySelector('h1')?document.querySelector('h1').innerText.trim():'',rows:Array.from(document.querySelectorAll('table tr')).map(function(r){return Array.from(r.querySelectorAll('th,td')).map(function(c){return c.innerText.trim();});})})").toMap();
+        report.insert("publishingDom", QJsonObject::fromVariantMap(dom));
+        const QVariantList rows = dom.value("rows").toList();
+        const bool expectedTable = rows.size() == 2
+            && rows.at(0).toList() == QVariantList{QString("Name"), QString("Value")}
+            && rows.at(1).toList() == QVariantList{QString("Sample"), QString("42")};
+        check(web->isVisible() && !pdfScroll->isVisible() && dom.value("title").toString() == "Actual publishing output"
+            && expectedTable, "Web publishing did not render the actual exported HTML DOM");
+        capture("publishing-web-actual-html");
+        check(click(window, pdfChoice), "Cannot choose PDF publishing");
+        check(waitUntil([&] { return ready() && pane->property("publishingMode").toString() == "pdf"; }), "PDF publishing did not finish loading");
+        const QUrl pdfUrl = pane->property("outputUrl").toUrl();
+        QFile pdfFile(pdfUrl.toLocalFile());
+        check(pdfScroll->isVisible() && !web->isVisible() && pane->property("errorText").toString().isEmpty()
+            && pdfFile.open(QIODevice::ReadOnly) && pdfFile.read(5) == "%PDF-", "PDF publishing did not load a real PDF document");
+        check(renderBarrier(window), "Cannot render the publishing PDF page");
+        capture("publishing-pdf-actual-pages");
+        auto *nativeWeb = window->findChild<QObject *>("native_webPreview");
+        check(nativeWeb && !nativeWeb->property("checked").toBool(), "Native Web command disagrees with PDF publishing");
+        check(nativeWeb && QMetaObject::invokeMethod(nativeWeb, "triggered"), "Cannot select Web publishing through the native View command");
+        check(waitUntil([&] { return ready() && pane->property("publishingMode").toString() == "web"; }), "Native Web command did not select Web output");
+        check(click(window, webChoice), "Cannot reselect Web publishing");
+        check(waitUntil([&] { return ready() && pane->property("publishingMode").toString() == "web"; }), "Web publishing return did not finish loading");
+        check(editor->property("text").toString() == sample && backend.documentRevision() == revision && !backend.modified(),
+            "Publishing format selection changed canonical source or dirty state");
+    });
+    editingLayoutCheck("document-chrome-input-hover-and-always-visible-setting", [&] {
+        settings->setProperty("autoHideChrome", true);
+        auto *header = child("topChrome");
+        auto *toggle = window->findChild<QObject *>("nativeAutoHideDocumentChrome");
+        if (!check(header && toggle, "Auto-hide document chrome controls are missing")) return;
+        const auto geometry = [&] {
+            QMap<QString, QRectF> result;
+            for (auto *item : {child("editorPane"), sourceScroll, pane, header, footer})
+                if (item) result.insert(item->objectName(), bounds(item));
+            return result;
+        };
+        const auto baseline = geometry();
+        const auto movePointer = [&](const QPointF &point) {
+            QMouseEvent event(QEvent::MouseMove, point, point, window->mapToGlobal(point.toPoint()), Qt::NoButton, Qt::NoButton, Qt::NoModifier);
+            QCoreApplication::sendEvent(window, &event); QCoreApplication::processEvents();
+        };
+        const QPointF writingPoint = bounds(sourceScroll).center();
+        movePointer(writingPoint);
+        editor->forceActiveFocus(Qt::MouseFocusReason);
+        key(window, Qt::Key_unknown, "x");
+        check(waitUntil([&] { return window->property("documentChromeHidden").toBool()
+            && !header->property("documentChromeVisible").toBool() && !footer->property("chromeVisible").toBool(); }), "Source typing did not hide document bars");
+        check(geometry() == baseline, "Hiding document bars changed writing geometry");
+        capture("document-chrome-hidden-writing");
+        movePointer(QPointF(window->width() - 4, 4));
+        check(waitUntil([&] { return header->property("documentChromeVisible").toBool(); })
+            && !footer->property("chromeVisible").toBool(), "Top edge did not independently reveal its document bar");
+        movePointer(QPointF(window->width() - 4, window->height() - 4));
+        check(waitUntil([&] { return footer->property("chromeVisible").toBool(); })
+            && !header->property("documentChromeVisible").toBool(), "Bottom edge did not independently reveal its document bar");
+        check(geometry() == baseline, "Revealing document bars changed writing geometry");
+        capture("document-chrome-bottom-edge-reveal");
+        check(QMetaObject::invokeMethod(window, "revealDocumentChrome"), "Cannot recover document chrome for preview scrolling");
+        movePointer(bounds(pane).center());
+        QWheelEvent wheel(bounds(pane).center(), window->mapToGlobal(bounds(pane).center().toPoint()), QPoint(), QPoint(0, -120),
+            Qt::NoButton, Qt::NoModifier, Qt::NoScrollPhase, false);
+        QCoreApplication::sendEvent(window, &wheel); QCoreApplication::processEvents();
+        check(waitUntil([&] { return window->property("documentChromeHidden").toBool(); }), "Publishing wheel interaction did not hide document bars");
+        check(QMetaObject::invokeMethod(toggle, "triggered"), "Cannot choose native always-visible document bars");
+        check(waitUntil([&] { return !settings->property("autoHideChrome").toBool() && footer->property("chromeVisible").toBool(); }),
+            "Native View toggle did not restore always-visible document bars");
+        check(geometry() == baseline, "Native chrome preference changed writing geometry");
+    });
 
     if (auto *about = window->findChild<QObject *>("aboutDialog")) {
         check(QMetaObject::invokeMethod(about, "open"), "Cannot open bundled About dialog");

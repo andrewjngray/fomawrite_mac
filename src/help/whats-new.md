@@ -1,5 +1,13 @@
 # What’s New in Fomawrite
 
+Build 119 adds:
+
+- A left editor with Source / Visual Edit, and a read-only right publishing pane with Web / PDF.
+- Real exported HTML and PDF pages, including output styles and paper settings.
+- Pane-owned footer controls, with Single / Split kept at the far right.
+- Document bars that hide while typing or scrolling and return at the top or bottom edge. View → Auto-Hide Document Bars keeps them visible when disabled.
+
+
 Build 118 adds:
 
 - separate **Editing: Source / Visual Edit** and **Layout: Single / Split** groups;

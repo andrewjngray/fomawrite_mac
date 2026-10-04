@@ -1,3 +1,4 @@
+#include <QtWebEngineQuick/qtwebenginequickglobal.h>
 #include "markdownextensions.h"
 #include "workspace.h"
 #include <QtConcurrent>
@@ -39,6 +40,9 @@ class FomawriteTest : public QObject {
     Q_OBJECT
 
 private slots:
+    void publishingWebCommandSelectsWebWithoutChangingEditor();
+    void documentChromeHidesForUserInputAndRevealsEdgesWithoutReflow();
+    void documentChromeKeepsMenusKeyboardAndNativeToggleAccessible();
     void paneAlignedFooterMenusFollowDividerWithoutEditing();
     void editingAndLayoutChoicesAreIndependent();
     void visualSplitEditsCanonicalSourceAndKeepsPreviewReadOnly();
@@ -321,6 +325,15 @@ private slots:
         QVERIFY(backend.modified());
         backend.discardRecovery();
     }
+
+    void init() {
+        QSettings settings;
+        settings.setValue("workspace/autoHideChrome", false);
+        settings.sync();
+    }
+
+    void publishingPreviewMatchesExportsWithoutChangingDraft();
+    void publishingPreviewOwnsTemporaryFilesAndReportsErrors();
 
     void initTestCase() {
         QCoreApplication::setOrganizationName("FomawriteTests");
@@ -1941,7 +1954,8 @@ private slots:
         const auto original = editor->property("text");
         QVERIFY(backend.exportDocument(QUrl::fromLocalFile(directory.filePath("sample.html")), "html"));
         QFile html(directory.filePath("sample.html")); QVERIFY(html.open(QIODevice::ReadOnly));
-        QVERIFY(html.readAll().contains("Export caf"));
+        QTextDocument exportedHtml; exportedHtml.setHtml(QString::fromUtf8(html.readAll()));
+        QVERIFY(exportedHtml.toPlainText().contains("Export café"));
         QVERIFY(backend.exportDocument(QUrl::fromLocalFile(directory.filePath("sample.pdf")), "pdf"));
         QFile pdf(directory.filePath("sample.pdf")); QVERIFY(pdf.open(QIODevice::ReadOnly));
         QVERIFY(pdf.readAll().startsWith("%PDF"));
@@ -4352,7 +4366,7 @@ private slots:
         QCOMPARE(settings->property("titleBarMode").toInt(), 0);
         QCOMPARE(settings->property("toolbarVisibilityMode").toInt(), 0);
         QVERIFY(leading->property("visible").toBool());
-        QVERIFY(QMetaObject::invokeMethod(libraryButton, "forceActiveFocus"));
+        qobject_cast<QQuickItem *>(libraryButton)->forceActiveFocus(Qt::TabFocusReason);
         QTRY_VERIFY(chrome->property("keyboardReveal").toBool());
         QTRY_COMPARE(title->property("opacity").toReal(), 1.0);
         QTRY_COMPARE(leading->property("opacity").toReal(), 1.0);
@@ -5454,6 +5468,7 @@ private:
 #include "cycle103-concept.inc"
 #include "cycle103-inline.inc"
 #include "cycle104-controls.inc"
+#include "cycle119-publishing.inc"
 #include "cycle106-footer.inc"
 #include "cycle107-footer-transitions.inc"
 #include "cycle108-bundled-footer.inc"
@@ -5466,9 +5481,15 @@ private:
 #include "cycle116-tables.inc"
 #include "cycle117-pane-chrome.inc"
 #include "cycle118-editing-layout.inc"
+#include "cycle119-document-chrome.inc"
 #include "cycle100-navigation.inc"
 #include "cycle99-integration.inc"
 #include "sourcevisualmapping-cycle99.inc"
 
-QTEST_MAIN(FomawriteTest)
+int main(int argc, char **argv) {
+    QtWebEngineQuick::initialize();
+    QApplication app(argc, argv);
+    FomawriteTest test;
+    return QTest::qExec(&test, argc, argv);
+}
 #include "tst_fomawrite.moc"

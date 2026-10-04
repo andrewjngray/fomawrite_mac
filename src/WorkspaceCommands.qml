@@ -158,7 +158,7 @@ QtObject {
         case "split": return layoutState.effectiveLayoutMode === 1;
         case "preview": return layoutState.effectiveLayoutMode === 2;
         case "togglePreview": return layoutState.effectiveLayoutMode !== 0;
-        case "webPreview": return true;
+        case "webPreview": return layoutState.effectiveLayoutMode !== 0 && settings.publishingFormat === "web";
         case "titleBarFade": return settings.titleBarMode === 0;
         case "titleBarAlways": return settings.titleBarMode === 1;
         case "toolbarFade": return settings.toolbarVisibilityMode === 0;
@@ -225,7 +225,7 @@ QtObject {
         case "preview": window.selectWritingMode("preview"); break;
         case "togglePreview": window.setDocumentView(layoutState.effectiveLayoutMode === 0 ? (layoutState.availableWidth >= 800 ? 1 : 2) : 0); break;
         case "reloadPreview": preview.reload(); break;
-        case "webPreview": if (layoutState.effectiveLayoutMode === 0) window.setDocumentView(layoutState.availableWidth >= 800 ? 1 : 2); break;
+        case "webPreview": settings.publishingFormat = "web"; if (layoutState.effectiveLayoutMode === 0) window.setDocumentView(layoutState.availableWidth >= 800 ? 1 : 2); break;
         case "titleBarFade": settings.titleBarMode = 0; break;
         case "titleBarAlways": settings.titleBarMode = 1; break;
         case "toolbarFade": settings.toolbarVisibilityMode = 0; break;

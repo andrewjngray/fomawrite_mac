@@ -21,15 +21,20 @@ Item {
     readonly property bool fullPreview: !editorPane.visible && previewPane.visible
     readonly property bool visualEditor: editorPane.visible && layoutState.visualEditEnabled
     property bool keyboardReveal: false
+    property bool activityHidden: false
+    property bool menuOpen: false
+    readonly property bool zoomMenuOpen: editorZoomControls.menuOpen || publishingZoomControls.menuOpen
+    readonly property bool documentChromeVisible: !activityHidden || chromeHover.hovered || keyboardReveal || menuOpen
     readonly property bool revealRequested: chromeHover.hovered || keyboardReveal
-    readonly property real titleContentOpacity: settings.titleBarMode === 1 || revealRequested ? 1 : 0
-    readonly property real toolbarContentOpacity: settings.toolbarVisibilityMode === 1 || revealRequested ? 1 : 0
+    readonly property real titleContentOpacity: documentChromeVisible && (settings.titleBarMode === 1 || revealRequested) ? 1 : 0
+    readonly property real toolbarContentOpacity: documentChromeVisible && (settings.toolbarVisibilityMode === 1 || revealRequested) ? 1 : 0
     readonly property bool toolbarContentVisible: settings.toolbarVisibilityMode !== 2
     readonly property real writingControlsWidth: documentHeader.width - documentHeader.nativeInset
         - (paneRestoreControls.visible ? paneRestoreControls.implicitWidth + 8 : 0)
     readonly property bool writingClusterExpanded: writingControlsWidth >= 580
     signal actionRequested(string action, var anchor)
     function focusWorkspaceControl() {
+        keyboardReveal = true;
         // F6 from Source can enter formatting without first transferring its
         // selection ownership to an unrelated workspace action.
         if (window.canFormatSource && toolbarContentVisible && toolbarContentOpacity > 0) {
@@ -107,7 +112,7 @@ Item {
     Rectangle {
         anchors.fill: parent
         color: backend.palette.page
-        MouseArea { anchors.fill: parent; onPressed: root.window.startSystemMove(); onDoubleClicked: root.window.visibility === Window.Maximized ? root.window.showNormal() : root.window.showMaximized() }
+        MouseArea { anchors.fill: parent; enabled: root.documentChromeVisible; onPressed: root.window.startSystemMove(); onDoubleClicked: root.window.visibility === Window.Maximized ? root.window.showNormal() : root.window.showMaximized() }
     }
     HoverHandler { id: chromeHover }
     Rectangle {
@@ -120,7 +125,7 @@ Item {
         RowLayout {
             anchors.fill: parent; anchors.leftMargin: root.window.isMac ? 84 : 12; anchors.rightMargin: 12; spacing: 8
             visible: root.toolbarContentVisible
-            opacity: root.toolbarContentOpacity
+            opacity: root.settings.toolbarVisibilityMode === 1 || root.revealRequested ? 1 : 0
             enabled: opacity > 0
             Item { Layout.fillWidth: true }
             ToolbarButton { objectName: "collapseOrganizerButton"; iconName: "panel-left-close"; hint: "Hide organizer"; onClicked: root.actionRequested("hideOrganizer", this) }
@@ -136,7 +141,7 @@ Item {
         MouseArea { anchors.fill: parent; onPressed: root.window.startSystemMove(); onDoubleClicked: root.window.visibility === Window.Maximized ? root.window.showNormal() : root.window.showMaximized() }
         RowLayout {
             anchors.fill: parent; anchors.leftMargin: root.window.isMac && !organizerHeader.visible ? 84 : 12; anchors.rightMargin: 12; spacing: 8
-            visible: root.toolbarContentVisible; opacity: root.toolbarContentOpacity; enabled: opacity > 0
+            visible: root.toolbarContentVisible; opacity: root.settings.toolbarVisibilityMode === 1 || root.revealRequested ? 1 : 0; enabled: opacity > 0
             ChromeButton {
                 objectName: "workspaceFolderButton"
                 text: backend.library.rootName || "Folder"
@@ -157,13 +162,16 @@ Item {
     }
     Rectangle {
         id: documentHeader
+        opacity: root.documentChromeVisible ? 1 : 0
+        enabled: root.documentChromeVisible
+        Behavior on opacity { NumberAnimation { duration: 140 } }
         objectName: "documentHeader"
         readonly property int nativeInset: root.window.isMac && !organizerHeader.visible && !filesHeader.visible ? 84 : 12
         x: root.editorPane.visible ? root.editorPane.x : root.previewPane.x
         width: root.editorPane.visible ? root.editorPane.width : root.previewPane.width
         height: root.height
         color: backend.palette.page
-        MouseArea { anchors.fill: parent; onPressed: root.window.startSystemMove(); onDoubleClicked: root.window.visibility === Window.Maximized ? root.window.showNormal() : root.window.showMaximized() }
+        MouseArea { anchors.fill: parent; enabled: root.documentChromeVisible; onPressed: root.window.startSystemMove(); onDoubleClicked: root.window.visibility === Window.Maximized ? root.window.showNormal() : root.window.showMaximized() }
         RowLayout {
             anchors.fill: parent; anchors.leftMargin: documentHeader.nativeInset; anchors.rightMargin: 12; spacing: 8
             Row {
@@ -248,6 +256,7 @@ Item {
                 }
                 ToolbarButton { id: sourceFormatButton; property bool sourceFormattingControl: true; objectName: "compactFormatButton"; visible: !root.fullPreview && !root.visualEditor && !root.writingClusterExpanded; iconName: "paragraph"; hint: "Formatting"; enabled: trailing.formattingAllowed; onClicked: root.actionRequested("format", this) }
                 PaneZoomControls {
+                    id: editorZoomControls
                     zoomController: root.zoomController
                     pane: root.editorPane.visible ? "source" : "preview"
                 }
@@ -265,11 +274,14 @@ Item {
     }
     Rectangle {
         id: splitPreviewHeader
+        opacity: root.documentChromeVisible ? 1 : 0
+        enabled: root.documentChromeVisible
+        Behavior on opacity { NumberAnimation { duration: 140 } }
         objectName: "previewHeader"
         visible: root.editorPane.visible && root.previewPane.visible
         x: root.previewPane.x; width: root.previewPane.width; height: root.height
         color: backend.palette.page
-        MouseArea { anchors.fill: parent; onPressed: root.window.startSystemMove() }
+        MouseArea { anchors.fill: parent; enabled: root.documentChromeVisible; onPressed: root.window.startSystemMove() }
         RowLayout {
             anchors.fill: parent; anchors.leftMargin: 12; anchors.rightMargin: 12
             visible: root.toolbarContentVisible; opacity: root.toolbarContentOpacity; enabled: opacity > 0
@@ -288,6 +300,7 @@ Item {
                 Layout.minimumWidth: 0
             }
             PaneZoomControls {
+                id: publishingZoomControls
                 zoomController: root.zoomController
                 pane: "preview"
                 controlsActive: root.editorPane.visible && root.previewPane.visible

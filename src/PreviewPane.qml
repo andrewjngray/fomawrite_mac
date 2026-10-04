@@ -60,6 +60,7 @@ Rectangle {
     property bool synchronizingVisualText: false
     signal scrollFractionChanged(real fraction)
     signal viewportInteraction()
+    signal writingActivity()
     function focusVisualEditor() { visualText.forceActiveFocus(); }
     function focusRenderedSurface() {
         if (visualEditEnabled) visualText.forceActiveFocus();
@@ -333,7 +334,8 @@ Rectangle {
             ? visualText.y + visualText.implicitHeight + 64
             : previewText.implicitHeight + 100)
         boundsBehavior: Flickable.StopAtBounds
-        onMovementStarted: root.viewportInteraction()
+        WheelHandler { target: null; blocking: false; onWheel: root.writingActivity() }
+        onMovementStarted: { root.viewportInteraction(); root.writingActivity(); }
         onContentYChanged: if (root.visible && !root.suspendViewportUpdates)
             root.scrollFractionChanged(contentY / Math.max(1, contentHeight - height))
         ScrollBar.vertical: ScrollBar {}
@@ -356,7 +358,7 @@ Rectangle {
             selectionColor: backend.palette.selection
             selectedTextColor: "white"
             onLinkActivated: function(link) { if (String(link).charAt(0) === "#") root.jumpToAnchor(String(link).slice(1)); else root.linkRequested(link); }
-            Keys.onPressed: root.viewportInteraction()
+            Keys.onPressed: { root.viewportInteraction(); root.writingActivity(); }
             Accessible.name: "Preview: read-only rendered Markdown"
             visible: !root.visualEditEnabled
         }
@@ -379,12 +381,15 @@ Rectangle {
             selectedTextColor: "white"
             font.family: root.visualTypeface
             font.pixelSize: root.visualTextSize
+            onPreeditTextChanged: if (activeFocus && preeditText.length) root.writingActivity()
             onTextChanged: root.applyVisualTextChange()
             onInputMethodComposingChanged: if (!inputMethodComposing) { root.applyVisualTextChange(); visualRefreshTimer.restart(); }
             onCursorRectangleChanged: Qt.callLater(root.ensureVisualCursorVisible)
             onActiveFocusChanged: if (activeFocus) Qt.callLater(root.ensureVisualCursorVisible)
             Keys.priority: Keys.BeforeItem
             Keys.onPressed: function(event) {
+                if (event.text.length || event.key === Qt.Key_Backspace || event.key === Qt.Key_Delete
+                    || event.key === Qt.Key_Up || event.key === Qt.Key_Down || event.key === Qt.Key_PageUp || event.key === Qt.Key_PageDown) root.writingActivity();
                 root.viewportInteraction();
                 if ((event.key === Qt.Key_Tab || event.key === Qt.Key_Backtab)
                         && !(event.modifiers & (Qt.ControlModifier | Qt.AltModifier | Qt.MetaModifier))) {

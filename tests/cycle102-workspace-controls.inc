@@ -261,12 +261,12 @@ void FomawriteTest::previewTemplateFooterAndNativeMenuShareState() {
     QVERIFY(cycle102Click(quick, palatino));
     QTRY_COMPARE(backend.outputStyle(), 6);
     QTRY_VERIFY(!menu->property("visible").toBool());
-    QCOMPARE(button->property("text").toString(), QStringLiteral("Preview · Palatino"));
+    QCOMPARE(button->property("text").toString(), QStringLiteral("Output · Palatino"));
     QVERIFY(nativePalatino->property("checked").toBool());
     QVERIFY(!nativeHelvetica->property("checked").toBool());
     QVERIFY(QMetaObject::invokeMethod(nativeHelvetica, "triggered"));
     QTRY_COMPARE(backend.outputStyle(), 5);
-    QCOMPARE(button->property("text").toString(), QStringLiteral("Preview · Helvetica"));
+    QCOMPARE(button->property("text").toString(), QStringLiteral("Output · Helvetica"));
     QVERIFY(!nativePalatino->property("checked").toBool());
     QVERIFY(nativeHelvetica->property("checked").toBool());
     QCOMPARE(editor->property("text").toString(), draft);
@@ -317,7 +317,7 @@ void FomawriteTest::previewTemplateRemainsReachableInNarrowSplit() {
             QTRY_VERIFY(button->isVisible());
             QCoreApplication::processEvents();
             QRectF previous;
-            for (auto *control : {button, source, visual, single, split}) {
+            for (auto *control : {source, visual, button, single, split}) {
                 const QRectF bounds = control->mapRectToItem(footer, control->boundingRect());
                 QVERIFY2(bounds.left() >= 11 && bounds.right() <= footer->width() - 11,
                          qPrintable(QString("%1 outside %2px footer: x=%3 width=%4").arg(control->objectName()).arg(width).arg(bounds.x()).arg(bounds.width())));

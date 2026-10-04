@@ -13,6 +13,25 @@ QVariantMap cycle112Anchor(QObject *owner, const char *method) {
     if (result.canConvert<QJSValue>()) return result.value<QJSValue>().toVariant().toMap();
     return result.toMap();
 }
+// Query the actual browser DOM in the isolated application world. Source
+// retains its QTextDocument geometry helper below.
+QVariant cycle112WebResult(QQuickItem *field, const QString &script) {
+    auto *engine = qmlEngine(field);
+    if (!engine) return {};
+    engine->globalObject().setProperty("cycle112DomResult", QJSValue(QJSValue::UndefinedValue));
+    const QJSValue callback = engine->evaluate("(function(value) { cycle112DomResult = value; })");
+    if (!QMetaObject::invokeMethod(field, "runJavaScript", Q_ARG(QString, script), Q_ARG(uint, 1), Q_ARG(QJSValue, callback))) return {};
+    QElapsedTimer timer; timer.start();
+    while (engine->globalObject().property("cycle112DomResult").isUndefined() && timer.elapsed() < 2000) QTest::qWait(10);
+    return engine->globalObject().property("cycle112DomResult").toVariant();
+}
+QVariantMap cycle112WebReadingAnchor(QQuickItem *field) {
+    return cycle112WebResult(field, QStringLiteral("(function(){var a=document.body.querySelectorAll('p,h1,h2,h3,h4,h5,h6,pre,table,li,img');for(var i=0;i<a.length;i++){var r=a[i].getBoundingClientRect();if(r.bottom>0)return {index:i,offset:r.top};}return null;})()" )).toMap();
+}
+qreal cycle112WebAnchorDrift(QQuickItem *field, const QVariantMap &anchor) {
+    const auto top = cycle112WebResult(field, QStringLiteral("(function(){var e=document.body.querySelectorAll('p,h1,h2,h3,h4,h5,h6,pre,table,li,img')[%1];return e?e.getBoundingClientRect().top:null;})()").arg(anchor["index"].toInt()));
+    return top.isValid() && !top.isNull() ? top.toReal() - anchor["offset"].toReal() : 999999;
+}
 qreal cycle112AnchorOffset(QQuickItem *field, QObject *scroll, int position) {
     QRectF rect;
     if (!QMetaObject::invokeMethod(field, "positionToRectangle", Q_RETURN_ARG(QRectF, rect), Q_ARG(int, position))) return -999999;
@@ -211,17 +230,17 @@ void FomawriteTest::documentDividerDoubleClickEqualizesWithoutChangingZoom() {
     QTRY_VERIFY(!window->property("changingDocumentView").toBool());
     QTRY_VERIFY(!pane->property("viewportRefreshPending").toBool());
     sourceScroll->setProperty("contentY", 1200.0); previewScroll->setProperty("contentY", 1800.0);
-    QCoreApplication::processEvents();
+    QTRY_VERIFY(qAbs(preview->property("scrollPosition").toPointF().y() - previewScroll->property("contentY").toReal()) < 2);
     const auto sourceAnchor = cycle112Anchor(window.data(), "captureSourceReadingAnchor");
-    const auto previewAnchor = cycle112Anchor(pane, "captureReadingAnchor");
+    const auto previewAnchor = cycle112WebReadingAnchor(preview);
     QVERIFY(!sourceAnchor.isEmpty() && !previewAnchor.isEmpty());
     QVERIFY(cycle102Click(quick, window->findChild<QQuickItem *>("sourceZoomInButton")));
     QTRY_VERIFY(!window->property("changingDocumentView").toBool());
     QVERIFY(qAbs(cycle112AnchorOffset(editor, sourceScroll, sourceAnchor["position"].toInt()) - sourceAnchor["offset"].toReal()) <= 2);
-    QVERIFY(qAbs(cycle112AnchorOffset(preview, previewScroll, previewAnchor["position"].toInt()) - previewAnchor["offset"].toReal()) <= 2);
+    QVERIFY(qAbs(cycle112WebAnchorDrift(preview, previewAnchor)) <= 2);
     QVERIFY(cycle102Click(quick, window->findChild<QQuickItem *>("previewZoomInButton")));
     QTRY_VERIFY(!window->property("changingDocumentView").toBool());
-    QVERIFY(qAbs(cycle112AnchorOffset(preview, previewScroll, previewAnchor["position"].toInt()) - previewAnchor["offset"].toReal()) <= 2);
+    QVERIFY(qAbs(cycle112WebAnchorDrift(preview, previewAnchor)) <= 2);
     QVERIFY(QMetaObject::invokeMethod(layout, "updateWidth", Q_ARG(QVariant, "preview"), Q_ARG(QVariant, 400)));
     QTRY_COMPARE(qRound(pane->width()), 400);
     QVERIFY(qAbs(editorPane->width() - pane->width()) > 100);
@@ -279,9 +298,9 @@ void FomawriteTest::paneZoomPresetsPreserveReadingAnchors() {
     QTRY_VERIFY(!window->property("changingDocumentView").toBool());
     QTRY_VERIFY(!pane->property("viewportRefreshPending").toBool());
     sourceScroll->setProperty("contentY", 1250.0); previewScroll->setProperty("contentY", 1840.0);
-    QCoreApplication::processEvents();
+    QTRY_VERIFY(qAbs(preview->property("scrollPosition").toPointF().y() - previewScroll->property("contentY").toReal()) < 2);
     auto sourceAnchor = cycle112Anchor(window.data(), "captureSourceReadingAnchor");
-    auto previewAnchor = cycle112Anchor(pane, "captureReadingAnchor");
+    auto previewAnchor = cycle112WebReadingAnchor(preview);
     QVERIFY(!sourceAnchor.isEmpty() && !previewAnchor.isEmpty());
     for (int cycle = 0; cycle < 3; ++cycle) {
         for (const auto &[target, action] : {std::pair{"source", "Preset125"}, std::pair{"source", "Reset"},
@@ -290,7 +309,7 @@ void FomawriteTest::paneZoomPresetsPreserveReadingAnchors() {
             QTRY_VERIFY(!window->property("changingDocumentView").toBool());
             QTRY_VERIFY(!pane->property("viewportRefreshPending").toBool());
             const qreal sourceDelta = cycle112AnchorOffset(editor, sourceScroll, sourceAnchor["position"].toInt()) - sourceAnchor["offset"].toReal();
-            const qreal previewDelta = cycle112AnchorOffset(preview, previewScroll, previewAnchor["position"].toInt()) - previewAnchor["offset"].toReal();
+            const qreal previewDelta = cycle112WebAnchorDrift(preview, previewAnchor);
             QVERIFY2(qAbs(sourceDelta) <= 2, qPrintable(QString("Source anchor drifted %1px after %2 %3, cycle %4").arg(sourceDelta).arg(target, action).arg(cycle)));
             QVERIFY2(qAbs(previewDelta) <= 2, qPrintable(QString("Preview anchor drifted %1px after %2 %3, cycle %4").arg(previewDelta).arg(target, action).arg(cycle)));
             QCOMPARE(editor->property("text").toString(), source);
@@ -301,7 +320,7 @@ void FomawriteTest::paneZoomPresetsPreserveReadingAnchors() {
             // direct scroll-property update or a call to the invalidation helper.
             for (auto *scroll : {sourceScroll, previewScroll}) {
                 const qreal oldY = scroll->property("contentY").toReal();
-                auto *item = qobject_cast<QQuickItem *>(scroll); QVERIFY(item);
+                auto *item = scroll == previewScroll ? preview : qobject_cast<QQuickItem *>(scroll); QVERIFY(item);
                 const QPointF local = item->mapToScene(QPointF(item->width() / 2, item->height() / 2));
                 QWheelEvent wheel(local, quick->mapToGlobal(local.toPoint()), QPoint(), QPoint(0, -360),
                                   Qt::NoButton, Qt::NoModifier, Qt::NoScrollPhase, false);
@@ -323,7 +342,7 @@ void FomawriteTest::paneZoomPresetsPreserveReadingAnchors() {
             }
             QCOMPARE(stableSamples, 3);
             sourceAnchor = cycle112Anchor(window.data(), "captureSourceReadingAnchor");
-            previewAnchor = cycle112Anchor(pane, "captureReadingAnchor");
+            previewAnchor = cycle112WebReadingAnchor(preview);
         }
     }
 }

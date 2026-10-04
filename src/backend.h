@@ -20,6 +20,8 @@ class QTextDocument;
 class QWindow;
 class QPagedPaintDevice;
 class QLockFile;
+class QTemporaryDir;
+class QIODevice;
 
 class Backend : public QObject {
     Q_OBJECT
@@ -137,6 +139,8 @@ public:
     Q_INVOKABLE void pageSetup();
     Q_INVOKABLE void printPreview();
     Q_INVOKABLE bool exportDocument(const QUrl &destination, const QString &format);
+    // Private temporary publishing output; never saves or changes the source.
+    Q_INVOKABLE QVariantMap publishingPreview(const QString &format);
     int outputStyle() const { return m_outputStyle; }
     QString outputFont() const;
     int outputPointSize() const;
@@ -254,6 +258,11 @@ private:
     void applyAuthorshipData(const QJsonObject &data);
     bool saveAuthorship(const QUrl &url);
     void loadAuthorship(const QUrl &url);
+    QString outputHtml(QTextDocument &document, QString *error) const;
+    void writeOutputPdf(QIODevice &device, QTextDocument &document) const;
+    std::unique_ptr<QTemporaryDir> m_publishingDirectory;
+    QStringList m_publishingFiles;
+    quint64 m_publishingGeneration = 0;
     void paintOutput(QPagedPaintDevice &device, QTextDocument &document) const;
     void applyTemplate(QTextDocument &document, bool preview) const;
     void prepareOutput(QTextDocument &document, bool plain = false) const;
