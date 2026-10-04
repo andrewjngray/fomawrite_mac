@@ -1528,3 +1528,12 @@ Implemented: independent top/bottom reveal latches reset on every editing/scroll
 Verification, runnable copies and any remaining limitations: [Cycle120 handoff](../research/cycle-120/README.md). [Optional review](../research/usability/cycle-120.md).
 
 Validation: **183 passed, 0 failed, 0 skipped**, including setup/cleanup. Dev, demo and Applications each pass **149 native checks**, with matching UI/version, valid strict signatures and zero QML warnings. Review build **0.3.0-dev16 / macOS 0.3.0 (120)**. No public release. Physical IME, VoiceOver, multi-display and broader parser/export parity remain open.
+
+
+## Cycle 121 — explicit fade and always-visible menu choices
+
+Requested: expose Fade In/Out and Always Show in View → Title Bar, as in Andrew’s iA Writer reference. Existing labels were still connected to a legacy hover-opacity preference that conflicted with document auto-hide. Both choices now use the current persisted document-bar preference, with synchronized checkmarks and the existing Auto-Hide Document Bars checkbox. Fade retains sticky edge reveal; Always Show keeps top and bottom bars visible through typing/scrolling. Separate toolbar-content preferences remain unchanged.
+
+[Verification and runnable copies](../research/cycle-121/README.md). [Optional review](../research/usability/cycle-121.md).
+
+Validation: **183 regressions pass**, including preference persistence after reopening. Dev and demo each pass **149 native executable checks** with matching embedded UI/version and strict signatures. Installed-copy verification is recorded in the handoff. Build **0.3.0-dev17 / macOS 0.3.0 (121)**.

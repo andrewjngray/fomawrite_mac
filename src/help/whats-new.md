@@ -1,5 +1,7 @@
 # What’s New in Fomawrite
 
+Build 121 connects View → Title Bar → Fade In/Out and Always Show to document-bar visibility. Fade In/Out keeps revealed bars visible until typing or scrolling; Always Show keeps both bars visible. The existing Auto-Hide Document Bars checkbox stays synchronized.
+
 Build 120 keeps each document bar visible after you reveal it at an edge. Moving the pointer away or clicking the publishing pane leaves it visible; scrolling or editing hides it again. Pane positions stay fixed. Studio uses a soft grey editing surface with the warm cream publishing surround.
 
 Build 119 adds:

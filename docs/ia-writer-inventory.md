@@ -2,7 +2,9 @@
 
 **Product identity, Cycle 60:** Omawrite was renamed Fomawrite. Historical iA comparisons below retain their original cycle wording; this does not change their implemented/partial/unverified classification. See [migration notes](product-rename.md).
 
-**Current UI overlay — Cycle120:** `0.3.0-dev16`, macOS `0.3.0 (120)`, retains Cycle119 pane ownership. Edge-revealed bars remain visible after pointer departure, until editing or scrolling. Copy/select-all and publishing clicks retain them. Studio pairs a soft grey editor with the existing warm publishing surround; actual export page colors stay intact. [Verification and limits](../research/cycle-120/README.md).
+**Current UI overlay — Cycle121:** View → Title Bar → Fade In/Out / Always Show now controls the persisted top/bottom document-bar behavior, with synchronized menu checkmarks and no legacy hover conflict. [Verification](../research/cycle-121/README.md).
+
+**Previous UI overlay — Cycle120:** `0.3.0-dev16`, macOS `0.3.0 (120)`, retains Cycle119 pane ownership. Edge-revealed bars remain visible after pointer departure, until editing or scrolling. Copy/select-all and publishing clicks retain them. Studio pairs a soft grey editor with the existing warm publishing surround; actual export page colors stay intact. [Verification and limits](../research/cycle-120/README.md).
 
 **Previous UI overlay — Cycle119:** review build `0.3.0-dev15`, macOS `0.3.0 (119)`. The left editor owns Source / Visual Edit and writing appearance. The right pane is read-only publishing output with Web / PDF and an independent output style. HTML and PDF previews reuse the export renderer; PDF displays real pages. Single / Split stays separate at the far right. Document bars hide on typing/scrolling and return at the matching edge without reflow, with keyboard/menu access and an always-visible preference. This clarifies pane ownership without claiming general WYSIWYG or complete competitor/parser parity. See the [Cycle119 verification and limits](../research/cycle-119/README.md).
 

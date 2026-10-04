@@ -28,7 +28,7 @@ Item {
     readonly property bool zoomMenuOpen: editorZoomControls.menuOpen || publishingZoomControls.menuOpen
     readonly property bool documentChromeVisible: !activityHidden || pointerReveal || keyboardReveal || menuOpen
     readonly property bool revealRequested: chromeHover.hovered || pointerReveal || keyboardReveal
-    readonly property real titleContentOpacity: documentChromeVisible && (settings.titleBarMode === 1 || revealRequested) ? 1 : 0
+    readonly property real titleContentOpacity: documentChromeVisible ? 1 : 0
     readonly property real toolbarContentOpacity: documentChromeVisible && (settings.toolbarVisibilityMode === 1 || revealRequested) ? 1 : 0
     readonly property bool toolbarContentVisible: settings.toolbarVisibilityMode !== 2
     readonly property real writingControlsWidth: documentHeader.width - documentHeader.nativeInset

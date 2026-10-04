@@ -4352,18 +4352,18 @@ private slots:
         auto *editor = window->findChild<QObject *>("sourceEditor");
         QVERIFY(settings && commands && chrome && title && leading && trailing && libraryButton && editor);
 
-        const int originalTitleMode = settings->property("titleBarMode").toInt();
+        const bool originalAutoHide = settings->property("autoHideChrome").toBool();
         const int originalToolbarVisibility = settings->property("toolbarVisibilityMode").toInt();
         QObject *restoreSettings = settings;
         auto restore = qScopeGuard([&] {
             if (!restoreSettings) return;
-            restoreSettings->setProperty("titleBarMode", originalTitleMode);
+            restoreSettings->setProperty("autoHideChrome", originalAutoHide);
             restoreSettings->setProperty("toolbarVisibilityMode", originalToolbarVisibility);
         });
 
         QVERIFY(QMetaObject::invokeMethod(commands, "run", Q_ARG(QVariant, QStringLiteral("titleBarFade"))));
         QVERIFY(QMetaObject::invokeMethod(commands, "run", Q_ARG(QVariant, QStringLiteral("toolbarFade"))));
-        QCOMPARE(settings->property("titleBarMode").toInt(), 0);
+        QVERIFY(settings->property("autoHideChrome").toBool());
         QCOMPARE(settings->property("toolbarVisibilityMode").toInt(), 0);
         QVERIFY(leading->property("visible").toBool());
         qobject_cast<QQuickItem *>(libraryButton)->forceActiveFocus(Qt::TabFocusReason);
@@ -4395,7 +4395,7 @@ private slots:
         QVERIFY(leading->property("visible").toBool());
         QTRY_COMPARE(leading->property("opacity").toReal(), 1.0);
 
-        settings->setProperty("titleBarMode", 0);
+        settings->setProperty("autoHideChrome", true);
         settings->setProperty("toolbarVisibilityMode", 2);
         restoreSettings = nullptr;
         window.reset();
@@ -4409,9 +4409,9 @@ private slots:
         auto *reopenedSettings = reopened->findChild<QObject *>("workspaceSettings");
         QVERIFY(reopenedSettings);
         restoreSettings = reopenedSettings;
-        QCOMPARE(reopenedSettings->property("titleBarMode").toInt(), 0);
+        QVERIFY(reopenedSettings->property("autoHideChrome").toBool());
         QCOMPARE(reopenedSettings->property("toolbarVisibilityMode").toInt(), 2);
-        reopenedSettings->setProperty("titleBarMode", originalTitleMode);
+        reopenedSettings->setProperty("autoHideChrome", originalAutoHide);
         reopenedSettings->setProperty("toolbarVisibilityMode", originalToolbarVisibility);
         QVERIFY(QMetaObject::invokeMethod(reopenedSettings, "sync"));
         restoreSettings = nullptr;

@@ -567,6 +567,7 @@ ApplicationWindow {
         onSentenceFocusChanged: backend.setFocusPosition(editor.cursorPosition, paragraphFocus, sentenceFocus)
         property bool paragraphFocus: false
         onParagraphFocusChanged: backend.setFocusPosition(editor.cursorPosition, paragraphFocus, sentenceFocus)
+        // Retain the legacy setting for migration; Title Bar now uses autoHideChrome.
         property int titleBarMode: 1
         property int toolbarVisibilityMode: 1
         property string publishingFormat: "web"
@@ -1808,6 +1809,7 @@ ApplicationWindow {
             NativeCommand { commandId: "outline" }
             NativeCommand { commandId: "statistics" }
             Platform.Menu {
+                objectName: "nativeTitleBarMenu"
                 title: "Title Bar"
                 NativeCommand { commandId: "titleBarFade" }
                 NativeCommand { commandId: "titleBarAlways" }

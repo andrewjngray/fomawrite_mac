@@ -1168,7 +1168,13 @@ int runDocumentViewCheck(QApplication &app, const QString &outputDirectory) {
         settings->setProperty("autoHideChrome", true);
         auto *header = child("topChrome");
         auto *toggle = window->findChild<QObject *>("nativeAutoHideDocumentChrome");
-        if (!check(header && toggle, "Auto-hide document chrome controls are missing")) return;
+        auto *fade = window->findChild<QObject *>("native_titleBarFade");
+        auto *always = window->findChild<QObject *>("native_titleBarAlways");
+        if (!check(header && toggle && fade && always, "Document chrome menu controls are missing")) return;
+        check(fade->property("text").toString() == "Fade In/Out"
+            && always->property("text").toString() == "Always Show", "Native Title Bar labels differ from the requested choices");
+        check(fade->property("checked").toBool() && !always->property("checked").toBool(),
+            "Native Title Bar choices disagree with enabled auto-hide");
         const auto geometry = [&] {
             QMap<QString, QRectF> result;
             for (auto *item : {child("editorPane"), sourceScroll, pane, header, footer})
@@ -1239,6 +1245,39 @@ int runDocumentViewCheck(QApplication &app, const QString &outputDirectory) {
         check(QMetaObject::invokeMethod(toggle, "triggered"), "Cannot choose native always-visible document bars");
         check(waitUntil([&] { return !settings->property("autoHideChrome").toBool() && footer->property("chromeVisible").toBool(); }),
             "Native View toggle did not restore always-visible document bars");
+        check(always->property("checked").toBool() && !fade->property("checked").toBool(),
+            "Native checkbox did not synchronize Title Bar choices");
+        settings->setProperty("titleBarMode", 0);
+        const int toolbarPreference = settings->property("toolbarVisibilityMode").toInt();
+        check(QMetaObject::invokeMethod(always, "triggered"), "Cannot select Title Bar Always Show");
+        movePointer(writingPoint);
+        editor->forceActiveFocus(Qt::MouseFocusReason);
+        const QString alwaysText = editor->property("text").toString();
+        key(window, Qt::Key_unknown, "a");
+        check(waitUntil([&] { return editor->property("text").toString() != alwaysText; }), "Always Show typing did not edit source");
+        check(!settings->property("autoHideChrome").toBool() && !toggle->property("checked").toBool()
+            && always->property("checked").toBool() && !fade->property("checked").toBool()
+            && header->property("documentChromeVisible").toBool() && footer->property("chromeVisible").toBool()
+            && header->property("titleContentOpacity").toReal() == 1,
+            "Always Show did not retain document bars while typing with legacy fade preference");
+        settings->setProperty("titleBarMode", 1);
+        check(QMetaObject::invokeMethod(fade, "triggered"), "Cannot select Title Bar Fade In/Out");
+        const QString fadeText = editor->property("text").toString();
+        key(window, Qt::Key_unknown, "f");
+        check(waitUntil([&] { return editor->property("text").toString() != fadeText
+            && !header->property("documentChromeVisible").toBool() && !footer->property("chromeVisible").toBool(); }),
+            "Fade In/Out did not restore hiding during actual typing");
+        check(settings->property("autoHideChrome").toBool() && toggle->property("checked").toBool()
+            && fade->property("checked").toBool() && !always->property("checked").toBool()
+            && header->property("titleContentOpacity").toReal() == 0
+            && settings->property("toolbarVisibilityMode").toInt() == toolbarPreference,
+            "Title Bar Fade selection changed toolbar preference or disagreed with checkbox");
+        movePointer(QPointF(window->width() - 4, 4));
+        check(waitUntil([&] { return header->property("documentChromeVisible").toBool(); }), "Fade selection lost top-edge reveal");
+        movePointer(writingPoint);
+        settle(200);
+        check(header->property("documentChromeVisible").toBool() && header->property("titleContentOpacity").toReal() == 1,
+            "Fade selection lost sticky title reveal after pointer departure");
         check(geometry() == baseline, "Native chrome preference changed writing geometry");
     });
 

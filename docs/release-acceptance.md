@@ -1,6 +1,10 @@
 # Acceptance ledger — current follow-through and Cycle 59 history
 
-## Current review build — Cycle 120
+## Current review build — Cycle 121
+
+**0.3.0-dev17 / macOS 0.3.0 (121)** exposes consistent Fade In/Out and Always Show choices. [Verification and limits](../research/cycle-121/README.md).
+
+## Previous review build — Cycle 120
 
 Build **0.3.0-dev16 / macOS 0.3.0 (120)** refines persistent edge reveal and Studio pane tones. [Cycle120 handoff and verification](../research/cycle-120/README.md). Historical acceptance gaps below remain open.
 
