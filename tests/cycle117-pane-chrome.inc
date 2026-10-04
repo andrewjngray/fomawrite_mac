@@ -36,6 +36,8 @@ struct Cycle117Window {
     bool mode(int value) {
         if (value == 2) { if (!cycle118ReadPreview(window.data())) return false; }
         else if (!cycle102Click(quick, footer->findChild<QQuickItem *>(value == 0 ? "singleModeButton" : "previewSplitButton"))) return false;
+        if (QGuiApplication::platformName() == "cocoa")
+            return cycle118FooterRenderBarrier(quick);
         QSignalSpy painted(quick, &QQuickWindow::frameSwapped);
         quick->update();
         return QTest::qWaitFor([&] { return !painted.isEmpty(); }, 1000);

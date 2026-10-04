@@ -91,13 +91,13 @@ void FomawriteTest::visualSplitEditsCanonicalSourceAndKeepsPreviewReadOnly() {
     const int point = visual->property("text").toString().indexOf("café"); QVERIFY(point >= 0);
     visual->forceActiveFocus();
     QVERIFY(QMetaObject::invokeMethod(visual, "select", Q_ARG(int, point), Q_ARG(int, point + 4)));
-    QTest::keyClick(f.quick, Qt::Key_B, Qt::NoModifier);
+    cycle111KeyClick(f.quick, 'b');
     const QString edited = QString(saved).replace("café", "b");
     QTRY_COMPARE(f.editor->property("text").toString(), edited);
     QTRY_VERIFY(f.backend.modified());
     const int revision = f.backend.documentRevision();
     QVERIFY(QMetaObject::invokeMethod(f.preview, "focusRenderedSurface"));
-    QTest::keyClick(f.quick, Qt::Key_X, Qt::NoModifier);
+    cycle111KeyClick(f.quick, 'x');
     QCOMPARE(f.editor->property("text").toString(), edited); QCOMPARE(f.backend.documentRevision(), revision);
     for (int mode : {0, 1, 0, 1}) {
         QVERIFY(f.mode(mode)); QTRY_COMPARE(f.layout->property("effectiveLayoutMode").toInt(), mode);

@@ -1,4 +1,17 @@
 namespace {
+// Nonactivating Cocoa QA windows may be occluded, which pauses automatic
+// polish/render frames. Flush two actual frames before inspecting geometry;
+// the fixed count never waits for a desired result or relaxes an assertion.
+bool cycle118FooterRenderBarrier(QQuickWindow *window) {
+    if (QGuiApplication::platformName() != "cocoa") return true;
+    if (!window) return false;
+    for (int frame = 0; frame < 2; ++frame) {
+        window->requestUpdate();
+        if (window->grabWindow().isNull()) return false;
+        QCoreApplication::processEvents(QEventLoop::AllEvents, 10);
+    }
+    return true;
+}
 QMap<QString, QRectF> cycle107ViewBounds(QQuickItem *footer) {
     QMap<QString, QRectF> result;
     for (const char *name : {"sourceModeButton", "visualEditToggle", "singleModeButton", "previewSplitButton"}) {
@@ -100,6 +113,7 @@ void FomawriteTest::footerViewControlsStayStationaryAcrossModes() {
             QVERIFY(cycle102Click(quick, source));
             QVERIFY(cycle102Click(quick, full));
             QTRY_COMPARE(layout->property("effectiveLayoutMode").toInt(), 0);
+            QVERIFY(cycle118FooterRenderBarrier(quick));
             QTRY_VERIFY(cycle106FooterControlsFit(window.data()));
             const auto initial = cycle107ViewBounds(footer);
             QCOMPARE(initial.size(), 4);
@@ -123,6 +137,7 @@ void FomawriteTest::footerViewControlsStayStationaryAcrossModes() {
                 for (int step = 0; step < steps.size(); ++step) {
                     QVERIFY(cycle102Click(quick, steps[step].first));
                     QTRY_COMPARE(layout->property("effectiveLayoutMode").toInt(), steps[step].second);
+                    QVERIFY(cycle118FooterRenderBarrier(quick));
                     QTRY_VERIFY(cycle107SameBounds(cycle107ViewBounds(footer), initial));
                     QTRY_VERIFY(cycle117PaneFooterAnchors(window.data()));
                     QTRY_VERIFY(cycle107ViewChecked(footer, layout));
@@ -221,8 +236,10 @@ void FomawriteTest::footerViewCyclesPreserveDraftSelectionAndWidths() {
     layout->setProperty("previewWidth", 382);
     auto *previewScroll = pane->findChild<QQuickItem *>("previewScroll"); QVERIFY(previewScroll);
     QVERIFY(cycle118ReadPreview(window.data()));
+    QVERIFY(cycle118FooterRenderBarrier(quick));
     QTRY_VERIFY(!window->property("changingDocumentView").toBool());
     QTRY_VERIFY(!pane->property("viewportRefreshPending").toBool());
+    QVERIFY(cycle118FooterRenderBarrier(quick));
     const qreal originalPreviewHeight = previewScroll->property("contentHeight").toReal();
     QVERIFY(originalPreviewHeight > previewScroll->height() * 2);
     for (bool navigation : {true, false}) {
@@ -291,9 +308,13 @@ void FomawriteTest::footerViewCyclesPreserveDraftSelectionAndWidths() {
     layout->setProperty("organizerVisible", true);
     layout->setProperty("filesVisible", true);
     QVERIFY(cycle118ReadPreview(window.data()));
+    QVERIFY(cycle118FooterRenderBarrier(quick));
     QTRY_VERIFY(!window->property("changingDocumentView").toBool());
     QTRY_VERIFY(!pane->property("viewportRefreshPending").toBool());
-    QTRY_VERIFY(qAbs(previewScroll->property("contentHeight").toReal() - originalPreviewHeight) <= 2);
+    QVERIFY(cycle118FooterRenderBarrier(quick));
+    QTRY_VERIFY2(qAbs(previewScroll->property("contentHeight").toReal() - originalPreviewHeight) <= 2,
+                 qPrintable(QString("Read-only Preview height changed after returning to the same layout: before %1 after %2, pane width %3")
+                     .arg(originalPreviewHeight).arg(previewScroll->property("contentHeight").toReal()).arg(pane->width())));
 
     // A new document supersedes an in-flight view restoration. Loading a short
     // note after long visual content must leave no inherited blank scroll tail.
