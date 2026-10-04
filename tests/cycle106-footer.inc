@@ -215,17 +215,17 @@ void FomawriteTest::footerAppearanceAndStatisticsWorkByClick() {
     QCOMPARE(families.size(), 3);
     QCOMPARE(editor->property("font").value<QFont>(), originalFont);
     for (const auto &[object, size] : {
-             std::pair{"sourceAppearanceLarger", 18}, std::pair{"sourceAppearanceSmaller", 16},
-             std::pair{"sourceAppearanceSmaller", 14}, std::pair{"sourceAppearanceReset", 16}}) {
+             std::pair{"sourceAppearanceLarger", 110}, std::pair{"sourceAppearanceSmaller", 100},
+             std::pair{"sourceAppearanceSmaller", 90}, std::pair{"sourceAppearanceReset", 100}}) {
         QVERIFY(cycle102Click(quick, appearance));
         QTRY_VERIFY(menu->property("opened").toBool());
         QVERIFY(cycle106MenuFits(quick, menu, appearance));
         QVERIFY(cycle102Click(quick, window->findChild<QQuickItem *>(object)));
-        QTRY_COMPARE(settings->property("writingSize").toInt(), size);
-        QCOMPARE(editor->property("font").value<QFont>().pixelSize(), originalFont.pixelSize() + size - 16);
+        QTRY_COMPARE(settings->property("sourceZoom").toInt(), size);
+        QCOMPARE(editor->property("font").value<QFont>().pixelSize(), qRound(originalFont.pixelSize() * size / 100.0));
     }
-    for (const auto &[size, disabled] : {std::pair{12, "sourceAppearanceSmaller"}, std::pair{32, "sourceAppearanceLarger"}}) {
-        settings->setProperty("writingSize", size);
+    for (const auto &[size, disabled] : {std::pair{75, "sourceAppearanceSmaller"}, std::pair{200, "sourceAppearanceLarger"}}) {
+        settings->setProperty("sourceZoom", size);
         QVERIFY(cycle102Click(quick, appearance));
         QTRY_VERIFY(menu->property("opened").toBool());
         auto *item = window->findChild<QQuickItem *>(disabled); QVERIFY(item);
@@ -233,7 +233,7 @@ void FomawriteTest::footerAppearanceAndStatisticsWorkByClick() {
         QVERIFY(QMetaObject::invokeMethod(menu, "close"));
         QTRY_VERIFY(!menu->property("visible").toBool());
     }
-    settings->setProperty("writingSize", 16);
+    settings->setProperty("sourceZoom", 100);
     settings->setProperty("toolbarMode", 1);
     auto *statistics = window->findChild<QQuickItem *>("toolbarStatistic"); QVERIFY(statistics);
     QVERIFY(cycle102Click(quick, statistics));

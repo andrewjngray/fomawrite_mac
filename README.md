@@ -46,8 +46,8 @@ The upstream Omawrite code is copyright David Heinemeier Hansson and remains und
 
 ## Current workspace review build
 
-The current review target is **0.3.0-dev10**, macOS bundle **0.3.0 (111)**. Cycles109–111 improve daily writing: safe list-item splitting in Visual Edit, a searchable keyboard-accessible outline, and responsive Find/Replace that starts near the caret and advances through replacements. A typography fix preserves remaining Redo history. The stationary document footer remains covered by repeated native view checks.
+The current review target is **0.3.0-dev11**, macOS bundle **0.3.0 (112)**. Source and Preview now have independent, saved zoom controls, optional linked zoom and a readable Preview baseline. Repeated zoom/reset preserves the reading passage; the document divider supports dragging and double-click balance. Screen magnification leaves Markdown and exported typography unchanged. The daily-writing improvements from Cycles109–111 and stationary footer remain included.
 
-Use `dist/Fomawrite Dev.app`, `/Applications/Fomawrite.app` or the ordinary/demo package `dist/Fomawrite.app` after the recorded refresh. [Cycle111](research/cycle-111/README.md) records exact bundle identities, verification and limits. The old public GitHub RC1 remains an earlier release.
+Use `dist/Fomawrite Dev.app`, `/Applications/Fomawrite.app` or the ordinary/demo package `dist/Fomawrite.app` after the recorded refresh. [Cycle112](research/cycle-112/README.md) records exact bundle identities, verification and limits. The old public GitHub RC1 remains an earlier release.
 
 Visual Edit preserves canonical Markdown and keeps explicit Source fallback for complex/nested structures and unsupported multiline operations. [The workspace plan](docs/workspace-ui-redesign-plan.md) records the design direction and remaining acceptance work.

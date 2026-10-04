@@ -14,12 +14,14 @@ bool cycle104HeaderControlsFit(QObject *window) {
                             "collapseOrganizerButton", "restoreOrganizerButton", "restoreFilesButton",
                             "documentBackButton", "documentForwardButton", "documentSearchButton",
                             "compactBoldButton", "compactItalicButton", "compactLinkButton", "compactParagraphButton",
-                            "compactFormatButton", "workspaceZoomOutButton", "workspaceZoomInButton",
+                            "compactFormatButton", "sourceZoomOutButton", "sourceZoomMenuButton", "sourceZoomInButton",
+                            "previewZoomOutButton", "previewZoomMenuButton", "previewZoomInButton",
                             "workspaceAppearanceButton", "exportHubButton", "topChromeLibraryButton"}) {
         auto *item = window->findChild<QQuickItem *>(name);
         if (!item || !item->isVisible()) continue;
         auto *header = item->parentItem();
         while (header && header->objectName() != "documentHeader"
+                      && header->objectName() != "previewHeader"
                       && header->objectName() != "filesHeader"
                       && header->objectName() != "organizerHeader") header = header->parentItem();
         if (!header || item->width() < 1 || item->height() < 1) return false;
@@ -45,93 +47,85 @@ void FomawriteTest::headerQuickZoomPreservesMarkdownAndUndo() {
     QVERIFY(cycle103Write(path, source));
     Backend backend;
     QQmlEngine engine; engine.rootContext()->setContextProperty("backend", &backend);
-    QQmlComponent component(&engine, QUrl::fromLocalFile(QFINDTESTDATA("../src/Main.qml")));
+    QQmlComponent component(&engine, QUrl(QStringLiteral("qrc:/Main.qml")));
     QScopedPointer<QObject> window(component.create()); QVERIFY2(window, qPrintable(component.errorString()));
     auto *quick = qobject_cast<QQuickWindow *>(window.data());
     auto *settings = window->findChild<QObject *>("workspaceSettings");
+    auto *zoom = window->findChild<QObject *>("paneZoomState");
     auto *layout = window->findChild<QObject *>("workspaceLayout");
-    auto *editor = window->findChild<QObject *>("sourceEditor");
-    auto *previewPane = window->findChild<QQuickItem *>("previewPane");
-    auto *preview = previewPane ? previewPane->findChild<QQuickItem *>("renderedPreview") : nullptr;
-    auto *visual = previewPane ? previewPane->findChild<QQuickItem *>("visualEditor") : nullptr;
-    auto *minus = window->findChild<QQuickItem *>("workspaceZoomOutButton");
-    auto *plus = window->findChild<QQuickItem *>("workspaceZoomInButton");
-    QVERIFY(quick && settings && layout && editor && preview && visual && minus && plus);
-    quick->resize(1280, 900); quick->show(); quick->requestActivate();
+    auto *editor = window->findChild<QQuickItem *>("sourceEditor");
+    auto *pane = window->findChild<QQuickItem *>("previewPane");
+    auto *preview = pane ? pane->findChild<QQuickItem *>("renderedPreview") : nullptr;
+    auto *visual = pane ? pane->findChild<QQuickItem *>("visualEditor") : nullptr;
+    QVERIFY(quick && settings && zoom && layout && editor && pane && preview && visual);
+    if (QGuiApplication::platformName() == "cocoa") quick->setFlag(Qt::WindowDoesNotAcceptFocus);
+    Cycle106MouseInputIsolation input(quick);
+    quick->resize(1440, 900); quick->show();
+    QVERIFY(QTest::qWaitForWindowExposed(quick));
     QVERIFY(backend.open(QUrl::fromLocalFile(path)));
     QVERIFY(QMetaObject::invokeMethod(window.data(), "applyReferenceWorkspace"));
     backend.setOutputStyle(6);
-    const auto pointSize = backend.outputPointSize();
-    const auto font = backend.outputFont();
+    const auto pointSize = backend.outputPointSize(); const auto font = backend.outputFont();
     const auto cleanup = qScopeGuard([&] { backend.discardRecovery(); });
-
-    // The user-facing controls must change text size without creating an edit.
-    QVERIFY(cycle102Click(quick, plus));
-    QCOMPARE(settings->property("writingSize").toInt(), 18);
-    QVERIFY(!backend.modified());
-    QVERIFY(!editor->property("canUndo").toBool());
-    QVERIFY(cycle102Click(quick, minus));
-    QCOMPARE(settings->property("writingSize").toInt(), 16);
-    QVERIFY(QMetaObject::invokeMethod(editor, "insert", Q_ARG(int, editor->property("text").toString().size()),
-                                     Q_ARG(QString, QStringLiteral("Unsaved addition."))));
+    auto click = [&](const char *name) { return cycle102Click(quick, window->findChild<QQuickItem *>(name)); };
+    QVERIFY(click("sourceZoomInButton"));
+    QCOMPARE(zoom->property("sourceZoom").toInt(), 110);
+    QCOMPARE(zoom->property("previewZoom").toInt(), 100);
+    QVERIFY(!backend.modified()); QVERIFY(!editor->property("canUndo").toBool());
+    QVERIFY(click("sourceZoomOutButton"));
+    QCOMPARE(zoom->property("sourceZoom").toInt(), 100);
+    QVERIFY(QMetaObject::invokeMethod(editor, "insert", Q_ARG(int, editor->property("text").toString().size()), Q_ARG(QString, QStringLiteral("Unsaved addition."))));
     const QString draft = editor->property("text").toString();
-    QVERIFY(backend.modified());
-
-    for (int mode = 0; mode < 3; ++mode) {
-        layout->setProperty("layoutMode", mode == 0 ? 0 : 2);
-        layout->setProperty("visualEditEnabled", mode == 2);
-        QObject *surface = mode == 0 ? editor : mode == 1 ? preview : visual;
-        QTRY_VERIFY(qobject_cast<QQuickItem *>(surface)->isVisible());
-        QTest::qWait(180); // Wait for the preview's Markdown reparse/style pass too.
-        QTRY_VERIFY(cycle104BodyLineHeight(surface) > 0);
-        const qreal beforeLine = cycle104BodyLineHeight(surface);
-        const int before = surface->property("font").value<QFont>().pixelSize();
-        QVERIFY(cycle102Click(quick, minus));
-        QCOMPARE(settings->property("writingSize").toInt(), 14);
-        QTest::qWait(180);
-        QTRY_VERIFY(cycle104BodyLineHeight(surface) < beforeLine);
-        QVERIFY(cycle102Click(quick, plus));
-        QCOMPARE(settings->property("writingSize").toInt(), 16);
-        QTest::qWait(180);
-        QTRY_COMPARE(cycle104BodyLineHeight(surface), beforeLine);
-        QVERIFY(cycle102Click(quick, plus));
-        QCOMPARE(settings->property("writingSize").toInt(), 18);
-        QTRY_VERIFY(surface->property("font").value<QFont>().pixelSize() > before);
-        QTest::qWait(180);
-        QTRY_VERIFY(cycle104BodyLineHeight(surface) > beforeLine);
-        const qreal largerLine = cycle104BodyLineHeight(surface);
-        const int larger = surface->property("font").value<QFont>().pixelSize();
-        QVERIFY(cycle102Click(quick, plus));
-        QCOMPARE(settings->property("writingSize").toInt(), 20);
-        QTRY_VERIFY(surface->property("font").value<QFont>().pixelSize() > larger);
-        QTest::qWait(180);
-        QTRY_VERIFY(cycle104BodyLineHeight(surface) > largerLine);
-        QVERIFY(cycle102Click(quick, minus));
-        QVERIFY(cycle102Click(quick, minus));
-        QCOMPARE(settings->property("writingSize").toInt(), 16);
-        QTRY_COMPARE(surface->property("font").value<QFont>().pixelSize(), before);
-        QTest::qWait(180);
-        QTRY_COMPARE(cycle104BodyLineHeight(surface), beforeLine);
+    QVERIFY(draft.endsWith("Unsaved addition.")); QVERIFY(backend.modified());
+    QVERIFY(QMetaObject::invokeMethod(editor, "select", Q_ARG(int, 5), Q_ARG(int, 12)));
+    layout->setProperty("organizerVisible", false); layout->setProperty("filesVisible", false);
+    QVERIFY(QMetaObject::invokeMethod(window.data(), "setDocumentView", Q_ARG(QVariant, 1)));
+    QTRY_VERIFY(editor->isVisible() && pane->isVisible());
+    QTRY_VERIFY(!window->property("changingDocumentView").toBool());
+    QTRY_VERIFY(cycle104BodyLineHeight(editor) > 0 && cycle104BodyLineHeight(preview) > 0);
+    const auto sourceFont = editor->property("font").value<QFont>();
+    const auto previewFont = preview->property("font").value<QFont>();
+    const qreal sourceLine = cycle104BodyLineHeight(editor), previewLine = cycle104BodyLineHeight(preview);
+    QVERIFY(click("sourceZoomInButton"));
+    QTRY_VERIFY(cycle104BodyLineHeight(editor) > sourceLine);
+    QCOMPARE(preview->property("font").value<QFont>(), previewFont);
+    QCOMPARE(cycle104BodyLineHeight(preview), previewLine);
+    QCOMPARE(editor->property("selectionStart").toInt(), 5); QCOMPARE(editor->property("selectionEnd").toInt(), 12);
+    const auto enlargedSource = editor->property("font").value<QFont>();
+    QVERIFY(click("previewZoomInButton"));
+    QTRY_VERIFY(preview->property("font").value<QFont>().pixelSize() > previewFont.pixelSize());
+    QTRY_VERIFY(cycle104BodyLineHeight(preview) > previewLine);
+    QCOMPARE(editor->property("font").value<QFont>(), enlargedSource);
+    QCOMPARE(zoom->property("sourceZoom").toInt(), 110); QCOMPARE(zoom->property("previewZoom").toInt(), 110);
+    QVERIFY(click("sourceZoomOutButton")); QVERIFY(click("previewZoomOutButton"));
+    QTRY_COMPARE(editor->property("font").value<QFont>(), sourceFont);
+    QTRY_COMPARE(preview->property("font").value<QFont>(), previewFont);
+    // Visual Edit shares the right pane's independent zoom, including in Split.
+    QVERIFY(QMetaObject::invokeMethod(window.data(), "selectWritingMode", Q_ARG(QVariant, "visual")));
+    QTRY_VERIFY(!window->property("changingDocumentView").toBool());
+    QVERIFY(QMetaObject::invokeMethod(window.data(), "setDocumentView", Q_ARG(QVariant, 1)));
+    QTRY_VERIFY(editor->isVisible() && visual->isVisible());
+    QTRY_VERIFY(!window->property("changingDocumentView").toBool());
+    const int visualSize = visual->property("font").value<QFont>().pixelSize();
+    QTRY_VERIFY(cycle104BodyLineHeight(visual) > 0);
+    const qreal visualLine = cycle104BodyLineHeight(visual);
+    QVERIFY(click("previewZoomInButton"));
+    QTRY_VERIFY(visual->property("font").value<QFont>().pixelSize() > visualSize);
+    QTRY_VERIFY(cycle104BodyLineHeight(visual) > visualLine);
+    QCOMPARE(editor->property("font").value<QFont>(), sourceFont);
+    QCOMPARE(zoom->property("sourceZoom").toInt(), 100);
+    QCOMPARE(zoom->property("previewZoom").toInt(), 110);
+    for (const QString &mode : {QStringLiteral("source"), QStringLiteral("preview"), QStringLiteral("visual")}) {
+        QVERIFY(QMetaObject::invokeMethod(window.data(), "selectWritingMode", Q_ARG(QVariant, mode)));
+        QTRY_VERIFY(!window->property("changingDocumentView").toBool());
+        QCOMPARE(zoom->property("sourceZoom").toInt(), 100); QCOMPARE(zoom->property("previewZoom").toInt(), 110);
         QCOMPARE(editor->property("text").toString(), draft);
-        QCOMPARE(backend.outputStyle(), 6);
-        QCOMPARE(backend.outputPointSize(), pointSize);
-        QCOMPARE(backend.outputFont(), font);
-        QVERIFY(backend.modified());
     }
-
-    layout->setProperty("visualEditEnabled", false);
-    layout->setProperty("layoutMode", 0);
-    while (settings->property("writingSize").toInt() < 32) QVERIFY(cycle102Click(quick, plus));
-    QTRY_VERIFY(!plus->isEnabled());
-    QVERIFY(minus->isEnabled());
-    while (settings->property("writingSize").toInt() > 12) QVERIFY(cycle102Click(quick, minus));
-    QTRY_VERIFY(!minus->isEnabled());
-    QVERIFY(plus->isEnabled());
-    QCOMPARE(editor->property("text").toString(), draft);
-    QVERIFY(QMetaObject::invokeMethod(editor, "undo"));
-    QCOMPARE(editor->property("text").toString(), QString::fromUtf8(source));
-    QVERIFY(QMetaObject::invokeMethod(editor, "redo"));
-    QCOMPARE(editor->property("text").toString(), draft);
+    QCOMPARE(backend.outputStyle(), 6); QCOMPARE(backend.outputPointSize(), pointSize); QCOMPARE(backend.outputFont(), font);
+    QCOMPARE(editor->property("selectionStart").toInt(), 5); QCOMPARE(editor->property("selectionEnd").toInt(), 12);
+    QVERIFY(backend.modified());
+    QVERIFY(QMetaObject::invokeMethod(editor, "undo")); QCOMPARE(editor->property("text").toString(), QString::fromUtf8(source));
+    QVERIFY(QMetaObject::invokeMethod(editor, "redo")); QCOMPARE(editor->property("text").toString(), draft);
     QCOMPARE(cycle103Read(path), source);
 }
 
@@ -139,40 +133,48 @@ void FomawriteTest::headerQuickControlsStayReachableWhenResized() {
     Cycle103SettingsSnapshot isolatedSettings;
     Backend backend;
     QQmlEngine engine; engine.rootContext()->setContextProperty("backend", &backend);
-    QQmlComponent component(&engine, QUrl::fromLocalFile(QFINDTESTDATA("../src/Main.qml")));
+    QQmlComponent component(&engine, QUrl(QStringLiteral("qrc:/Main.qml")));
     QScopedPointer<QObject> window(component.create()); QVERIFY2(window, qPrintable(component.errorString()));
     auto *quick = qobject_cast<QQuickWindow *>(window.data());
-    auto *settings = window->findChild<QObject *>("workspaceSettings");
+    auto *zoom = window->findChild<QObject *>("paneZoomState");
     auto *layout = window->findChild<QObject *>("workspaceLayout");
-    auto *editor = window->findChild<QObject *>("sourceEditor");
-    auto *minus = window->findChild<QQuickItem *>("workspaceZoomOutButton");
-    auto *plus = window->findChild<QQuickItem *>("workspaceZoomInButton");
-    auto *appearance = window->findChild<QQuickItem *>("workspaceAppearanceButton");
-    QVERIFY(quick && settings && layout && editor && minus && plus && appearance);
-    quick->resize(1440, 900); quick->show(); quick->requestActivate();
+    auto *editor = window->findChild<QQuickItem *>("sourceEditor");
+    auto *pane = window->findChild<QQuickItem *>("previewPane");
+    QVERIFY(quick && zoom && layout && editor && pane);
+    if (QGuiApplication::platformName() == "cocoa") quick->setFlag(Qt::WindowDoesNotAcceptFocus);
+    Cycle106MouseInputIsolation input(quick);
+    quick->resize(1440, 800); quick->show(); QVERIFY(QTest::qWaitForWindowExposed(quick));
     QVERIFY(QMetaObject::invokeMethod(window.data(), "applyReferenceWorkspace"));
-    editor->setProperty("text", "# A quieter place to write\n\nQuick text-size controls keep the writing close.\n");
+    editor->setProperty("text", "# Quick controls\n\nA café draft stays within reach.\n");
     const auto cleanup = qScopeGuard([&] { backend.discardRecovery(); });
-    for (int mode : {0, 1, 2}) {
-        layout->setProperty("layoutMode", mode);
-        for (int width : {1440, 1100, 980, 900, 720}) {
-            quick->resize(width, 800);
-            QTRY_VERIFY(cycle104HeaderControlsFit(window.data()));
-            QVERIFY(minus->isVisible() && plus->isVisible() && appearance->isVisible());
-            QVERIFY(cycle102Click(quick, plus));
-            QCOMPARE(settings->property("writingSize").toInt(), 18);
-            QVERIFY(cycle102Click(quick, minus));
-            QCOMPARE(settings->property("writingSize").toInt(), 16);
-            if (mode == 0 && (width == 1440 || width == 720))
-                QVERIFY(cycle102Capture(quick, width == 1440 ? "cycle104-controls-wide" : "cycle104-controls-narrow"));
+    for (bool dark : {false, true}) {
+        backend.setThemePreset(dark ? "dark" : "studio");
+        for (int mode : {0, 1, 2}) {
+            for (int width : {1440, 1100, 980, 900, 820, 803, 720}) {
+                quick->resize(width, 800);
+                QVERIFY(QMetaObject::invokeMethod(window.data(), "setDocumentView", Q_ARG(QVariant, mode)));
+                QTRY_VERIFY(!window->property("changingDocumentView").toBool());
+                QTRY_VERIFY(cycle104HeaderControlsFit(window.data()));
+                for (const QString &target : {QStringLiteral("source"), QStringLiteral("preview")}) {
+                    const bool visible = target == "source" ? editor->isVisible() : pane->isVisible();
+                    if (!visible) continue;
+                    auto *minus = window->findChild<QQuickItem *>(target + "ZoomOutButton");
+                    auto *plus = window->findChild<QQuickItem *>(target + "ZoomInButton");
+                    auto *menu = window->findChild<QQuickItem *>(target + "ZoomMenuButton");
+                    QVERIFY(minus && plus && menu && minus->isVisible() && plus->isVisible() && menu->isVisible());
+                    QVERIFY(cycle102Click(quick, plus)); QCOMPARE(zoom->property(qPrintable(target + "Zoom")).toInt(), 110);
+                    QVERIFY(cycle102Click(quick, minus)); QCOMPARE(zoom->property(qPrintable(target + "Zoom")).toInt(), 100);
+                    QVERIFY(cycle102Click(quick, menu));
+                    auto *popup = window->findChild<QObject *>(target + "ZoomMenu"); QVERIFY(popup);
+                    QTRY_VERIFY(popup->property("opened").toBool());
+                    auto *parent = qvariant_cast<QQuickItem *>(popup->property("parent")); QVERIFY(parent);
+                    const QRectF bounds = parent->mapRectToScene(QRectF(popup->property("x").toReal(), popup->property("y").toReal(), popup->property("width").toReal(), popup->property("height").toReal()));
+                    QVERIFY(QRectF(QPointF(), quick->size()).adjusted(-1, -1, 1, 1).contains(bounds));
+                    QVERIFY(QMetaObject::invokeMethod(popup, "close")); QTRY_VERIFY(!popup->property("visible").toBool());
+                }
+            }
         }
     }
-    layout->setProperty("organizerVisible", false);
-    layout->setProperty("filesVisible", false);
-    QTRY_VERIFY(cycle104HeaderControlsFit(window.data()));
-    QVERIFY(cycle102Click(quick, plus));
-    QCOMPARE(settings->property("writingSize").toInt(), 18);
-    QVERIFY(cycle102Capture(quick, "cycle104-controls-collapsed"));
 }
 
 void FomawriteTest::folderHeaderButtonRequestsFolderPicker() {
@@ -195,13 +197,19 @@ Window {
     property string lastWritingSurface: "source"
     QtObject { id: preferences; property int titleBarMode: 1; property int toolbarVisibilityMode: 1; property int writingSize: 16 }
     QtObject { id: state }
+    QtObject {
+        id: zoomPreferences
+        property int sourceZoom: 100; property int previewZoom: 100
+        property bool linkedZoom: false; property int zoomRevision: 1; property int writingSize: 16
+    }
+    PaneZoomState { id: zoom; settings: zoomPreferences }
     Item { id: organizer; x: 0; width: 184 }
     Item { id: files; x: 185; width: 232 }
     Item { id: editor; x: 418; width: 682 }
     Item { id: preview; visible: false; property bool visualEditEnabled: false }
     WorkspaceHeader {
         anchors.left: parent.left; anchors.right: parent.right
-        window: fixture; settings: preferences; layoutState: state
+        window: fixture; settings: preferences; layoutState: state; zoomController: zoom
         organizerSlot: organizer; filesSlot: files; editorPane: editor; previewPane: preview
     }
 }

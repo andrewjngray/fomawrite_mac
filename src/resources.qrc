@@ -3,8 +3,10 @@
         <file>LibraryPane.qml</file>
         <file>LibraryContextMenu.qml</file>
         <file>WorkspaceCommands.qml</file>
+        <file>PaneZoomState.qml</file>
         <file>WorkspaceLayout.qml</file>
         <file>WorkspaceHeader.qml</file>
+        <file>PaneZoomControls.qml</file>
         <file>ToolbarButton.qml</file>
         <file>ToolbarGroup.qml</file>
         <file>WorkspaceFooter.qml</file>

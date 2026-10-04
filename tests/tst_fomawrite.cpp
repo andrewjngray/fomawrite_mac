@@ -39,6 +39,10 @@ class FomawriteTest : public QObject {
     Q_OBJECT
 
 private slots:
+    void paneZoomPresetsPreserveReadingAnchors();
+    void paneZoomPresetsLinkAndPersistWithoutEditing();
+    void paneZoomMigrationKeepsLegacySourceAppearance();
+    void documentDividerDoubleClickEqualizesWithoutChangingZoom();
     void outlineSearchJumpsFromNarrowVisualWithoutChangingDraft();
     void outlineKeyboardFilteringAndCancelPreserveSourceSelection();
     void visualListMiddleBreaksPreserveMarkersAndUnicode();
@@ -936,7 +940,8 @@ private slots:
         QVERIFY(QMetaObject::invokeMethod(whatsNewAction, "triggered"));
         QTRY_VERIFY(dialog->property("opened").toBool());
         QCOMPARE(dialog->property("title").toString(), QStringLiteral("What’s New in Fomawrite"));
-        QVERIFY(viewer->property("text").toString().contains(QStringLiteral("Recent local improvements")));
+        QVERIFY(viewer->property("text").toString().startsWith(QStringLiteral("# What’s New in Fomawrite")));
+        QVERIFY(viewer->property("text").toString().contains(QStringLiteral("independent Source and Preview zoom")));
         QVERIFY(QMetaObject::invokeMethod(dialog, "close"));
         QVERIFY(QMetaObject::invokeMethod(shortcutsAction, "triggered"));
         QTRY_VERIFY(shortcuts->property("opened").toBool());
@@ -3306,14 +3311,15 @@ private slots:
         QCOMPARE(editor->property("text").toString(), QString::fromUtf8(source));
         QVERIFY(!backend.modified());
         QVERIFY(!editor->property("canUndo").toBool());
-        settings->setProperty("writingSize", 32);
+        QVERIFY(run("editor"));
+        settings->setProperty("sourceZoom", 200);
         QVERIFY(run("larger"));
-        QCOMPARE(settings->property("writingSize").toInt(), 32);
-        settings->setProperty("writingSize", 12);
+        QCOMPARE(settings->property("sourceZoom").toInt(), 200);
+        settings->setProperty("sourceZoom", 75);
         QVERIFY(run("smaller"));
-        QCOMPARE(settings->property("writingSize").toInt(), 12);
+        QCOMPARE(settings->property("sourceZoom").toInt(), 75);
         QVERIFY(run("resetSize"));
-        QCOMPARE(settings->property("writingSize").toInt(), 16);
+        QCOMPARE(settings->property("sourceZoom").toInt(), 100);
         settings->setProperty("paragraphFocus", false);
         settings->setProperty("typewriter", false);
         settings->setProperty("showMarkup", true);
@@ -3981,9 +3987,9 @@ private slots:
         auto *settings = window->findChild<QObject *>("workspaceSettings");
         auto *layout = window->findChild<QObject *>("workspaceLayout");
         const QString original = editor->property("text").toString();
-        settings->setProperty("writingSize", 22);
+        settings->setProperty("sourceZoom", 140);
         settings->setProperty("paragraphFocus", true);
-        settings->setProperty("writingSize", 16);
+        settings->setProperty("sourceZoom", 100);
         settings->setProperty("paragraphFocus", false);
         QCoreApplication::processEvents();
         QCOMPARE(editor->property("text").toString(), original);
@@ -5139,7 +5145,7 @@ private slots:
         QVERIFY(editor);
         auto *settings = window->findChild<QObject *>("workspaceSettings");
         settings->setProperty("writingAppearance", "editorial");
-        settings->setProperty("writingSize", 16);
+        settings->setProperty("sourceZoom", 100);
         QCOMPARE(editor->property("font").value<QFont>().pixelSize(), 19);
 
         // `omarchy display text size 16` sets the GNOME factor to 16/12.
@@ -5235,6 +5241,7 @@ private:
 #include "cycle110-outline.inc"
 #include "cycle109-visual-lists.inc"
 #include "cycle111-find.inc"
+#include "cycle112-pane-zoom.inc"
 #include "cycle100-navigation.inc"
 #include "cycle99-integration.inc"
 #include "sourcevisualmapping-cycle99.inc"

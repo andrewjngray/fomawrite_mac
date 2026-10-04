@@ -16,3 +16,9 @@ Makefile
 
 # Menu audit raw captures can contain private window content.
 /research/menu-audit-2026-09-12/raw/
+
+# Cycle112 keeps final Dev captures and compact reports; exclude duplicate/intermediate pixels.
+/research/cycle-112/initial/
+/research/cycle-112/native/
+/research/cycle-112/demo/*.png
+/research/cycle-112/applications/*.png

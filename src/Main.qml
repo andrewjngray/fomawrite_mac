@@ -37,8 +37,8 @@ ApplicationWindow {
         ? workspaceSettings.writingAppearance : "manuscript"
     readonly property string editorFontFamily: activeWritingAppearance === "editorial" ? Qt.application.font.family
         : activeWritingAppearance === "book" ? "Georgia" : isMac ? "Menlo" : "iA Writer Mono S"
-    readonly property int editorFontPixelSize: scaledSize(workspaceSettings.writingSize
-        + (activeWritingAppearance === "manuscript" ? 1 : activeWritingAppearance === "book" ? 4 : 3))
+    readonly property int writingBasePixelSize: activeWritingAppearance === "manuscript" ? 17 : activeWritingAppearance === "book" ? 20 : 19
+    readonly property int editorFontPixelSize: scaledSize(writingBasePixelSize * paneZoom.sourceZoom / 100)
     readonly property int editorWidth: Math.min(
         scaledSize(680),
         Math.max(180, editorPane.width - 64))
@@ -50,12 +50,25 @@ ApplicationWindow {
     }
     property bool synchronizingScroll: false
     property var documentViewportTransition: null
+    property var zoomViewportCheckpoint: null
     readonly property bool changingDocumentView: documentViewportTransition !== null
 
     // A view change can rewrap both documents several times while SplitView
     // settles. Keep their reading positions independent during that reflow;
     // programmatic clamps must not become synchronized-scroll gestures.
-    function beginDocumentViewportTransition() {
+    function captureSourceReadingAnchor() {
+        var position = Math.max(0, editor.positionAt(0, Math.max(0, editorFlick.contentY - editor.y + 1)));
+        return { position: position, offset: editor.y + editor.positionToRectangle(position).y - editorFlick.contentY };
+    }
+    function restoreSourceReadingAnchor(anchor) {
+        var y = editor.y + editor.positionToRectangle(Math.max(0, Math.min(editor.length, anchor.position))).y - anchor.offset;
+        editorFlick.contentY = Math.max(0, Math.min(Math.max(0, editorFlick.contentHeight - editorFlick.height), y));
+    }
+    function readingViewportKey() {
+        return [editorFlick.width, editorFlick.height, editorFlick.contentHeight,
+                editorFlick.contentY, previewPane.readingViewportKey()].join(":");
+    }
+    function beginDocumentViewportTransition(preserveReadingAnchor) {
         if (!documentViewportTransition) {
             editorFlick.cancelFlick();
             wheelScroll.stop();
@@ -67,6 +80,21 @@ ApplicationWindow {
                 geometry: "", stablePasses: 0, passes: 0
             };
         }
+        if (preserveReadingAnchor) {
+            if (!documentViewportTransition.sourceAnchor) {
+                // Rewrapping changes the first character on a visible line. Keep
+                // the original logical anchor through an uninterrupted zoom
+                // series so preset/reset cycles cannot drift one line at a time.
+                var checkpoint = zoomViewportCheckpoint;
+                var reuse = checkpoint && checkpoint.key === readingViewportKey();
+                documentViewportTransition.sourceAnchor = reuse ? checkpoint.sourceAnchor : captureSourceReadingAnchor();
+                documentViewportTransition.previewAnchor = reuse ? checkpoint.previewAnchor : previewPane.captureReadingAnchor();
+            }
+        } else {
+            zoomViewportCheckpoint = null;
+            documentViewportTransition.sourceAnchor = null;
+            documentViewportTransition.previewAnchor = null;
+        }
         documentViewportTransition.geometry = "";
         documentViewportTransition.stablePasses = 0;
         documentViewportTransition.passes = 0;
@@ -74,6 +102,7 @@ ApplicationWindow {
         documentViewportSettle.restart();
     }
     function cancelDocumentViewportTransition() {
+        zoomViewportCheckpoint = null;
         documentViewportSettle.stop();
         documentViewportTransition = null;
     }
@@ -91,15 +120,22 @@ ApplicationWindow {
         }
         var geometry = [editorFlick.width, editorFlick.height, editorFlick.contentHeight,
                         previewPane.viewportGeometry()].join(":");
-        editorFlick.contentY = state.sourceFraction * Math.max(0, editorFlick.contentHeight - editorFlick.height);
-        previewPane.scrollToFraction(state.previewFraction);
+        if (state.sourceAnchor) restoreSourceReadingAnchor(state.sourceAnchor);
+        else editorFlick.contentY = state.sourceFraction * Math.max(0, editorFlick.contentHeight - editorFlick.height);
+        if (state.previewAnchor) previewPane.restoreReadingAnchor(state.previewAnchor);
+        else previewPane.scrollToFraction(state.previewFraction);
         state.stablePasses = geometry === state.geometry ? state.stablePasses + 1 : 0;
         state.geometry = geometry;
         ++state.passes;
         // Two unchanged frames include deferred rich-text styling and layout.
         // A bound also releases the transaction if a display keeps resizing.
-        if ((state.stablePasses >= 2 && !previewPane.viewportRefreshPending) || state.passes >= 16)
+        var settled = state.stablePasses >= 2 && !previewPane.viewportRefreshPending;
+        if (settled || state.passes >= 16) {
             cancelDocumentViewportTransition();
+            if (settled && state.sourceAnchor && state.previewAnchor)
+                zoomViewportCheckpoint = { key: readingViewportKey(),
+                    sourceAnchor: state.sourceAnchor, previewAnchor: state.previewAnchor };
+        }
     }
     Timer {
         id: documentViewportSettle
@@ -262,15 +298,18 @@ ApplicationWindow {
         sequence: "Shift+F6"; context: Qt.WindowShortcut; enabled: win.workspaceOwnsKeyboard
         onActivated: win.cycleWorkspaceFocus(true)
     }
+    property string lastZoomPane: "source"
     property string lastWritingSurface: "source"
     function updateWritingSurfaceFromFocus() {
         // Bound activeFocus flags can lag the window's focus-item notification.
         // Classify the actual editor item; toolbar/menu focus keeps the last
         // writing surface rather than borrowing a stale Visual Edit flag.
         var item = activeFocusItem;
-        if (isInside(item, editor)) lastWritingSurface = "source";
-        else if (item && item.objectName === previewPane.visualEditorObjectName
-                 && isInside(item, previewPane)) lastWritingSurface = "visual";
+        if (isInside(item, editor)) { lastWritingSurface = "source"; lastZoomPane = "source"; }
+        else if (isInside(item, previewPane)) {
+            lastZoomPane = "preview";
+            if (item && item.objectName === previewPane.visualEditorObjectName) lastWritingSurface = "visual";
+        }
     }
     onActiveFocusItemChanged: {
         topChrome.keyboardReveal = isInside(activeFocusItem, topChrome);
@@ -333,6 +372,12 @@ ApplicationWindow {
             }
         });
     }
+    function equalizeDocumentPanes() {
+        if (workspaceLayout.effectiveLayoutMode !== 1) return;
+        beginDocumentViewportTransition(true);
+        var total = editorPane.width + previewPane.width;
+        workspaceLayout.updateWidth("preview", Math.max(320, Math.min(total / 2, total - 480)));
+    }
     function setDocumentView(mode) {
         if (mode === 1 && !documentFooter.canSplit) return;
         beginDocumentViewportTransition();
@@ -374,6 +419,7 @@ ApplicationWindow {
         backend.themePreset = "studio";
         workspaceSettings.writingAppearance = "editorial";
         workspaceSettings.writingSize = 16;
+        paneZoom.resetAll();
         workspaceSettings.toolbarVisibilityMode = 1;
         workspaceLayout.restoreDefaults();
         workspaceLayout.layoutMode = 0;
@@ -386,6 +432,7 @@ ApplicationWindow {
         backend.themePreset = "studio";
         workspaceSettings.writingAppearance = "manuscript";
         workspaceSettings.writingSize = 16;
+        paneZoom.resetAll();
         workspaceSettings.toolbarVisibilityMode = 1;
         workspaceSettings.toolbarMode = 0;
         workspaceSettings.titleBarMode = 1;
@@ -410,7 +457,11 @@ ApplicationWindow {
         property bool libraryVisible: true
         property bool organizerVisible: true
         property int layoutMode: 1
-        property int writingSize: 16
+        property int writingSize: 16 // Legacy migration only; pane zoom now owns screen size.
+        property int sourceZoom: 100
+        property int previewZoom: 100
+        property bool linkedZoom: false
+        property int zoomRevision: 0
         property string writingAppearance: "editorial"
         property int appearanceRevision: 0
         property bool showMarkup: true
@@ -454,8 +505,18 @@ ApplicationWindow {
         onShowMarkupChanged: backend.setShowMarkup(showMarkup)
     }
 
+    PaneZoomState {
+        id: paneZoom
+        settings: workspaceSettings
+        legacyAppearanceOffset: win.writingBasePixelSize - 16
+        effectivePane: workspaceLayout.effectiveLayoutMode === 0 ? "source"
+            : workspaceLayout.effectiveLayoutMode === 2 ? "preview" : win.lastZoomPane
+        onBeforeZoomChanged: win.beginDocumentViewportTransition(true)
+    }
+
     WorkspaceCommands {
         id: workspaceCommands
+        zoomController: paneZoom
         settings: workspaceSettings
         layoutState: workspaceLayout
         library: backend.library
@@ -509,6 +570,7 @@ ApplicationWindow {
 
     WorkspaceHeader {
         id: topChrome
+        zoomController: paneZoom
         anchors.top: parent.top
         width: parent.width
         window: win
@@ -826,8 +888,8 @@ ApplicationWindow {
         CompactMenuItem { text: "Paragraph focus"; checkable: true; checked: workspaceSettings.paragraphFocus; onTriggered: workspaceCommands.run("paragraph") }
         CompactMenuItem { text: "Typewriter scrolling"; checkable: true; checked: workspaceSettings.typewriter; onTriggered: workspaceCommands.run("typewriter") }
         MenuSeparator {}
-        CompactMenuItem { text: "Larger text"; enabled: workspaceSettings.writingSize < 32; onTriggered: workspaceCommands.run("larger") }
-        CompactMenuItem { text: "Smaller text"; enabled: workspaceSettings.writingSize > 12; onTriggered: workspaceCommands.run("smaller") }
+        CompactMenuItem { text: "Larger text"; enabled: paneZoom.activeZoom < paneZoom.maximumZoom; onTriggered: workspaceCommands.run("larger") }
+        CompactMenuItem { text: "Smaller text"; enabled: paneZoom.activeZoom > paneZoom.minimumZoom; onTriggered: workspaceCommands.run("smaller") }
         CompactMenuItem { text: "Reset text size"; onTriggered: workspaceCommands.run("resetSize") }
         MenuSeparator {}
         CompactMenuItem { text: "Template: Modern"; checkable: true; checked: backend.outputStyle === 0; onTriggered: workspaceCommands.run("sans") }
@@ -843,9 +905,9 @@ ApplicationWindow {
         CompactMenuItem { objectName: "sourceAppearanceEditorial"; text: "Editorial"; checkable: true; autoExclusive: true; checked: win.activeWritingAppearance === "editorial"; onTriggered: workspaceCommands.run("writingEditorial") }
         CompactMenuItem { objectName: "sourceAppearanceBook"; text: "Book"; checkable: true; autoExclusive: true; checked: win.activeWritingAppearance === "book"; onTriggered: workspaceCommands.run("writingBook") }
         MenuSeparator {}
-        CompactMenuItem { objectName: "sourceAppearanceLarger"; text: "Larger text"; enabled: workspaceSettings.writingSize < 32; onTriggered: workspaceCommands.run("larger") }
-        CompactMenuItem { objectName: "sourceAppearanceSmaller"; text: "Smaller text"; enabled: workspaceSettings.writingSize > 12; onTriggered: workspaceCommands.run("smaller") }
-        CompactMenuItem { objectName: "sourceAppearanceReset"; text: "Reset text size"; onTriggered: workspaceCommands.run("resetSize") }
+        CompactMenuItem { objectName: "sourceAppearanceLarger"; text: "Larger text"; enabled: paneZoom.sourceZoom < paneZoom.maximumZoom; onTriggered: paneZoom.adjustZoom("source", 10) }
+        CompactMenuItem { objectName: "sourceAppearanceSmaller"; text: "Smaller text"; enabled: paneZoom.sourceZoom > paneZoom.minimumZoom; onTriggered: paneZoom.adjustZoom("source", -10) }
+        CompactMenuItem { objectName: "sourceAppearanceReset"; text: "Reset text size"; onTriggered: paneZoom.resetZoom("source") }
     }
     CompactMenu {
         id: footerStylesMenu
@@ -2617,12 +2679,14 @@ ApplicationWindow {
         orientation: Qt.Horizontal
         handle: Rectangle {
             id: workspaceDivider
-            objectName: "workspaceDivider"
+            readonly property bool documentDivider: editorPane.visible && previewPane.visible
+                && Math.abs(x - (editorPane.x + editorPane.width)) <= 2
+            objectName: documentDivider ? "documentSplitDivider" : "workspaceDivider"
             implicitWidth: 1
             color: SplitHandle.hovered || SplitHandle.pressed ? backend.palette.focus : backend.palette.border
             // A fine visual rule still has a generous mouse target for resizing.
             containmentMask: Item { x: -4; width: 9; height: workspaceDivider.height }
-            HoverHandler { cursorShape: Qt.SplitHCursor; margin: 4 }
+            HoverHandler { id: dividerHover; cursorShape: Qt.SplitHCursor; margin: 4 }
         }
         Item {
             id: organizerSlot
@@ -3270,14 +3334,13 @@ ApplicationWindow {
             SplitView.preferredWidth: workspaceLayout.effectivePreviewWidth
             SplitView.minimumWidth: 320
             typeface: backend.outputFont
-            // Apply view zoom after the readable baseline, so every minus click
-            // changes the visible text rather than hitting a hidden size floor.
-            textSize: Math.max(12, backend.outputPointSize * 4 / 3 - 3) + workspaceSettings.writingSize - 16
+            // Screen zoom never changes the selected export style or point size.
+            textSize: Math.round(Math.max(17, backend.outputPointSize * 4 / 3) * paneZoom.previewZoom / 100)
             layoutMode: workspaceLayout.effectiveLayoutMode
             visualEditEnabled: workspaceLayout.visualEditEnabled
             onVisualEditEnabledChanged: workspaceLayout.visualEditEnabled = visualEditEnabled
             visualTypeface: win.editorFontFamily
-            visualTextSize: win.editorFontPixelSize + (win.activeWritingAppearance === "manuscript" ? win.scaledSize(1) : 0)
+            visualTextSize: win.scaledSize(win.writingBasePixelSize * paneZoom.previewZoom / 100)
             visualTopInset: height < 600 ? 32 : 64
             onLayoutRequested: function(mode) { win.setDocumentView(mode); }
             onAnchorNavigationFailed: function(anchor) {
@@ -3291,6 +3354,76 @@ ApplicationWindow {
                     backend.openExternalUrl(resolved);
             }
         }
+    }
+
+    // SplitView consumes pointer events on its delegates. Own both gestures in
+    // this narrow document gutter; navigation dividers retain native resizing.
+    MouseArea {
+        id: documentDividerGestures
+        objectName: "documentDividerGestures"
+        visible: editorPane.visible && previewPane.visible
+        x: workspaceSplit.x + editorPane.x + editorPane.width - 4
+        y: workspaceSplit.y
+        width: 9
+        height: Math.max(0, workspaceSplit.height - documentFooter.height)
+        z: 1
+        acceptedButtons: Qt.LeftButton
+        hoverEnabled: true
+        preventStealing: true
+        cursorShape: Qt.SplitHCursor
+        property real pressSceneX: 0
+        property real pressPreviewWidth: 0
+        property var readingAnchors: null
+        property bool balanceOnRelease: false
+        function preserveReadingPosition() {
+            if (!readingAnchors) return;
+            win.beginDocumentViewportTransition(true);
+            win.documentViewportTransition.sourceAnchor = readingAnchors.source;
+            win.documentViewportTransition.previewAnchor = readingAnchors.preview;
+        }
+        onPressed: function(mouse) {
+            pressSceneX = mapToItem(win.contentItem, mouse.x, mouse.y).x;
+            pressPreviewWidth = previewPane.width;
+            balanceOnRelease = false;
+            win.beginDocumentViewportTransition(true);
+            readingAnchors = { source: win.documentViewportTransition.sourceAnchor,
+                preview: win.documentViewportTransition.previewAnchor };
+        }
+        onPositionChanged: function(mouse) {
+            if (!pressed || balanceOnRelease || !readingAnchors) return;
+            var delta = mapToItem(win.contentItem, mouse.x, mouse.y).x - pressSceneX;
+            var total = editorPane.width + previewPane.width;
+            var next = Math.max(320, Math.min(total - 480, pressPreviewWidth - delta));
+            if (Math.abs(next - previewPane.width) < 0.5) return;
+            preserveReadingPosition();
+            workspaceLayout.updateWidth("preview", next);
+        }
+        onDoubleClicked: balanceOnRelease = true
+        onReleased: {
+            preserveReadingPosition();
+            readingAnchors = null;
+            if (balanceOnRelease) Qt.callLater(win.equalizeDocumentPanes);
+            balanceOnRelease = false;
+        }
+        onCanceled: {
+            preserveReadingPosition();
+            readingAnchors = null;
+            balanceOnRelease = false;
+        }
+        Rectangle {
+            x: 4; width: 1; height: parent.height
+            visible: documentDividerGestures.containsMouse || documentDividerGestures.pressed
+            color: backend.palette.focus
+        }
+        Rectangle {
+            anchors.centerIn: parent
+            width: 3; height: 32; radius: 1.5
+            visible: documentDividerGestures.containsMouse || documentDividerGestures.pressed
+            color: backend.palette.focus
+        }
+        ToolTip.visible: containsMouse && !pressed
+        ToolTip.delay: 700
+        ToolTip.text: "Drag to resize panes · Double-click to balance"
     }
 
     DocumentFooter {
@@ -3335,6 +3468,7 @@ ApplicationWindow {
         if (workspaceSettings.toolbarVisibilityMode < 0 || workspaceSettings.toolbarVisibilityMode > 2)
             workspaceSettings.toolbarVisibilityMode = 1;
         if (adoptReferenceWorkspace) applyReferenceWorkspace();
+        paneZoom.initialize();
         Qt.callLater(win.refreshDocumentStatistics);
         var geometry = backend.windowGeometry();
         if (geometry.x >= 0) x = geometry.x;

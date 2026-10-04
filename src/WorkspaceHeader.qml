@@ -13,6 +13,7 @@ Item {
     required property var filesSlot
     required property var editorPane
     required property var previewPane
+    required property var zoomController
     property bool keyboardReveal: false
     readonly property bool revealRequested: chromeHover.hovered || keyboardReveal
     readonly property real titleContentOpacity: settings.titleBarMode === 1 || revealRequested ? 1 : 0
@@ -20,7 +21,7 @@ Item {
     readonly property bool toolbarContentVisible: settings.toolbarVisibilityMode !== 2
     readonly property real writingControlsWidth: documentHeader.width - documentHeader.nativeInset
         - (paneRestoreControls.visible ? paneRestoreControls.implicitWidth + 8 : 0)
-    readonly property bool writingClusterExpanded: writingControlsWidth >= 490
+    readonly property bool writingClusterExpanded: writingControlsWidth >= 580
     signal actionRequested(string action, var anchor)
     function focusWorkspaceControl() { workspaceButton.forceActiveFocus(Qt.TabFocusReason); }
     height: 52
@@ -111,12 +112,12 @@ Item {
             }
             Row {
                 objectName: "topChromeToolbarLeading"
-                visible: root.toolbarContentVisible; opacity: root.toolbarContentOpacity; enabled: opacity > 0
+                visible: root.toolbarContentVisible && root.writingControlsWidth >= 340; opacity: root.toolbarContentOpacity; enabled: opacity > 0
                 spacing: 8
                 // Workspace remains available to reveal faded controls before keyboard traversal.
                 ToolbarGroup {
                     objectName: "documentHistoryControls"
-                    visible: root.writingControlsWidth >= 360
+                    visible: root.writingControlsWidth >= 670
                     ToolbarButton { objectName: "documentBackButton"; grouped: true; iconName: "back"; hint: "Previous document"; enabled: backend.canGoBack; onClicked: root.actionRequested("back", this) }
                     ToolbarButton { objectName: "documentForwardButton"; grouped: true; showDivider: true; iconName: "forward"; hint: "Next document"; enabled: backend.canGoForward; onClicked: root.actionRequested("forward", this) }
                 }
@@ -137,27 +138,12 @@ Item {
                     ToolbarButton { objectName: "compactParagraphButton"; grouped: true; iconName: "paragraph"; hint: "Paragraph formatting"; enabled: trailing.formattingAllowed; onClicked: root.actionRequested("format", this) }
                 }
                 ToolbarButton { objectName: "compactFormatButton"; visible: !root.writingClusterExpanded; iconName: "paragraph"; hint: "Formatting"; enabled: trailing.formattingAllowed; onClicked: root.actionRequested("format", this) }
-                ToolbarGroup {
-                    objectName: "workspaceZoomControls"
-                    ToolbarButton {
-                        objectName: "workspaceZoomOutButton"
-                        grouped: true
-                        iconName: "minus"
-                        hint: "Decrease text size"
-                        enabled: root.settings.writingSize > 12
-                        onClicked: root.actionRequested("smaller", this)
-                    }
-                    ToolbarButton {
-                        objectName: "workspaceZoomInButton"
-                        grouped: true
-                        iconName: "plus"
-                        hint: "Increase text size"
-                        enabled: root.settings.writingSize < 32
-                        onClicked: root.actionRequested("larger", this)
-                    }
+                PaneZoomControls {
+                    zoomController: root.zoomController
+                    pane: root.editorPane.visible ? "source" : "preview"
                 }
                 ToolbarButton { objectName: "workspaceAppearanceButton"; text: "Aa"; hint: "Writing appearance"; onClicked: root.actionRequested("appearance", this) }
-                ToolbarButton { objectName: "exportHubButton"; visible: root.writingControlsWidth >= 420; iconName: "export"; hint: "Export and share"; onClicked: root.actionRequested("export", this) }
+                ToolbarButton { objectName: "exportHubButton"; visible: root.writingControlsWidth >= 450; iconName: "export"; hint: "Export and share"; onClicked: root.actionRequested("export", this) }
             }
             ToolbarButton {
                 id: workspaceButton
@@ -175,9 +161,15 @@ Item {
         color: backend.palette.page
         MouseArea { anchors.fill: parent; onPressed: root.window.startSystemMove() }
         RowLayout {
-            anchors.fill: parent; anchors.margins: 12
+            anchors.fill: parent; anchors.leftMargin: 12; anchors.rightMargin: 12
             visible: root.toolbarContentVisible; opacity: root.toolbarContentOpacity; enabled: opacity > 0
-            Label { text: root.previewPane.visualEditEnabled ? "Visual Edit" : "Preview"; color: backend.palette.muted; font.pixelSize: 13; Layout.fillWidth: true }
+            spacing: 8
+            Label { text: root.previewPane.visualEditEnabled ? "Visual Edit" : "Preview"; color: backend.palette.muted; font.pixelSize: 13; Layout.fillWidth: true; Layout.minimumWidth: 0; elide: Text.ElideRight }
+            PaneZoomControls {
+                zoomController: root.zoomController
+                pane: "preview"
+                controlsActive: root.editorPane.visible && root.previewPane.visible
+            }
             ToolbarButton { iconName: "export"; hint: "Export and share"; onClicked: root.actionRequested("export", this) }
             ToolbarButton { iconName: "close"; hint: "Hide preview"; onClicked: root.actionRequested("hidePreview", this) }
         }

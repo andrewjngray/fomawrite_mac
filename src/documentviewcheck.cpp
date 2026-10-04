@@ -15,6 +15,7 @@
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QJSValue>
 #include <QKeyEvent>
 #include <QMouseEvent>
 #include <QQmlApplicationEngine>
@@ -138,6 +139,28 @@ bool click(QQuickWindow *window, QQuickItem *button, bool allowDisabled = false)
     return true;
 }
 
+// Deliver the second press as well as its double-click notification, matching
+// QPA delivery while keeping every event inside this isolated window.
+bool doubleClick(QQuickWindow *window, QQuickItem *item) {
+    if (!renderBarrier(window) || !item || !item->isVisible()) return false;
+    const QPointF point = bounds(item).center();
+    if (!QRectF(QPointF(), window->size()).contains(point)) return false;
+    const QPointF global = window->mapToGlobal(point.toPoint());
+    const quint64 timestamp = quint64(QDateTime::currentMSecsSinceEpoch());
+    const QEvent::Type types[]{QEvent::MouseButtonPress, QEvent::MouseButtonRelease,
+                              QEvent::MouseButtonPress, QEvent::MouseButtonDblClick,
+                              QEvent::MouseButtonRelease};
+    for (int index = 0; index < 5; ++index) {
+        const bool released = types[index] == QEvent::MouseButtonRelease;
+        QMouseEvent event(types[index], point, point, global, Qt::LeftButton,
+                          released ? Qt::NoButton : Qt::LeftButton, Qt::NoModifier);
+        event.setTimestamp(timestamp + quint64(index * 35));
+        QCoreApplication::sendEvent(window, &event);
+        QCoreApplication::processEvents();
+    }
+    return true;
+}
+
 // Deliver keyboard input through the same QQuickWindow dispatch used by an
 // actual editor. No OS-level events or activation of the user's other apps.
 void key(QQuickWindow *window, int value, const QString &text = {},
@@ -194,6 +217,9 @@ int runDocumentViewCheck(QApplication &app, const QString &outputDirectory) {
     QStringList failures;
     QJsonArray scenarios;
     QJsonArray dailyWritingChecks;
+    QJsonArray paneZoomChecks;
+    QJsonArray paneZoomReadings;
+    QJsonArray paneZoomDividerEvents;
     QJsonArray screenshots;
     QJsonArray qmlWarnings;
     QJsonObject report{{"schema", 1}, {"startedAt", QDateTime::currentDateTimeUtc().toString(Qt::ISODate)},
@@ -213,6 +239,9 @@ int runDocumentViewCheck(QApplication &app, const QString &outputDirectory) {
         report.insert("failures", QJsonArray::fromStringList(failures));
         report.insert("scenarios", scenarios);
         report.insert("dailyWritingChecks", dailyWritingChecks);
+        report.insert("paneZoomChecks", paneZoomChecks);
+        report.insert("paneZoomReadings", paneZoomReadings);
+        report.insert("paneZoomDividerEvents", paneZoomDividerEvents);
         report.insert("screenshots", screenshots);
         report.insert("qmlWarnings", qmlWarnings);
         report.insert("finishedAt", QDateTime::currentDateTimeUtc().toString(Qt::ISODate));
@@ -223,7 +252,7 @@ int runDocumentViewCheck(QApplication &app, const QString &outputDirectory) {
             return 2;
         }
         qInfo().noquote() << "Document view check:" << (failures.isEmpty() ? "PASS" : "FAIL")
-                          << scenarios.size() << "footer states," << dailyWritingChecks.size() << "daily-writing checks; report:" << file.fileName();
+                          << scenarios.size() << "footer states," << dailyWritingChecks.size() << "daily-writing checks," << paneZoomChecks.size() << "pane-zoom checks; report:" << file.fileName();
         for (const QString &failure : failures) qWarning().noquote() << failure;
         return failures.isEmpty() ? 0 : 1;
     };
@@ -231,7 +260,8 @@ int runDocumentViewCheck(QApplication &app, const QString &outputDirectory) {
     for (const QString &name : {QStringLiteral("Main.qml"), QStringLiteral("DocumentFooter.qml"),
             QStringLiteral("FooterButton.qml"), QStringLiteral("PreviewPane.qml"),
             QStringLiteral("WorkspaceLayout.qml"), QStringLiteral("WorkspaceCommands.qml"), QStringLiteral("AboutDialog.qml"),
-            QStringLiteral("DocumentFindBar.qml"), QStringLiteral("DocumentOutline.qml")}) {
+            QStringLiteral("DocumentFindBar.qml"), QStringLiteral("DocumentOutline.qml"),
+            QStringLiteral("PaneZoomState.qml"), QStringLiteral("PaneZoomControls.qml"), QStringLiteral("WorkspaceHeader.qml")}) {
         const QString hash = fileHash(":/" + name);
         check(!hash.isEmpty(), "Bundled resource missing: " + name);
         resources.insert(name, hash);
@@ -563,6 +593,7 @@ int runDocumentViewCheck(QApplication &app, const QString &outputDirectory) {
             daily("find-nearest-match-and-keyboard-navigation", [&] {
                 check(click(window, searchButton), "Cannot click document Find button");
                 check(waitUntil([&] { return findBar->isVisible() && findField->hasActiveFocus(); }), "Find did not take query focus");
+                check(renderBarrier(window), "Cannot render Find navigation baseline");
                 QMap<QString, QRectF> findBounds;
                 for (auto *control : {previousMatch, nextMatch, closeFind}) findBounds.insert(control->objectName(), bounds(control));
                 check(enterText(window, findField, QString::fromUtf8("café")), "Cannot type Unicode Find query");
@@ -622,6 +653,7 @@ int runDocumentViewCheck(QApplication &app, const QString &outputDirectory) {
                 check(enterText(window, findField, "missing-phrase"), "Cannot enter no-match query");
                 check(click(window, replaceToggle), "Cannot reveal narrow replacement row");
                 settle(80);
+                check(renderBarrier(window), "Cannot render narrow Find containment frame");
                 for (auto *control : {findField, replaceField, previousMatch, nextMatch, closeFind, replaceToggle, replaceCurrent, replaceAll, matchStatus}) {
                     check(control->isVisible() && bounds(findBar).adjusted(-0.5, -0.5, 0.5, 0.5).contains(bounds(control)),
                           "Narrow Find control is outside its bar: " + control->objectName());
@@ -753,6 +785,278 @@ int runDocumentViewCheck(QApplication &app, const QString &outputDirectory) {
               "Unsafe break inside bold list text changed the canonical document");
         check(pane->property("visualStatus").toString().contains("Source"), "Refused structural break did not explain Source fallback");
     });
+
+    // View zoom is a presentation preference. Exercise the shipped pane controls
+    // independently of the existing footer/daily-writing regression counts.
+    auto *zoom = window->findChild<QObject *>("paneZoomState");
+    auto *commands = window->findChild<QObject *>("workspaceCommands");
+    if (check(zoom && commands, "Shipped pane zoom controller is missing")) {
+        const auto percent = [&](const QString &target) { return zoom->property((target + "Zoom").toUtf8()).toInt(); };
+        const auto zoomItem = [&](const QString &target, const QString &suffix) {
+            return window->findChild<QQuickItem *>(target + "Zoom" + suffix);
+        };
+        const auto settledZoom = [&] {
+            check(renderBarrier(window), "Cannot render pane zoom frame");
+            check(waitUntil(ready), "Pane zoom did not settle its viewport");
+            check(renderBarrier(window), "Cannot render settled pane zoom frame");
+        };
+        const auto chooseZoom = [&](const QString &target, const QString &entry) {
+            if (!check(click(window, zoomItem(target, "MenuButton")), "Cannot open " + target + " zoom menu")) return;
+            auto *menu = window->findChild<QObject *>(target + "ZoomMenu");
+            if (!check(menu && waitUntil([&] { return menu->property("opened").toBool(); }), "Pane zoom menu did not open")) return;
+            auto *item = zoomItem(target, entry);
+            if (check(item, "Missing zoom menu item: " + target + entry)) {
+                check(click(window, item), "Cannot click zoom menu item: " + target + entry);
+                check(waitUntil([&] { return !menu->property("visible").toBool(); }), "Pane zoom menu did not close after selection");
+            }
+            settledZoom();
+        };
+        const auto zoomCheck = [&](const QString &name, const std::function<void()> &exercise) {
+            const qsizetype before = failures.size();
+            exercise();
+            QJsonObject controls;
+            for (const QString &target : {QStringLiteral("source"), QStringLiteral("preview")}) {
+                for (const QString &suffix : {QStringLiteral("OutButton"), QStringLiteral("MenuButton"), QStringLiteral("InButton")}) {
+                    if (auto *item = zoomItem(target, suffix)) {
+                        auto entry = rectJson(bounds(item));
+                        entry.insert("visible", item->isVisible()); entry.insert("enabled", item->isEnabled());
+                        controls.insert(target + "Zoom" + suffix, entry);
+                    }
+                }
+            }
+            if (layout->property("effectiveLayoutMode").toInt() == 1) {
+                for (const QString &suffix : {QStringLiteral("OutButton"), QStringLiteral("MenuButton"), QStringLiteral("InButton")}) {
+                    auto *sourceControl = zoomItem("source", suffix);
+                    auto *previewControl = zoomItem("preview", suffix);
+                    check(sourceControl && previewControl && qAbs(bounds(sourceControl).y() - bounds(previewControl).y()) <= 0.5
+                        && qAbs(sourceControl->height() - previewControl->height()) <= 0.5,
+                        "Source and Preview zoom controls do not share a baseline: " + suffix);
+                }
+            }
+            paneZoomChecks.append(QJsonObject{{"name", name}, {"passed", failures.size() == before},
+                {"newFailures", int(failures.size() - before)}, {"sourceZoom", percent("source")},
+                {"previewZoom", percent("preview")}, {"linked", zoom->property("linked").toBool()},
+                {"effectivePane", zoom->property("effectivePane").toString()},
+                {"windowWidth", window->width()}, {"sourcePixelSize", window->property("editorFontPixelSize").toInt()},
+                {"previewPixelSize", pane->property("textSize").toInt()}, {"controls", controls},
+                {"sourceSha256", sha256(editor->property("text").toString().toUtf8())}});
+        };
+        window->resize(1440, 800);
+        backend.setThemePreset("studio");
+        backend.setOutputStyle(0);
+        const QString zoomOriginal = QString::fromUtf8("# Two comfortable reading sizes\n\nSource and Preview can have different zoom without changing Markdown.\n\n## A longer passage\n\ncafé 東京 — keep the source, cursor and Undo history intact.\n");
+        const QString zoomAddition = "\nAn unsaved ending stays an ordinary edit.\n";
+        if (loadSample("Independent pane zoom", zoomOriginal)) {
+            QMetaObject::invokeMethod(editor, "insert", Q_ARG(int, zoomOriginal.size()), Q_ARG(QString, zoomAddition));
+            const QString zoomDraft = zoomOriginal + zoomAddition;
+            const int zoomSelection = zoomDraft.indexOf("different zoom");
+            QMetaObject::invokeMethod(editor, "select", Q_ARG(int, zoomSelection), Q_ARG(int, zoomSelection + 14));
+            action("previewSplitButton", 1, false);
+            chooseZoom("source", "Reset"); chooseZoom("preview", "Reset");
+            const QString initialOutput = temporary.filePath("zoom-before.html");
+            check(backend.exportDocument(QUrl::fromLocalFile(initialOutput), "html"), "Cannot export initial zoom sample");
+            const QString initialOutputHash = fileHash(initialOutput);
+            const int outputStyle = backend.outputStyle(), outputPointSize = backend.outputPointSize();
+            const QString outputFont = backend.outputFont();
+            zoomCheck("independent-pane-buttons-and-presets", [&] {
+                check(!zoom->property("linked").toBool() && percent("source") == 100 && percent("preview") == 100,
+                      "Fresh pane zoom does not start independent at 100 percent");
+                const int sourceSize = window->property("editorFontPixelSize").toInt();
+                const int previewSize = pane->property("textSize").toInt();
+                check(previewSize >= 17, "Standard Preview 100 percent is below the readable 17px baseline");
+                check(click(window, zoomItem("source", "InButton")), "Cannot click Source zoom plus"); settledZoom();
+                check(percent("source") == 110 && percent("preview") == 100
+                    && window->property("editorFontPixelSize").toInt() > sourceSize
+                    && pane->property("textSize").toInt() == previewSize, "Source zoom changed Preview or failed to enlarge Source");
+                const int enlargedSource = window->property("editorFontPixelSize").toInt();
+                check(click(window, zoomItem("preview", "InButton")), "Cannot click Preview zoom plus"); settledZoom();
+                check(percent("source") == 110 && percent("preview") == 110
+                    && window->property("editorFontPixelSize").toInt() == enlargedSource
+                    && pane->property("textSize").toInt() > previewSize, "Preview zoom changed Source or failed to enlarge Preview");
+                chooseZoom("source", "Preset75");
+                check(percent("source") == 75 && zoomItem("source", "OutButton") && !zoomItem("source", "OutButton")->isEnabled(), "Minimum Source zoom still allows minus");
+                chooseZoom("preview", "Preset200");
+                check(percent("preview") == 200 && zoomItem("preview", "InButton") && !zoomItem("preview", "InButton")->isEnabled(), "Maximum Preview zoom still allows plus");
+                chooseZoom("source", "Preset125"); chooseZoom("preview", "Preset150");
+                check(editor->property("selectionStart").toInt() == zoomSelection
+                    && editor->property("selectionEnd").toInt() == zoomSelection + 14, "Zoom controls changed the Source selection");
+                capture("zoom-independent-split");
+            });
+            zoomCheck("pane-zoom-link-reset-and-active-routing", [&] {
+                chooseZoom("preview", "Link");
+                check(zoom->property("linked").toBool() && percent("source") == 150 && percent("preview") == 150,
+                      "Link zoom did not adopt the clicked Preview pane size");
+                check(click(window, zoomItem("source", "OutButton")), "Cannot decrease linked zoom"); settledZoom();
+                check(percent("source") == 140 && percent("preview") == 140, "Linked minus did not adjust both panes");
+                chooseZoom("source", "Link");
+                check(!zoom->property("linked").toBool() && percent("source") == 140 && percent("preview") == 140,
+                      "Unlink zoom changed the current pane sizes");
+                chooseZoom("source", "Preset125"); chooseZoom("preview", "Preset150");
+                editor->forceActiveFocus();
+                check(waitUntil([&] { return zoom->property("effectivePane").toString() == "source"; }), "Source focus did not route global zoom");
+                check(QMetaObject::invokeMethod(commands, "run", Q_ARG(QVariant, QVariant("larger"))), "Cannot dispatch global Larger Text"); settledZoom();
+                check(percent("source") == 135 && percent("preview") == 150, "Global Larger Text changed the wrong pane");
+                check(QMetaObject::invokeMethod(pane, "focusRenderedSurface"), "Cannot focus rendered pane for global zoom");
+                check(waitUntil([&] { return zoom->property("effectivePane").toString() == "preview"; }), "Preview focus did not route global zoom");
+                check(QMetaObject::invokeMethod(commands, "run", Q_ARG(QVariant, QVariant("smaller"))), "Cannot dispatch global Smaller Text"); settledZoom();
+                check(percent("source") == 135 && percent("preview") == 140, "Global Smaller Text changed the wrong pane");
+                chooseZoom("source", "Reset");
+                check(percent("source") == 100 && percent("preview") == 140, "Source reset altered independent Preview zoom");
+                chooseZoom("preview", "Reset");
+                check(percent("source") == 100 && percent("preview") == 100, "Preview reset did not restore 100 percent");
+            });
+            zoomCheck("pane-zoom-persists-through-document-modes", [&] {
+                chooseZoom("source", "Preset125"); chooseZoom("preview", "Preset150");
+                for (int round = 0; round < 2; ++round) {
+                    action("previewFullButton", 2, false);
+                    check(zoomItem("preview", "MenuButton") && zoomItem("preview", "MenuButton")->isVisible(), "Full Preview has no percentage control");
+                    action("visualEditToggle", 2, true);
+                    auto *visual = pane->findChild<QQuickItem *>("visualEditor");
+                    check(visual && pane->property("visualTextSize").toInt() > window->property("writingBasePixelSize").toInt(),
+                          "Visual Edit did not use Preview magnification");
+                    action("sourceModeButton", 0, false);
+                    check(zoomItem("source", "MenuButton") && zoomItem("source", "MenuButton")->isVisible(), "Source view has no percentage control");
+                    action("previewSplitButton", 1, false);
+                    check(percent("source") == 125 && percent("preview") == 150, "Changing document view lost independent zoom values");
+                }
+                capture("zoom-restored-split");
+            });
+            zoomCheck("minimum-pane-zoom-headers-and-source-safety", [&] {
+                if (auto *hide = child("collapseOrganizerButton"); hide && hide->isVisible()) check(click(window, hide), "Cannot collapse organizer for narrow zoom check");
+                if (auto *hide = child("collapseFilesButton"); hide && hide->isVisible()) check(click(window, hide), "Cannot collapse library for narrow zoom check");
+                check(QMetaObject::invokeMethod(layout, "updateWidth", Q_ARG(QVariant, QVariant("preview")), Q_ARG(QVariant, QVariant(320))),
+                      "Cannot prepare minimum Preview width");
+                window->resize(803, 800); settledZoom();
+                action("previewSplitButton", 1, false);
+                for (const QString &target : {QStringLiteral("source"), QStringLiteral("preview")}) chooseZoom(target, "Preset200");
+                settledZoom();
+                auto *sourceHeader = child("documentHeader"); auto *previewHeader = child("previewHeader");
+                check(sourceHeader && previewHeader && sourceHeader->width() >= 480 && sourceHeader->width() <= 484
+                    && previewHeader->width() >= 320 && previewHeader->width() <= 324, "Narrow zoom fixture did not reach 480px Source and 320px Preview");
+                for (const QString &target : {QStringLiteral("source"), QStringLiteral("preview")}) {
+                    auto *header = target == "source" ? sourceHeader : previewHeader;
+                    QRectF previous;
+                    for (const QString &suffix : {QStringLiteral("OutButton"), QStringLiteral("MenuButton"), QStringLiteral("InButton")}) {
+                        auto *control = zoomItem(target, suffix);
+                        if (!check(header && control && control->isVisible(), "Narrow pane zoom control is hidden: " + target + suffix)) continue;
+                        const QRectF rect = bounds(control);
+                        check(bounds(header).adjusted(-0.5, -0.5, 0.5, 0.5).contains(rect)
+                            && QRectF(QPointF(), window->size()).contains(rect), "Narrow zoom control crosses its header: " + target + suffix);
+                        check(previous.isNull() || previous.right() <= rect.left() + 0.5, "Narrow zoom buttons overlap"); previous = rect;
+                    }
+                }
+                capture("zoom-minimum-pane-headers");
+                backend.setThemePreset("dark"); settledZoom(); capture("zoom-minimum-pane-headers-dark");
+                chooseZoom("source", "Reset"); chooseZoom("preview", "Reset");
+                check(editor->property("text").toString() == zoomDraft && backend.modified(), "Pane zoom changed the draft or dirty state");
+                check(backend.outputStyle() == outputStyle && backend.outputPointSize() == outputPointSize && backend.outputFont() == outputFont,
+                      "Pane zoom changed output typography");
+                const QString afterOutput = temporary.filePath("zoom-after.html");
+                check(backend.exportDocument(QUrl::fromLocalFile(afterOutput), "html")
+                    && fileHash(afterOutput) == initialOutputHash, "Screen zoom changed exported HTML bytes");
+                QMetaObject::invokeMethod(editor, "undo");
+                check(editor->property("text").toString() == zoomOriginal, "Zoom polluted Undo of the unsaved ending");
+                QMetaObject::invokeMethod(editor, "redo");
+                check(editor->property("text").toString() == zoomDraft, "Zoom destroyed Redo of the unsaved ending");
+                QFile file(temporary.filePath("Independent pane zoom.md"));
+                check(file.open(QIODevice::ReadOnly) && file.readAll() == zoomOriginal.toUtf8(), "Zoom saved a diagnostic draft without request");
+            });
+            zoomCheck("zoom-reading-anchors-and-divider-double-click", [&] {
+                window->resize(1280, 800);
+                backend.setThemePreset("studio");
+                settings->setProperty("synchronizedScroll", false);
+                QString readingSource = "# Reading position across zoom\n\n";
+                for (int index = 0; index < 70; ++index)
+                    readingSource += QString("Paragraph %1 keeps a distinct place in a longer document. Changing the size of the letters should keep this passage in view, even when the lines wrap differently.\n\n").arg(index);
+                if (!loadSample("Zoom reading position", readingSource)) return;
+                action("previewSplitButton", 1, false);
+                chooseZoom("source", "Reset"); chooseZoom("preview", "Reset");
+                check(QMetaObject::invokeMethod(layout, "updateWidth", Q_ARG(QVariant, QVariant("preview")), Q_ARG(QVariant, QVariant(400))),
+                      "Cannot prepare unequal writing panes");
+                settledZoom();
+                auto *previewScroll = pane->findChild<QQuickItem *>("previewScroll");
+                auto *rendered = pane->findChild<QQuickItem *>("renderedPreview");
+                if (!check(previewScroll && rendered, "Rendered reading surface is missing")) return;
+                sourceScroll->setProperty("contentY", 700.0);
+                previewScroll->setProperty("contentY", 1100.0);
+                settledZoom();
+                const auto readingAnchor = [&](QObject *owner, const char *method) {
+                    QVariant result;
+                    check(QMetaObject::invokeMethod(owner, method, Q_RETURN_ARG(QVariant, result)), "Cannot capture reading anchor");
+                    if (result.canConvert<QJSValue>()) return result.value<QJSValue>().toVariant().toMap();
+                    return result.toMap();
+                };
+                const QVariantMap sourceAnchor = readingAnchor(window, "captureSourceReadingAnchor");
+                const QVariantMap previewAnchor = readingAnchor(pane, "captureReadingAnchor");
+                check(sourceAnchor.value("position").toInt() > 0 && previewAnchor.value("position").toInt() > 0,
+                      "Reading-position fixture did not scroll both panes into the document");
+                QString anchorStage = "initial";
+                const auto assertAnchor = [&](QQuickItem *field, QQuickItem *scroll, const QVariantMap &anchor, const QString &name) {
+                    QRectF rectangle;
+                    check(QMetaObject::invokeMethod(field, "positionToRectangle", Q_RETURN_ARG(QRectF, rectangle),
+                        Q_ARG(int, anchor.value("position").toInt())), "Cannot locate preserved " + name + " reading anchor");
+                    const qreal offset = field->y() + rectangle.y() - scroll->property("contentY").toReal();
+                    const qreal expectedOffset = anchor.value("offset").toReal();
+                    const qreal delta = offset - expectedOffset;
+                    paneZoomReadings.append(QJsonObject{{"stage", anchorStage}, {"pane", name},
+                        {"position", anchor.value("position").toInt()}, {"expectedOffset", expectedOffset},
+                        {"actualOffset", offset}, {"delta", delta}, {"lineHeight", rectangle.height()},
+                        {"positionRect", rectJson(rectangle)}, {"fieldWidth", field->width()}, {"fieldY", field->y()},
+                        {"scrollY", scroll->property("contentY").toReal()}, {"contentHeight", scroll->property("contentHeight").toReal()},
+                        {"sourceZoom", percent("source")}, {"previewZoom", percent("preview")},
+                        {"transitionPending", window->property("changingDocumentView").toBool()},
+                        {"previewRefreshPending", pane->property("viewportRefreshPending").toBool()}});
+                    check(qAbs(delta) <= 2.0,
+                          QString("%1 reading anchor moved at %2: position %3, expected offset %4, actual %5, delta %6, line height %7, zoom %8/%9")
+                          .arg(name, anchorStage).arg(anchor.value("position").toInt()).arg(expectedOffset).arg(offset)
+                          .arg(delta).arg(rectangle.height()).arg(percent("source")).arg(percent("preview")));
+                };
+                const auto assertBothAnchors = [&] {
+                    assertAnchor(editor, sourceScroll, sourceAnchor, "Source");
+                    assertAnchor(rendered, previewScroll, previewAnchor, "Preview");
+                };
+                capture("zoom-scrolled-before");
+                for (const QString &target : {QStringLiteral("source"), QStringLiteral("preview")}) {
+                    anchorStage = target + "-125";
+                    chooseZoom(target, "Preset125"); assertBothAnchors();
+                    if (target == "preview") capture("zoom-scrolled-preview125");
+                    anchorStage = target + "-reset100";
+                    chooseZoom(target, "Reset"); assertBothAnchors();
+                }
+                auto *sourceHeader = child("documentHeader");
+                auto *previewHeader = child("previewHeader");
+                auto *divider = child("documentSplitDivider");
+                if (!check(sourceHeader && previewHeader && divider, "Document divider is missing")) return;
+                check(qAbs(sourceHeader->width() - previewHeader->width()) > 80, "Divider fixture is already balanced");
+                const auto dividerState = [&](const QString &stage) {
+                    auto *gestures = child("documentDividerGestures");
+                    QJsonObject gestureState;
+                    if (gestures) {
+                        gestureState = rectJson(bounds(gestures));
+                        gestureState.insert("class", QString::fromLatin1(gestures->metaObject()->className()));
+                        gestureState.insert("enabled", gestures->isEnabled());
+                        gestureState.insert("visible", gestures->isVisible());
+                        gestureState.insert("pressed", gestures->property("pressed").toBool());
+                        gestureState.insert("balanceOnRelease", gestures->property("balanceOnRelease").toBool());
+                    }
+                    paneZoomDividerEvents.append(QJsonObject{{"stage", stage}, {"divider", rectJson(bounds(divider))},
+                        {"sourceWidth", sourceHeader->width()}, {"previewWidth", previewHeader->width()},
+                        {"requestedPreviewWidth", layout->property("previewWidth").toReal()}, {"gestures", gestureState}});
+                };
+                dividerState("before");
+                check(doubleClick(window, divider), "Cannot double-click the document divider");
+                settledZoom();
+                dividerState("after");
+                check(qAbs(sourceHeader->width() - previewHeader->width()) <= 2,
+                      QString("Actual divider double-click did not balance panes: %1 / %2, requested preview %3")
+                          .arg(sourceHeader->width()).arg(previewHeader->width()).arg(layout->property("previewWidth").toReal()));
+                anchorStage = "divider-double-click";
+                assertBothAnchors();
+                check(editor->property("text").toString() == readingSource && !backend.modified(), "Reading zoom or divider reset changed the document");
+                capture("zoom-balanced-panes");
+            });
+        }
+    }
 
     if (auto *about = window->findChild<QObject *>("aboutDialog")) {
         check(QMetaObject::invokeMethod(about, "open"), "Cannot open bundled About dialog");

@@ -7,6 +7,7 @@ QtObject {
     id: root
     objectName: "workspaceCommands"
     required property var settings
+    required property var zoomController
     required property var layoutState
     required property var library
     required property var libraryPane
@@ -125,8 +126,8 @@ QtObject {
         if (id === "spelling") return window.isMac && editor.length > 0;
         if (id === "organizer") return true;
         if (id === "split") return layoutState.availableWidth >= 800;
-        if (id === "larger") return settings.writingSize < 32;
-        if (id === "smaller") return settings.writingSize > 12;
+        if (id === "larger") return zoomController.activeZoom < zoomController.maximumZoom;
+        if (id === "smaller") return zoomController.activeZoom > zoomController.minimumZoom;
         return entry(id) !== null;
     }
     function isChecked(id) {
@@ -206,9 +207,9 @@ QtObject {
         case "excerpts": libraryPane.showExcerpts = !libraryPane.showExcerpts; break;
         case "navigationTree": library.navigationMode = 0; break;
         case "navigationList": library.navigationMode = 1; break;
-        case "larger": settings.writingSize = Math.min(32, settings.writingSize + 2); break;
-        case "smaller": settings.writingSize = Math.max(12, settings.writingSize - 2); break;
-        case "resetSize": settings.writingSize = 16; break;
+        case "larger": zoomController.adjustZoom(zoomController.effectivePane, 10); break;
+        case "smaller": zoomController.adjustZoom(zoomController.effectivePane, -10); break;
+        case "resetSize": zoomController.resetZoom(zoomController.effectivePane); break;
         case "writingManuscript": settings.writingAppearance = "manuscript"; break;
         case "writingEditorial": settings.writingAppearance = "editorial"; break;
         case "writingBook": settings.writingAppearance = "book"; break;

@@ -1,6 +1,15 @@
 # What’s New in Fomawrite
 
-Build111 adds:
+Build 112 adds:
+
+- independent Source and Preview zoom controls, with percentage presets and reset;
+- optional Link zoom: enabling it matches both sides to the chosen pane, then changes them together;
+- remembered zoom settings across Source, Split, Full and Visual Edit;
+- a more readable default Preview size without changing exported formatting;
+- double-clicking the document divider balances pane widths within their minimum sizes;
+- reading-position preservation while zooming.
+
+Build 111 added:
 
 - a searchable document outline with current-section markers and keyboard navigation;
 - a responsive Find/Replace bar with clear result status, accessible controls and forward replacement progress;

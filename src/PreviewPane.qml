@@ -10,7 +10,12 @@ Rectangle {
     property bool showFooter: true
     property real bottomInset: 0
     property bool suspendViewportUpdates: false
-    readonly property bool viewportRefreshPending: refreshTimer.running || visualRefreshTimer.running
+    // Timers finish before their deferred parse/style callbacks. Keep viewport
+    // restoration suspended until the latest callbacks have actually completed.
+    property bool previewRefreshInFlight: false
+    property bool visualRefreshInFlight: false
+    readonly property bool viewportRefreshPending: refreshTimer.running || previewRefreshInFlight
+        || (visualEditEnabled && (visualRefreshTimer.running || visualRefreshInFlight))
     property bool tonalLayoutButtons: false
     required property var renderer
     property string markdown: ""
@@ -61,6 +66,21 @@ Rectangle {
         return Math.max(0, Math.min(1, previewScroll.contentY
             / Math.max(1, previewScroll.contentHeight - previewScroll.height)));
     }
+    function captureReadingAnchor() {
+        var field = visualEditEnabled ? visualText : previewText;
+        var position = Math.max(0, field.positionAt(0, Math.max(0, previewScroll.contentY - field.y + 1)));
+        return { visual: visualEditEnabled, position: position,
+            offset: field.y + field.positionToRectangle(position).y - previewScroll.contentY };
+    }
+    function restoreReadingAnchor(anchor) {
+        if (anchor.visual !== visualEditEnabled || viewportRefreshPending) return;
+        var field = visualEditEnabled ? visualText : previewText;
+        var target = field.y + field.positionToRectangle(Math.max(0, Math.min(field.length, anchor.position))).y - anchor.offset;
+        previewScroll.contentY = Math.max(0, Math.min(Math.max(0, previewScroll.contentHeight - previewScroll.height), target));
+    }
+    function readingViewportKey() {
+        return [viewportGeometry(), previewScroll.contentY, visualEditEnabled].join(":");
+    }
     function viewportGeometry() {
         return [previewScroll.width, previewScroll.height, previewScroll.contentHeight].join(":");
     }
@@ -85,6 +105,7 @@ Rectangle {
     color: backend.palette.page
     property string renderedMarkdown: ""
     property int previewRefreshRevision: 0
+    property int visualRefreshRevision: 0
     onMarkdownChanged: {
         refreshTimer.restart()
         if (visualEditEnabled)
@@ -99,17 +120,29 @@ Rectangle {
         // Reparse when font size/theme changes too: normalized HTML contains
         // explicit formatting from the previous preview pass.
         var revision = ++previewRefreshRevision;
+        previewRefreshInFlight = true;
         renderedMarkdown = "";
         Qt.callLater(function() {
-            if (revision !== root.previewRefreshRevision) return;
-            renderedMarkdown = renderer.previewMarkdown(markdown);
+            if (!root || revision !== root.previewRefreshRevision) return;
+            try {
+                renderedMarkdown = renderer.previewMarkdown(markdown);
+            } catch (error) {
+                if (revision === root.previewRefreshRevision)
+                    root.previewRefreshInFlight = false;
+                throw error;
+            }
             Qt.callLater(function() {
-                if (revision !== root.previewRefreshRevision) return;
-                root.renderer.stylePreview(previewText.textDocument);
-                if (root.pendingAnchor !== "") {
-                    var anchor = root.pendingAnchor;
-                    root.pendingAnchor = "";
-                    root.jumpToAnchor(anchor);
+                if (!root || revision !== root.previewRefreshRevision) return;
+                try {
+                    root.renderer.stylePreview(previewText.textDocument);
+                    if (root.pendingAnchor !== "") {
+                        var anchor = root.pendingAnchor;
+                        root.pendingAnchor = "";
+                        root.jumpToAnchor(anchor);
+                    }
+                } finally {
+                    if (revision === root.previewRefreshRevision)
+                        root.previewRefreshInFlight = false;
                 }
             });
         });
@@ -120,13 +153,20 @@ Rectangle {
         // Invalidate queued parse/style completions before clearing the text.
         // Otherwise an old completion can consume a new pending heading while
         // its replacement preview is still empty.
-        ++previewRefreshRevision;
+        var revision = ++previewRefreshRevision;
+        previewRefreshInFlight = true;
         renderedMarkdown = "";
-        Qt.callLater(refresh);
+        Qt.callLater(function() {
+            if (root && revision === root.previewRefreshRevision) root.refresh();
+        });
     }
     function loadVisualProjection(selectionStart, selectionEnd) {
-        if (!visualEditEnabled)
+        var revision = ++visualRefreshRevision;
+        visualRefreshInFlight = false;
+        if (!visualEditEnabled) {
+            visualRefreshTimer.stop();
             return;
+        }
         if (visualText.inputMethodComposing) {
             visualRefreshTimer.restart();
             return;
@@ -141,10 +181,17 @@ Rectangle {
         visualSnapshot = projection.visualText || "";
         visualImages = projection.images || [];
         visualText.text = visualSnapshot;
+        visualRefreshInFlight = true;
         Qt.callLater(function() {
-            if (!root.visualEditEnabled) return;
-            if (visualText.inputMethodComposing) { visualRefreshTimer.restart(); return; }
-            root.renderer.styleVisualEditor(visualText.textDocument, root.visualTextSize, root.visualTypeface);
+            if (!root || revision !== root.visualRefreshRevision) return;
+            try {
+                if (!root.visualEditEnabled) return;
+                if (visualText.inputMethodComposing) { visualRefreshTimer.restart(); return; }
+                root.renderer.styleVisualEditor(visualText.textDocument, root.visualTextSize, root.visualTypeface);
+            } finally {
+                if (revision === root.visualRefreshRevision)
+                    root.visualRefreshInFlight = false;
+            }
         });
         first = Math.max(0, Math.min(first, visualSnapshot.length));
         last = Math.max(0, Math.min(last, visualSnapshot.length));
@@ -226,8 +273,15 @@ Rectangle {
         visualStatus = visualEditEnabled
             ? "Edit text, simple table cells and image captions. Return splits or continues simple list items; unsupported structures stay in Source."
             : "Rendered preview is read-only.";
-        if (visualEditEnabled)
-            Qt.callLater(loadVisualProjection);
+        var revision = ++visualRefreshRevision;
+        visualRefreshTimer.stop();
+        visualRefreshInFlight = visualEditEnabled;
+        if (visualEditEnabled) {
+            Qt.callLater(function() {
+                if (root && revision === root.visualRefreshRevision && root.visualEditEnabled)
+                    root.loadVisualProjection();
+            });
+        }
     }
     Connections { target: root.renderer; function onOutputStyleChanged() { root.reload(); } }
     Component.onCompleted: refresh()

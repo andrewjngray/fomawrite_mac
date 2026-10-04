@@ -1437,6 +1437,17 @@ Planned scope: provide a clear, consistent Find/Replace surface and finish the a
 
 Changes: rounded search/replacement fields, stable grouped navigation, useful match counts, nearest-caret search, advance-after-replacement behavior, keyboard Return/Shift-Return/Escape, narrow/dark support, and cancellation of obsolete view restoration when Find opens. Source typing updates results without selecting another match; hiding Source closes Find.
 
-Verification and artifacts: **159 regression tests pass**,11 focused native checks and4 final Find checks pass. Each Dev/demo/Applications bundle passes124 footer states plus seven writing workflows, strict signatures and embedded-resource/version comparison. The checker now explicitly renders frames before measuring layout, retaining every geometry assertion after two intermediate-layout failures. See the [handoff record](../research/cycle-111/README.md). All local copies are `0.3.0-dev10`, macOS `0.3.0 (111)`. [Optional exercise](../research/usability/cycle-111.md).
+Verification and artifacts: **159 regression tests pass**,11 focused native checks and4 final Find checks pass. Each Dev/demo/Applications bundle passes 124 footer states plus seven writing workflows, strict signatures and embedded-resource/version comparison. The checker now explicitly renders frames before measuring layout, retaining every geometry assertion after two intermediate-layout failures. See the [handoff record](../research/cycle-111/README.md). All local copies are `0.3.0-dev10`, macOS `0.3.0 (111)`. [Optional exercise](../research/usability/cycle-111.md).
 
 Limits: diagnostic input is synthetic Qt input in the actual app's isolated temporary window. Physical VoiceOver/input/display acceptance remains open. No Cycle112 implementation, notarization or public release is included; further product work should follow Andrew's review.
+
+
+## Cycle 112 — independent pane zoom and split sizing
+
+Planned scope: Andrew requested separate size adjustment for both sides of Split. Provide matching compact − percentage + controls, independent saved 75–200% magnification, percentage presets/reset, optional linked zoom, a more readable Preview baseline, and discoverable divider drag/double-click balance.
+
+Changes: shared header control and zoom state, one-time legacy Source-size migration, active-pane routing for text-size commands, matching header baselines and compact fit. Preview and Visual Edit share their pane’s zoom. Retained logical text anchors prevent rewrap drift through repeated zoom/reset; real reading/editing interaction invalidates the saved anchor. Deferred Preview parsing/styling remains covered by the viewport transaction. Screen zoom does not write Markdown or output typography. The document divider balances within the existing Source 480px / Preview 320px minimums.
+
+Validation: **163 regression tests and 8 focused native checks pass**. The real executable passes 124 footer states, seven daily-writing workflows and five pane-zoom workflows, including strict 2px anchor bounds (measured 0px). Final artifact identities: see [Cycle112](../research/cycle-112/README.md). Target: `0.3.0-dev11`, macOS `0.3.0 (112)`, stable Dev, ordinary demo/package and Applications. [Optional exercise](../research/usability/cycle-112.md). Native verification uses synthetic Qt input in isolated app windows; physical mouse/keyboard, VoiceOver and display-scale acceptance remain open.
+
+Andrew’s zoom request supersedes the proposed Cycle112 focus-safety scope. Formatting focus safety and safe link editing remain the next bounded improvements, followed by everyday-writing acceptance and review-led image/table/list ergonomics. Public distribution remains separate.

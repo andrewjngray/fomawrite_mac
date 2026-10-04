@@ -95,7 +95,8 @@ void FomawriteTest::referenceWorkspacePresetPreservesDraftAndOutput() {
         const QString draft = editor->property("text").toString();
         QVERIFY(QMetaObject::invokeMethod(editor, "select", Q_ARG(int, 5), Q_ARG(int, 12)));
         settings->setProperty("writingAppearance", "book");
-        settings->setProperty("writingSize", 24);
+        settings->setProperty("sourceZoom", 150);
+        settings->setProperty("previewZoom", 175);
         settings->setProperty("toolbarVisibilityMode", 2);
         layout->setProperty("layoutMode", 2);
         layout->setProperty("organizerVisible", false);
