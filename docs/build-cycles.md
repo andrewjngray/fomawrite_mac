@@ -1400,3 +1400,16 @@ Changes: a single document footer keeps all four view controls at the lower righ
 Verification and artifact status: see the [Cycle 107 evidence record](../research/cycle-107/README.md) for the final test gate, native screenshots, limits and exact bundle identities. Target version: `0.3.0-dev8`, macOS `0.3.0 (107)`, stable Dev, ordinary demo/package and Applications. [Optional review exercise](../research/usability/cycle-107.md).
 
 Next: Andrew's review of the actual repeated-switch behavior. Physical VoiceOver/display-scale checks remain open. Image/table/list ergonomics and optional public distribution remain separate scopes.
+
+
+## Cycle 108 — shipped-footer verification and responsive view consistency
+
+Planned scope: investigate Andrew's repeated reports of moving Source controls; exercise the actual app, repeated mode changes and resize boundaries before refreshing all local copies.
+
+Changes: keep all footer action controls together at fixed right-hand positions and use a mode-independent compact-style budget. Correct hidden Visual Edit indication, one-click Visual Edit from contracted Source, Visual Edit-off from contracted Full, and explicit Split at the resize restoration boundary. Classify writing focus from the actual editor item rather than stale focus bindings. Footer and menu checks track the effective layout, and repeated workspace-mode selection preserves checkmarks. About identifies the running application version/path.
+
+Verification: production build/package pass; **152 regression tests pass**, including rapid mode clicks, long Unicode drafts, selection/Undo and scroll preservation, both focus-dependent contraction paths and repeated menu choices. Cycle107 fixtures now load qrc:/Main.qml. An explicit diagnostic in the real executable runs 124 native states and saves captures with isolated temporary settings/documents; its wrapper compares executable identity, embedded UI and version metadata with the checkout. See the [Cycle108 evidence record](../research/cycle-108/README.md) for each local bundle's results and actual screenshots.
+
+Limits: external macOS Accessibility was unavailable, so native verification uses synthetic Qt events in the application's own isolated window, not physical OS input. Original screenshots match the old separate-footer presentation, but their originating process is unproven. Physical VoiceOver/display scaling and arbitrary restored workspaces remain acceptance checks. Public RC1 is unchanged.
+
+Runnable artifacts: `0.3.0-dev9`, macOS `0.3.0 (108)` at stable Dev, ordinary/demo and Applications paths; final identities in the [artifact record](../research/cycle-108/artifacts.json). [Optional review exercise](../research/usability/cycle-108.md).

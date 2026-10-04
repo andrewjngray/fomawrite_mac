@@ -180,6 +180,8 @@ ApplicationWindow {
                                     workspaceSettings.styleCheckCustom,
                                     workspaceSettings.styleCheckFillers);
     }
+    AboutDialog { id: aboutDialog }
+
     Connections {
         target: backend
         function onDocumentStatisticsChanged() { statisticsRefreshTimer.restart(); }
@@ -260,10 +262,18 @@ ApplicationWindow {
         onActivated: win.cycleWorkspaceFocus(true)
     }
     property string lastWritingSurface: "source"
+    function updateWritingSurfaceFromFocus() {
+        // Bound activeFocus flags can lag the window's focus-item notification.
+        // Classify the actual editor item; toolbar/menu focus keeps the last
+        // writing surface rather than borrowing a stale Visual Edit flag.
+        var item = activeFocusItem;
+        if (isInside(item, editor)) lastWritingSurface = "source";
+        else if (item && item.objectName === previewPane.visualEditorObjectName
+                 && isInside(item, previewPane)) lastWritingSurface = "visual";
+    }
     onActiveFocusItemChanged: {
-        topChrome.keyboardReveal = isInside(activeFocusItem, topChrome)
-        if (previewPane.visualEditorFocused) lastWritingSurface = "visual"
-        else if (editor.activeFocus) lastWritingSurface = "source"
+        topChrome.keyboardReveal = isInside(activeFocusItem, topChrome);
+        updateWritingSurfaceFromFocus();
     }
 
     WorkspaceLayout {
@@ -331,6 +341,9 @@ ApplicationWindow {
             lastWritingSurface = "source";
         }
         workspaceLayout.layoutMode = mode;
+        // A deliberate Split click overrides resize hysteresis, including
+        // when Split is already the saved intent but currently contracted.
+        if (mode === 1) workspaceLayout.recalculate(true);
         // Changing the arrangement is not a request to jump to an old caret.
         documentViewportTransition.focusTarget = mode === 0 ? "source"
             : mode === 2 ? "preview"
@@ -338,11 +351,14 @@ ApplicationWindow {
     }
     function toggleVisualEditing() {
         beginDocumentViewportTransition();
-        var enabled = !workspaceLayout.visualEditEnabled;
+        var visibleMode = workspaceLayout.effectiveLayoutMode;
+        // Responsive Source can retain a hidden Visual Edit preference.
+        // Clicking must show Visual Edit immediately; turning it off in a
+        // contracted full view must stay on the rendered document.
+        var enabled = visibleMode === 0 || !workspaceLayout.visualEditEnabled;
+        if (visibleMode !== 1) workspaceLayout.layoutMode = 2;
         workspaceLayout.visualEditEnabled = enabled;
         previewPane.visualEditEnabled = enabled;
-        if (enabled && workspaceLayout.effectiveLayoutMode === 0)
-            workspaceLayout.layoutMode = 2;
         lastWritingSurface = enabled ? "visual" : "source";
         documentViewportTransition.focusTarget = "preview";
     }
@@ -852,13 +868,22 @@ ApplicationWindow {
         id: workspaceMenu
         objectName: "workspaceMenu"
         width: 258
+        function restoreViewChecks() {
+            // MenuItem toggles itself before triggered, even when selecting the
+            // current mode is a no-op. Rebind these indicators to the actual
+            // view; Visual Edit and Split may legitimately both be selected.
+            workspaceSourceView.checked = Qt.binding(function() { return workspaceLayout.effectiveLayoutMode === 0; });
+            workspaceVisualView.checked = Qt.binding(function() { return workspaceLayout.effectiveLayoutMode !== 0 && workspaceLayout.visualEditEnabled; });
+            workspacePreviewView.checked = Qt.binding(function() { return workspaceLayout.effectiveLayoutMode === 2 && !workspaceLayout.visualEditEnabled; });
+            workspaceSplitView.checked = Qt.binding(function() { return workspaceLayout.effectiveLayoutMode === 1; });
+        }
         CompactMenuItem { objectName: "workspaceOrganizer"; text: workspaceCommands.label("organizer"); checkable: true; checked: workspaceLayout.effectiveOrganizerVisible; onTriggered: win.toggleWorkspacePane("organizer") }
         CompactMenuItem { objectName: "workspaceFiles"; text: workspaceCommands.label("library"); checkable: true; checked: workspaceLayout.effectiveFilesVisible; onTriggered: win.toggleWorkspacePane("files") }
         MenuSeparator {}
-        CompactMenuItem { text: "Source"; checkable: true; checked: workspaceLayout.layoutMode === 0; onTriggered: win.selectWritingMode("source") }
-        CompactMenuItem { text: "Visual Edit"; checkable: true; checked: workspaceLayout.visualEditEnabled; onTriggered: win.selectWritingMode("visual") }
-        CompactMenuItem { text: "Preview"; checkable: true; checked: workspaceLayout.layoutMode === 2 && !workspaceLayout.visualEditEnabled; onTriggered: win.selectWritingMode("preview") }
-        CompactMenuItem { text: "Source and preview side by side"; checkable: true; checked: workspaceLayout.effectiveLayoutMode === 1; enabled: documentFooter.canSplit; onTriggered: win.setDocumentView(1) }
+        CompactMenuItem { id: workspaceSourceView; text: "Source"; checkable: true; checked: workspaceLayout.effectiveLayoutMode === 0; onTriggered: { win.selectWritingMode("source"); workspaceMenu.restoreViewChecks(); } }
+        CompactMenuItem { id: workspaceVisualView; text: "Visual Edit"; checkable: true; checked: workspaceLayout.effectiveLayoutMode !== 0 && workspaceLayout.visualEditEnabled; onTriggered: { win.selectWritingMode("visual"); workspaceMenu.restoreViewChecks(); } }
+        CompactMenuItem { id: workspacePreviewView; text: "Preview"; checkable: true; checked: workspaceLayout.effectiveLayoutMode === 2 && !workspaceLayout.visualEditEnabled; onTriggered: { win.selectWritingMode("preview"); workspaceMenu.restoreViewChecks(); } }
+        CompactMenuItem { id: workspaceSplitView; text: "Source and preview side by side"; checkable: true; checked: workspaceLayout.effectiveLayoutMode === 1; enabled: documentFooter.canSplit; onTriggered: { win.setDocumentView(1); workspaceMenu.restoreViewChecks(); } }
         MenuSeparator {}
         CompactMenuItem { text: "Document outline"; onTriggered: workspaceCommands.run("outline") }
         CompactMenuItem { text: "Document statistics"; onTriggered: workspaceCommands.run("statistics") }
@@ -1903,6 +1928,13 @@ ApplicationWindow {
         Platform.Menu {
             title: "Help"
             Platform.MenuItem {
+                objectName: "helpAboutFomawrite"
+                text: "About Fomawrite"
+                role: Platform.MenuItem.AboutRole
+                onTriggered: aboutDialog.open()
+            }
+            Platform.MenuSeparator {}
+            Platform.MenuItem {
                 objectName: "helpFomawrite"
                 text: "Fomawrite Help"
                 onTriggered: helpDialog.showPage("help", "Fomawrite Help")
@@ -2890,6 +2922,7 @@ ApplicationWindow {
                 // Reflowing an inactive Source pane must not pull the preview
                 // back to an old caret through synchronized scrolling.
                 onCursorRectangleChanged: if (activeFocus && editorPane.visible) editorFlick.ensureCursorVisible()
+                onActiveFocusChanged: if (activeFocus) Qt.callLater(win.updateWritingSurfaceFromFocus)
                 onCursorPositionChanged: backend.setFocusPosition(cursorPosition, workspaceSettings.paragraphFocus, workspaceSettings.sentenceFocus)
 
                 function replaceSelectionWith(replacement) {
@@ -3339,7 +3372,7 @@ ApplicationWindow {
                 editor.forceActiveFocus();
                 Qt.callLater(function() { editorFlick.ensureCursorVisible(); });
             }
-            onVisualEditorFocusedChanged: if (visualEditorFocused) win.lastWritingSurface = "visual"
+            onVisualEditorFocusedChanged: if (visualEditorFocused) Qt.callLater(win.updateWritingSurfaceFromFocus)
             onEditorUndoRequested: editor.undo()
             onEditorRedoRequested: editor.redo()
             darkMode: win.darkMode
@@ -3379,8 +3412,11 @@ ApplicationWindow {
         width: parent.width - x
         z: 2
         layoutMode: workspaceLayout.effectiveLayoutMode
-        visualEditing: workspaceLayout.visualEditEnabled
+        visualEditing: workspaceLayout.effectiveLayoutMode !== 0 && workspaceLayout.visualEditEnabled
         canSplit: workspaceLayout.availableWidth >= 800
+        styleWidthBudget: Math.max(0, workspaceLayout.availableWidth
+            - (workspaceLayout.organizerVisible ? workspaceLayout.organizerWidth : 0)
+            - (workspaceLayout.filesVisible ? workspaceLayout.fileWidth : 0))
         writingAppearance: win.activeWritingAppearance === "editorial" ? "Editorial" : win.activeWritingAppearance === "book" ? "Book" : "Manuscript"
         previewTemplate: backend.outputTemplateName
         statusText: backend.status

@@ -148,10 +148,10 @@ QtObject {
         case "excerpts": return libraryPane.showExcerpts;
         case "navigationTree": return library.navigationMode === 0;
         case "navigationList": return library.navigationMode === 1;
-        case "editor": return layoutState.layoutMode === 0;
-        case "split": return layoutState.layoutMode === 1;
-        case "preview": return layoutState.layoutMode === 2;
-        case "togglePreview": return layoutState.layoutMode !== 0;
+        case "editor": return layoutState.effectiveLayoutMode === 0;
+        case "split": return layoutState.effectiveLayoutMode === 1;
+        case "preview": return layoutState.effectiveLayoutMode === 2;
+        case "togglePreview": return layoutState.effectiveLayoutMode !== 0;
         case "webPreview": return true;
         case "titleBarFade": return settings.titleBarMode === 0;
         case "titleBarAlways": return settings.titleBarMode === 1;

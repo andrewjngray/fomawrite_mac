@@ -39,6 +39,8 @@ class FomawriteTest : public QObject {
     Q_OBJECT
 
 private slots:
+    void bundledFooterRapidModesPreserveDraftAndViewport();
+    void bundledFooterRoutesFollowResponsivePresentation();
     void footerCompactStylesRemainReachableAcrossModes();
     void footerViewControlsStayStationaryAcrossModes();
     void footerViewCyclesPreserveDraftSelectionAndWidths();
@@ -221,10 +223,11 @@ private slots:
         auto *search = window->findChild<QQuickItem *>("searchField");
         QVERIFY(layout && editor && drawer && prompt && search);
         window->setProperty("width", 720);
-        layout->setProperty("layoutMode", 1);
-        layout->setProperty("visualEditEnabled", true);
-        window->setProperty("lastWritingSurface", "visual");
+        // Enter the view through its real route; assigning a remembered focus
+        // flag while Source owns focus no longer describes a valid UI state.
+        QVERIFY(QMetaObject::invokeMethod(window.data(), "selectWritingMode", Q_ARG(QVariant, "visual")));
         QTRY_COMPARE(layout->property("effectiveLayoutMode").toInt(), 2);
+        QTRY_VERIFY(!window->property("changingDocumentView").toBool());
         const QString draft = "Keep **unsaved** writing.\n";
         editor->setProperty("text", draft);
         QVERIFY(QMetaObject::invokeMethod(window.data(), "toggleWorkspacePane", Q_ARG(QVariant, "organizer")));
@@ -5219,6 +5222,7 @@ private:
 #include "cycle104-controls.inc"
 #include "cycle106-footer.inc"
 #include "cycle107-footer-transitions.inc"
+#include "cycle108-bundled-footer.inc"
 #include "cycle100-navigation.inc"
 #include "cycle99-integration.inc"
 #include "sourcevisualmapping-cycle99.inc"

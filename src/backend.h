@@ -23,6 +23,7 @@ class QLockFile;
 
 class Backend : public QObject {
     Q_OBJECT
+    Q_PROPERTY(QString applicationPath READ applicationPath CONSTANT)
     Q_PROPERTY(int outputStyle READ outputStyle NOTIFY outputStyleChanged)
     Q_PROPERTY(QString outputFont READ outputFont NOTIFY outputStyleChanged)
     Q_PROPERTY(int outputPointSize READ outputPointSize NOTIFY outputStyleChanged)
@@ -49,6 +50,7 @@ public:
     explicit Backend(QObject *parent = nullptr, bool outputOnly = false);
     ~Backend() override;
 
+    QString applicationPath() const;
     QObject *library() { return &m_library; }
     QUrl documentBaseUrl() const;
 

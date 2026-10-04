@@ -512,6 +512,10 @@ void Backend::setParentWindow(QWindow *window) {
     m_parentWindow = window;
 }
 
+QString Backend::applicationPath() const {
+    return QCoreApplication::applicationFilePath();
+}
+
 QString Backend::fileName() const {
     if (!m_fileUrl.isValid() || m_fileUrl.isEmpty())
         return QStringLiteral("Untitled.md");

@@ -7,6 +7,7 @@ TEMPLATE = app
 
 HEADERS += \
     src/backend.h \
+    src/documentviewcheck.h \
     src/markdownhighlighter.h \
     src/sourcevisualmapping.h \
     src/visualtexthighlighter.h \
@@ -15,6 +16,7 @@ HEADERS += \
 
 SOURCES += \
     src/main.cpp \
+    src/documentviewcheck.cpp \
     src/backend.cpp \
     src/markdownhighlighter.cpp \
     src/sourcevisualmapping.cpp \

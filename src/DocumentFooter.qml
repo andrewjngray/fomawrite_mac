@@ -14,7 +14,10 @@ WorkspaceFooter {
     property bool showStatus: false
     property bool showStatistics: false
     property string statisticsText: ""
-    readonly property bool compact: width < 660
+    // Use the width available with the requested navigation columns so
+    // switching views cannot expand/collapse the style controls by itself.
+    property real styleWidthBudget: width
+    readonly property bool compact: Math.min(width, styleWidthBudget) < 660
     readonly property bool statusVisible: statusLabel.visible
     property alias stylesAnchor: stylesButton
     signal viewRequested(int mode)
@@ -28,6 +31,25 @@ WorkspaceFooter {
         anchors.fill: parent
         anchors.leftMargin: 12; anchors.rightMargin: 12
         spacing: 6
+        Label {
+            id: statusLabel
+            objectName: "sourceFooterStatus"
+            visible: root.showStatus && !root.showStatistics && root.width >= 880
+            text: root.statusText
+            font.family: Qt.application.font.family; font.pixelSize: 13
+            color: backend.palette.muted
+            elide: Text.ElideRight
+            Layout.fillWidth: true; Layout.minimumWidth: 0
+            Accessible.name: "Document status: " + text
+        }
+        FooterButton {
+            objectName: "toolbarStatistic"
+            visible: root.showStatistics && root.width >= 880
+            text: root.statisticsText; hint: text
+            Layout.fillWidth: true; Layout.minimumWidth: 34
+            onClicked: root.statisticsRequested()
+        }
+        Item { Layout.fillWidth: true; visible: !statusLabel.visible && !(root.showStatistics && root.width >= 880) }
         FooterButton {
             objectName: "sourceAppearanceButton"
             visible: !root.compact
@@ -53,25 +75,6 @@ WorkspaceFooter {
             Layout.preferredWidth: 34
             onClicked: root.stylesMenuRequested(this)
         }
-        Label {
-            id: statusLabel
-            objectName: "sourceFooterStatus"
-            visible: root.showStatus && !root.showStatistics && root.width >= 880
-            text: root.statusText
-            font.family: Qt.application.font.family; font.pixelSize: 13
-            color: backend.palette.muted
-            elide: Text.ElideRight
-            Layout.fillWidth: true; Layout.minimumWidth: 0
-            Accessible.name: "Document status: " + text
-        }
-        FooterButton {
-            objectName: "toolbarStatistic"
-            visible: root.showStatistics && root.width >= 880
-            text: root.statisticsText; hint: text
-            Layout.fillWidth: true; Layout.minimumWidth: 34
-            onClicked: root.statisticsRequested()
-        }
-        Item { Layout.fillWidth: true; visible: !statusLabel.visible && !(root.showStatistics && root.width >= 880) }
         FooterButton {
             objectName: "visualEditToggle"
             leftPadding: 8; rightPadding: 8

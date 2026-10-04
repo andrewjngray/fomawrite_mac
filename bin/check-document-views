@@ -1,0 +1,72 @@
+#!/usr/bin/env python3
+"""Exercise the actual Mac bundle, then compare its embedded UI with this checkout."""
+import argparse
+import hashlib
+import json
+import os
+from pathlib import Path
+import plistlib
+import re
+import subprocess
+import sys
+import time
+
+root = Path(__file__).resolve().parent.parent
+parser = argparse.ArgumentParser(description=__doc__)
+parser.add_argument('output', type=Path, help='Directory for synthetic screenshots and report')
+parser.add_argument('--app', type=Path, default=root / 'dist/Fomawrite Dev.app')
+args = parser.parse_args()
+app = args.app.resolve()
+executable = app / 'Contents/MacOS/Fomawrite'
+output = args.output.resolve()
+if not executable.is_file():
+    parser.error(f'Bundle executable not found: {executable}')
+output.mkdir(parents=True, exist_ok=True)
+started_ns = time.time_ns()
+result = subprocess.run([str(executable), '--check-document-views', str(output)],
+                        env={**os.environ, 'QT_FORCE_STDERR_LOGGING': '1'}, timeout=240)
+if result.returncode:
+    sys.exit(result.returncode)
+report_path = output / 'report.json'
+if not report_path.is_file() or report_path.stat().st_mtime_ns < started_ns:
+    sys.exit('The launched bundle did not produce a fresh report')
+report = json.loads(report_path.read_text())
+failures = []
+if not report.get('passed'):
+    failures.append('The bundle reported failed view checks')
+if report.get('platform') != 'cocoa':
+    failures.append('Expected native Cocoa window verification')
+if Path(report.get('executable', '')).resolve() != executable.resolve():
+    failures.append('Report came from a different executable')
+if report.get('executableSha256') != hashlib.sha256(executable.read_bytes()).hexdigest():
+    failures.append('Executable changed during the check')
+for name, actual in report.get('resourceSha256', {}).items():
+    expected = hashlib.sha256((root / 'src' / name).read_bytes()).hexdigest()
+    if actual != expected:
+        failures.append(f'Embedded {name} differs from checkout')
+for name in ('Main.qml', 'DocumentFooter.qml', 'WorkspaceLayout.qml', 'WorkspaceCommands.qml'):
+    if name not in report.get('resourceSha256', {}):
+        failures.append(f'No embedded hash for {name}')
+expected_version = re.search(r'setApplicationVersion\(QStringLiteral\("([^"]+)"\)\)',
+                             (root / 'src/main.cpp').read_text()).group(1)
+if report.get('applicationVersion') != expected_version:
+    failures.append('Application version differs from checkout')
+with (app / 'Contents/Info.plist').open('rb') as file:
+    info = plistlib.load(file)
+with (root / 'macos/Info.plist').open('rb') as file:
+    expected_info = plistlib.load(file)
+for field in ('CFBundleShortVersionString', 'CFBundleVersion'):
+    if info.get(field) != expected_info.get(field):
+        failures.append(f'{field} differs from checkout')
+verification = {'passed': not failures, 'failures': failures, 'app': str(app),
+                'version': report.get('applicationVersion'),
+                'build': info.get('CFBundleVersion'), 'bundleIdentifier': info.get('CFBundleIdentifier'),
+                'executableSha256': report.get('executableSha256'),
+                'resourceSha256': report.get('resourceSha256'),
+                'statesChecked': len(report.get('scenarios', []))}
+(output / 'bundle-verification.json').write_text(json.dumps(verification, indent=2) + '\n')
+if failures:
+    print('\n'.join(failures), file=sys.stderr)
+    sys.exit(1)
+print(f"Verified {app}: {expected_version}, build {info['CFBundleVersion']}; "
+      f"{verification['statesChecked']} states; embedded UI matches checkout.")

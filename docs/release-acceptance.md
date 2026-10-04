@@ -1,8 +1,8 @@
 # Acceptance ledger — current follow-through and Cycle 59 history
 
-## Current follow-through — Cycles 98–106
+## Current follow-through — Cycles 98–108
 
-The current review target is application `0.3.0-dev7`, macOS `0.3.0 (106)`. Cycle 106 aligns the workspace footers, shares header control styling and verifies actual mode/template/appearance menu selections and repeated opening. Cycle 105 simplifies the actual toolbar glyphs and capsule treatment against Andrew’s reference. Cycle 104 refines the folder heading and formatting controls, and adds quick text sizing to the native workspace implemented in Cycle 103. See [Cycle 106](../research/cycle-106/README.md) for evidence. This records the affected workflows; it does not recertify the full historical menu matrix.
+The current review target is application `0.3.0-dev9`, macOS `0.3.0 (108)`. Cycles 107–108 provide one stationary document footer, correct responsive view/focus state and consistent mode checkmarks, and verify 124 native states in each actual local bundle. All 152 regression tests and four focused native workflows pass. See [Cycle 108](../research/cycle-108/README.md) for the installed executable identities, screenshots and explicit synthetic-input/physical-accessibility limits. Cycle 106 aligns the workspace footers, shares header control styling and verifies actual mode/template/appearance menu selections and repeated opening. Cycle 105 simplifies the actual toolbar glyphs and capsule treatment against Andrew’s reference. Cycle 104 refines the folder heading and formatting controls, and adds quick text sizing to the native workspace implemented in Cycle 103. See [Cycle 106](../research/cycle-106/README.md) for that earlier checkpoint. This records the affected workflows; it does not recertify the full historical menu matrix.
 
 | Area | New bounded evidence | Still open |
 | --- | --- | --- |

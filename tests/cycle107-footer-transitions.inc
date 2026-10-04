@@ -9,7 +9,7 @@ QMap<QString, QRectF> cycle107ViewBounds(QQuickItem *footer) {
     return result;
 }
 bool cycle107SameBounds(const QMap<QString, QRectF> &actual, const QMap<QString, QRectF> &expected) {
-    if (actual.size() != 4 || expected.size() != 4) return false;
+    if (actual.isEmpty() || actual.size() != expected.size()) return false;
     for (auto it = expected.cbegin(); it != expected.cend(); ++it) {
         const auto found = actual.value(it.key());
         if (qAbs(found.left() - it.value().left()) > 0.1 || qAbs(found.top() - it.value().top()) > 0.1
@@ -18,6 +18,14 @@ bool cycle107SameBounds(const QMap<QString, QRectF> &actual, const QMap<QString,
         }
     }
     return true;
+}
+QMap<QString, QRectF> cycle107ActionBounds(QQuickItem *footer) {
+    auto result = cycle107ViewBounds(footer);
+    for (const char *name : {"footerStylesButton", "sourceAppearanceButton", "previewTemplateButton"}) {
+        auto *button = footer->findChild<QQuickItem *>(name);
+        if (button && button->isVisible()) result.insert(QString::fromLatin1(name), cycle103SceneBounds(button));
+    }
+    return result;
 }
 bool cycle107ViewLabelsReadable(QQuickItem *footer) {
     for (const char *name : {"visualEditToggle", "sourceModeButton", "previewSplitButton", "previewFullButton", "footerStylesButton"}) {
@@ -35,7 +43,8 @@ bool cycle107ViewChecked(QQuickItem *footer, QObject *layout) {
         if (!button || button->property("checked").toBool() != (mode == expectedMode)) return false;
     }
     auto *visual = footer->findChild<QQuickItem *>("visualEditToggle");
-    return visual && visual->property("checked").toBool() == layout->property("visualEditEnabled").toBool();
+    return visual && visual->property("checked").toBool()
+        == (mode != 0 && layout->property("visualEditEnabled").toBool());
 }
 }
 
@@ -43,7 +52,7 @@ void FomawriteTest::footerViewControlsStayStationaryAcrossModes() {
     Cycle103SettingsSnapshot isolatedSettings;
     Backend backend;
     QQmlEngine engine; engine.rootContext()->setContextProperty("backend", &backend);
-    QQmlComponent component(&engine, QUrl::fromLocalFile(QFINDTESTDATA("../src/Main.qml")));
+    QQmlComponent component(&engine, QUrl(QStringLiteral("qrc:/Main.qml")));
     QScopedPointer<QObject> window(component.create()); QVERIFY2(window, qPrintable(component.errorString()));
     auto *quick = qobject_cast<QQuickWindow *>(window.data());
     auto *layout = window->findChild<QObject *>("workspaceLayout");
@@ -78,6 +87,8 @@ void FomawriteTest::footerViewControlsStayStationaryAcrossModes() {
             QTRY_VERIFY(cycle106FooterControlsFit(window.data()));
             const auto initial = cycle107ViewBounds(footer);
             QCOMPARE(initial.size(), 4);
+            const auto initialActions = cycle107ActionBounds(footer);
+            const bool initiallyCompact = styles->isVisible();
             const QRectF initialFooter = cycle103SceneBounds(footer);
             const QRectF initialAppearance = cycle103SceneBounds(appearance);
             const QRectF initialOutput = cycle103SceneBounds(output);
@@ -101,22 +112,20 @@ void FomawriteTest::footerViewControlsStayStationaryAcrossModes() {
                     QVERIFY(cycle102Click(quick, steps[step].first));
                     QTRY_COMPARE(layout->property("effectiveLayoutMode").toInt(), steps[step].second);
                     QTRY_VERIFY(cycle107SameBounds(cycle107ViewBounds(footer), initial));
+                    QTRY_VERIFY(cycle107SameBounds(cycle107ActionBounds(footer), initialActions));
                     QTRY_VERIFY(cycle107ViewChecked(footer, layout));
                     QTRY_VERIFY2(cycle107ViewLabelsReadable(footer), "Footer view labels must not be truncated.");
                     QTRY_VERIFY(cycle106FootersAlign(window.data()));
                     QTRY_VERIFY(cycle106FooterControlsFit(window.data()));
                     // Style selection is independent of the visible writing mode.
-                    QCOMPARE(appearance->isVisible(), footer->width() >= 660);
-                    QCOMPARE(output->isVisible(), footer->width() >= 660);
-                    QCOMPARE(styles->isVisible(), footer->width() < 660);
+                    QCOMPARE(appearance->isVisible(), !initiallyCompact);
+                    QCOMPARE(output->isVisible(), !initiallyCompact);
+                    QCOMPARE(styles->isVisible(), initiallyCompact);
                     if (width == 1440) {
                         QTRY_COMPARE(cycle103SceneBounds(footer), initialFooter);
                         QTRY_COMPARE(cycle103SceneBounds(output), initialOutput);
                         QTRY_COMPARE(cycle103SceneBounds(appearance), initialAppearance);
                     }
-                    auto *leftControl = styles->isVisible() ? styles : appearance;
-                    QVERIFY(qAbs(cycle103SceneBounds(leftControl).left()
-                                 - cycle103SceneBounds(footer).left() - 12) < 0.1);
                     if (!dark && pass == 0 && (step == 0 || step == 1 || step == 2 || step == 4))
                         QVERIFY(cycle102Capture(quick, QString("cycle107-view-%1-%2-%3").arg(width).arg(step).arg(steps[step].second)));
                 }
@@ -173,7 +182,7 @@ void FomawriteTest::footerViewCyclesPreserveDraftSelectionAndWidths() {
     QVERIFY(cycle103Write(path, saved.toUtf8()));
     Backend backend;
     QQmlEngine engine; engine.rootContext()->setContextProperty("backend", &backend);
-    QQmlComponent component(&engine, QUrl::fromLocalFile(QFINDTESTDATA("../src/Main.qml")));
+    QQmlComponent component(&engine, QUrl(QStringLiteral("qrc:/Main.qml")));
     QScopedPointer<QObject> window(component.create()); QVERIFY2(window, qPrintable(component.errorString()));
     auto *quick = qobject_cast<QQuickWindow *>(window.data());
     auto *layout = window->findChild<QObject *>("workspaceLayout");
@@ -307,7 +316,7 @@ void FomawriteTest::footerCompactStylesRemainReachableAcrossModes() {
     Cycle103SettingsSnapshot isolatedSettings;
     Backend backend;
     QQmlEngine engine; engine.rootContext()->setContextProperty("backend", &backend);
-    QQmlComponent component(&engine, QUrl::fromLocalFile(QFINDTESTDATA("../src/Main.qml")));
+    QQmlComponent component(&engine, QUrl(QStringLiteral("qrc:/Main.qml")));
     QScopedPointer<QObject> window(component.create()); QVERIFY2(window, qPrintable(component.errorString()));
     auto *quick = qobject_cast<QQuickWindow *>(window.data());
     auto *layout = window->findChild<QObject *>("workspaceLayout");

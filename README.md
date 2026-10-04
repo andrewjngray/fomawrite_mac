@@ -24,6 +24,14 @@ open dist/Fomawrite.app
 
 `dist/Fomawrite.app` is the ordinary app. `dist/Fomawrite Dev.app` is the stable QA app; both come from the same source, but can differ until refreshed. The approved light icon is generated from `macos/FomawriteIcon.svg`; `macos/FomawriteRunningIcon.svg` supplies the first dark concept while the macOS app runs. Run `./bin/make-app-icon` (requires QtSvg and `iconutil`) to rebuild the committed light `.icns` and both runtime PNGs. They use bundle IDs `io.github.andrewjngray.fomawrite` and `io.github.andrewjngray.fomawrite.dev`. Bundles are locally ad-hoc signed, not notarized for public distribution. Do not replace either while it is running; close it normally and preserve unsaved work first.
 
+To verify the UI inside a specific local bundle, using disposable documents and settings:
+
+```sh
+./bin/check-document-views research/footer-review --app "dist/Fomawrite Dev.app"
+```
+
+This runs native Qt pointer-event checks, captures the app's window and compares embedded QML/version metadata with the checkout. It does not use macOS accessibility automation or touch the normal workspace. The report identifies the tested executable. Use **Fomawrite → About Fomawrite** to identify a normally running copy.
+
 The first launch of a renamed Mac bundle migrates prior preferences and copies matching workspace/recovery state from the matching former Omawrite identity, leaving the old files in place. Existing hidden `.omawrite-authors.json` sidecars and clipboard metadata remain compatible so a product rename does not discard authorship annotations. [Migration details](docs/product-rename.md).
 
 ## Project and status
@@ -38,8 +46,8 @@ The upstream Omawrite code is copyright David Heinemeier Hansson and remains und
 
 ## Current workspace review build
 
-The current review target is **0.3.0-dev7**, macOS bundle **0.3.0 (106)**. Workspace footers now share the top toolbar’s fonts, rounded controls and interaction states. The Library, Organizer, Source and Preview bottom rules align; appearance and template menus open above their controls, and Split/Full share one capsule. See [Cycle 106](research/cycle-106/README.md) for actual native screenshots and click verification.
+The current review target is **0.3.0-dev9**, macOS bundle **0.3.0 (108)**. One document footer keeps Source / Split / Full and Visual Edit together at the lower right. Responsive view indicators follow the visible pane; explicit Split and Visual Edit clicks work after narrowing and widening. The About dialog identifies the running app version and path. See [Cycle 108](research/cycle-108/README.md) for the installed-bundle checks and remaining verification limits.
 
-Use `dist/Fomawrite Dev.app`, `/Applications/Fomawrite.app` or the ordinary/demo package `dist/Fomawrite.app` to review build 106. The [Cycle 106 handoff](research/cycle-106/README.md) records test results and installed bundle identities. The old public GitHub RC1 download remains a different, earlier release.
+Use `dist/Fomawrite Dev.app`, `/Applications/Fomawrite.app` or the ordinary/demo package `dist/Fomawrite.app` to review build 108 after the recorded refresh. The old public GitHub RC1 download remains a different, earlier release.
 
 [Cycle 98](research/cycle-98/README.md) records 111 passing native integration assertions, including keyboard focus, compact navigation, native tabs and full screen. [Cycle 99](research/cycle-99/README.md) describes editable simple table cells, image alt text with local thumbnails, inline code and safe list continuation. Visual Edit keeps canonical Markdown and explicit Source fallback; arbitrary multiline paste, splitting within a list item, spatial image placement and general WYSIWYG are not implemented. [The workspace plan](docs/workspace-ui-redesign-plan.md) records the next review and development scope.

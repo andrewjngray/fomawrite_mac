@@ -28,6 +28,7 @@
 
 #include "backend.h"
 #include "systemtheme.h"
+#include "documentviewcheck.h"
 #ifdef FOMAWRITE_CONTEXT_SMOKE
 #include <QAccessible>
 #include <QKeyEvent>
@@ -133,7 +134,16 @@ int main(int argc, char *argv[]) {
     app.setOrganizationName(QStringLiteral("AndrewGray"));
     app.setOrganizationDomain(QStringLiteral("andrewjngray.github.io"));
     app.setApplicationDisplayName(QStringLiteral("Fomawrite"));
-    app.setApplicationVersion(QStringLiteral("0.3.0-dev8"));
+    app.setApplicationVersion(QStringLiteral("0.3.0-dev9"));
+    const int documentCheck = app.arguments().indexOf(QStringLiteral("--check-document-views"));
+    if (documentCheck >= 0) {
+        const QString destination = app.arguments().value(documentCheck + 1);
+        if (destination.isEmpty() || destination.startsWith('-')) {
+            qCritical("Usage: --check-document-views <output-directory>");
+            return 2;
+        }
+        return runDocumentViewCheck(app, destination);
+    }
 #ifdef FOMAWRITE_CONTEXT_SMOKE
     // A separately compiled integration test runs the real window manager with
     // disposable settings and documents, never the user's workspace.
