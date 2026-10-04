@@ -62,7 +62,14 @@ ApplicationWindow {
         if (keyboardChrome) return;
         topChrome.keyboardReveal = false;
         documentFooter.keyboardReveal = false;
+        topChrome.pointerReveal = false;
+        documentFooter.pointerReveal = false;
         documentChromeHidden = true;
+    }
+    function performDocumentEdit(action) {
+        var before = editor.text;
+        action();
+        if (editor.text !== before) writingActivity();
     }
     function revealDocumentChrome() {
         documentChromeHidden = false;
@@ -1471,13 +1478,13 @@ ApplicationWindow {
     Shortcut {
         sequence: "Ctrl+Z"
         context: Qt.WindowShortcut
-        onActivated: win.editTarget.undo()
+        onActivated: win.performDocumentEdit(function() { win.editTarget.undo(); })
     }
 
     Shortcut {
         sequences: ["Ctrl+Shift+Z", "Ctrl+Y"]
         context: Qt.WindowShortcut
-        onActivated: win.editTarget.redo()
+        onActivated: win.performDocumentEdit(function() { win.editTarget.redo(); })
     }
 
     Shortcut {
@@ -1573,10 +1580,10 @@ ApplicationWindow {
         }
         Platform.Menu {
             title: "Edit"
-            Platform.MenuItem { objectName: "editUndo"; text: "Undo"; enabled: win.editTarget.canUndo; onTriggered: win.editTarget.undo() }
-            Platform.MenuItem { objectName: "editRedo"; text: "Redo"; enabled: win.editTarget.canRedo; onTriggered: win.editTarget.redo() }
+            Platform.MenuItem { objectName: "editUndo"; text: "Undo"; enabled: win.editTarget.canUndo; onTriggered: win.performDocumentEdit(function() { win.editTarget.undo(); }) }
+            Platform.MenuItem { objectName: "editRedo"; text: "Redo"; enabled: win.editTarget.canRedo; onTriggered: win.performDocumentEdit(function() { win.editTarget.redo(); }) }
             Platform.MenuSeparator {}
-            Platform.MenuItem { text: "Cut"; enabled: win.sourceClipboardAllowed && !win.editTarget.readOnly && win.editTarget.selectedText.length > 0; onTriggered: { if (win.editTarget === editor) { backend.copySelection(editor.selectionStart, editor.selectionEnd, "markdown"); editor.remove(editor.selectionStart, editor.selectionEnd); } else win.editTarget.cut(); } }
+            Platform.MenuItem { text: "Cut"; enabled: win.sourceClipboardAllowed && !win.editTarget.readOnly && win.editTarget.selectedText.length > 0; onTriggered: { if (win.editTarget === editor) { backend.copySelection(editor.selectionStart, editor.selectionEnd, "markdown"); win.performDocumentEdit(function() { editor.remove(editor.selectionStart, editor.selectionEnd); }); } else win.editTarget.cut(); } }
             Platform.MenuItem { text: "Copy"; enabled: win.sourceClipboardAllowed && win.editTarget.selectedText.length > 0; onTriggered: { if (win.editTarget === editor) backend.copySelection(editor.selectionStart, editor.selectionEnd, "markdown"); else win.editTarget.copy(); } }
             Platform.MenuItem { objectName: "editCopyFormatted"; text: "Copy Formatted"; enabled: win.sourceClipboardAllowed && win.editTarget === editor && editor.selectedText.length > 0; onTriggered: backend.copySelection(editor.selectionStart, editor.selectionEnd, "formatted") }
             Platform.MenuItem { objectName: "editCopyHtml"; text: "Copy HTML"; enabled: win.sourceClipboardAllowed && win.editTarget === editor && editor.selectedText.length > 0; onTriggered: backend.copySelection(editor.selectionStart, editor.selectionEnd, "html") }
@@ -1588,7 +1595,7 @@ ApplicationWindow {
                 Platform.MenuItem { objectName: "editPasteMarkdown"; text: "Markdown from HTML"; enabled: win.sourceClipboardAllowed && win.editTarget === editor && editor.canPaste; onTriggered: { editor.forceActiveFocus(); editor.replaceAtomic(editor.selectionStart, editor.selectionEnd, backend.clipboardMarkdown()); } }
             }
             Platform.MenuSeparator {}
-            Platform.MenuItem { objectName: "editDelete"; text: "Delete"; enabled: win.sourceClipboardAllowed && !win.editTarget.readOnly && win.editTarget.selectedText.length > 0; onTriggered: win.editTarget.remove(win.editTarget.selectionStart, win.editTarget.selectionEnd) }
+            Platform.MenuItem { objectName: "editDelete"; text: "Delete"; enabled: win.sourceClipboardAllowed && !win.editTarget.readOnly && win.editTarget.selectedText.length > 0; onTriggered: win.performDocumentEdit(function() { win.editTarget.remove(win.editTarget.selectionStart, win.editTarget.selectionEnd); }) }
             Platform.MenuItem { text: "Select All"; enabled: win.sourceClipboardAllowed && win.editTarget.length > 0; onTriggered: win.editTarget.selectAll() }
             Platform.MenuSeparator {}
             Platform.Menu {
@@ -2682,7 +2689,7 @@ ApplicationWindow {
             id: editorPane
             objectName: "editorPane"
             onVisibleChanged: if (!visible && win.searchOpen) win.closeSearch(false)
-            color: backend.palette.page
+            color: backend.palette.editor
             visible: workspaceLayout.effectiveLayoutMode !== 2
             SplitView.fillWidth: true
             SplitView.minimumWidth: workspaceLayout.effectiveLayoutMode === 1 ? 480 : 320
@@ -2985,7 +2992,8 @@ ApplicationWindow {
                 }
 
                 function replaceAtomic(start, end, text, selectionStartOffset, selectionEndOffset) {
-                    var result = backend.replaceText(start, end, text);
+                    var result;
+                    win.performDocumentEdit(function() { result = backend.replaceText(start, end, text); });
                     if (result.start === undefined) return;
                     if (selectionStartOffset !== undefined)
                         select(result.start + selectionStartOffset, result.start + selectionEndOffset);
@@ -3078,7 +3086,8 @@ ApplicationWindow {
                 }
 
                 function pasteClipboardAsPlainText() {
-                    var end = backend.pasteWithAuthorship(selectionStart, selectionEnd);
+                    var end;
+                    win.performDocumentEdit(function() { end = backend.pasteWithAuthorship(selectionStart, selectionEnd); });
                     if (end >= 0) cursorPosition = end;
                 }
 
@@ -3155,7 +3164,8 @@ ApplicationWindow {
                     win.cancelDocumentViewportTransition();
                     if ((event.key === Qt.Key_C || event.key === Qt.Key_X) && (event.modifiers & Qt.ControlModifier)
                         && !(event.modifiers & (Qt.AltModifier | Qt.MetaModifier | Qt.ShiftModifier))) {
-                        if (backend.copySelection(selectionStart, selectionEnd, "markdown") && event.key === Qt.Key_X) remove(selectionStart, selectionEnd);
+                        if (backend.copySelection(selectionStart, selectionEnd, "markdown") && event.key === Qt.Key_X)
+                            win.performDocumentEdit(function() { editor.remove(editor.selectionStart, editor.selectionEnd); });
                         event.accepted = true; return;
                     }
                     var pasteKey = (event.key === Qt.Key_V)
@@ -3244,6 +3254,7 @@ ApplicationWindow {
 
         PreviewPane {
             id: visualEditorPane
+            color: backend.palette.editor
             objectName: "visualEditorPane"
             scrollObjectName: "visualEditorScroll"
             renderedObjectName: "visualEditorRenderedPreview"
@@ -3264,8 +3275,8 @@ ApplicationWindow {
             visualTextSize: win.editorFontPixelSize
             visualTopInset: height < 600 ? 32 : 64
             onVisualEditorFocusedChanged: if (visualEditorFocused) Qt.callLater(win.updateWritingSurfaceFromFocus)
-            onEditorUndoRequested: editor.undo()
-            onEditorRedoRequested: editor.redo()
+            onEditorUndoRequested: win.performDocumentEdit(function() { editor.undo(); })
+            onEditorRedoRequested: win.performDocumentEdit(function() { editor.redo(); })
             onSourceEditRequested: win.selectWritingMode("source")
             onScrollFractionChanged: function(fraction) {
                 if (!visible || !workspaceSettings.synchronizedScroll || win.synchronizingScroll || win.changingDocumentView || workspaceLayout.effectiveLayoutMode !== 1) return;

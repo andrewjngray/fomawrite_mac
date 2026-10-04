@@ -21,11 +21,13 @@ Item {
     readonly property bool fullPreview: !editorPane.visible && previewPane.visible
     readonly property bool visualEditor: editorPane.visible && layoutState.visualEditEnabled
     property bool keyboardReveal: false
+    // Edge entry reveals until the next editing or scrolling gesture.
+    property bool pointerReveal: false
     property bool activityHidden: false
     property bool menuOpen: false
     readonly property bool zoomMenuOpen: editorZoomControls.menuOpen || publishingZoomControls.menuOpen
-    readonly property bool documentChromeVisible: !activityHidden || chromeHover.hovered || keyboardReveal || menuOpen
-    readonly property bool revealRequested: chromeHover.hovered || keyboardReveal
+    readonly property bool documentChromeVisible: !activityHidden || pointerReveal || keyboardReveal || menuOpen
+    readonly property bool revealRequested: chromeHover.hovered || pointerReveal || keyboardReveal
     readonly property real titleContentOpacity: documentChromeVisible && (settings.titleBarMode === 1 || revealRequested) ? 1 : 0
     readonly property real toolbarContentOpacity: documentChromeVisible && (settings.toolbarVisibilityMode === 1 || revealRequested) ? 1 : 0
     readonly property bool toolbarContentVisible: settings.toolbarVisibilityMode !== 2
@@ -112,9 +114,17 @@ Item {
     Rectangle {
         anchors.fill: parent
         color: backend.palette.page
+        Rectangle {
+            x: root.editorPane.x; width: root.editorPane.width; height: parent.height
+            visible: root.editorPane.visible
+            color: backend.palette.editor
+        }
         MouseArea { anchors.fill: parent; enabled: root.documentChromeVisible; onPressed: root.window.startSystemMove(); onDoubleClicked: root.window.visibility === Window.Maximized ? root.window.showNormal() : root.window.showMaximized() }
     }
-    HoverHandler { id: chromeHover }
+    HoverHandler {
+        id: chromeHover
+        onHoveredChanged: if (hovered && root.settings.autoHideChrome) root.pointerReveal = true
+    }
     Rectangle {
         id: organizerHeader
         objectName: "organizerHeader"
@@ -170,7 +180,7 @@ Item {
         x: root.editorPane.visible ? root.editorPane.x : root.previewPane.x
         width: root.editorPane.visible ? root.editorPane.width : root.previewPane.width
         height: root.height
-        color: backend.palette.page
+        color: root.editorPane.visible ? backend.palette.editor : backend.palette.page
         MouseArea { anchors.fill: parent; enabled: root.documentChromeVisible; onPressed: root.window.startSystemMove(); onDoubleClicked: root.window.visibility === Window.Maximized ? root.window.showNormal() : root.window.showMaximized() }
         RowLayout {
             anchors.fill: parent; anchors.leftMargin: documentHeader.nativeInset; anchors.rightMargin: 12; spacing: 8

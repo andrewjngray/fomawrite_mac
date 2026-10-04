@@ -46,10 +46,17 @@ Rectangle {
     signal scrollFractionChanged(real fraction)
     signal viewportInteraction()
     signal writingActivity()
-    function userInteraction() {
+    function userInteraction(hideChrome = true) {
         webRestorationKey = "";
-        viewportInteraction(); writingActivity();
+        viewportInteraction();
+        if (hideChrome) writingActivity();
         if (publishingMode === "web") { webUserScrolling = true; userScrollExpiry.restart(); }
+    }
+    function scrollKey(event) {
+        return event.key === Qt.Key_Up || event.key === Qt.Key_Down
+            || event.key === Qt.Key_Left || event.key === Qt.Key_Right
+            || event.key === Qt.Key_PageUp || event.key === Qt.Key_PageDown
+            || event.key === Qt.Key_Home || event.key === Qt.Key_End || event.key === Qt.Key_Space;
     }
     signal anchorNavigationFailed(string anchor)
     signal linkRequested(url link)
@@ -192,9 +199,9 @@ Rectangle {
             } else if (root.visible && !root.suspendViewportUpdates && !root.previewRefreshInFlight)
                 root.scrollFractionChanged(root.viewportFraction());
         }
-        Keys.onPressed: root.userInteraction()
+        Keys.onPressed: function(event) { root.userInteraction(root.scrollKey(event)); }
         WheelHandler { target: null; blocking: false; onWheel: root.userInteraction() }
-        TapHandler { onPressedChanged: if (pressed) root.userInteraction() }
+        TapHandler { onPressedChanged: if (pressed) root.userInteraction(false) }
         ScrollBar.vertical: ScrollBar {}
         ScrollBar.horizontal: ScrollBar {}
         Column {
@@ -282,8 +289,8 @@ Rectangle {
         }
         onScrollPositionChanged: if (!root.previewRefreshInFlight && root.publishingMode === "web") root.webViewportCommand("", true)
         onContentsSizeChanged: if (!root.previewRefreshInFlight && root.publishingMode === "web") root.webViewportCommand("", false)
-        TapHandler { onPressedChanged: if (pressed) root.userInteraction() }
-        Keys.onPressed: root.userInteraction()
+        TapHandler { onPressedChanged: if (pressed) root.userInteraction(false) }
+        Keys.onPressed: function(event) { root.userInteraction(root.scrollKey(event)); }
         Accessible.name: "Web publishing preview, read-only"
     }
     // Chromium owns an internal focus/input item, so QML pointer handlers on

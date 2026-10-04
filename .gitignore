@@ -55,3 +55,8 @@ Makefile
 /research/cycle-119/*
 !/research/cycle-119/README.md
 !/research/cycle-119/verified-builds.json
+
+# Cycle120 local UI evidence.
+/research/cycle-120/*
+!/research/cycle-120/README.md
+!/research/cycle-120/verified-builds.json

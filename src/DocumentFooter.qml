@@ -12,10 +12,14 @@ WorkspaceFooter {
     property bool activityHidden: false
     property bool menuOpen: false
     property bool keyboardReveal: false
-    readonly property bool chromeVisible: !activityHidden || footerHover.hovered || menuOpen || keyboardReveal
+    property bool pointerReveal: false
+    readonly property bool chromeVisible: !activityHidden || pointerReveal || menuOpen || keyboardReveal
     opacity: chromeVisible ? 1 : 0
     Behavior on opacity { NumberAnimation { duration: 140 } }
-    HoverHandler { id: footerHover }
+    HoverHandler {
+        id: footerHover
+        onHoveredChanged: if (hovered) root.pointerReveal = true
+    }
     property real sourcePaneWidth: layoutMode === 1 ? width / 2 : width
     property real previewPaneStart: layoutMode === 1 ? sourcePaneWidth : 0
     property string writingAppearance: "Manuscript"
@@ -41,6 +45,11 @@ WorkspaceFooter {
     signal templateMenuRequested(var anchor)
     signal statisticsRequested()
 
+    Rectangle {
+        x: 0; y: 1; width: root.sourcePaneWidth; height: parent.height - 1
+        visible: root.layoutMode !== 2
+        color: backend.palette.editor
+    }
     Rectangle {
         objectName: "documentFooterPaneDivider"
         visible: root.layoutMode === 1

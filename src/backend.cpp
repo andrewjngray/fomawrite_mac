@@ -585,6 +585,7 @@ QVariantMap Backend::palette() const {
             {"inactiveSelectedRow", "#DFE1E4"}};
     }
     colors.insert("page", m_themeBackground);
+    colors.insert("editor", studio && !m_darkMode ? QStringLiteral("#F7F7F7") : m_themeBackground);
     colors.insert("canvas", m_themeBackground);
     colors.insert("text", m_themeForeground);
     colors.insert("selection", m_themeSelection);
@@ -1589,7 +1590,7 @@ void Backend::attachDocument(QObject *textDocument) {
     m_highlighter = new MarkdownHighlighter(m_document);
     m_highlighter->setDarkMode(m_darkMode);
     m_highlighter->setShowMarkup(m_showMarkup);
-    m_highlighter->setColors(m_themeBackground, m_themeForeground, m_themeAccent);
+    m_highlighter->setColors(palette().value("editor").toString(), m_themeForeground, m_themeAccent);
 
     connect(m_document, &QTextDocument::contentsChange, this,
             [this](int position, int, int charsAdded) {
@@ -2504,7 +2505,7 @@ void Backend::loadOmarchyTheme() {
     if (oldDark != m_darkMode) emit darkModeChanged();
     if (m_highlighter) {
         m_highlighter->setDarkMode(m_darkMode);
-        m_highlighter->setColors(m_themeBackground, m_themeForeground, m_themeAccent);
+        m_highlighter->setColors(palette().value("editor").toString(), m_themeForeground, m_themeAccent);
     }
 
     emit themeColorsChanged();

@@ -1,6 +1,10 @@
 # Acceptance ledger — current follow-through and Cycle 59 history
 
-## Current review build — Cycle 119
+## Current review build — Cycle 120
+
+Build **0.3.0-dev16 / macOS 0.3.0 (120)** refines persistent edge reveal and Studio pane tones. [Cycle120 handoff and verification](../research/cycle-120/README.md). Historical acceptance gaps below remain open.
+
+## Previous review build — Cycle 119
 
 Build **0.3.0-dev15 / macOS 0.3.0 (119)** puts editing controls under the left editor and publishing controls under the read-only right output pane. Web and PDF reuse the export renderer. Auto-hide document bars preserve geometry and recover through edge hover, menus and keyboard access. Dev, demo and Applications each pass **149 actual-executable checks**, matching UI/version, strict signatures and zero QML warnings. The full regression run passed 181 cases with one stale label expectation; the corrected final focused rerun passed **8/8**. No known failure remains. See the [Cycle119 handoff](../research/cycle-119/README.md) and [verified identities](../research/cycle-119/verified-builds.json). Prior physical input, accessibility and parser/export limitations remain open.
 

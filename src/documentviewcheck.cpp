@@ -1191,17 +1191,51 @@ int runDocumentViewCheck(QApplication &app, const QString &outputDirectory) {
         movePointer(QPointF(window->width() - 4, 4));
         check(waitUntil([&] { return header->property("documentChromeVisible").toBool(); })
             && !footer->property("chromeVisible").toBool(), "Top edge did not independently reveal its document bar");
+        movePointer(writingPoint);
+        settle(200);
+        check(header->property("documentChromeVisible").toBool() && !footer->property("chromeVisible").toBool(),
+            "Top bar did not stay independently revealed after pointer departure");
+        check(geometry() == baseline, "Leaving the top edge changed writing geometry");
+        editor->forceActiveFocus(Qt::MouseFocusReason);
+        key(window, Qt::Key_unknown, "y");
+        check(waitUntil([&] { return !header->property("documentChromeVisible").toBool()
+            && !footer->property("chromeVisible").toBool(); }), "Source typing did not clear the top-edge reveal");
         movePointer(QPointF(window->width() - 4, window->height() - 4));
         check(waitUntil([&] { return footer->property("chromeVisible").toBool(); })
             && !header->property("documentChromeVisible").toBool(), "Bottom edge did not independently reveal its document bar");
+        movePointer(bounds(pane).center());
+        settle(200);
+        check(footer->property("chromeVisible").toBool() && !header->property("documentChromeVisible").toBool(),
+            "Bottom bar did not stay independently revealed after pointer departure");
         check(geometry() == baseline, "Revealing document bars changed writing geometry");
         capture("document-chrome-bottom-edge-reveal");
-        check(QMetaObject::invokeMethod(window, "revealDocumentChrome"), "Cannot recover document chrome for preview scrolling");
-        movePointer(bounds(pane).center());
+        check(click(window, pane), "Cannot click Publishing after revealing the bottom bar");
+        settle(200);
+        check(footer->property("chromeVisible").toBool() && !header->property("documentChromeVisible").toBool(),
+            "A Publishing click cleared the bottom-edge reveal without scrolling or editing");
+        check(geometry() == baseline, "A Publishing click changed writing geometry");
         QWheelEvent wheel(bounds(pane).center(), window->mapToGlobal(bounds(pane).center().toPoint()), QPoint(), QPoint(0, -120),
             Qt::NoButton, Qt::NoModifier, Qt::NoScrollPhase, false);
         QCoreApplication::sendEvent(window, &wheel); QCoreApplication::processEvents();
-        check(waitUntil([&] { return window->property("documentChromeHidden").toBool(); }), "Publishing wheel interaction did not hide document bars");
+        check(waitUntil([&] { return window->property("documentChromeHidden").toBool()
+            && !header->property("documentChromeVisible").toBool() && !footer->property("chromeVisible").toBool(); }),
+            "Publishing wheel interaction did not clear the bottom-edge reveal");
+        for (int cycle = 0; cycle < 2; ++cycle) {
+            movePointer(QPointF(window->width() - 4, 4));
+            check(waitUntil([&] { return header->property("documentChromeVisible").toBool(); })
+                && !footer->property("chromeVisible").toBool(), "Repeated top-edge reveal was not independent");
+            movePointer(QPointF(window->width() - 4, window->height() - 4));
+            check(waitUntil([&] { return footer->property("chromeVisible").toBool(); }), "Repeated bottom-edge reveal failed");
+            movePointer(writingPoint);
+            settle(200);
+            check(header->property("documentChromeVisible").toBool() && footer->property("chromeVisible").toBool(),
+                "Revealing another edge or leaving it discarded a latched bar");
+            editor->forceActiveFocus(Qt::MouseFocusReason);
+            key(window, Qt::Key_unknown, "z");
+            check(waitUntil([&] { return !header->property("documentChromeVisible").toBool()
+                && !footer->property("chromeVisible").toBool(); }), "Repeated source typing did not reset both edge reveals");
+            check(geometry() == baseline, "Repeated edge reveals changed writing geometry");
+        }
         check(QMetaObject::invokeMethod(toggle, "triggered"), "Cannot choose native always-visible document bars");
         check(waitUntil([&] { return !settings->property("autoHideChrome").toBool() && footer->property("chromeVisible").toBool(); }),
             "Native View toggle did not restore always-visible document bars");

@@ -262,6 +262,7 @@ Rectangle {
         var change = visualDiff(visualSnapshot, visualText.text);
         if (renderer.applyVisualEdit(change.start, change.length, change.replacement,
                                      visualSourceSnapshot)) {
+            root.writingActivity();
             visualStatus = "Applied to Markdown source.";
             var first = visualText.selectionStart;
             var last = visualText.selectionEnd;
@@ -388,7 +389,8 @@ Rectangle {
             onActiveFocusChanged: if (activeFocus) Qt.callLater(root.ensureVisualCursorVisible)
             Keys.priority: Keys.BeforeItem
             Keys.onPressed: function(event) {
-                if (event.text.length || event.key === Qt.Key_Backspace || event.key === Qt.Key_Delete
+                if ((event.text.length && !(event.modifiers & (Qt.ControlModifier | Qt.MetaModifier)))
+                    || event.key === Qt.Key_Backspace || event.key === Qt.Key_Delete
                     || event.key === Qt.Key_Up || event.key === Qt.Key_Down || event.key === Qt.Key_PageUp || event.key === Qt.Key_PageDown) root.writingActivity();
                 root.viewportInteraction();
                 if ((event.key === Qt.Key_Tab || event.key === Qt.Key_Backtab)

@@ -1,5 +1,7 @@
 # What’s New in Fomawrite
 
+Build 120 keeps each document bar visible after you reveal it at an edge. Moving the pointer away or clicking the publishing pane leaves it visible; scrolling or editing hides it again. Pane positions stay fixed. Studio uses a soft grey editing surface with the warm cream publishing surround.
+
 Build 119 adds:
 
 - A left editor with Source / Visual Edit, and a read-only right publishing pane with Web / PDF.

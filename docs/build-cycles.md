@@ -1517,3 +1517,14 @@ Approved scope: Source / Visual Edit belongs to the left editor; Web / PDF belon
 Implemented: pane-owned controls with readable compact menus; shared export/preview HTML and PDF rendering; bounded private preview files; persisted publishing choice and auto-hide preference; View toggle, F6/keyboard recovery, independent edge reveal, and asynchronous Web reading-anchor preservation through zoom/divider changes. Added QtWebEngine and QtQuick.Pdf dependencies.
 
 Verification and runnable copies: [Cycle119 handoff](../research/cycle-119/README.md). [Optional review exercise](../research/usability/cycle-119.md). Dev, demo and Applications each pass 149 actual-executable checks, strict signatures and matching UI/version with zero QML warnings. The full regression run passed 181 cases plus one stale label expectation; that expectation was corrected and the final focused rerun passed 8/8, including the native Web selector. Production commit `19b3f89127709205f740793a37fb24e45b9b667d`. Packaging fixes bundle-local dependencies for the nested browser helper. Physical IME, VoiceOver, multi-display acceptance and general WYSIWYG/parser parity remain open. No public release or notarization in this cycle.
+
+
+## Cycle 120 — persistent edge reveal and separate pane tones
+
+Andrew’s follow-up: keep an edge-revealed document bar visible after the pointer leaves, until editing or scrolling resumes. Use iA Writer’s soft grey for the editing surface and retain the warm publishing surround.
+
+Implemented: independent top/bottom reveal latches reset on every editing/scroll gesture; ordinary publishing clicks no longer hide controls. Existing open-menu and keyboard protections, always-visible preference and fixed geometry remain. Studio uses grey for Source/Visual Edit and their matching header/footer; publishing retains its cream surround and actual output page colors. Other themes keep their existing surfaces.
+
+Verification, runnable copies and any remaining limitations: [Cycle120 handoff](../research/cycle-120/README.md). [Optional review](../research/usability/cycle-120.md).
+
+Validation: **183 passed, 0 failed, 0 skipped**, including setup/cleanup. Dev, demo and Applications each pass **149 native checks**, with matching UI/version, valid strict signatures and zero QML warnings. Review build **0.3.0-dev16 / macOS 0.3.0 (120)**. No public release. Physical IME, VoiceOver, multi-display and broader parser/export parity remain open.

@@ -49,15 +49,26 @@ void FomawriteTest::documentChromeHidesForUserInputAndRevealsEdgesWithoutReflow(
     QTRY_VERIFY(header->property("documentChromeVisible").toBool());
     QVERIFY(!f.footer->property("chromeVisible").toBool());
     QTest::mouseMove(f.quick, writingPoint);
+    QTest::qWait(200);
+    QVERIFY(header->property("documentChromeVisible").toBool());
+    QVERIFY(!f.footer->property("chromeVisible").toBool());
+    QCOMPARE(cycle119DocumentGeometry(f), geometry);
+    f.editor->forceActiveFocus(Qt::MouseFocusReason);
+    f.editor->setProperty("cursorPosition", 0);
+    cycle111KeyClick(f.quick, 'y');
+    QTRY_COMPARE(f.editor->property("text").toString(), "yx" + text);
     QTRY_VERIFY(!header->property("documentChromeVisible").toBool());
     QTest::mouseMove(f.quick, QPoint(f.quick->width() - 5, f.quick->height() - 4));
     QTRY_VERIFY(f.footer->property("chromeVisible").toBool());
     QVERIFY(!header->property("documentChromeVisible").toBool());
     QVERIFY(source->isEnabled());
+    QTest::mouseMove(f.quick, writingPoint);
+    QTest::qWait(200);
+    QVERIFY(f.footer->property("chromeVisible").toBool());
+    QVERIFY(!header->property("documentChromeVisible").toBool());
     QCOMPARE(cycle119DocumentGeometry(f), geometry);
 
-    QVERIFY(QMetaObject::invokeMethod(f.window.data(), "revealDocumentChrome"));
-    QTest::mouseMove(f.quick, writingPoint);
+    // Scrolling clears a bottom-edge reveal after the pointer has left it.
     f.editor->forceActiveFocus(Qt::MouseFocusReason);
     scroll->setProperty("contentY", 0);
     cycle119Wheel(f.quick, writingPoint);
@@ -65,12 +76,82 @@ void FomawriteTest::documentChromeHidesForUserInputAndRevealsEdgesWithoutReflow(
     QTRY_VERIFY(scroll->property("contentY").toReal() > 0);
     QTRY_VERIFY(!f.footer->property("chromeVisible").toBool());
     QCOMPARE(cycle119DocumentGeometry(f), geometry);
-    QCOMPARE(f.editor->property("text").toString(), "x" + text);
+    QVERIFY(!header->property("documentChromeVisible").toBool());
+    QCOMPARE(f.editor->property("text").toString(), "yx" + text);
+    // Both edges can be latched independently, and activity resets them on every cycle.
+    for (int cycle = 0; cycle < 2; ++cycle) {
+        QTest::mouseMove(f.quick, QPoint(f.quick->width() - 5, 4));
+        QTRY_VERIFY(header->property("documentChromeVisible").toBool());
+        QVERIFY(!f.footer->property("chromeVisible").toBool());
+        QTest::mouseMove(f.quick, QPoint(f.quick->width() - 5, f.quick->height() - 4));
+        QTRY_VERIFY(f.footer->property("chromeVisible").toBool());
+        QTest::mouseMove(f.quick, writingPoint);
+        QTest::qWait(200);
+        QVERIFY(header->property("documentChromeVisible").toBool());
+        QVERIFY(f.footer->property("chromeVisible").toBool());
+        QVERIFY(QMetaObject::invokeMethod(f.window.data(), "writingActivity"));
+        QTRY_VERIFY(!header->property("documentChromeVisible").toBool());
+        QTRY_VERIFY(!f.footer->property("chromeVisible").toBool());
+        QCOMPARE(cycle119DocumentGeometry(f), geometry);
+    }
     // A programmatic document update alone does not hide newly revealed chrome.
     QVERIFY(QMetaObject::invokeMethod(f.window.data(), "revealDocumentChrome"));
     f.editor->setProperty("text", text);
     QCoreApplication::processEvents();
     QVERIFY(!f.window->property("documentChromeHidden").toBool());
+
+    // Clipboard selection/copy are harmless; actual paste and native Undo are edits.
+    const QString clipboardDraft = "A short clipboard draft.\n";
+    f.editor->setProperty("text", clipboardDraft);
+    QTRY_VERIFY(!f.window->property("changingDocumentView").toBool());
+    scroll->setProperty("contentY", 0);
+    f.editor->forceActiveFocus(Qt::MouseFocusReason);
+    QVERIFY(QMetaObject::invokeMethod(f.window.data(), "writingActivity"));
+    const auto revealTop = [&] {
+        QTest::mouseMove(f.quick, QPoint(f.quick->width() - 5, 4));
+        QTest::mouseMove(f.quick, writingPoint);
+        QTest::qWait(200);
+        return header->property("documentChromeVisible").toBool();
+    };
+    QVERIFY(revealTop());
+    QTest::keyClick(f.quick, Qt::Key_A, Qt::ControlModifier);
+    QTRY_COMPARE(f.editor->property("selectedText").toString(), clipboardDraft);
+    QTest::keyClick(f.quick, Qt::Key_C, Qt::ControlModifier);
+    QTRY_COMPARE(QGuiApplication::clipboard()->text(), clipboardDraft);
+    QVERIFY(header->property("documentChromeVisible").toBool());
+    QGuiApplication::clipboard()->setText("Pasted draft.");
+    QTest::keyClick(f.quick, Qt::Key_V, Qt::ControlModifier);
+    QTRY_COMPARE(f.editor->property("text").toString(), QString("Pasted draft."));
+    QTRY_VERIFY(!header->property("documentChromeVisible").toBool());
+    QVERIFY(revealTop());
+    auto *undo = f.window->findChild<QObject *>("editUndo");
+    QVERIFY(undo && undo->property("enabled").toBool());
+    QVERIFY(QMetaObject::invokeMethod(undo, "triggered"));
+    QTRY_COMPARE(f.editor->property("text").toString(), clipboardDraft);
+    QTRY_VERIFY(!header->property("documentChromeVisible").toBool());
+
+    // Visual Edit also keeps Copy/Select All visible until text actually changes.
+    QVERIFY(QMetaObject::invokeMethod(f.window.data(), "selectWritingMode", Q_ARG(QVariant, "visual")));
+    auto *visual = f.item("visualEditor"), *visualPane = f.item("visualEditorPane");
+    QVERIFY(visual && visualPane);
+    QTRY_VERIFY(visual->isVisible());
+    QTRY_VERIFY(!visualPane->property("viewportRefreshPending").toBool());
+    QTRY_VERIFY(!f.window->property("changingDocumentView").toBool());
+    visual->forceActiveFocus(Qt::MouseFocusReason);
+    QVERIFY(QMetaObject::invokeMethod(f.window.data(), "writingActivity"));
+    QVERIFY(revealTop());
+    QTest::keyClick(f.quick, Qt::Key_A, Qt::ControlModifier);
+    QTRY_VERIFY(!visual->property("selectedText").toString().isEmpty());
+    QTest::keyClick(f.quick, Qt::Key_C, Qt::ControlModifier);
+    QTRY_COMPARE(QGuiApplication::clipboard()->text(), visual->property("selectedText").toString());
+    QVERIFY(header->property("documentChromeVisible").toBool());
+    // Edit within the paragraph; replacing the entire projection can include
+    // structural boundaries that deliberately require Source.
+    visual->setProperty("cursorPosition", 1);
+    cycle111KeyClick(f.quick, 'v');
+    QTRY_VERIFY(f.editor->property("text").toString() != clipboardDraft);
+    QTRY_VERIFY(!header->property("documentChromeVisible").toBool());
+    QCOMPARE(cycle119DocumentGeometry(f), geometry);
 }
 
 void FomawriteTest::documentChromeKeepsMenusKeyboardAndNativeToggleAccessible() {
