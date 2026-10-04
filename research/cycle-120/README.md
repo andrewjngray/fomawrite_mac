@@ -11,3 +11,5 @@ Studio now has a soft grey editor, including Source, Visual Edit and its header/
 Refreshed runnable targets: `dist/Fomawrite Dev.app`, `dist/Fomawrite.app`, `/Applications/Fomawrite.app`. No public release or notarization.
 
 Physical IME/VoiceOver, multiple displays and broader parser/export parity remain outside this targeted refinement.
+
+Verified source commit: `3a06bd262ef29bdd6d643792fb12d7930b34568c`.
