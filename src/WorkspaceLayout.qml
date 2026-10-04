@@ -7,7 +7,8 @@ QtObject {
 
     property bool organizerVisible: true
     property bool filesVisible: true
-    property int layoutMode: 1 // 0 Source, 1 Split, 2 Preview / Visual Edit
+    property int layoutMode: 1 // 0 Single editor, 1 Editor + Preview, 2 Preview only
+    property int lastEditingLayoutMode: 1 // Restore this arrangement when leaving Preview only.
     property bool visualEditEnabled: false
     property real organizerWidth: 208
     property real fileWidth: 288
@@ -42,7 +43,8 @@ QtObject {
     function modeAt(level) {
         if (desiredMode() !== 1 || level < 3)
             return desiredMode()
-        return activeSurface === "visual" && visualEditEnabled ? 2 : 0
+        // Contraction keeps the chosen editor; focus never changes editing mode.
+        return 0
     }
 
     function minimumAt(level) {
@@ -106,22 +108,34 @@ QtObject {
     }
 
     function saveState() {
-        return { version: 1, organizerVisible: organizerVisible, filesVisible: filesVisible,
+        return { version: 2, organizerVisible: organizerVisible, filesVisible: filesVisible,
             layoutMode: desiredMode(), visualEditEnabled: visualEditEnabled,
+            lastEditingLayoutMode: lastEditingLayoutMode === 1 ? 1 : 0,
             organizerWidth: boundedWidth(organizerWidth, 184, 288, 208),
             fileWidth: boundedWidth(fileWidth, 232, 420, 288),
             previewWidth: boundedWidth(previewWidth, 320, 2400, 420) }
     }
 
     function restoreState(state) {
-        if (!state || typeof state !== "object" || state.version !== 1)
+        if (!state || typeof state !== "object" || (state.version !== 1 && state.version !== 2))
             return false
+        var restoredMode = typeof state.layoutMode === "number" && state.layoutMode % 1 === 0
+                && state.layoutMode >= 0 && state.layoutMode <= 2 ? state.layoutMode : 1
+        var restoredVisual = typeof state.visualEditEnabled === "boolean" ? state.visualEditEnabled : false
+        // Version 1 combined editing mode and arrangement: Full Visual Edit
+        // was mode 2, while mode 0 always selected Source. Migrate user intent
+        // before restoring the independently selectable version-2 controls.
+        if (state.version === 1) {
+            if (restoredMode === 0) restoredVisual = false
+            else if (restoredMode === 2 && restoredVisual) restoredMode = 0
+        }
         _batching = true
         organizerVisible = typeof state.organizerVisible === "boolean" ? state.organizerVisible : true
         filesVisible = typeof state.filesVisible === "boolean" ? state.filesVisible : true
-        layoutMode = typeof state.layoutMode === "number" && state.layoutMode % 1 === 0
-                && state.layoutMode >= 0 && state.layoutMode <= 2 ? state.layoutMode : 1
-        visualEditEnabled = typeof state.visualEditEnabled === "boolean" ? state.visualEditEnabled : false
+        layoutMode = restoredMode
+        visualEditEnabled = restoredVisual
+        lastEditingLayoutMode = restoredMode !== 2 ? restoredMode
+                : state.version === 2 && state.lastEditingLayoutMode === 1 ? 1 : 0
         organizerWidth = boundedWidth(state.organizerWidth, 184, 288, 208)
         fileWidth = boundedWidth(state.fileWidth, 232, 420, 288)
         previewWidth = boundedWidth(state.previewWidth, 320, 2400, 420)
@@ -131,14 +145,18 @@ QtObject {
     }
 
     function restoreDefaults() {
-        restoreState({ version: 1, organizerVisible: true, filesVisible: true,
-            layoutMode: 1, visualEditEnabled: false,
+        restoreState({ version: 2, organizerVisible: true, filesVisible: true,
+            layoutMode: 1, visualEditEnabled: false, lastEditingLayoutMode: 1,
             organizerWidth: 208, fileWidth: 288, previewWidth: 420 })
     }
 
     onOrganizerVisibleChanged: recalculate(true)
     onFilesVisibleChanged: recalculate(true)
-    onLayoutModeChanged: recalculate(true)
+    onLayoutModeChanged: {
+        if (!_batching && (layoutMode === 0 || layoutMode === 1))
+            lastEditingLayoutMode = layoutMode
+        recalculate(true)
+    }
     onVisualEditEnabledChanged: recalculate(false)
     onOrganizerWidthChanged: recalculate(false)
     onFileWidthChanged: recalculate(false)

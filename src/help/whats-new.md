@@ -1,6 +1,14 @@
 # What’s New in Fomawrite
 
-Build 117 adds:
+Build 118 adds:
+
+- separate **Editing: Source / Visual Edit** and **Layout: Single / Split** groups;
+- a chosen editor on the left with an independent, read-only output Preview in Split;
+- Single retains your chosen editing mode; changing editing mode retains the layout;
+- an explicit **Preview Only** reading command in View and the workspace menu;
+- fixed footer group positions, independent editor/output zoom, and migration of saved window layouts.
+
+Build 117 added:
 
 - Source appearance and Preview template controls aligned with their own panes; Source/Split/Full stay at the right;
 - compact pane controls that follow divider resizing without overlapping;

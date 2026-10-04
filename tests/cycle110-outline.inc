@@ -35,7 +35,7 @@ void FomawriteTest::outlineSearchJumpsFromNarrowVisualWithoutChangingDraft() {
     const int cursor = editor->property("cursorPosition").toInt();
     QVERIFY(QMetaObject::invokeMethod(window.data(), "selectWritingMode", Q_ARG(QVariant, "visual")));
     QTRY_VERIFY(!window->property("changingDocumentView").toBool());
-    QTRY_COMPARE(layout->property("effectiveLayoutMode").toInt(), 2);
+    QTRY_COMPARE(layout->property("effectiveLayoutMode").toInt(), 0);
     // The outline must preserve the settled document revision. Changing the
     // writing view can finish deferred Qt typography before this interaction.
     const int revision = backend.documentRevision();

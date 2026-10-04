@@ -67,8 +67,10 @@ QtObject {
         { id: "writingManuscript", title: "Manuscript (Mono)", toggle: true },
         { id: "writingEditorial", title: "Editorial (Sans)", toggle: true },
         { id: "writingBook", title: "Book (Serif)", toggle: true },
-        { id: "editor", title: "Editor Only", toggle: true },
-        { id: "split", title: "Editor and Preview", toggle: true },
+        { id: "sourceEditing", title: "Source", toggle: true },
+        { id: "visualEditing", title: "Visual Edit", toggle: true },
+        { id: "editor", title: "Single", toggle: true },
+        { id: "split", title: "Split", toggle: true },
         { id: "preview", title: "Preview Only", toggle: true },
         { id: "togglePreview", title: "Preview", toggle: true },
         { id: "reloadPreview", title: "Reload Preview" },
@@ -150,6 +152,8 @@ QtObject {
         case "excerpts": return libraryPane.showExcerpts;
         case "navigationTree": return library.navigationMode === 0;
         case "navigationList": return library.navigationMode === 1;
+        case "sourceEditing": return layoutState.effectiveLayoutMode !== 2 && !layoutState.visualEditEnabled;
+        case "visualEditing": return layoutState.effectiveLayoutMode !== 2 && layoutState.visualEditEnabled;
         case "editor": return layoutState.effectiveLayoutMode === 0;
         case "split": return layoutState.effectiveLayoutMode === 1;
         case "preview": return layoutState.effectiveLayoutMode === 2;
@@ -214,7 +218,9 @@ QtObject {
         case "writingManuscript": settings.writingAppearance = "manuscript"; break;
         case "writingEditorial": settings.writingAppearance = "editorial"; break;
         case "writingBook": settings.writingAppearance = "book"; break;
-        case "editor": window.selectWritingMode("source"); break;
+        case "sourceEditing": window.selectWritingMode("source"); break;
+        case "visualEditing": window.selectWritingMode("visual"); break;
+        case "editor": window.setDocumentView(0); break;
         case "split": window.setDocumentView(1); break;
         case "preview": window.selectWritingMode("preview"); break;
         case "togglePreview": window.setDocumentView(layoutState.effectiveLayoutMode === 0 ? (layoutState.availableWidth >= 800 ? 1 : 2) : 0); break;

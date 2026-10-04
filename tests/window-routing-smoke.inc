@@ -375,12 +375,12 @@ const auto smokeWorkspace = [&](const std::shared_ptr<Session> &original,
                    && studioState.value("organizerVisible").toBool() && studioState.value("filesVisible").toBool()
                    && second->backend->outputStyle() == outputStyle,
                    "Studio action applies the writing composition and preserves output style")) return;
-    smokeOriginalPanes = {{"version", 1}, {"organizerVisible", false}, {"filesVisible", true},
-        {"layoutMode", 0}, {"visualEditEnabled", false}, {"organizerWidth", 232.0}, {"fileWidth", 304.0}, {"previewWidth", 400.0}};
-    smokeSecondPanes = {{"version", 1}, {"organizerVisible", true}, {"filesVisible", true},
-        {"layoutMode", 1}, {"visualEditEnabled", false}, {"organizerWidth", 216.0}, {"fileWidth", 296.0}, {"previewWidth", 360.0}};
-    smokeTabPanes = {{"version", 1}, {"organizerVisible", true}, {"filesVisible", false},
-        {"layoutMode", 2}, {"visualEditEnabled", false}, {"organizerWidth", 224.0}, {"fileWidth", 320.0}, {"previewWidth", 420.0}};
+    smokeOriginalPanes = {{"version", 2}, {"organizerVisible", false}, {"filesVisible", true},
+        {"layoutMode", 0}, {"visualEditEnabled", false}, {"lastEditingLayoutMode", 0}, {"organizerWidth", 232.0}, {"fileWidth", 304.0}, {"previewWidth", 400.0}};
+    smokeSecondPanes = {{"version", 2}, {"organizerVisible", true}, {"filesVisible", true},
+        {"layoutMode", 1}, {"visualEditEnabled", false}, {"lastEditingLayoutMode", 1}, {"organizerWidth", 216.0}, {"fileWidth", 296.0}, {"previewWidth", 360.0}};
+    smokeTabPanes = {{"version", 2}, {"organizerVisible", true}, {"filesVisible", false},
+        {"layoutMode", 2}, {"visualEditEnabled", false}, {"lastEditingLayoutMode", 0}, {"organizerWidth", 224.0}, {"fileWidth", 320.0}, {"previewWidth", 420.0}};
     if (!smokeCheck(smokeRestorePanes(original->window, smokeOriginalPanes)
                    && smokeRestorePanes(second->window, smokeSecondPanes)
                    && smokeRestorePanes(tab->window, smokeTabPanes), "restore three independent per-window pane states")) return;

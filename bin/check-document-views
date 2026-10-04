@@ -46,6 +46,9 @@ if len(acceptance_checks) < 6 or any(not check.get('passed') for check in accept
 chrome_checks = report.get('paneChromeChecks', [])
 if len(chrome_checks) < 3 or any(not check.get('passed') for check in chrome_checks):
     failures.append('The shipped app did not pass all pane/footer/library checks')
+editing_checks = report.get('editingLayoutChecks', [])
+if len(editing_checks) < 2 or any(not check.get('passed') for check in editing_checks):
+    failures.append('The shipped app did not pass independent Editing/Layout checks')
 if report.get('platform') != 'cocoa':
     failures.append('Expected native Cocoa window verification')
 if Path(report.get('executable', '')).resolve() != executable.resolve():
@@ -79,11 +82,11 @@ verification = {'passed': not failures, 'failures': failures, 'app': str(app),
                 'resourceSha256': report.get('resourceSha256'),
                 'statesChecked': len(report.get('scenarios', [])),
                 'dailyWritingChecks': len(daily_checks), 'paneZoomChecks': len(zoom_checks),
-                'editorAcceptanceChecks': len(acceptance_checks), 'paneChromeChecks': len(chrome_checks)}
+                'editorAcceptanceChecks': len(acceptance_checks), 'paneChromeChecks': len(chrome_checks), 'editingLayoutChecks': len(editing_checks)}
 (output / 'bundle-verification.json').write_text(json.dumps(verification, indent=2) + '\n')
 if failures:
     print('\n'.join(failures), file=sys.stderr)
     sys.exit(1)
 print(f"Verified {app}: {expected_version}, build {info['CFBundleVersion']}; "
       f"{verification['statesChecked']} footer states, {len(daily_checks)} daily-writing checks and {len(zoom_checks)} pane-zoom checks, {len(acceptance_checks)} editor acceptance checks; "
-      f"{len(chrome_checks)} pane/footer/library checks; embedded UI matches checkout.")
+      f"{len(chrome_checks)} pane/footer/library checks, {len(editing_checks)} independent Editing/Layout checks; embedded UI matches checkout.")

@@ -26,8 +26,8 @@ bool cycle108NativeViewChecks(QObject *window, int mode) {
 }
 bool cycle108WorkspaceViewChecks(QObject *menu, int mode, bool visual) {
     for (const auto &[text, expected] : {
-             std::pair{"Source", mode == 0}, std::pair{"Source and preview side by side", mode == 1},
-             std::pair{"Preview", mode == 2 && !visual}, std::pair{"Visual Edit", mode != 0 && visual}}) {
+             std::pair{"Source", mode != 2 && !visual}, std::pair{"Visual Edit", mode != 2 && visual},
+             std::pair{"Single", mode == 0}, std::pair{"Split", mode == 1}, std::pair{"Preview Only", mode == 2}}) {
         auto *item = cycle108MenuItem(menu, QString::fromLatin1(text));
         if (!item || item->property("checked").toBool() != expected) return false;
     }
@@ -58,7 +58,7 @@ void FomawriteTest::bundledFooterRapidModesPreserveDraftAndViewport() {
     QVERIFY(quick && layout && settings && footer && editor && scroll && pane);
     auto *source = footer->findChild<QQuickItem *>("sourceModeButton");
     auto *split = footer->findChild<QQuickItem *>("previewSplitButton");
-    auto *full = footer->findChild<QQuickItem *>("previewFullButton");
+    auto *full = footer->findChild<QQuickItem *>("singleModeButton");
     auto *visual = footer->findChild<QQuickItem *>("visualEditToggle");
     QVERIFY(source && split && full && visual);
     cycle106KeepNativeFocus(quick);
@@ -83,6 +83,7 @@ void FomawriteTest::bundledFooterRapidModesPreserveDraftAndViewport() {
     for (bool synchronized : {false, true}) {
         settings->setProperty("synchronizedScroll", synchronized);
         QVERIFY(cycle102Click(quick, source));
+        QVERIFY(cycle102Click(quick, full));
         QTRY_VERIFY(!window->property("changingDocumentView").toBool());
         QVERIFY(QMetaObject::invokeMethod(editor, "select", Q_ARG(int, start), Q_ARG(int, end)));
         QTest::qWait(100);
@@ -94,16 +95,16 @@ void FomawriteTest::bundledFooterRapidModesPreserveDraftAndViewport() {
         const int cursor = editor->property("cursorPosition").toInt();
         const auto bounds = cycle107ViewBounds(footer);
         const QRectF footerBounds = cycle103SceneBounds(footer);
-        QCOMPARE(bounds.size(), 3);
+        QCOMPARE(bounds.size(), 4);
         for (int burst = 0; burst < 4; ++burst) {
-            const QList<QQuickItem *> choices{full, visual, split, full, source, visual, split, source};
+            const QList<QQuickItem *> choices{full, visual, split, full, source, visual, split, full, source};
             int overlappingClicks = 0;
             for (auto *choice : choices) {
                 if (window->property("changingDocumentView").toBool()) ++overlappingClicks;
                 QSignalSpy painted(quick, &QQuickWindow::frameSwapped);
-                // Visual Edit follows its pane; click its last painted position.
-                // Only Source/Split/Full retain their baseline coordinates.
-                const auto target = choice == visual ? cycle103SceneBounds(choice) : bounds.value(choice->objectName());
+                // The editing group may compact; use its currently painted position.
+                // Single/Split retain their baseline coordinates.
+                const auto target = choice == visual || choice == source ? cycle103SceneBounds(choice) : bounds.value(choice->objectName());
                 QVERIFY(cycle108PaintedClick(quick, choice, target.center().toPoint()));
                 quick->update();
                 // Wait for one presented frame, not the 48–120ms viewport
@@ -148,133 +149,77 @@ void FomawriteTest::bundledFooterRoutesFollowResponsivePresentation() {
     Cycle103SettingsSnapshot isolatedSettings;
     Backend backend;
     QQmlEngine engine; engine.rootContext()->setContextProperty("backend", &backend);
-    QQmlComponent component(&engine, QUrl(QStringLiteral("qrc:/Main.qml")));
+    QQmlComponent component(&engine, QUrl("qrc:/Main.qml"));
     QScopedPointer<QObject> window(component.create()); QVERIFY2(window, qPrintable(component.errorString()));
     auto *quick = qobject_cast<QQuickWindow *>(window.data());
     auto *layout = window->findChild<QObject *>("workspaceLayout");
     auto *footer = window->findChild<QQuickItem *>("documentFooter");
     auto *editor = window->findChild<QQuickItem *>("sourceEditor");
-    auto *scroll = window->findChild<QQuickItem *>("editorScroll");
     auto *pane = window->findChild<QQuickItem *>("previewPane");
-    auto *visualEditor = pane ? pane->findChild<QQuickItem *>("visualEditor") : nullptr;
-    auto *previewScroll = pane ? pane->findChild<QQuickItem *>("previewScroll") : nullptr;
+    auto *visualEditor = window->findChild<QQuickItem *>("visualEditor");
     auto *workspaceButton = window->findChild<QQuickItem *>("topChromeLibraryButton");
     auto *workspaceMenu = window->findChild<QObject *>("workspaceMenu");
-    QVERIFY(quick && layout && footer && editor && scroll && pane && visualEditor && previewScroll && workspaceButton && workspaceMenu);
+    QVERIFY(quick && layout && footer && editor && pane && visualEditor && workspaceButton && workspaceMenu);
     auto *source = footer->findChild<QQuickItem *>("sourceModeButton");
     auto *split = footer->findChild<QQuickItem *>("previewSplitButton");
-    auto *full = footer->findChild<QQuickItem *>("previewFullButton");
+    auto *single = footer->findChild<QQuickItem *>("singleModeButton");
     auto *visual = footer->findChild<QQuickItem *>("visualEditToggle");
-    QVERIFY(source && split && full && visual);
-    cycle106KeepNativeFocus(quick);
-    Cycle106MouseInputIsolation mouseInput(quick);
+    QVERIFY(source && split && single && visual);
+    cycle106KeepNativeFocus(quick); Cycle106MouseInputIsolation mouseInput(quick);
     quick->resize(1440, 800); quick->show();
     QVERIFY(QMetaObject::invokeMethod(window.data(), "applyReferenceWorkspace"));
     const QString draft = QString::fromUtf8("# Responsive editing\n\nKeep the café draft — 你好 — unchanged while choosing a view.\n");
     editor->setProperty("text", draft);
     const auto cleanup = qScopeGuard([&] { backend.discardRecovery(); });
     QVERIFY(QTest::qWaitForWindowExposed(quick));
-    if (QGuiApplication::platformName() != "cocoa") {
-        quick->requestActivate();
-        QTRY_VERIFY(quick->isActive());
+    // Width pressure contracts the layout, never changes the chosen editor.
+    for (auto *editing : {source, visual}) {
+        quick->resize(1440, 800); QTRY_VERIFY(split->isEnabled());
+        QVERIFY(cycle102Click(quick, editing)); QVERIFY(cycle102Click(quick, split));
+        QTRY_COMPARE(layout->property("effectiveLayoutMode").toInt(), 1);
+        QVERIFY(!pane->property("visualEditEnabled").toBool());
+        quick->resize(720, 800);
+        QTRY_COMPARE(layout->property("effectiveLayoutMode").toInt(), 0);
+        QCOMPARE(layout->property("visualEditEnabled").toBool(), editing == visual);
+        QTRY_COMPARE(visualEditor->isVisible(), editing == visual);
+        QVERIFY(cycle107ViewChecked(footer, layout));
+        QVERIFY(cycle108NativeViewChecks(window.data(), 0));
+        QVERIFY(cycle108WorkspaceViewChecks(workspaceMenu, 0, editing == visual));
+        quick->resize(820, 800); QTRY_VERIFY(split->isEnabled());
+        QCOMPARE(layout->property("effectiveLayoutMode").toInt(), 0);
+        QVERIFY(cycle102Click(quick, split));
+        QTRY_COMPARE(layout->property("effectiveLayoutMode").toInt(), 1);
+        QCOMPARE(layout->property("visualEditEnabled").toBool(), editing == visual);
+        QVERIFY(cycle107ViewChecked(footer, layout));
     }
-
-    // Source-focused Split collapses to Source, even if its hidden companion
-    // had visual editing enabled. The first Visual Edit click must show it.
-    QVERIFY(cycle102Click(quick, split));
-    QVERIFY(cycle102Click(quick, visual));
-    QTRY_VERIFY(!window->property("changingDocumentView").toBool());
-    QTest::mouseClick(quick, Qt::LeftButton, Qt::NoModifier, editor->mapToScene(QPointF(20, 15)).toPoint());
-    QTRY_VERIFY(editor->hasActiveFocus());
-    QTRY_COMPARE(window->property("lastWritingSurface").toString(), QStringLiteral("source"));
-    quick->resize(720, 800);
-    QTRY_COMPARE(layout->property("effectiveLayoutMode").toInt(), 0);
-    QVERIFY(cycle107ViewChecked(footer, layout));
-    QVERIFY(cycle108NativeViewChecks(window.data(), 0));
-    QVERIFY(cycle108WorkspaceViewChecks(workspaceMenu, 0, false));
-    QVERIFY(cycle102Click(quick, visual));
-    QTRY_COMPARE(layout->property("effectiveLayoutMode").toInt(), 2);
-    QVERIFY(visual->property("checked").toBool());
-    QVERIFY(pane->isVisible() && visualEditor->isVisible());
-    QVERIFY(cycle108WorkspaceViewChecks(workspaceMenu, 2, true));
-    QVERIFY(cycle102Click(quick, source));
-    QTRY_COMPARE(layout->property("effectiveLayoutMode").toInt(), 0);
-
-    // Visual-focused Split collapses to Full Visual. Turning editing off keeps
-    // Full Preview visible, instead of unexpectedly jumping to Source.
-    quick->resize(1440, 800);
-    QTRY_VERIFY(split->isEnabled());
-    QVERIFY(cycle102Click(quick, split));
-    QVERIFY(cycle102Click(quick, visual));
-    QTRY_VERIFY(!window->property("changingDocumentView").toBool());
-    QTest::mouseClick(quick, Qt::LeftButton, Qt::NoModifier, visualEditor->mapToScene(QPointF(20, 15)).toPoint());
-    QTRY_COMPARE(window->property("lastWritingSurface").toString(), QStringLiteral("visual"));
-    quick->resize(720, 800);
-    QTRY_COMPARE(layout->property("effectiveLayoutMode").toInt(), 2);
-    QVERIFY(cycle107ViewChecked(footer, layout));
-    QVERIFY(cycle108NativeViewChecks(window.data(), 2));
-    QVERIFY(cycle102Click(quick, visual));
-    QTRY_COMPARE(layout->property("effectiveLayoutMode").toInt(), 2);
-    QVERIFY(!visual->property("checked").toBool());
-    QVERIFY(pane->findChild<QQuickItem *>("renderedPreview")->isVisible());
-    QVERIFY(cycle108WorkspaceViewChecks(workspaceMenu, 2, false));
-
-    // A remembered Split intent can still be contracted just above its minimum
-    // width. An enabled explicit Split command must show both panes immediately.
-    quick->resize(1440, 800);
-    QTRY_VERIFY(split->isEnabled());
-    QVERIFY(cycle102Click(quick, source));
-    QVERIFY(cycle102Click(quick, split));
-    QTRY_VERIFY(!window->property("changingDocumentView").toBool());
-    quick->resize(720, 800);
-    QTRY_COMPARE(layout->property("effectiveLayoutMode").toInt(), 0);
-    quick->resize(820, 800);
-    QTRY_VERIFY(split->isEnabled());
-    QCOMPARE(layout->property("effectiveLayoutMode").toInt(), 0);
-    QVERIFY(cycle102Click(quick, split));
-    QTRY_COMPARE(layout->property("effectiveLayoutMode").toInt(), 1);
-    QVERIFY(cycle107ViewChecked(footer, layout));
-    QVERIFY(cycle108NativeViewChecks(window.data(), 1));
-
-    // The rendered toolbar menu uses the same choices as the footer, including
-    // Source while Visual Edit is active. Menu dismissal must not consume the
-    // next click or leave an old tooltip over the view controls.
-    quick->resize(1440, 800);
-    QTest::qWait(100);
-    const auto initial = cycle107ViewBounds(footer);
-    const QRectF footerBounds = cycle103SceneBounds(footer);
+    quick->resize(1440, 800); QVERIFY(cycle102Click(quick, single)); QVERIFY(cycle102Click(quick, source));
+    QTest::qWait(100); const auto initial = cycle107ViewBounds(footer);
     for (const auto &[text, mode, editing] : {
-             std::tuple{"Visual Edit", 2, true}, std::tuple{"Visual Edit", 2, true},
-             std::tuple{"Source", 0, false}, std::tuple{"Source", 0, false},
-             std::tuple{"Preview", 2, false}, std::tuple{"Preview", 2, false},
-             std::tuple{"Source and preview side by side", 1, false}, std::tuple{"Source and preview side by side", 1, false}}) {
-        QVERIFY(cycle102Click(quick, workspaceButton));
-        QTRY_VERIFY(workspaceMenu->property("opened").toBool());
+             std::tuple{"Visual Edit", 0, true}, std::tuple{"Visual Edit", 0, true},
+             std::tuple{"Split", 1, true}, std::tuple{"Source", 1, false},
+             std::tuple{"Single", 0, false}, std::tuple{"Visual Edit", 0, true},
+             std::tuple{"Preview Only", 2, true}, std::tuple{"Visual Edit", 0, true},
+             std::tuple{"Source", 0, false}, std::tuple{"Split", 1, false}}) {
+        QVERIFY(cycle102Click(quick, workspaceButton)); QTRY_VERIFY(workspaceMenu->property("opened").toBool());
         QVERIFY(cycle102Click(quick, cycle108MenuItem(workspaceMenu, QString::fromLatin1(text))));
         QTRY_VERIFY(!workspaceMenu->property("visible").toBool());
         QTRY_COMPARE(layout->property("effectiveLayoutMode").toInt(), mode);
-        QCOMPARE(visual->property("checked").toBool(), editing);
+        QCOMPARE(layout->property("visualEditEnabled").toBool(), editing);
         QVERIFY(cycle107ViewChecked(footer, layout));
-        QTRY_VERIFY2(cycle108WorkspaceViewChecks(workspaceMenu, mode, editing),
-                 qPrintable(QString("View menu checkmarks disagreed after selecting %1.").arg(QString::fromLatin1(text))));
+        QTRY_VERIFY(cycle108WorkspaceViewChecks(workspaceMenu, mode, editing));
         QVERIFY(cycle108NativeViewChecks(window.data(), mode));
         QTRY_VERIFY(cycle107SameBounds(cycle107ViewBounds(footer), initial));
-        QTRY_COMPARE(cycle103SceneBounds(footer), footerBounds);
+        QCOMPARE(editor->property("text").toString(), draft);
         QVERIFY(!workspaceButton->property("tooltipReady").toBool());
     }
     QQuickItem *hidePreview = nullptr;
-    for (auto *item : window->findChildren<QQuickItem *>()) {
-        if (item->property("hint").toString() == QStringLiteral("Hide preview")) { hidePreview = item; break; }
-    }
+    for (auto *item : window->findChildren<QQuickItem *>())
+        if (item->property("hint").toString() == "Hide preview") { hidePreview = item; break; }
     QVERIFY(hidePreview && hidePreview->isVisible());
+    QVERIFY(cycle102Click(quick, visual));
     QVERIFY(cycle102Click(quick, hidePreview));
     QTRY_COMPARE(layout->property("effectiveLayoutMode").toInt(), 0);
+    QVERIFY(layout->property("visualEditEnabled").toBool());
     QVERIFY(cycle107ViewChecked(footer, layout));
-    QVERIFY(cycle108NativeViewChecks(window.data(), 0));
-    QVERIFY(cycle102Click(quick, full));
-    QVERIFY(cycle102Click(quick, source));
-    QTRY_VERIFY(!window->property("changingDocumentView").toBool());
-    QTRY_COMPARE(layout->property("effectiveLayoutMode").toInt(), 0);
     QCOMPARE(editor->property("text").toString(), draft);
-    QVERIFY(cycle107SameBounds(cycle107ViewBounds(footer), initial));
 }

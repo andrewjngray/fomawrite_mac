@@ -34,7 +34,8 @@ struct Cycle117Window {
         return window->findChild<QQuickItem *>(name);
     }
     bool mode(int value) {
-        if (!cycle102Click(quick, footer->findChild<QQuickItem *>(value == 0 ? "sourceModeButton" : value == 1 ? "previewSplitButton" : "previewFullButton"))) return false;
+        if (value == 2) { if (!cycle118ReadPreview(window.data())) return false; }
+        else if (!cycle102Click(quick, footer->findChild<QQuickItem *>(value == 0 ? "singleModeButton" : "previewSplitButton"))) return false;
         QSignalSpy painted(quick, &QQuickWindow::frameSwapped);
         quick->update();
         return QTest::qWaitFor([&] { return !painted.isEmpty(); }, 1000);
@@ -104,7 +105,8 @@ void FomawriteTest::paneAlignedFooterMenusFollowDividerWithoutEditing() {
     }
     QVERIFY(f.mode(2)); QTRY_VERIFY(!appearance->isVisible() && output->isVisible());
     QVERIFY(f.mode(0)); QTRY_VERIFY(appearance->isVisible() && !output->isVisible());
-    QVERIFY(cycle102Click(f.quick, visual)); QTRY_VERIFY(f.preview->property("visualEditEnabled").toBool());
+    QVERIFY(cycle102Click(f.quick, visual)); QTRY_VERIFY(f.layout->property("visualEditEnabled").toBool());
+    QVERIFY(!f.preview->property("visualEditEnabled").toBool());
     QVERIFY(f.mode(0));
     QCOMPARE(f.editor->property("text").toString(), draft);
     QVERIFY(QMetaObject::invokeMethod(f.editor, "undo")); QCOMPARE(f.editor->property("text").toString(), saved);

@@ -910,6 +910,27 @@ QVariantMap Backend::replaceText(int start, int end, const QString &replacement)
     return {{"start", first}, {"end", first + normalized.size()}};
 }
 
+int Backend::visualPositionForSource(int sourcePosition) const {
+    const QString source = currentDocumentText();
+    const auto mapping = SourceVisualMapping::create(source);
+    int position = qBound(0, sourcePosition, int(source.size()));
+    if (position == source.size()) return int(mapping.visualText().size());
+    // History and anchors normally provide valid cursor boundaries. Clamp an
+    // arbitrary caller's interior UTF-16/combining position to a whole grapheme.
+    QTextBoundaryFinder boundary(QTextBoundaryFinder::Grapheme, source);
+    boundary.setPosition(position);
+    if (!boundary.isAtBoundary()) position = qMax(0, int(boundary.toPreviousBoundary()));
+    // The edit mapper intentionally rejects empty spans. One represented unit
+    // gives the same start position without changing any source or Undo state.
+    const auto precise = mapping.visualSpanForSource({position, 1});
+    if (precise.isValid()) return precise.start;
+    for (const auto &block : mapping.blocks()) {
+        if (position <= block.source.start || position < block.source.end())
+            return qBound(0, block.visual.start, int(mapping.visualText().size()));
+    }
+    return int(mapping.visualText().size());
+}
+
 QVariantMap Backend::visualProjection() const {
     const QString source = currentDocumentText();
     const SourceVisualMapping mapping = SourceVisualMapping::create(source);

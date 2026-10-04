@@ -56,7 +56,8 @@ void FomawriteTest::headerQuickZoomPreservesMarkdownAndUndo() {
     auto *editor = window->findChild<QQuickItem *>("sourceEditor");
     auto *pane = window->findChild<QQuickItem *>("previewPane");
     auto *preview = pane ? pane->findChild<QQuickItem *>("renderedPreview") : nullptr;
-    auto *visual = pane ? pane->findChild<QQuickItem *>("visualEditor") : nullptr;
+    auto *visualPane = window->findChild<QQuickItem *>("visualEditorPane");
+    auto *visual = visualPane ? visualPane->findChild<QQuickItem *>("visualEditor") : nullptr;
     QVERIFY(quick && settings && zoom && layout && editor && pane && preview && visual);
     if (QGuiApplication::platformName() == "cocoa") quick->setFlag(Qt::WindowDoesNotAcceptFocus);
     Cycle106MouseInputIsolation input(quick);
@@ -100,25 +101,33 @@ void FomawriteTest::headerQuickZoomPreservesMarkdownAndUndo() {
     QVERIFY(click("sourceZoomOutButton")); QVERIFY(click("previewZoomOutButton"));
     QTRY_COMPARE(editor->property("font").value<QFont>(), sourceFont);
     QTRY_COMPARE(preview->property("font").value<QFont>(), previewFont);
-    // Visual Edit shares the right pane's independent zoom, including in Split.
+    // Either editing representation shares the left editor zoom; output Preview stays independent.
     QVERIFY(QMetaObject::invokeMethod(window.data(), "selectWritingMode", Q_ARG(QVariant, "visual")));
     QTRY_VERIFY(!window->property("changingDocumentView").toBool());
     QVERIFY(QMetaObject::invokeMethod(window.data(), "setDocumentView", Q_ARG(QVariant, 1)));
-    QTRY_VERIFY(editor->isVisible() && visual->isVisible());
+    QTRY_VERIFY(!editor->isVisible() && visual->isVisible() && pane->isVisible());
     QTRY_VERIFY(!window->property("changingDocumentView").toBool());
     const int visualSize = visual->property("font").value<QFont>().pixelSize();
     QTRY_VERIFY(cycle104BodyLineHeight(visual) > 0);
     const qreal visualLine = cycle104BodyLineHeight(visual);
-    QVERIFY(click("previewZoomInButton"));
+    QVERIFY(click("sourceZoomInButton"));
     QTRY_VERIFY(visual->property("font").value<QFont>().pixelSize() > visualSize);
     QTRY_VERIFY(cycle104BodyLineHeight(visual) > visualLine);
-    QCOMPARE(editor->property("font").value<QFont>(), sourceFont);
-    QCOMPARE(zoom->property("sourceZoom").toInt(), 100);
+    QCOMPARE(preview->property("font").value<QFont>(), previewFont);
+    QCOMPARE(zoom->property("sourceZoom").toInt(), 110);
+    QCOMPARE(zoom->property("previewZoom").toInt(), 100);
+    const auto enlargedVisual = visual->property("font").value<QFont>();
+    const qreal enlargedVisualLine = cycle104BodyLineHeight(visual);
+    QVERIFY(click("previewZoomInButton"));
+    QTRY_VERIFY(preview->property("font").value<QFont>().pixelSize() > previewFont.pixelSize());
+    QCOMPARE(visual->property("font").value<QFont>(), enlargedVisual);
+    QCOMPARE(cycle104BodyLineHeight(visual), enlargedVisualLine);
+    QCOMPARE(zoom->property("sourceZoom").toInt(), 110);
     QCOMPARE(zoom->property("previewZoom").toInt(), 110);
     for (const QString &mode : {QStringLiteral("source"), QStringLiteral("preview"), QStringLiteral("visual")}) {
         QVERIFY(QMetaObject::invokeMethod(window.data(), "selectWritingMode", Q_ARG(QVariant, mode)));
         QTRY_VERIFY(!window->property("changingDocumentView").toBool());
-        QCOMPARE(zoom->property("sourceZoom").toInt(), 100); QCOMPARE(zoom->property("previewZoom").toInt(), 110);
+        QCOMPARE(zoom->property("sourceZoom").toInt(), 110); QCOMPARE(zoom->property("previewZoom").toInt(), 110);
         QCOMPARE(editor->property("text").toString(), draft);
     }
     QCOMPARE(backend.outputStyle(), 6); QCOMPARE(backend.outputPointSize(), pointSize); QCOMPARE(backend.outputFont(), font);
@@ -197,7 +206,7 @@ Window {
     property string lastWritingSurface: "source"
     property bool canFormatSource: false
     QtObject { id: preferences; property int titleBarMode: 1; property int toolbarVisibilityMode: 1; property int writingSize: 16 }
-    QtObject { id: state }
+    QtObject { id: state; property bool visualEditEnabled: false }
     QtObject {
         id: zoomPreferences
         property int sourceZoom: 100; property int previewZoom: 100

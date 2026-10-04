@@ -293,8 +293,9 @@ void FomawriteTest::previewTemplateRemainsReachableInNarrowSplit() {
     auto *menu = window->findChild<QObject *>("previewTemplateMenu");
     auto *visual = footer->findChild<QQuickItem *>("visualEditToggle");
     auto *split = footer->findChild<QQuickItem *>("previewSplitButton");
-    auto *full = footer->findChild<QQuickItem *>("previewFullButton");
-    QVERIFY(quick && layout && pane && button && menu && visual && split && full);
+    auto *single = footer->findChild<QQuickItem *>("singleModeButton");
+    auto *source = footer->findChild<QQuickItem *>("sourceModeButton");
+    QVERIFY(quick && layout && pane && button && menu && visual && split && single && source);
     Cycle106MouseInputIsolation mouseInput(quick);
     const int originalStyle = backend.outputStyle();
     const auto cleanup = qScopeGuard([&] { backend.setOutputStyle(originalStyle); });
@@ -316,14 +317,14 @@ void FomawriteTest::previewTemplateRemainsReachableInNarrowSplit() {
             QTRY_VERIFY(button->isVisible());
             QCoreApplication::processEvents();
             QRectF previous;
-            for (auto *control : {button, visual, split, full}) {
+            for (auto *control : {button, source, visual, single, split}) {
                 const QRectF bounds = control->mapRectToItem(footer, control->boundingRect());
                 QVERIFY2(bounds.left() >= 11 && bounds.right() <= footer->width() - 11,
                          qPrintable(QString("%1 outside %2px footer: x=%3 width=%4").arg(control->objectName()).arg(width).arg(bounds.x()).arg(bounds.width())));
                 QVERIFY(bounds.height() >= 32);
                 if (!previous.isNull()) {
-                    // Split and Full are adjacent segments of one capsule.
-                    const qreal gap = control == full ? 0 : 3;
+                    // Source/Visual and Single/Split each form a separate capsule.
+                    const qreal gap = control == visual || control == split ? 0 : 3;
                     QVERIFY(previous.right() + gap <= bounds.left());
                 }
                 previous = bounds;

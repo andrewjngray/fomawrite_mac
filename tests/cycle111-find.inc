@@ -68,12 +68,12 @@ void FomawriteTest::findReplaceContinuesFromCaretAndPreservesUndo() {
     QTRY_VERIFY(editor->hasActiveFocus());
     QCOMPARE(editor->property("text").toString(), source);
     QFile saved(path); QVERIFY(saved.open(QIODevice::ReadOnly)); QCOMPARE(saved.readAll(), source.toUtf8());
-    // A Full click must not leave an invisible Find field consuming shortcuts.
+    // Preview Only must not leave an invisible Find field consuming shortcuts.
     QVERIFY(QMetaObject::invokeMethod(window.data(), "openSearch", Q_ARG(QVariant, false), Q_ARG(QVariant, false)));
-    QVERIFY(cycle102Click(quick, footer->findChild<QQuickItem *>("previewFullButton")));
+    QVERIFY(cycle118ReadPreview(window.data()));
     QTRY_VERIFY(!window->property("searchOpen").toBool());
     QTRY_COMPARE(layout->property("effectiveLayoutMode").toInt(), 2);
-    // Find opened during a pending Full/Visual transition takes keyboard
+    // Find opened during a pending Preview/Visual transition takes keyboard
     // ownership immediately and keeps it after the old transition would finish.
     for (const QString &mode : {QStringLiteral("preview"), QStringLiteral("visual")}) {
         QVERIFY(QMetaObject::invokeMethod(window.data(), "closeSearch", Q_ARG(QVariant, false)));

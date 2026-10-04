@@ -67,17 +67,19 @@ ApplicationWindow {
     }
     function readingViewportKey() {
         return [editorFlick.width, editorFlick.height, editorFlick.contentHeight,
-                editorFlick.contentY, previewPane.readingViewportKey()].join(":");
+                editorFlick.contentY, visualEditorPane.readingViewportKey(), previewPane.readingViewportKey()].join(":");
     }
     function beginDocumentViewportTransition(preserveReadingAnchor) {
         if (!documentViewportTransition) {
             editorFlick.cancelFlick();
             wheelScroll.stop();
             previewPane.stopViewportMotion();
+            visualEditorPane.stopViewportMotion();
             documentViewportTransition = {
                 sourceFraction: Math.max(0, Math.min(1, editorFlick.contentY
                     / Math.max(1, editorFlick.contentHeight - editorFlick.height))),
                 previewFraction: previewPane.viewportFraction(),
+                visualFraction: visualEditorPane.viewportFraction(),
                 geometry: "", stablePasses: 0, passes: 0
             };
         }
@@ -90,11 +92,13 @@ ApplicationWindow {
                 var reuse = checkpoint && checkpoint.key === readingViewportKey();
                 documentViewportTransition.sourceAnchor = reuse ? checkpoint.sourceAnchor : captureSourceReadingAnchor();
                 documentViewportTransition.previewAnchor = reuse ? checkpoint.previewAnchor : previewPane.captureReadingAnchor();
+                documentViewportTransition.visualAnchor = reuse ? checkpoint.visualAnchor : visualEditorPane.captureReadingAnchor();
             }
         } else {
             zoomViewportCheckpoint = null;
             documentViewportTransition.sourceAnchor = null;
             documentViewportTransition.previewAnchor = null;
+            documentViewportTransition.visualAnchor = null;
         }
         documentViewportTransition.geometry = "";
         documentViewportTransition.stablePasses = 0;
@@ -114,28 +118,33 @@ ApplicationWindow {
             state.focusApplied = true;
             // Restore editing focus while caret-driven scrolling is suspended.
             // The saved viewport is reapplied after focus and deferred layout.
-            if (state.focusTarget === "source" && editorPane.visible)
+            if (state.focusTarget === "visual" && visualEditorPane.visible)
+                visualEditorPane.focusVisualEditor();
+            else if (state.focusTarget === "source" && win.sourceEditorVisible)
                 editor.forceActiveFocus();
             else if (previewPane.visible)
                 previewPane.focusRenderedSurface();
         }
         var geometry = [editorFlick.width, editorFlick.height, editorFlick.contentHeight,
-                        previewPane.viewportGeometry()].join(":");
+                        visualEditorPane.viewportGeometry(), previewPane.viewportGeometry()].join(":");
         if (state.sourceAnchor) restoreSourceReadingAnchor(state.sourceAnchor);
         else editorFlick.contentY = state.sourceFraction * Math.max(0, editorFlick.contentHeight - editorFlick.height);
         if (state.previewAnchor) previewPane.restoreReadingAnchor(state.previewAnchor);
         else previewPane.scrollToFraction(state.previewFraction);
+        if (state.visualAnchor) visualEditorPane.restoreReadingAnchor(state.visualAnchor);
+        else visualEditorPane.scrollToFraction(state.visualFraction);
         state.stablePasses = geometry === state.geometry ? state.stablePasses + 1 : 0;
         state.geometry = geometry;
         ++state.passes;
         // Two unchanged frames include deferred rich-text styling and layout.
         // A bound also releases the transaction if a display keeps resizing.
-        var settled = state.stablePasses >= 2 && !previewPane.viewportRefreshPending;
+        var settled = state.stablePasses >= 2 && !previewPane.viewportRefreshPending
+            && !visualEditorPane.viewportRefreshPending;
         if (settled || state.passes >= 16) {
             cancelDocumentViewportTransition();
             if (settled && state.sourceAnchor && state.previewAnchor)
                 zoomViewportCheckpoint = { key: readingViewportKey(),
-                    sourceAnchor: state.sourceAnchor, previewAnchor: state.previewAnchor };
+                    sourceAnchor: state.sourceAnchor, previewAnchor: state.previewAnchor, visualAnchor: state.visualAnchor };
         }
     }
     Timer {
@@ -237,7 +246,9 @@ ApplicationWindow {
     // explicit formatting controls. An unrelated field never borrows a stale
     // Source selection merely because the editor remains visible.
     property bool sourceFormattingOwned: false
-    readonly property bool canFormatSource: editorPane.visible && sourceFormattingOwned
+    readonly property bool sourceEditorVisible: editorPane.visible && !workspaceLayout.visualEditEnabled
+    onSourceEditorVisibleChanged: if (!sourceEditorVisible && completionPopup) completionPopup.close()
+    readonly property bool canFormatSource: sourceEditorVisible && sourceFormattingOwned
         && !editor.readOnly && !editor.inputMethodComposing
     function isSourceFormattingChrome(item) {
         var current = item;
@@ -253,7 +264,7 @@ ApplicationWindow {
     }
     function updateSourceFormattingOwner() {
         var item = activeFocusItem;
-        if (editorPane.visible && isInside(item, editor)) sourceFormattingOwned = true;
+        if (sourceEditorVisible && isInside(item, editor)) sourceFormattingOwned = true;
         else if (!isSourceFormattingChrome(item)) sourceFormattingOwned = false;
     }
 
@@ -269,8 +280,8 @@ ApplicationWindow {
     }
     function focusWorkspaceRegion(region) {
         if (region === "source" && editorPane.visible) {
-            editor.forceActiveFocus(Qt.TabFocusReason);
-            editorFlick.ensureCursorVisible();
+            if (workspaceLayout.visualEditEnabled) visualEditorPane.focusVisualEditor();
+            else { editor.forceActiveFocus(Qt.TabFocusReason); editorFlick.ensureCursorVisible(); }
             return;
         }
         if (region === "preview" && previewPane.visible) {
@@ -286,8 +297,7 @@ ApplicationWindow {
         else topChrome.focusWorkspaceControl();
     }
     function focusWritingSurface() {
-        focusWorkspaceRegion(previewPane.visible && (!editorPane.visible || lastWritingSurface === "visual")
-                             ? "preview" : "source");
+        focusWorkspaceRegion(editorPane.visible ? "source" : "preview");
     }
     readonly property bool workspaceOwnsKeyboard: !navigationDrawer.visible && (!activeFocusItem
         || isInside(activeFocusItem, workspaceSplit) || isInside(activeFocusItem, topChrome)
@@ -333,10 +343,8 @@ ApplicationWindow {
         // writing surface rather than borrowing a stale Visual Edit flag.
         var item = activeFocusItem;
         if (isInside(item, editor)) { lastWritingSurface = "source"; lastZoomPane = "source"; }
-        else if (isInside(item, previewPane)) {
-            lastZoomPane = "preview";
-            if (item && item.objectName === previewPane.visualEditorObjectName) lastWritingSurface = "visual";
-        }
+        else if (isInside(item, visualEditorPane)) { lastWritingSurface = "visual"; lastZoomPane = "source"; }
+        else if (isInside(item, previewPane)) lastZoomPane = "preview";
     }
     onActiveFocusItemChanged: {
         topChrome.keyboardReveal = isInside(activeFocusItem, topChrome);
@@ -352,7 +360,10 @@ ApplicationWindow {
     }
     Connections {
         target: workspaceLayout
-        function onVisualEditEnabledChanged() { previewPane.visualEditEnabled = workspaceLayout.visualEditEnabled; }
+        function onVisualEditEnabledChanged() {
+            win.sourceFormattingOwned = false;
+            Qt.callLater(win.rescueHiddenWorkspaceFocus);
+        }
         function onEffectiveOrganizerVisibleChanged() { Qt.callLater(win.rescueHiddenWorkspaceFocus); }
         function onEffectiveFilesVisibleChanged() { Qt.callLater(win.rescueHiddenWorkspaceFocus); }
         function onEffectiveLayoutModeChanged() {
@@ -409,42 +420,44 @@ ApplicationWindow {
         var total = editorPane.width + previewPane.width;
         workspaceLayout.updateWidth("preview", Math.max(320, Math.min(total / 2, total - 480)));
     }
+    // Layout and editing choice are independent. Preview-only is a reading
+    // action; returning to editing restores the last chosen arrangement.
     function setDocumentView(mode) {
         if (mode === 1 && !documentFooter.canSplit) return;
+        if (mode === 2 && searchOpen) closeSearch(false);
         beginDocumentViewportTransition();
-        if (mode === 0) {
-            workspaceLayout.visualEditEnabled = false;
-            previewPane.visualEditEnabled = false;
-            lastWritingSurface = "source";
-        }
         workspaceLayout.layoutMode = mode;
-        // A deliberate Split click overrides resize hysteresis, including
-        // when Split is already the saved intent but currently contracted.
         if (mode === 1) workspaceLayout.recalculate(true);
-        // Changing the arrangement is not a request to jump to an old caret.
-        documentViewportTransition.focusTarget = mode === 0 ? "source"
-            : mode === 2 ? "preview"
-            : lastWritingSurface === "visual" && workspaceLayout.visualEditEnabled ? "preview" : "source";
+        documentViewportTransition.focusTarget = mode === 2 ? "preview"
+            : workspaceLayout.visualEditEnabled ? "visual" : "source";
+    }
+    function setEditingMode(visual) {
+        if (visual && searchOpen) closeSearch(false);
+        if (workspaceLayout.visualEditEnabled === visual && workspaceLayout.effectiveLayoutMode !== 2) {
+            focusWritingSurface();
+            return;
+        }
+        beginDocumentViewportTransition();
+        var wasVisual = workspaceLayout.visualEditEnabled;
+        // Carry the current reading position across editor representations.
+        if (wasVisual !== visual) {
+            if (visual) documentViewportTransition.visualFraction = documentViewportTransition.sourceFraction;
+            else documentViewportTransition.sourceFraction = documentViewportTransition.visualFraction;
+        }
+        workspaceLayout.visualEditEnabled = visual;
+        if (workspaceLayout.layoutMode === 2)
+            workspaceLayout.layoutMode = workspaceLayout.lastEditingLayoutMode;
+        lastWritingSurface = visual ? "visual" : "source";
+        lastZoomPane = "source";
+        sourceFormattingOwned = false;
+        documentViewportTransition.focusTarget = lastWritingSurface;
     }
     function toggleVisualEditing() {
-        beginDocumentViewportTransition();
-        var visibleMode = workspaceLayout.effectiveLayoutMode;
-        // Responsive Source can retain a hidden Visual Edit preference.
-        // Clicking must show Visual Edit immediately; turning it off in a
-        // contracted full view must stay on the rendered document.
-        var enabled = visibleMode === 0 || !workspaceLayout.visualEditEnabled;
-        if (visibleMode !== 1) workspaceLayout.layoutMode = 2;
-        workspaceLayout.visualEditEnabled = enabled;
-        previewPane.visualEditEnabled = enabled;
-        lastWritingSurface = enabled ? "visual" : "source";
-        documentViewportTransition.focusTarget = "preview";
+        setEditingMode(!workspaceLayout.visualEditEnabled);
     }
     function selectWritingMode(mode) {
-        beginDocumentViewportTransition();
-        workspaceLayout.visualEditEnabled = mode === "visual";
-        previewPane.visualEditEnabled = workspaceLayout.visualEditEnabled;
-        lastWritingSurface = mode === "visual" ? "visual" : "source";
-        setDocumentView(mode === "source" ? 0 : 2);
+        if (mode === "preview") setDocumentView(2);
+        else setEditingMode(mode === "visual");
     }
     function applyStudioWorkspace() {
         backend.themePreset = "studio";
@@ -558,7 +571,7 @@ ApplicationWindow {
         onOutlineRequested: {
             outlineDrawer.headings = backend.documentOutline(editor.text);
             outlineDrawer.showFor(workspaceLayout.effectiveLayoutMode !== 2 && win.lastWritingSurface === "source" ? editor.cursorPosition : -1,
-                win.isInside(win.activeFocusItem, editor) || win.isInside(win.activeFocusItem, previewPane) ? win.activeFocusItem : null);
+                win.isInside(win.activeFocusItem, editor) || win.isInside(win.activeFocusItem, visualEditorPane) || win.isInside(win.activeFocusItem, previewPane) ? win.activeFocusItem : null);
         }
         onStatisticsRequested: statisticsDialog.open()
         onTypewriterChanged: editorFlick.ensureCursorVisible()
@@ -635,7 +648,7 @@ ApplicationWindow {
             case "appearance": win.openAnchoredMenu(writingOptions, anchor); break;
             case "workspace": win.openAnchoredMenu(workspaceMenu, anchor); break;
             case "export": win.openExportHub("pdf"); break;
-            case "hidePreview": win.selectWritingMode("source"); break;
+            case "hidePreview": win.setDocumentView(0); break;
             }
         }
     }
@@ -677,13 +690,10 @@ ApplicationWindow {
     DocumentOutline {
         id: outlineDrawer
         onFocusRestoreRequested: {
-            if (workspaceLayout.effectiveLayoutMode === 2 || (workspaceLayout.visualEditEnabled && win.lastWritingSurface === "visual"))
-                previewPane.focusRenderedSurface();
-            else editor.forceActiveFocus();
+            win.focusWritingSurface();
         }
         onJumpRequested: function(position) {
-            if (workspaceLayout.effectiveLayoutMode === 2)
-                win.setDocumentView(workspaceLayout.availableWidth >= 800 ? 1 : 0);
+            win.setEditingMode(false);
             win.cancelDocumentViewportTransition();
             win.lastWritingSurface = "source";
             editor.cursorPosition = position;
@@ -866,21 +876,22 @@ ApplicationWindow {
         objectName: "workspaceMenu"
         width: 258
         function restoreViewChecks() {
-            // MenuItem toggles itself before triggered, even when selecting the
-            // current mode is a no-op. Rebind these indicators to the actual
-            // view; Visual Edit and Split may legitimately both be selected.
-            workspaceSourceView.checked = Qt.binding(function() { return workspaceLayout.effectiveLayoutMode === 0; });
-            workspaceVisualView.checked = Qt.binding(function() { return workspaceLayout.effectiveLayoutMode !== 0 && workspaceLayout.visualEditEnabled; });
-            workspacePreviewView.checked = Qt.binding(function() { return workspaceLayout.effectiveLayoutMode === 2 && !workspaceLayout.visualEditEnabled; });
+            workspaceSourceView.checked = Qt.binding(function() { return workspaceLayout.effectiveLayoutMode !== 2 && !workspaceLayout.visualEditEnabled; });
+            workspaceVisualView.checked = Qt.binding(function() { return workspaceLayout.effectiveLayoutMode !== 2 && workspaceLayout.visualEditEnabled; });
+            workspaceSingleView.checked = Qt.binding(function() { return workspaceLayout.effectiveLayoutMode === 0; });
             workspaceSplitView.checked = Qt.binding(function() { return workspaceLayout.effectiveLayoutMode === 1; });
+            workspacePreviewView.checked = Qt.binding(function() { return workspaceLayout.effectiveLayoutMode === 2; });
         }
         CompactMenuItem { objectName: "workspaceOrganizer"; text: workspaceCommands.label("organizer"); checkable: true; checked: workspaceLayout.effectiveOrganizerVisible; onTriggered: win.toggleWorkspacePane("organizer") }
         CompactMenuItem { objectName: "workspaceFiles"; text: workspaceCommands.label("library"); checkable: true; checked: workspaceLayout.effectiveFilesVisible; onTriggered: win.toggleWorkspacePane("files") }
         MenuSeparator {}
-        CompactMenuItem { id: workspaceSourceView; text: "Source"; checkable: true; checked: workspaceLayout.effectiveLayoutMode === 0; onTriggered: { win.selectWritingMode("source"); workspaceMenu.restoreViewChecks(); } }
-        CompactMenuItem { id: workspaceVisualView; text: "Visual Edit"; checkable: true; checked: workspaceLayout.effectiveLayoutMode !== 0 && workspaceLayout.visualEditEnabled; onTriggered: { win.selectWritingMode("visual"); workspaceMenu.restoreViewChecks(); } }
-        CompactMenuItem { id: workspacePreviewView; text: "Preview"; checkable: true; checked: workspaceLayout.effectiveLayoutMode === 2 && !workspaceLayout.visualEditEnabled; onTriggered: { win.selectWritingMode("preview"); workspaceMenu.restoreViewChecks(); } }
-        CompactMenuItem { id: workspaceSplitView; text: "Source and preview side by side"; checkable: true; checked: workspaceLayout.effectiveLayoutMode === 1; enabled: documentFooter.canSplit; onTriggered: { win.setDocumentView(1); workspaceMenu.restoreViewChecks(); } }
+        CompactMenuItem { id: workspaceSourceView; objectName: "workspaceSourceView"; text: "Source"; checkable: true; checked: workspaceLayout.effectiveLayoutMode !== 2 && !workspaceLayout.visualEditEnabled; onTriggered: { win.selectWritingMode("source"); workspaceMenu.restoreViewChecks(); } }
+        CompactMenuItem { id: workspaceVisualView; objectName: "workspaceVisualView"; text: "Visual Edit"; checkable: true; checked: workspaceLayout.effectiveLayoutMode !== 2 && workspaceLayout.visualEditEnabled; onTriggered: { win.selectWritingMode("visual"); workspaceMenu.restoreViewChecks(); } }
+        MenuSeparator {}
+        CompactMenuItem { id: workspaceSingleView; objectName: "workspaceSingleView"; text: "Single"; checkable: true; checked: workspaceLayout.effectiveLayoutMode === 0; onTriggered: { win.setDocumentView(0); workspaceMenu.restoreViewChecks(); } }
+        CompactMenuItem { id: workspaceSplitView; objectName: "workspaceSplitView"; text: "Split"; checkable: true; checked: workspaceLayout.effectiveLayoutMode === 1; enabled: documentFooter.canSplit; onTriggered: { win.setDocumentView(1); workspaceMenu.restoreViewChecks(); } }
+        MenuSeparator {}
+        CompactMenuItem { id: workspacePreviewView; objectName: "workspacePreviewView"; text: "Preview Only"; checkable: true; checked: workspaceLayout.effectiveLayoutMode === 2; onTriggered: { win.selectWritingMode("preview"); workspaceMenu.restoreViewChecks(); } }
         MenuSeparator {}
         CompactMenuItem { objectName: "workspaceOutlineEntry"; text: "Document outline"; onTriggered: workspaceCommands.run("outline") }
         CompactMenuItem { text: "Document statistics"; onTriggered: workspaceCommands.run("statistics") }
@@ -1026,7 +1037,7 @@ ApplicationWindow {
 
     function showCompletions() {
         completionPopup.close();
-        if (editor.inputMethodComposing || editor.selectionStart !== editor.selectionEnd) return false;
+        if (!sourceEditorVisible || editor.inputMethodComposing || editor.selectionStart !== editor.selectionEnd) return false;
         var result = backend.wordCompletions(editor.cursorPosition);
         var items = result.items || [];
         if (items.length === 0) return false;
@@ -1040,11 +1051,12 @@ ApplicationWindow {
         completionPopup.x = Math.max(8, Math.min(win.contentItem.width - completionPopup.width - 8, point.x));
         completionPopup.y = Math.max(8, Math.min(win.contentItem.height - completionPopup.height - 8, point.y));
         completionPopup.open();
-        Qt.callLater(function() { completionList.forceActiveFocus(); });
+        Qt.callLater(function() { if (win.sourceEditorVisible && completionPopup.visible) completionList.forceActiveFocus(); });
         return true;
     }
 
     function acceptCompletion(index) {
+        if (!sourceEditorVisible) { completionPopup.close(); return false; }
         if (index < 0 || index >= completionItems.length
             || editor.inputMethodComposing
             || editor.selectionStart !== editor.selectionEnd
@@ -1134,9 +1146,10 @@ ApplicationWindow {
         // Anchor navigation never reloads an existing view, including a dirty
         // destination. Resolve against the text that is actually open there.
         Qt.callLater(function() {
+            win.cancelDocumentViewportTransition();
             editor.cursorPosition = position;
-            if (editor.visible) editor.forceActiveFocus();
-            editorFlick.ensureCursorVisible();
+            if (visualEditorPane.visible) visualEditorPane.navigateToSourcePosition(position);
+            else if (win.sourceEditorVisible) { editor.forceActiveFocus(); editorFlick.ensureCursorVisible(); }
         });
         previewPane.navigateToAnchor(fragment);
         return true;
@@ -1235,7 +1248,12 @@ ApplicationWindow {
             openDocumentTarget(pendingOpenUrl, fragment);
         } else if (action === "history") {
             var position = backend.navigateHistory(pendingHistoryDirection);
-            if (position >= 0) Qt.callLater(function() { editor.cursorPosition = position; editor.forceActiveFocus(); editorFlick.ensureCursorVisible(); });
+            if (position >= 0) Qt.callLater(function() {
+                win.cancelDocumentViewportTransition();
+                editor.cursorPosition = position;
+                if (visualEditorPane.visible) visualEditorPane.navigateToSourcePosition(position);
+                else if (win.sourceEditorVisible) { editor.forceActiveFocus(); editorFlick.ensureCursorVisible(); }
+            });
         } else if (action === "new") {
             backend.newDocument();
         } else if (action === "create") {
@@ -1274,18 +1292,19 @@ ApplicationWindow {
             : Window.FullScreen;
     }
 
-    readonly property bool visualEditorActive: previewPane.visualEditEnabled && previewPane.visualEditorFocused
+    readonly property bool visualEditorActive: visualEditorPane.visible && visualEditorPane.visualEditorFocused
     readonly property var editTarget: visualEditorActive ? editor : (activeFocusItem && typeof activeFocusItem.cut === "function" ? activeFocusItem : editor)
+    // Canonical Undo remains available from Visual Edit chrome. Clipboard
+    // commands must not borrow an invisible Source selection from that chrome.
+    readonly property bool sourceClipboardAllowed: !visualEditorActive && (sourceEditorVisible || editTarget !== editor)
 
     function openSearch(withReplace, useSelection) {
         cancelDocumentViewportTransition();
         var selected = editor.selectedText;
-        // Find edits canonical source, including when a narrow split has fallen back to Visual Edit.
-        if (workspaceLayout.effectiveLayoutMode === 2) {
-            workspaceLayout.visualEditEnabled = false;
-            lastWritingSurface = "source";
-            workspaceLayout.layoutMode = workspaceLayout.availableWidth >= 800 ? 1 : 0;
-        }
+        // Find/Replace acts on canonical Markdown. Reveal that editor explicitly
+        // while preserving Single/Split rather than hiding search behind Visual Edit.
+        if (!sourceEditorVisible) setEditingMode(false);
+        cancelDocumentViewportTransition();
         if (!searchOpen) searchAnchor = editor.selectionStart;
         searchOpen = true;
         replaceOpen = withReplace;
@@ -1342,7 +1361,7 @@ ApplicationWindow {
         editor.deselect();
         searchUpdating = false;
         replaceOpen = false;
-        if (restoreFocus !== false) editor.forceActiveFocus();
+        if (restoreFocus !== false) focusWritingSurface();
     }
 
     Shortcut {
@@ -1524,20 +1543,20 @@ ApplicationWindow {
             Platform.MenuItem { objectName: "editUndo"; text: "Undo"; enabled: win.editTarget.canUndo; onTriggered: win.editTarget.undo() }
             Platform.MenuItem { objectName: "editRedo"; text: "Redo"; enabled: win.editTarget.canRedo; onTriggered: win.editTarget.redo() }
             Platform.MenuSeparator {}
-            Platform.MenuItem { text: "Cut"; enabled: !win.visualEditorActive && !win.editTarget.readOnly && win.editTarget.selectedText.length > 0; onTriggered: { if (win.editTarget === editor) { backend.copySelection(editor.selectionStart, editor.selectionEnd, "markdown"); editor.remove(editor.selectionStart, editor.selectionEnd); } else win.editTarget.cut(); } }
-            Platform.MenuItem { text: "Copy"; enabled: !win.visualEditorActive && win.editTarget.selectedText.length > 0; onTriggered: { if (win.editTarget === editor) backend.copySelection(editor.selectionStart, editor.selectionEnd, "markdown"); else win.editTarget.copy(); } }
-            Platform.MenuItem { objectName: "editCopyFormatted"; text: "Copy Formatted"; enabled: !win.visualEditorActive && win.editTarget === editor && editor.selectedText.length > 0; onTriggered: backend.copySelection(editor.selectionStart, editor.selectionEnd, "formatted") }
-            Platform.MenuItem { objectName: "editCopyHtml"; text: "Copy HTML"; enabled: !win.visualEditorActive && win.editTarget === editor && editor.selectedText.length > 0; onTriggered: backend.copySelection(editor.selectionStart, editor.selectionEnd, "html") }
-            Platform.MenuItem { objectName: "editCopyMarkdown"; text: "Copy Markdown"; enabled: !win.visualEditorActive && win.editTarget === editor && editor.selectedText.length > 0; onTriggered: backend.copySelection(editor.selectionStart, editor.selectionEnd, "markdown") }
-            Platform.MenuItem { text: "Paste"; enabled: !win.visualEditorActive && !win.editTarget.readOnly && win.editTarget.canPaste; onTriggered: { if (win.editTarget === editor) editor.pasteClipboardAsPlainText(); else win.editTarget.paste(); } }
+            Platform.MenuItem { text: "Cut"; enabled: win.sourceClipboardAllowed && !win.editTarget.readOnly && win.editTarget.selectedText.length > 0; onTriggered: { if (win.editTarget === editor) { backend.copySelection(editor.selectionStart, editor.selectionEnd, "markdown"); editor.remove(editor.selectionStart, editor.selectionEnd); } else win.editTarget.cut(); } }
+            Platform.MenuItem { text: "Copy"; enabled: win.sourceClipboardAllowed && win.editTarget.selectedText.length > 0; onTriggered: { if (win.editTarget === editor) backend.copySelection(editor.selectionStart, editor.selectionEnd, "markdown"); else win.editTarget.copy(); } }
+            Platform.MenuItem { objectName: "editCopyFormatted"; text: "Copy Formatted"; enabled: win.sourceClipboardAllowed && win.editTarget === editor && editor.selectedText.length > 0; onTriggered: backend.copySelection(editor.selectionStart, editor.selectionEnd, "formatted") }
+            Platform.MenuItem { objectName: "editCopyHtml"; text: "Copy HTML"; enabled: win.sourceClipboardAllowed && win.editTarget === editor && editor.selectedText.length > 0; onTriggered: backend.copySelection(editor.selectionStart, editor.selectionEnd, "html") }
+            Platform.MenuItem { objectName: "editCopyMarkdown"; text: "Copy Markdown"; enabled: win.sourceClipboardAllowed && win.editTarget === editor && editor.selectedText.length > 0; onTriggered: backend.copySelection(editor.selectionStart, editor.selectionEnd, "markdown") }
+            Platform.MenuItem { text: "Paste"; enabled: win.sourceClipboardAllowed && !win.editTarget.readOnly && win.editTarget.canPaste; onTriggered: { if (win.editTarget === editor) editor.pasteClipboardAsPlainText(); else win.editTarget.paste(); } }
             Platform.Menu {
                 title: "Paste As"
-                Platform.MenuItem { objectName: "editPastePlain"; text: "Plain Text"; enabled: !win.visualEditorActive && win.editTarget === editor && editor.canPaste; onTriggered: { editor.forceActiveFocus(); editor.replaceAtomic(editor.selectionStart, editor.selectionEnd, backend.clipboardText()); } }
-                Platform.MenuItem { objectName: "editPasteMarkdown"; text: "Markdown from HTML"; enabled: !win.visualEditorActive && win.editTarget === editor && editor.canPaste; onTriggered: { editor.forceActiveFocus(); editor.replaceAtomic(editor.selectionStart, editor.selectionEnd, backend.clipboardMarkdown()); } }
+                Platform.MenuItem { objectName: "editPastePlain"; text: "Plain Text"; enabled: win.sourceClipboardAllowed && win.editTarget === editor && editor.canPaste; onTriggered: { editor.forceActiveFocus(); editor.replaceAtomic(editor.selectionStart, editor.selectionEnd, backend.clipboardText()); } }
+                Platform.MenuItem { objectName: "editPasteMarkdown"; text: "Markdown from HTML"; enabled: win.sourceClipboardAllowed && win.editTarget === editor && editor.canPaste; onTriggered: { editor.forceActiveFocus(); editor.replaceAtomic(editor.selectionStart, editor.selectionEnd, backend.clipboardMarkdown()); } }
             }
             Platform.MenuSeparator {}
-            Platform.MenuItem { objectName: "editDelete"; text: "Delete"; enabled: !win.visualEditorActive && !win.editTarget.readOnly && win.editTarget.selectedText.length > 0; onTriggered: win.editTarget.remove(win.editTarget.selectionStart, win.editTarget.selectionEnd) }
-            Platform.MenuItem { text: "Select All"; enabled: !win.visualEditorActive && win.editTarget.length > 0; onTriggered: win.editTarget.selectAll() }
+            Platform.MenuItem { objectName: "editDelete"; text: "Delete"; enabled: win.sourceClipboardAllowed && !win.editTarget.readOnly && win.editTarget.selectedText.length > 0; onTriggered: win.editTarget.remove(win.editTarget.selectionStart, win.editTarget.selectionEnd) }
+            Platform.MenuItem { text: "Select All"; enabled: win.sourceClipboardAllowed && win.editTarget.length > 0; onTriggered: win.editTarget.selectAll() }
             Platform.MenuSeparator {}
             Platform.Menu {
                 title: "Find"
@@ -1699,7 +1718,7 @@ ApplicationWindow {
             Platform.MenuItem {
                 objectName: "native_showCompletions"
                 text: "Show Completions"
-                enabled: win.editTarget === editor && editor.selectionStart === editor.selectionEnd
+                enabled: win.sourceEditorVisible && win.editTarget === editor && editor.selectionStart === editor.selectionEnd
                 onTriggered: win.showCompletions()
             }
             NativeCommand { commandId: "markup" }
@@ -1722,19 +1741,21 @@ ApplicationWindow {
                 Platform.MenuItem { text: "Load Custom Template…"; onTriggered: outputStyleDialog.open() }
             }
             Platform.MenuSeparator { objectName: "nativeAfterTemplate" }
-            NativeCommand { commandId: "reloadPreview" }
             Platform.Menu {
-                title: "Preview"
-                NativeCommand { commandId: "preview"; text: "Full" }
-                NativeCommand { commandId: "split"; text: "Split" }
-                Platform.MenuSeparator {}
-                NativeCommand { commandId: "webPreview" }
-                Platform.Menu {
-                    title: "PDF"
-                    Platform.MenuItem { objectName: "native_pdfPreview"; text: "Paginated Preview…"; onTriggered: backend.printPreview() }
-                }
+                title: "Editing"
+                NativeCommand { commandId: "sourceEditing" }
+                NativeCommand { commandId: "visualEditing" }
             }
-            NativeCommand { commandId: "editor" }
+            Platform.Menu {
+                title: "Layout"
+                NativeCommand { commandId: "editor" }
+                NativeCommand { commandId: "split" }
+            }
+            Platform.MenuSeparator {}
+            NativeCommand { commandId: "preview" }
+            NativeCommand { commandId: "webPreview"; text: "Web Preview" }
+            NativeCommand { commandId: "reloadPreview" }
+            Platform.MenuItem { objectName: "native_pdfPreview"; text: "Paginated Preview…"; onTriggered: backend.printPreview() }
             Platform.MenuSeparator {}
             NativeCommand { commandId: "outline" }
             NativeCommand { commandId: "statistics" }
@@ -2662,8 +2683,9 @@ ApplicationWindow {
 
         Flickable {
             id: editorFlick
+            visible: !workspaceLayout.visualEditEnabled
             onContentYChanged: {
-                if (!workspaceSettings.synchronizedScroll || win.synchronizingScroll || win.changingDocumentView || workspaceLayout.effectiveLayoutMode !== 1) return;
+                if (!win.sourceEditorVisible || !workspaceSettings.synchronizedScroll || win.synchronizingScroll || win.changingDocumentView || workspaceLayout.effectiveLayoutMode !== 1) return;
                 win.synchronizingScroll = true;
                 previewPane.scrollToFraction(contentY / Math.max(1, contentHeight - height));
                 win.synchronizingScroll = false;
@@ -2898,7 +2920,7 @@ ApplicationWindow {
                 }
                 // Reflowing an inactive Source pane must not pull the preview
                 // back to an old caret through synchronized scrolling.
-                onCursorRectangleChanged: if (activeFocus && editorPane.visible) editorFlick.ensureCursorVisible()
+                onCursorRectangleChanged: if (activeFocus && win.sourceEditorVisible) editorFlick.ensureCursorVisible()
                 onActiveFocusChanged: if (activeFocus) {
                     Qt.callLater(win.updateWritingSurfaceFromFocus);
                     Qt.callLater(win.updateSourceFormattingOwner);
@@ -3172,6 +3194,38 @@ ApplicationWindow {
             }
         }
 
+        PreviewPane {
+            id: visualEditorPane
+            objectName: "visualEditorPane"
+            scrollObjectName: "visualEditorScroll"
+            renderedObjectName: "visualEditorRenderedPreview"
+            anchors.fill: parent
+            anchors.topMargin: documentMeta.y + documentMeta.height
+            showFooter: false
+            bottomInset: documentFooter.height
+            visible: workspaceLayout.visualEditEnabled
+            visualEditEnabled: workspaceLayout.visualEditEnabled
+            suspendViewportUpdates: win.changingDocumentView
+            onViewportInteraction: win.cancelDocumentViewportTransition()
+            renderer: win.appBackend
+            markdown: editor.text
+            documentBaseUrl: backend.documentBaseUrl
+            darkMode: win.darkMode
+            visualTypeface: win.editorFontFamily
+            visualTextSize: win.editorFontPixelSize
+            visualTopInset: height < 600 ? 32 : 64
+            onVisualEditorFocusedChanged: if (visualEditorFocused) Qt.callLater(win.updateWritingSurfaceFromFocus)
+            onEditorUndoRequested: editor.undo()
+            onEditorRedoRequested: editor.redo()
+            onSourceEditRequested: win.selectWritingMode("source")
+            onScrollFractionChanged: function(fraction) {
+                if (!visible || !workspaceSettings.synchronizedScroll || win.synchronizingScroll || win.changingDocumentView || workspaceLayout.effectiveLayoutMode !== 1) return;
+                win.synchronizingScroll = true;
+                previewPane.scrollToFraction(fraction);
+                win.synchronizingScroll = false;
+            }
+        }
+
         DocumentFindBar {
             id: searchPane
             anchors.top: parent.top
@@ -3199,6 +3253,9 @@ ApplicationWindow {
 
         PreviewPane {
             id: previewPane
+            allowVisualEdit: false
+            visualEditEnabled: false
+            visualEditorObjectName: "outputPreviewVisualEditor"
             showFooter: false
             bottomInset: documentFooter.height
             suspendViewportUpdates: win.changingDocumentView
@@ -3208,35 +3265,21 @@ ApplicationWindow {
             onScrollFractionChanged: function(fraction) {
                 if (!workspaceSettings.synchronizedScroll || win.synchronizingScroll || win.changingDocumentView || workspaceLayout.effectiveLayoutMode !== 1) return;
                 win.synchronizingScroll = true;
-                editorFlick.contentY = Math.max(0, editorFlick.contentHeight - editorFlick.height) * fraction;
+                if (workspaceLayout.visualEditEnabled) visualEditorPane.scrollToFraction(fraction);
+                else editorFlick.contentY = Math.max(0, editorFlick.contentHeight - editorFlick.height) * fraction;
                 win.synchronizingScroll = false;
             }
             markdown: editor.text
             documentBaseUrl: backend.documentBaseUrl
-            onSourceEditRequested: {
-                previewPane.visualEditEnabled = false;
-                workspaceCommands.run("editor");
-                win.lastWritingSurface = "source";
-                editor.forceActiveFocus();
-                Qt.callLater(function() { editorFlick.ensureCursorVisible(); });
-            }
-            onVisualEditorFocusedChanged: if (visualEditorFocused) Qt.callLater(win.updateWritingSurfaceFromFocus)
-            onEditorUndoRequested: editor.undo()
-            onEditorRedoRequested: editor.redo()
             darkMode: win.darkMode
             visible: workspaceLayout.effectiveLayoutMode !== 0
             SplitView.fillWidth: workspaceLayout.effectiveLayoutMode === 2
             SplitView.preferredWidth: workspaceLayout.effectivePreviewWidth
             SplitView.minimumWidth: 320
             typeface: backend.outputFont
-            // Screen zoom never changes the selected export style or point size.
+            // Output zoom stays independent from either editing representation.
             textSize: Math.round(Math.max(17, backend.outputPointSize * 4 / 3) * paneZoom.previewZoom / 100)
             layoutMode: workspaceLayout.effectiveLayoutMode
-            visualEditEnabled: workspaceLayout.visualEditEnabled
-            onVisualEditEnabledChanged: workspaceLayout.visualEditEnabled = visualEditEnabled
-            visualTypeface: win.editorFontFamily
-            visualTextSize: win.scaledSize(win.writingBasePixelSize * paneZoom.previewZoom / 100)
-            visualTopInset: height < 600 ? 32 : 64
             onLayoutRequested: function(mode) { win.setDocumentView(mode); }
             onAnchorNavigationFailed: function(anchor) {
                 win.showNavigationNotice("Heading or anchor “" + anchor + "” was not found in this document.");
@@ -3275,6 +3318,7 @@ ApplicationWindow {
             win.beginDocumentViewportTransition(true);
             win.documentViewportTransition.sourceAnchor = readingAnchors.source;
             win.documentViewportTransition.previewAnchor = readingAnchors.preview;
+            win.documentViewportTransition.visualAnchor = readingAnchors.visual;
         }
         onPressed: function(mouse) {
             pressSceneX = mapToItem(win.contentItem, mouse.x, mouse.y).x;
@@ -3282,7 +3326,7 @@ ApplicationWindow {
             balanceOnRelease = false;
             win.beginDocumentViewportTransition(true);
             readingAnchors = { source: win.documentViewportTransition.sourceAnchor,
-                preview: win.documentViewportTransition.previewAnchor };
+                preview: win.documentViewportTransition.previewAnchor, visual: win.documentViewportTransition.visualAnchor };
         }
         onPositionChanged: function(mouse) {
             if (!pressed || balanceOnRelease || !readingAnchors) return;
@@ -3329,7 +3373,7 @@ ApplicationWindow {
         width: parent.width - x
         z: 2
         layoutMode: workspaceLayout.effectiveLayoutMode
-        visualEditing: workspaceLayout.effectiveLayoutMode !== 0 && workspaceLayout.visualEditEnabled
+        visualEditing: workspaceLayout.visualEditEnabled
         canSplit: workspaceLayout.availableWidth >= 800
         sourcePaneWidth: editorPane.visible ? editorPane.width : 0
         previewPaneStart: previewPane.visible ? previewPane.x - x : width
@@ -3339,8 +3383,8 @@ ApplicationWindow {
         showStatus: !workspaceLayout.effectiveOrganizerVisible
         showStatistics: workspaceSettings.toolbarMode === 1
         statisticsText: win.compactToolbarStatistics()
-        onViewRequested: function(mode) { win.setDocumentView(mode); }
-        onVisualEditRequested: win.toggleVisualEditing()
+        onLayoutRequested: function(mode) { win.setDocumentView(mode); }
+        onEditingRequested: function(visual) { win.setEditingMode(visual); }
         onAppearanceMenuRequested: function(anchor) { win.openAnchoredMenu(sourceAppearanceMenu, anchor); }
         onTemplateMenuRequested: function(anchor) { win.openAnchoredMenu(previewTemplateMenu, anchor); }
         onStatisticsRequested: workspaceCommands.run("statistics")

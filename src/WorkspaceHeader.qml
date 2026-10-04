@@ -19,6 +19,7 @@ Item {
     property string documentName: backend.fileName
     property bool documentModified: backend.modified
     readonly property bool fullPreview: !editorPane.visible && previewPane.visible
+    readonly property bool visualEditor: editorPane.visible && layoutState.visualEditEnabled
     property bool keyboardReveal: false
     readonly property bool revealRequested: chromeHover.hovered || keyboardReveal
     readonly property real titleContentOpacity: settings.titleBarMode === 1 || revealRequested ? 1 : 0
@@ -203,7 +204,7 @@ Item {
             Label {
                 objectName: "fullPreviewHeaderModeLabel"
                 visible: root.fullPreview && root.toolbarContentVisible && root.writingControlsWidth >= 380
-                text: root.previewPane.visualEditEnabled ? "Visual Edit" : "Preview"
+                text: "Preview"
                 font.pixelSize: 13
                 color: backend.palette.muted
                 opacity: root.toolbarContentOpacity
@@ -215,7 +216,22 @@ Item {
                 Layout.fillWidth: true
                 Layout.minimumWidth: 0
             }
-            Item { visible: !root.fullPreview; Layout.fillWidth: true; Layout.minimumWidth: 6 }
+            Label {
+                objectName: "visualEditorHeaderModeLabel"
+                visible: root.visualEditor && root.toolbarContentVisible && root.writingControlsWidth >= 540
+                text: "Visual Edit"
+                font.pixelSize: 13
+                color: backend.palette.muted
+                opacity: root.toolbarContentOpacity
+            }
+            PreviewDocumentIdentity {
+                identityPrefix: "visualEditorDocument"
+                visible: root.visualEditor && root.toolbarContentVisible
+                opacity: root.titleContentOpacity
+                Layout.fillWidth: true
+                Layout.minimumWidth: 0
+            }
+            Item { visible: !root.fullPreview && !root.visualEditor; Layout.fillWidth: true; Layout.minimumWidth: 6 }
             Row {
                 id: trailing
                 objectName: "topChromeToolbarTrailing"
@@ -224,13 +240,13 @@ Item {
                 ToolbarGroup {
                     objectName: "compactWritingControls"
                     property bool sourceFormattingControl: true
-                    visible: !root.fullPreview && root.writingClusterExpanded
+                    visible: !root.fullPreview && !root.visualEditor && root.writingClusterExpanded
                     ToolbarButton { id: sourceBoldButton; objectName: "compactBoldButton"; grouped: true; text: "B"; font.pixelSize: 16; font.weight: Font.Bold; hint: trailing.formattingAllowed ? "Bold selection" : "Choose Source to apply formatting"; enabled: trailing.formattingAllowed; onClicked: root.actionRequested("bold", this) }
                     ToolbarButton { objectName: "compactItalicButton"; grouped: true; text: "I"; font.family: "Times New Roman"; font.pixelSize: 18; font.italic: true; hint: "Italic selection"; enabled: trailing.formattingAllowed; onClicked: root.actionRequested("italic", this) }
                     ToolbarButton { objectName: "compactLinkButton"; grouped: true; iconName: "link"; hint: "Insert or edit link"; enabled: trailing.formattingAllowed; onClicked: root.actionRequested("link", this) }
                     ToolbarButton { objectName: "compactParagraphButton"; grouped: true; iconName: "paragraph"; hint: "Paragraph formatting"; enabled: trailing.formattingAllowed; onClicked: root.actionRequested("format", this) }
                 }
-                ToolbarButton { id: sourceFormatButton; property bool sourceFormattingControl: true; objectName: "compactFormatButton"; visible: !root.fullPreview && !root.writingClusterExpanded; iconName: "paragraph"; hint: "Formatting"; enabled: trailing.formattingAllowed; onClicked: root.actionRequested("format", this) }
+                ToolbarButton { id: sourceFormatButton; property bool sourceFormattingControl: true; objectName: "compactFormatButton"; visible: !root.fullPreview && !root.visualEditor && !root.writingClusterExpanded; iconName: "paragraph"; hint: "Formatting"; enabled: trailing.formattingAllowed; onClicked: root.actionRequested("format", this) }
                 PaneZoomControls {
                     zoomController: root.zoomController
                     pane: root.editorPane.visible ? "source" : "preview"
@@ -261,7 +277,7 @@ Item {
             Label {
                 objectName: "previewHeaderModeLabel"
                 visible: splitPreviewHeader.width >= 500
-                text: root.previewPane.visualEditEnabled ? "Visual Edit" : "Preview"
+                text: "Preview"
                 color: backend.palette.muted
                 font.pixelSize: 13
             }

@@ -45,3 +45,8 @@ Makefile
 /research/cycle-117/*
 !/research/cycle-117/README.md
 !/research/cycle-117/verified-builds.json
+
+# Cycle118 local UI evidence; publish only the reviewed handoff and identities.
+/research/cycle-118/*
+!/research/cycle-118/README.md
+!/research/cycle-118/verified-builds.json

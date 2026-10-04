@@ -40,6 +40,8 @@ class FomawriteTest : public QObject {
 
 private slots:
     void paneAlignedFooterMenusFollowDividerWithoutEditing();
+    void editingAndLayoutChoicesAreIndependent();
+    void visualSplitEditsCanonicalSourceAndKeepsPreviewReadOnly();
     void previewHeaderTracksFileAndEditedState();
     void compactLibraryRowsOpenActualFilesAndIndentChildren();
     void linkSyntaxPreservesSupportedFormsAndRejectsAmbiguity();
@@ -152,7 +154,7 @@ private slots:
         QCOMPARE(layout->property("effectiveLayoutMode").toInt(), 0);
         layout->setProperty("activeSurface", "visual");
         layout->setProperty("visualEditEnabled", true);
-        QCOMPARE(layout->property("effectiveLayoutMode").toInt(), 2);
+        QCOMPARE(layout->property("effectiveLayoutMode").toInt(), 0);
         QCOMPARE(layout->property("layoutMode").toInt(), 1);
         QVERIFY(layout->property("visualEditEnabled").toBool());
         layout->setProperty("availableWidth", 1440);
@@ -193,7 +195,8 @@ private slots:
         first->setProperty("availableWidth", 720);
         QJSValue firstWrapper = engine.newQObject(first.data());
         const QVariantMap saved = firstWrapper.property("saveState").callWithInstance(firstWrapper).toVariant().toMap();
-        QCOMPARE(saved.value("version").toInt(), 1);
+        QCOMPARE(saved.value("version").toInt(), 2);
+        QCOMPARE(saved.value("lastEditingLayoutMode").toInt(), 1);
         QCOMPARE(saved.value("organizerWidth").toDouble(), 250.0);
         QCOMPARE(saved.value("fileWidth").toDouble(), 380.0);
         QCOMPARE(saved.value("previewWidth").toDouble(), 600.0);
@@ -230,6 +233,50 @@ private slots:
         QVERIFY(second->property("filesVisible").toBool());
         QVERIFY(!first->property("filesVisible").toBool());
         QCOMPARE(first->property("fileWidth").toDouble(), 380.0);
+
+        // Legacy Source/Full encoded both representation and arrangement. Each
+        // old combination must migrate once into the two independent choices.
+        QJSValue secondWrapper = engine.newQObject(second.data());
+        for (int oldMode : {0, 1, 2}) {
+            for (bool oldVisual : {false, true}) {
+                const QVariantMap legacy{{"version", 1}, {"layoutMode", oldMode},
+                    {"visualEditEnabled", oldVisual}, {"previewWidth", 560}};
+                QVERIFY(QMetaObject::invokeMethod(second.data(), "restoreState", Q_ARG(QVariant, legacy)));
+                const int expectedMode = oldMode == 2 && oldVisual ? 0 : oldMode;
+                const bool expectedVisual = oldMode == 0 ? false : oldVisual;
+                QCOMPARE(second->property("layoutMode").toInt(), expectedMode);
+                QCOMPARE(second->property("visualEditEnabled").toBool(), expectedVisual);
+                QCOMPARE(second->property("lastEditingLayoutMode").toInt(), expectedMode == 1 ? 1 : 0);
+                const QVariantMap migrated = secondWrapper.property("saveState")
+                    .callWithInstance(secondWrapper).toVariant().toMap();
+                QCOMPARE(migrated.value("version").toInt(), 2);
+                QVERIFY(QMetaObject::invokeMethod(second.data(), "restoreState", Q_ARG(QVariant, migrated)));
+                QCOMPARE(second->property("layoutMode").toInt(), expectedMode);
+                QCOMPARE(second->property("visualEditEnabled").toBool(), expectedVisual);
+                QCOMPARE(second->property("previewWidth").toDouble(), 560.0);
+            }
+        }
+        // Preview-only must retain both the last editing layout and the
+        // selected editor across a checkpoint, including responsive contraction.
+        for (int editingMode : {0, 1}) {
+            for (bool visual : {false, true}) {
+                second->setProperty("layoutMode", editingMode);
+                second->setProperty("visualEditEnabled", visual);
+                second->setProperty("availableWidth", 720);
+                second->setProperty("layoutMode", 2);
+                QCOMPARE(second->property("lastEditingLayoutMode").toInt(), editingMode);
+                const QVariantMap reading = secondWrapper.property("saveState")
+                    .callWithInstance(secondWrapper).toVariant().toMap();
+                QVERIFY(QMetaObject::invokeMethod(second.data(), "restoreDefaults"));
+                QVERIFY(QMetaObject::invokeMethod(second.data(), "restoreState", Q_ARG(QVariant, reading)));
+                QCOMPARE(second->property("layoutMode").toInt(), 2);
+                QCOMPARE(second->property("lastEditingLayoutMode").toInt(), editingMode);
+                QCOMPARE(second->property("visualEditEnabled").toBool(), visual);
+                second->setProperty("layoutMode", second->property("lastEditingLayoutMode"));
+                QCOMPARE(second->property("layoutMode").toInt(), editingMode);
+                QCOMPARE(second->property("visualEditEnabled").toBool(), visual);
+            }
+        }
     }
 
     void compactWorkspaceNavigationAndFindKeepSourceSafe() {
@@ -250,7 +297,8 @@ private slots:
         // Enter the view through its real route; assigning a remembered focus
         // flag while Source owns focus no longer describes a valid UI state.
         QVERIFY(QMetaObject::invokeMethod(window.data(), "selectWritingMode", Q_ARG(QVariant, "visual")));
-        QTRY_COMPARE(layout->property("effectiveLayoutMode").toInt(), 2);
+        QTRY_COMPARE(layout->property("effectiveLayoutMode").toInt(), 0);
+        QVERIFY(layout->property("visualEditEnabled").toBool());
         QTRY_VERIFY(!window->property("changingDocumentView").toBool());
         const QString draft = "Keep **unsaved** writing.\n";
         editor->setProperty("text", draft);
@@ -2329,6 +2377,9 @@ private slots:
         auto *menuItem = window->findChild<QObject *>("native_showCompletions");
         auto *popup = window->findChild<QObject *>("completionPopup");
         QVERIFY(editor && menuItem && popup);
+        QVERIFY(QMetaObject::invokeMethod(window.data(), "selectWritingMode",
+                                          Q_ARG(QVariant, QStringLiteral("source"))));
+        QTRY_VERIFY(window->property("sourceEditorVisible").toBool());
 
         const QString source = QStringLiteral("caféteria welcomes café.\nTry café");
         editor->setProperty("text", source);
@@ -2367,6 +2418,42 @@ private slots:
         QCOMPARE(editor->property("text").toString(), QStringLiteral("caféteria welcomes café.\nTry caféteria"));
         QVERIFY(QMetaObject::invokeMethod(editor, "undo"));
         QCOMPARE(editor->property("text").toString(), source);
+
+        // A suggestion captured in Source must never act on that hidden
+        // editor after choosing Visual Edit or the read-only Preview view.
+        for (const QString &mode : {QStringLiteral("visual"), QStringLiteral("preview")}) {
+            QVERIFY(QMetaObject::invokeMethod(window.data(), "selectWritingMode",
+                                              Q_ARG(QVariant, QStringLiteral("source"))));
+            QTRY_VERIFY(window->property("sourceEditorVisible").toBool());
+            editor->setProperty("cursorPosition", source.size());
+            QVERIFY(QMetaObject::invokeMethod(window.data(), "showCompletions",
+                                              Q_RETURN_ARG(QVariant, shown)));
+            QVERIFY(shown.toBool());
+            QTRY_VERIFY(popup->property("opened").toBool());
+            const int staleChoice = window->property("completionItems").toStringList()
+                .indexOf(QStringLiteral("caféteria"));
+            QVERIFY(staleChoice >= 0);
+
+            QVERIFY(QMetaObject::invokeMethod(window.data(), "selectWritingMode",
+                                              Q_ARG(QVariant, mode)));
+            QTRY_VERIFY(!window->property("sourceEditorVisible").toBool());
+            QTRY_VERIFY(!popup->property("visible").toBool());
+            QVERIFY(!menuItem->property("enabled").toBool());
+            QCOMPARE(editor->property("cursorPosition").toInt(), source.size());
+            QCOMPARE(window->property("completionPrefix").toString(), QStringLiteral("café"));
+            QVERIFY(QMetaObject::invokeMethod(window.data(), "showCompletions",
+                                              Q_RETURN_ARG(QVariant, shown)));
+            QVERIFY(!shown.toBool());
+            QVERIFY(QMetaObject::invokeMethod(window.data(), "acceptCompletion",
+                                              Q_RETURN_ARG(QVariant, accepted),
+                                              Q_ARG(QVariant, staleChoice)));
+            QVERIFY(!accepted.toBool());
+            QCOMPARE(editor->property("text").toString(), source);
+            QCOMPARE(backend.visualProjection().value("source").toString(), source);
+        }
+        QVERIFY(QMetaObject::invokeMethod(window.data(), "selectWritingMode",
+                                          Q_ARG(QVariant, QStringLiteral("source"))));
+        QTRY_VERIFY(window->property("sourceEditorVisible").toBool());
 
         const QString protectedSource = QStringLiteral(
             "prose projection\n"
@@ -3133,6 +3220,13 @@ private slots:
         auto *layout = window->findChild<QObject *>("workspaceLayout");
         auto *pane = window->findChild<QObject *>("libraryPane");
         QVERIFY(settings && pane);
+        // Failed assertions must not leak display preferences into later fixtures.
+        const auto cleanup = qScopeGuard([&] {
+            pane->setProperty("dateMode", 0);
+            pane->setProperty("showExcerpts", false);
+            backend.library()->setProperty("navigationMode", 0);
+            backend.library()->setProperty("ascending", true);
+        });
         auto native = [&](const char *id) { return window->findChild<QObject *>(QStringLiteral("native_") + id); };
         auto *libraryAction = native("library");
 #ifdef Q_OS_MACOS
@@ -3203,11 +3297,6 @@ private slots:
         QVERIFY(QMetaObject::invokeMethod(native("descending"), "triggered"));
         QVERIFY(!backend.library()->property("ascending").toBool());
         QVERIFY(!native("ascending")->property("checked").toBool());
-        // Restore the shared test preferences for following existing tests.
-        pane->setProperty("dateMode", 0);
-        pane->setProperty("showExcerpts", false);
-        backend.library()->setProperty("navigationMode", 0);
-        backend.library()->setProperty("ascending", true);
     }
 
     void nativeFileAndEditMenuActionsRespectFocusAndGuards() {
@@ -3790,6 +3879,9 @@ private slots:
         QVERIFY(backend.library()->property("ascending").toBool());
         auto *previews = window->findChild<QObject *>("libraryPreviewToggle");
         QVERIFY(previews);
+        auto *libraryPane = window->findChild<QObject *>("libraryPane");
+        QVERIFY(libraryPane);
+        libraryPane->setProperty("showExcerpts", false);
         QVERIFY(!previews->property("checked").toBool());
         QVERIFY(trigger("Show Text Excerpts"));
         QVERIFY(previews->property("checked").toBool());
@@ -4674,7 +4766,7 @@ private slots:
         QScopedPointer<QObject> window(component.create()); QVERIFY2(window, qPrintable(component.errorString()));
         auto *editor = window->findChild<QObject *>("sourceEditor");
         auto *visual = window->findChild<QObject *>("visualEditor");
-        auto *pane = window->findChild<QObject *>("previewPane");
+        auto *pane = window->findChild<QObject *>("visualEditorPane");
         auto *settings = window->findChild<QObject *>("workspaceSettings");
         auto *layout = window->findChild<QObject *>("workspaceLayout");
         auto *quickWindow = qobject_cast<QQuickWindow *>(window.data());
@@ -4682,7 +4774,8 @@ private slots:
         const int originalLayout = layout->property("layoutMode").toInt();
         QVERIFY(layout->setProperty("layoutMode", 1));
         QVERIFY(editor->setProperty("text", QStringLiteral("Plain sentence.\n")));
-        QVERIFY(pane->setProperty("visualEditEnabled", true));
+        QVERIFY(QMetaObject::invokeMethod(window.data(), "selectWritingMode", Q_ARG(QVariant, "visual")));
+        QTRY_VERIFY(!window->property("changingDocumentView").toBool());
         QTRY_COMPARE(visual->property("text").toString(), QStringLiteral("Plain sentence.\n"));
         QVERIFY(QMetaObject::invokeMethod(visual, "forceActiveFocus"));
         QVERIFY(visual->setProperty("cursorPosition", 5));
@@ -4704,6 +4797,8 @@ private slots:
 
     void visualProjectionAppliesOnlySafeMappedEdits() {
         Backend backend;
+        QCOMPARE(backend.visualPositionForSource(-1), 0);
+        QCOMPARE(backend.visualPositionForSource(1000), 0);
         QQmlEngine engine;
         engine.rootContext()->setContextProperty(QStringLiteral("backend"), &backend);
         QQmlComponent component(&engine, QUrl::fromLocalFile(QFINDTESTDATA("../src/Main.qml")));
@@ -4725,6 +4820,25 @@ private slots:
         QCOMPARE(blocks.at(2).toMap().value("kind").toString(), QStringLiteral("sourceOnly"));
         QVERIFY(!blocks.at(2).toMap().value("editable").toBool());
 
+        const QString visualText = projection.value("visualText").toString();
+        const bool couldUndo = editor->property("canUndo").toBool();
+        const bool wasModified = backend.modified();
+        const int cursor = editor->property("cursorPosition").toInt();
+        QCOMPARE(backend.visualPositionForSource(-20), 0);
+        QCOMPARE(backend.visualPositionForSource(0), 0); // Heading marker.
+        QCOMPARE(backend.visualPositionForSource(1), 0);
+        QCOMPARE(backend.visualPositionForSource(source.indexOf("Heading") + 3), 3);
+        QCOMPARE(backend.visualPositionForSource(source.indexOf('\n')), visualText.indexOf("Plain"));
+        QCOMPARE(backend.visualPositionForSource(source.indexOf("bold") + 2), visualText.indexOf("bold") + 2);
+        QCOMPARE(backend.visualPositionForSource(source.indexOf("**")), visualText.indexOf("Plain"));
+        QCOMPARE(backend.visualPositionForSource(source.indexOf("table") + 3), visualText.indexOf("| table"));
+        QCOMPARE(backend.visualPositionForSource(source.size()), visualText.size());
+        QCOMPARE(backend.visualPositionForSource(source.size() + 100), visualText.size());
+        QCOMPARE(editor->property("text").toString(), source);
+        QCOMPARE(editor->property("cursorPosition").toInt(), cursor);
+        QCOMPARE(editor->property("canUndo").toBool(), couldUndo);
+        QCOMPARE(backend.modified(), wasModified);
+
         const int boldVisualStart = projection.value("visualText").toString().indexOf("bold");
         QVERIFY(backend.applyVisualEdit(boldVisualStart, 4, QStringLiteral("strong"), source));
         QCOMPARE(editor->property("text").toString(),
@@ -4739,6 +4853,15 @@ private slots:
         const int tableVisualStart = projection.value("visualText").toString().indexOf("table");
         QVERIFY(!backend.applyVisualEdit(tableVisualStart, 5, QStringLiteral("grid"), source));
         QCOMPARE(editor->property("text").toString(), source);
+        const QString unicodeSource = QStringLiteral("# 📝 Cafe\u0301\n");
+        editor->setProperty("text", unicodeSource);
+        const int emoji = unicodeSource.indexOf(QStringLiteral("📝"));
+        QCOMPARE(backend.visualPositionForSource(emoji), 0);
+        QCOMPARE(backend.visualPositionForSource(emoji + 1), 0); // Inside surrogate pair.
+        const int accent = unicodeSource.indexOf(QChar(0x0301));
+        QCOMPARE(backend.visualPositionForSource(accent), backend.visualPositionForSource(accent - 1));
+        QCOMPARE(editor->property("text").toString(), unicodeSource);
+        QVERIFY(!editor->property("canUndo").toBool());
         backend.discardRecovery();
     }
 
@@ -4782,29 +4905,31 @@ private slots:
         auto *quick = qobject_cast<QQuickWindow *>(window.data());
         auto *editor = window->findChild<QQuickItem *>(QStringLiteral("sourceEditor"));
         auto *visual = window->findChild<QQuickItem *>(QStringLiteral("visualEditor"));
-        auto *pane = window->findChild<QQuickItem *>(QStringLiteral("previewPane"));
+        auto *pane = window->findChild<QQuickItem *>(QStringLiteral("visualEditorPane"));
         auto *layout = window->findChild<QObject *>(QStringLiteral("workspaceLayout"));
         auto *bold = window->findChild<QObject *>(QStringLiteral("compactBoldButton"));
         QVERIFY(quick && editor && visual && pane && layout && bold);
         const auto originalMode = layout->property("layoutMode");
-        const bool originalVisual = pane->property("visualEditEnabled").toBool();
+        const bool originalVisual = layout->property("visualEditEnabled").toBool();
         const auto restore = qScopeGuard([&] {
             layout->setProperty("layoutMode", originalMode);
-            pane->setProperty("visualEditEnabled", originalVisual);
+            layout->setProperty("visualEditEnabled", originalVisual);
             backend.discardRecovery();
         });
         quick->resize(1440, 800);
         layout->setProperty("layoutMode", 1);
-        pane->setProperty("visualEditEnabled", true);
-        QTRY_VERIFY(editor->isVisible() && visual->isVisible());
+        QVERIFY(QMetaObject::invokeMethod(window.data(), "selectWritingMode", Q_ARG(QVariant, "source")));
+        QTRY_VERIFY(editor->isVisible() && !visual->isVisible());
         const QString source = QStringLiteral("Plain bold text.\n");
         QVERIFY(editor->setProperty("text", source));
-        QTRY_COMPARE(visual->property("text").toString(), source);
-        QTRY_VERIFY(!pane->property("viewportRefreshPending").toBool());
+        QTRY_VERIFY(!window->property("changingDocumentView").toBool());
         editor->forceActiveFocus();
         QTRY_VERIFY(window->property("canFormatSource").toBool());
         QVERIFY(QMetaObject::invokeMethod(editor, "select", Q_ARG(int, 0), Q_ARG(int, 5)));
-        visual->forceActiveFocus();
+        QVERIFY(QMetaObject::invokeMethod(window.data(), "selectWritingMode", Q_ARG(QVariant, "visual")));
+        QTRY_VERIFY(!window->property("changingDocumentView").toBool());
+        QTRY_VERIFY(!editor->isVisible() && visual->isVisible());
+        QTRY_COMPARE(visual->property("text").toString(), source);
         QTRY_COMPARE(quick->activeFocusItem(), visual);
         QTRY_VERIFY(!window->property("canFormatSource").toBool());
         QVERIFY(!bold->property("enabled").toBool());
@@ -4814,7 +4939,9 @@ private slots:
         QCOMPARE(editor->property("text").toString(), source);
         QCOMPARE(editor->property("selectionStart").toInt(), 0);
         QCOMPARE(editor->property("selectionEnd").toInt(), 5);
-        editor->forceActiveFocus();
+        QVERIFY(QMetaObject::invokeMethod(window.data(), "selectWritingMode", Q_ARG(QVariant, "source")));
+        QTRY_VERIFY(!window->property("changingDocumentView").toBool());
+        QTRY_VERIFY(editor->isVisible() && !visual->isVisible());
         QTRY_VERIFY(window->property("canFormatSource").toBool());
         QVERIFY(bold->property("enabled").toBool());
         QVERIFY(QMetaObject::invokeMethod(bold, "clicked"));
@@ -4831,13 +4958,14 @@ private slots:
         QScopedPointer<QObject> window(component.create());
         QVERIFY2(window, qPrintable(component.errorString()));
         auto *sourceEditor = window->findChild<QObject *>(QStringLiteral("sourceEditor"));
-        auto *pane = window->findChild<QObject *>(QStringLiteral("previewPane"));
+        auto *pane = window->findChild<QObject *>(QStringLiteral("visualEditorPane"));
         auto *visualEditor = window->findChild<QObject *>(QStringLiteral("visualEditor"));
         QVERIFY(sourceEditor && pane && visualEditor);
 
         const QString source = QStringLiteral("# Heading\n\nPlain **bold** text.\n| table | value |\n");
         QVERIFY(sourceEditor->setProperty("text", source));
-        QVERIFY(pane->setProperty("visualEditEnabled", true));
+        QVERIFY(QMetaObject::invokeMethod(window.data(), "selectWritingMode", Q_ARG(QVariant, "visual")));
+        QTRY_VERIFY(!window->property("changingDocumentView").toBool());
         QTRY_COMPARE(visualEditor->property("text").toString(),
                      QStringLiteral("Heading\n\nPlain bold text.\n| table | value |\n"));
         const QString revised = QStringLiteral("Heading\n\nPlain strong text.\n| table | value |\n");
@@ -4853,7 +4981,8 @@ private slots:
         QTRY_COMPARE(sourceEditor->property("text").toString(), source);
         QTRY_COMPARE(visualEditor->property("text").toString(),
                      QStringLiteral("Heading\n\nPlain bold text.\n| table | value |\n"));
-        QVERIFY(pane->setProperty("visualEditEnabled", false));
+        QVERIFY(QMetaObject::invokeMethod(window.data(), "selectWritingMode", Q_ARG(QVariant, "source")));
+        QTRY_VERIFY(!window->property("changingDocumentView").toBool());
         QCOMPARE(sourceEditor->property("text").toString(), source);
         backend.discardRecovery();
     }
@@ -4888,7 +5017,7 @@ private slots:
         auto *wideGallery = window->findChild<QObject *>(QStringLiteral("exportWideGallery"));
         auto *exportPreview = window->findChild<QObject *>(QStringLiteral("exportHubPreviewPane"));
         auto *exportSource = window->findChild<QObject *>(QStringLiteral("exportHubSourcePreview"));
-        auto *pane = window->findChild<QObject *>(QStringLiteral("previewPane"));
+        auto *pane = window->findChild<QObject *>(QStringLiteral("visualEditorPane"));
         auto *visual = window->findChild<QObject *>(QStringLiteral("visualEditor"));
         QVERIFY(hub && destination && cancel && bands && horizontalViewport && horizontalBar && horizontalThumb
                 && optionsBand && stylesBand && previewBand
@@ -5004,7 +5133,8 @@ private slots:
         QVERIFY(QMetaObject::invokeMethod(window.data(), "selectWritingMode", Q_ARG(QVariant, "visual")));
         QTRY_VERIFY(visual->property("visible").toBool());
         const QFont visualFont = qvariant_cast<QFont>(visual->property("font"));
-        QVERIFY(visualFont.pixelSize() >= 18);
+        QCOMPARE(visualFont.pixelSize(), window->property("editorFontPixelSize").toInt());
+        QVERIFY(visualFont.pixelSize() >= 12);
         if (qEnvironmentVariableIsSet("FOMAWRITE_EXPORT_TEST_CAPTURE")) {
             backend.setThemePreset(qEnvironmentVariable("FOMAWRITE_EXPORT_TEST_CAPTURE_THEME") == QStringLiteral("dark")
                                    ? QStringLiteral("dark") : QStringLiteral("light"));
@@ -5054,25 +5184,28 @@ private slots:
         auto *settings = window->findChild<QObject *>(QStringLiteral("workspaceSettings"));
         auto *layout = window->findChild<QObject *>("workspaceLayout");
         auto *source = window->findChild<QObject *>(QStringLiteral("sourceEditor"));
-        auto *pane = window->findChild<QObject *>(QStringLiteral("previewPane"));
+        auto *pane = window->findChild<QObject *>(QStringLiteral("visualEditorPane"));
         auto *footer = window->findChild<QObject *>(QStringLiteral("documentFooter"));
         auto *sourceButton = footer ? footer->findChild<QObject *>(QStringLiteral("sourceModeButton")) : nullptr;
         QVERIFY(settings && source && pane && sourceButton);
+        // The previous export fixture deliberately ends at 720px. Exercise
+        // both layout choices at a width that actually permits Split.
+        window->setProperty("width", 1440);
+        window->setProperty("height", 820);
         const QString markdown = QStringLiteral("# Heading\n\nA safe paragraph.\n");
         QVERIFY(source->setProperty("text", markdown));
-        QVERIFY(layout->setProperty("layoutMode", 1));
-        QVERIFY(pane->setProperty("visualEditEnabled", true));
-        QVERIFY(pane->property("visualEditEnabled").toBool());
-        QVERIFY(QMetaObject::invokeMethod(pane, "layoutRequested", Q_ARG(int, 2)));
-        QCOMPARE(layout->property("layoutMode").toInt(), 2);
-        QVERIFY(pane->property("visualEditEnabled").toBool());
-        QVERIFY(QMetaObject::invokeMethod(pane, "layoutRequested", Q_ARG(int, 1)));
-        QCOMPARE(layout->property("layoutMode").toInt(), 1);
-        QVERIFY(pane->property("visualEditEnabled").toBool());
-        QVERIFY(QMetaObject::invokeMethod(sourceButton, "clicked"));
-        QCOMPARE(layout->property("layoutMode").toInt(), 0);
-        QVERIFY(!pane->property("visualEditEnabled").toBool());
-        QCOMPARE(window->property("lastWritingSurface").toString(), QStringLiteral("source"));
+        for (int chosenLayout : {0, 1}) {
+            QVERIFY(QMetaObject::invokeMethod(window.data(), "setDocumentView", Q_ARG(QVariant, chosenLayout)));
+            QVERIFY(QMetaObject::invokeMethod(window.data(), "selectWritingMode", Q_ARG(QVariant, "visual")));
+            QTRY_VERIFY(!window->property("changingDocumentView").toBool());
+            QCOMPARE(layout->property("layoutMode").toInt(), chosenLayout);
+            QVERIFY(pane->property("visualEditEnabled").toBool());
+            QVERIFY(QMetaObject::invokeMethod(sourceButton, "clicked"));
+            QTRY_VERIFY(!window->property("changingDocumentView").toBool());
+            QCOMPARE(layout->property("layoutMode").toInt(), chosenLayout);
+            QVERIFY(!pane->property("visualEditEnabled").toBool());
+            QCOMPARE(window->property("lastWritingSurface").toString(), QStringLiteral("source"));
+        }
         QCOMPARE(source->property("text").toString(), markdown);
         backend.discardRecovery();
     }
@@ -5332,6 +5465,7 @@ private:
 #include "cycle113-focus.inc"
 #include "cycle116-tables.inc"
 #include "cycle117-pane-chrome.inc"
+#include "cycle118-editing-layout.inc"
 #include "cycle100-navigation.inc"
 #include "cycle99-integration.inc"
 #include "sourcevisualmapping-cycle99.inc"

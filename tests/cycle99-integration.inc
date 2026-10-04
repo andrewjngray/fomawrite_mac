@@ -16,7 +16,7 @@ void FomawriteTest::visualObjectsKeepMarkdownUndoAndLocalImages() {
     QScopedPointer<QObject> window(component.create());
     QVERIFY2(window, qPrintable(component.errorString()));
     auto *editor = window->findChild<QObject *>("sourceEditor");
-    auto *pane = window->findChild<QObject *>("previewPane");
+    auto *pane = window->findChild<QObject *>("visualEditorPane");
     auto *visual = window->findChild<QObject *>("visualEditor");
     auto *thumbnail = pane->findChild<QObject *>("visualImageThumbnail");
     auto *inspect = pane->findChild<QObject *>("visualImageInspectButton");
@@ -85,9 +85,9 @@ void FomawriteTest::visualEditingKeepsCaretVisibleAndUnicodeIntact() {
     QScopedPointer<QObject> window(component.create());
     QVERIFY2(window, qPrintable(component.errorString()));
     auto *editor = window->findChild<QObject *>("sourceEditor");
-    auto *pane = window->findChild<QObject *>("previewPane");
+    auto *pane = window->findChild<QObject *>("visualEditorPane");
     auto *visual = window->findChild<QObject *>("visualEditor");
-    auto *scroll = pane->findChild<QObject *>("previewScroll");
+    auto *scroll = pane->findChild<QObject *>("visualEditorScroll");
     QVERIFY(editor && pane && visual && scroll);
     window->setProperty("width", 1200); window->setProperty("height", 700);
     auto *quick = qobject_cast<QQuickWindow *>(window.data());

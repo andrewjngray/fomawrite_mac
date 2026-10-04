@@ -62,9 +62,9 @@ void FomawriteTest::visualTableKeyboardNavigationPreservesDraftAndUndo() {
     QScopedPointer<QObject> window(component.create()); QVERIFY2(window, qPrintable(component.errorString()));
     auto *quick = qobject_cast<QQuickWindow *>(window.data());
     auto *editor = window->findChild<QQuickItem *>("sourceEditor");
-    auto *pane = window->findChild<QQuickItem *>("previewPane");
+    auto *pane = window->findChild<QQuickItem *>("visualEditorPane");
     auto *visual = pane ? pane->findChild<QQuickItem *>("visualEditor") : nullptr;
-    auto *scroll = pane ? pane->findChild<QObject *>("previewScroll") : nullptr;
+    auto *scroll = pane ? pane->findChild<QObject *>("visualEditorScroll") : nullptr;
     auto *zoom = window->findChild<QObject *>("paneZoomState");
     QVERIFY(quick && editor && pane && visual && scroll && zoom);
     cycle106KeepNativeFocus(quick); Cycle106MouseInputIsolation input(quick);
@@ -99,7 +99,7 @@ void FomawriteTest::visualTableKeyboardNavigationPreservesDraftAndUndo() {
     QVERIFY(QMetaObject::invokeMethod(editor, "select", Q_ARG(int, 2), Q_ARG(int, 7)));
     // The same real keys work on a narrow dark pane at a larger reading size.
     backend.setThemePreset("dark"); quick->resize(720, 600);
-    QVERIFY(QMetaObject::invokeMethod(zoom, "setZoom", Q_ARG(QVariant, "preview"), Q_ARG(QVariant, 175)));
+    QVERIFY(QMetaObject::invokeMethod(zoom, "setZoom", Q_ARG(QVariant, "source"), Q_ARG(QVariant, 175)));
     QTRY_VERIFY(!window->property("changingDocumentView").toBool());
     QTRY_VERIFY(!pane->property("viewportRefreshPending").toBool());
     visual->setProperty("cursorPosition", cells.at(6).visual.start); visual->forceActiveFocus();
@@ -151,7 +151,7 @@ void FomawriteTest::visualTableNavigationRejectsStaleAndCrossCellSelections() {
     QScopedPointer<QObject> window(component.create()); QVERIFY2(window, qPrintable(component.errorString()));
     auto *quick = qobject_cast<QQuickWindow *>(window.data());
     auto *editor = window->findChild<QQuickItem *>("sourceEditor");
-    auto *pane = window->findChild<QQuickItem *>("previewPane");
+    auto *pane = window->findChild<QQuickItem *>("visualEditorPane");
     auto *visual = pane ? pane->findChild<QQuickItem *>("visualEditor") : nullptr;
     QVERIFY(quick && editor && pane && visual);
     cycle106KeepNativeFocus(quick); Cycle106MouseInputIsolation input(quick);

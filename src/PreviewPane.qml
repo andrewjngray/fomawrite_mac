@@ -6,6 +6,8 @@ Rectangle {
     id: root
     objectName: "previewPane"
     property string visualEditorObjectName: "visualEditor"
+    property string scrollObjectName: "previewScroll"
+    property string renderedObjectName: "renderedPreview"
     property bool allowVisualEdit: true
     property bool showFooter: true
     property real bottomInset: 0
@@ -100,6 +102,16 @@ Rectangle {
     function navigateToAnchor(anchor) {
         pendingAnchor = anchor;
         reload();
+    }
+    function navigateToSourcePosition(position) {
+        if (!allowVisualEdit || !visualEditEnabled) return;
+        var visualPosition = renderer.visualPositionForSource(position);
+        loadVisualProjection(visualPosition, visualPosition);
+        Qt.callLater(function() {
+            if (!root.visible || !root.visualEditEnabled) return;
+            root.focusVisualEditor();
+            root.ensureVisualCursorVisible();
+        });
     }
     signal layoutRequested(int mode)
     signal linkRequested(url link)
@@ -243,7 +255,7 @@ Rectangle {
                  replacement: after.slice(prefix, afterEnd) };
     }
     function applyVisualTextChange() {
-        if (synchronizingVisualText || visualText.inputMethodComposing
+        if (!allowVisualEdit || !visualEditEnabled || synchronizingVisualText || visualText.inputMethodComposing
                 || visualText.text === visualSnapshot)
             return;
         var change = visualDiff(visualSnapshot, visualText.text);
@@ -259,7 +271,7 @@ Rectangle {
         }
     }
     function navigateVisualTable(backwards) {
-        if (visualText.inputMethodComposing) return false;
+        if (!allowVisualEdit || !visualEditEnabled || visualText.inputMethodComposing) return false;
         var result = renderer.navigateVisualTable(visualText.selectionStart, visualText.selectionEnd,
                                                   backwards, visualSourceSnapshot);
         if (!result.handled) return false;
@@ -277,6 +289,7 @@ Rectangle {
         return true;
     }
     function insertVisualBreak(shift) {
+        if (!allowVisualEdit || !visualEditEnabled) return;
         if (visualText.selectionStart !== visualText.selectionEnd) {
             visualStatus = "Use Source to replace a selection with a new block.";
             return;
@@ -310,7 +323,7 @@ Rectangle {
     Timer { id: visualRefreshTimer; interval: 80; onTriggered: root.loadVisualProjection() }
     Flickable {
         id: previewScroll
-        objectName: "previewScroll"
+        objectName: root.scrollObjectName
         anchors.fill: parent
         anchors.bottomMargin: root.showFooter ? previewFooter.height : root.bottomInset
         anchors.topMargin: imageContext.visible ? imageContext.height : 0
@@ -326,7 +339,7 @@ Rectangle {
         ScrollBar.vertical: ScrollBar {}
         TextEdit {
             id: previewText
-            objectName: "renderedPreview"
+            objectName: root.renderedObjectName
             x: Math.max(22, (previewScroll.width - 740) / 2)
             y: 10
             width: Math.max(100, Math.min(740, previewScroll.width - 44))
@@ -351,6 +364,7 @@ Rectangle {
             id: visualText
             objectName: root.visualEditorObjectName
             visible: root.visualEditEnabled
+            readOnly: !root.allowVisualEdit || !root.visualEditEnabled
             x: Math.max(root.visualSideInset, (previewScroll.width - 720) / 2)
             y: root.visualTopInset
             width: Math.max(100, Math.min(720, previewScroll.width - root.visualSideInset * 2))

@@ -11,7 +11,7 @@ Item {
     required property string pane
     property bool controlsActive: true
     readonly property int zoomPercent: pane === "source" ? zoomController.sourceZoom : zoomController.previewZoom
-    readonly property string paneName: pane === "source" ? "Source" : "Preview"
+    readonly property string paneName: pane === "source" ? "Editor" : "Preview"
     readonly property string controlPrefix: controlsActive ? pane + "Zoom" : "inactive" + paneName + "Zoom"
     property var previousFocusItem: null
     objectName: controlPrefix + "Controls"

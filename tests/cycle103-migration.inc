@@ -36,8 +36,8 @@ const auto smokeReferenceMigration = [&](const std::shared_ptr<Session> &session
                    "prepare an unsaved selected draft for the one-time migration regression")) return false;
     const int revision = session->backend->documentRevision();
     settings->setProperty("writingAppearance", QStringLiteral("book"));
-    const QVariantMap customPanes{{"version", 1}, {"organizerVisible", false}, {"filesVisible", true},
-        {"layoutMode", 2}, {"visualEditEnabled", false}, {"organizerWidth", 216.0},
+    const QVariantMap customPanes{{"version", 2}, {"organizerVisible", false}, {"filesVisible", true},
+        {"layoutMode", 2}, {"visualEditEnabled", false}, {"lastEditingLayoutMode", 0}, {"organizerWidth", 216.0},
         {"fileWidth", 296.0}, {"previewWidth", 380.0}};
     if (!smokeCheck(smokeRestorePanes(window, customPanes) && smokePaneState(window) == customPanes
                    && settings->property("writingAppearance").toString() == QStringLiteral("book"),

@@ -134,7 +134,7 @@ int main(int argc, char *argv[]) {
     app.setOrganizationName(QStringLiteral("AndrewGray"));
     app.setOrganizationDomain(QStringLiteral("andrewjngray.github.io"));
     app.setApplicationDisplayName(QStringLiteral("Fomawrite"));
-    app.setApplicationVersion(QStringLiteral("0.3.0-dev13"));
+    app.setApplicationVersion(QStringLiteral("0.3.0-dev14"));
     const int documentCheck = app.arguments().indexOf(QStringLiteral("--check-document-views"));
     if (documentCheck >= 0) {
         const QString destination = app.arguments().value(documentCheck + 1);
@@ -436,7 +436,11 @@ int main(int argc, char *argv[]) {
         const QRect saved(entry["x"].toInt(),entry["y"].toInt(),entry["width"].toInt(1100),entry["height"].toInt(720));
         w->setGeometry(WorkspaceStore::visibleGeometry(saved,target->availableGeometry(),QSize(w->minimumWidth(),w->minimumHeight())));
         // Older checkpoints have no paneState; preserve the QML migration/defaults.
-        if (entry["paneState"].isObject()) {
+        const auto paneVersion = entry["paneState"].toObject().value("version");
+        // The outer workspace file remains version 1. Pane state has its own
+        // schema; QML migrates legacy combined view modes to version 2.
+        if (entry["paneState"].isObject()
+            && (paneVersion == QJsonValue(1) || paneVersion == QJsonValue(2))) {
             auto paneState = entry["paneState"].toObject();
             // Clamp a restored preview preference to this display, rather than
             // the temporarily narrow restored window. Runtime contraction is QML-only.

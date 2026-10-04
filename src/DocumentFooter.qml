@@ -1,7 +1,8 @@
 import QtQuick
 import QtQuick.Controls
 
-// Pane tools follow the divider; document view controls retain one fixed home.
+// Pane appearance and output styles follow their content. Editing and layout
+// are independent choices, each in its own permanent capsule.
 WorkspaceFooter {
     id: root
     property int layoutMode: 0
@@ -16,16 +17,21 @@ WorkspaceFooter {
     property bool showStatistics: false
     property string statisticsText: ""
     readonly property bool hasPreview: layoutMode !== 0
-    readonly property real paneStart: hasPreview ? previewPaneStart : 0
-    readonly property real paneRoom: Math.max(0, viewControls.x - 6 - paneStart - 12)
-    readonly property bool compactVisual: paneRoom < (hasPreview ? 250 : 218)
-    readonly property bool statusVisible: statusLabel.visible
-    readonly property real statusStart: (hasPreview && layoutMode === 2 ? templateButton.x + templateButton.width
-                                                               : appearanceButton.x + appearanceButton.width) + 12
-    readonly property real statusEnd: layoutMode === 1 ? sourcePaneWidth - 12 : visualButton.x - 12
+    readonly property real controlsStart: editingControls.x
+    // SplitView updates pane widths and positions during polish. Budget against
+    // both edges so a previous editor width cannot cover the newly placed
+    // Preview tool while switching layouts or contracting the navigation panes.
+    readonly property real sourceToolsEnd: layoutMode === 1
+        ? Math.min(sourcePaneWidth, previewPaneStart) - 12 : controlsStart - 8
+    readonly property real appearanceRoom: Math.max(0, sourceToolsEnd - 12)
+    readonly property real templateRoom: Math.max(0, controlsStart - 8 - previewPaneStart - 12)
+    readonly property real statusStart: (layoutMode === 2 ? templateButton.x + templateButton.width
+                                                                      : appearanceButton.x + appearanceButton.width) + 12
+    readonly property real statusEnd: layoutMode === 1 ? sourceToolsEnd : controlsStart - 12
     readonly property real statusWidth: Math.max(0, statusEnd - statusStart)
-    signal viewRequested(int mode)
-    signal visualEditRequested()
+    readonly property bool statusVisible: statusLabel.visible
+    signal editingRequested(bool visual)
+    signal layoutRequested(int mode)
     signal appearanceMenuRequested(var anchor)
     signal templateMenuRequested(var anchor)
     signal statisticsRequested()
@@ -39,23 +45,27 @@ WorkspaceFooter {
     FooterButton {
         id: appearanceButton
         objectName: "sourceAppearanceButton"
-        visible: root.layoutMode !== 2
+        visible: root.layoutMode !== 2 && root.appearanceRoom >= 34
         x: 12; anchors.verticalCenter: parent.verticalCenter
-        width: Math.min(128, Math.max(34, (root.hasPreview ? root.sourcePaneWidth - 12 : visualButton.x - 6) - x))
+        width: Math.min(128, root.appearanceRoom)
         text: width >= 110 ? root.writingAppearance : "Aa"
         menuIndicator: width >= 60
+        leftPadding: width < 70 ? 6 : 12
+        rightPadding: leftPadding
         alignLeft: width >= 110
-        hint: "Choose Source writing appearance: " + root.writingAppearance
+        hint: "Choose editor writing appearance: " + root.writingAppearance
         onClicked: root.appearanceMenuRequested(this)
     }
     FooterButton {
         id: templateButton
         objectName: "previewTemplateButton"
-        visible: root.hasPreview
+        visible: root.hasPreview && root.previewPaneStart >= 0 && root.templateRoom >= 34
         x: root.previewPaneStart + 12; anchors.verticalCenter: parent.verticalCenter
-        width: Math.min(200, Math.max(34, root.paneRoom - visualButton.width - 6))
+        width: Math.min(200, root.templateRoom)
         text: width >= 170 ? "Preview · " + root.previewTemplate : width >= 70 ? root.previewTemplate : "Aa"
         menuIndicator: width >= 60
+        leftPadding: width < 70 ? 6 : 12
+        rightPadding: leftPadding
         alignLeft: width >= 70
         hint: "Choose Preview template: " + root.previewTemplate
         onClicked: root.templateMenuRequested(this)
@@ -79,57 +89,59 @@ WorkspaceFooter {
         text: root.statisticsText; hint: text
         onClicked: root.statisticsRequested()
     }
-    FooterButton {
-        id: visualButton
-        objectName: "visualEditToggle"
-        width: root.compactVisual ? 34 : 84
+    ToolbarGroup {
+        id: editingControls
+        objectName: "documentEditingControls"
+        x: layoutControls.x - width - 12
         anchors.verticalCenter: parent.verticalCenter
-        x: root.hasPreview
-            ? Math.max(templateButton.x + templateButton.width + 6,
-                       Math.min(root.previewPaneStart + (root.width - root.previewPaneStart - width) / 2,
-                                viewControls.x - 6 - width))
-            : viewControls.x - 6 - width
-        leftPadding: root.compactVisual ? 8 : 6; rightPadding: leftPadding
-        text: root.compactVisual ? "" : "Visual Edit"
-        iconName: root.compactVisual ? "compose" : ""
-        hint: root.visualEditing ? "Turn off Visual Edit" : "Visual Edit — edit the rendered document"
-        checked: root.visualEditing
-        Accessible.checkable: true; Accessible.checked: checked
-        onClicked: root.visualEditRequested()
+        Accessible.role: Accessible.Grouping
+        Accessible.name: "Editing mode"
+        FooterButton {
+            objectName: "sourceModeButton"
+            text: "Source"; hint: "Edit Markdown source"
+            leftPadding: 6; rightPadding: 6
+            grouped: true; width: 56
+            checked: root.layoutMode !== 2 && !root.visualEditing
+            Accessible.checkable: true; Accessible.checked: checked
+            onClicked: root.editingRequested(false)
+        }
+        FooterButton {
+            objectName: "visualEditToggle"
+            text: "Visual Edit"
+            hint: "Visual Edit — edit the document visually"
+            leftPadding: 6; rightPadding: 6
+            grouped: true; width: 80
+            checked: root.layoutMode !== 2 && root.visualEditing
+            Accessible.checkable: true; Accessible.checked: checked
+            onClicked: root.editingRequested(true)
+        }
     }
     ToolbarGroup {
-        id: viewControls
+        id: layoutControls
         objectName: "documentViewControls"
         anchors.right: parent.right; anchors.rightMargin: 12
         anchors.verticalCenter: parent.verticalCenter
+        Accessible.role: Accessible.Grouping
+        Accessible.name: "Document layout"
         FooterButton {
-            objectName: "sourceModeButton"
-            text: "Source"; hint: "Show Markdown source"
-            leftPadding: 8; rightPadding: 8
-            grouped: true; width: 62
+            objectName: "singleModeButton"
+            text: "Single"; hint: "Single — show the chosen editor alone"
+            leftPadding: 6; rightPadding: 6
+            grouped: true; width: 56
             checked: root.layoutMode === 0
             Accessible.checkable: true; Accessible.checked: checked
-            onClicked: root.viewRequested(0)
+            onClicked: root.layoutRequested(0)
         }
         FooterButton {
             objectName: "previewSplitButton"
             text: "Split"
-            hint: root.canSplit ? "Show source and rendered document side by side" : "Widen the window to use Split view"
-            leftPadding: 8; rightPadding: 8
-            grouped: true; width: 50
+            hint: root.canSplit ? "Split — show the chosen editor beside output Preview" : "Widen the window to use Split layout"
+            leftPadding: 6; rightPadding: 6
+            grouped: true; width: 44
             enabled: root.canSplit
             checked: root.layoutMode === 1
             Accessible.checkable: true; Accessible.checked: checked
-            onClicked: root.viewRequested(1)
-        }
-        FooterButton {
-            objectName: "previewFullButton"
-            text: "Full"; hint: "Show the rendered document at full width"
-            leftPadding: 8; rightPadding: 8
-            grouped: true; width: 46
-            checked: root.layoutMode === 2
-            Accessible.checkable: true; Accessible.checked: checked
-            onClicked: root.viewRequested(2)
+            onClicked: root.layoutRequested(1)
         }
     }
 }

@@ -219,7 +219,8 @@ void FomawriteTest::workspaceFocusCycleIncludesRenderedPreview() {
     auto *editor = window->findChild<QQuickItem *>("sourceEditor");
     auto *preview = window->findChild<QQuickItem *>("previewPane");
     auto *rendered = preview ? preview->findChild<QQuickItem *>("renderedPreview") : nullptr;
-    auto *visual = preview ? preview->findChild<QQuickItem *>("visualEditor") : nullptr;
+    auto *visualPane = window->findChild<QQuickItem *>("visualEditorPane");
+    auto *visual = visualPane ? visualPane->findChild<QQuickItem *>("visualEditor") : nullptr;
     auto *header = window->findChild<QQuickItem *>("topChrome");
     auto *layout = window->findChild<QObject *>("workspaceLayout");
     QVERIFY(quick && editor && preview && rendered && visual && header && layout);
@@ -248,20 +249,27 @@ void FomawriteTest::workspaceFocusCycleIncludesRenderedPreview() {
         return true;
     };
     for (const bool visualEnabled : {false, true}) {
-        preview->setProperty("visualEditEnabled", visualEnabled);
-        QTRY_VERIFY(!preview->property("viewportRefreshPending").toBool());
+        QVERIFY(QMetaObject::invokeMethod(window.data(), "selectWritingMode", Q_ARG(QVariant, "source")));
+        QTRY_VERIFY(!window->property("changingDocumentView").toBool());
         editor->forceActiveFocus(); QTRY_VERIFY(window->property("canFormatSource").toBool());
         QVERIFY(QMetaObject::invokeMethod(editor, "select", Q_ARG(int, start), Q_ARG(int, start + 4)));
-        auto *surface = visualEnabled ? visual : rendered;
-        QVERIFY(cycle(false)); QTRY_COMPARE(quick->activeFocusItem(), surface);
+        if (visualEnabled)
+            QVERIFY(QMetaObject::invokeMethod(window.data(), "selectWritingMode", Q_ARG(QVariant, "visual")));
+        QTRY_VERIFY(!window->property("changingDocumentView").toBool());
+        QTRY_VERIFY(!preview->property("viewportRefreshPending").toBool());
+        auto *editingSurface = visualEnabled ? visual : editor;
+        QTRY_COMPARE(quick->activeFocusItem(), editingSurface);
+        // The right-hand output Preview stays read-only with either left editor.
+        QVERIFY(preview->property("allowVisualEdit").toBool() == false);
+        QVERIFY(cycle(false)); QTRY_COMPARE(quick->activeFocusItem(), rendered);
         QVERIFY(!window->property("canFormatSource").toBool());
         QVERIFY(cycle(false)); QTRY_VERIFY(within(quick->activeFocusItem(), header));
-        QVERIFY(cycle(true)); QTRY_COMPARE(quick->activeFocusItem(), surface);
-        QVERIFY(cycle(true)); QTRY_COMPARE(quick->activeFocusItem(), editor);
-        QVERIFY(window->property("canFormatSource").toBool());
+        QVERIFY(cycle(true)); QTRY_COMPARE(quick->activeFocusItem(), rendered);
+        QVERIFY(cycle(true)); QTRY_COMPARE(quick->activeFocusItem(), editingSurface);
+        QCOMPARE(window->property("canFormatSource").toBool(), !visualEnabled);
         // Complete both wraparound directions without skipping the right pane.
         QVERIFY(cycle(true)); QTRY_VERIFY(within(quick->activeFocusItem(), header));
-        QVERIFY(cycle(false)); QTRY_COMPARE(quick->activeFocusItem(), editor);
+        QVERIFY(cycle(false)); QTRY_COMPARE(quick->activeFocusItem(), editingSurface);
         QCOMPARE(editor->property("selectionStart").toInt(), start);
         QCOMPARE(editor->property("selectionEnd").toInt(), start + 4);
         QCOMPARE(editor->property("text").toString(), draft);

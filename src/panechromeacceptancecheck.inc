@@ -11,7 +11,7 @@
         auto *sourcePane = child("editorPane");
         auto *appearance = buttons.value("sourceAppearanceButton");
         auto *outputStyle = buttons.value("previewTemplateButton");
-        auto *visual = buttons.value("visualEditToggle");
+        auto *visual = child("documentEditingControls");
         auto *modeGroup = child("documentViewControls");
         if (!check(sourcePane && appearance && outputStyle && visual && modeGroup, "Pane-owned footer controls are missing")) return;
         check(appearance->isVisible() == sourcePane->isVisible(), "Source appearance is assigned to the wrong pane");
@@ -66,8 +66,8 @@
             capture(QString("pane-footer-narrow-split-%1").arg(width));
         }
         backend.setThemePreset("dark"); settle(80); capture("pane-footer-narrow-dark");
-        window->resize(1280, 720); action("previewFullButton", 2, false); paneAnchorCheck(); capture("pane-footer-full-preview");
-        action("sourceModeButton", 0, false); paneAnchorCheck(); capture("pane-footer-source");
+        window->resize(1280, 720); action("previewOnly", 2, false); paneAnchorCheck(); capture("pane-footer-full-preview");
+        sourceSingle(); paneAnchorCheck(); capture("pane-footer-source");
         QMetaObject::invokeMethod(editor, "undo"); check(editor->property("text").toString() == text, "Pane tools added an Undo unit");
         QMetaObject::invokeMethod(editor, "redo"); check(editor->property("text").toString() == draft, "Pane tools changed Redo");
     });
@@ -96,7 +96,7 @@
         check(name->isVisible() && edited->isVisible() && bounds(header).contains(bounds(name)) && bounds(header).contains(bounds(edited))
               && bounds(name).right() <= bounds(edited).left(), "Narrow Preview filename/Edited overlap or disappear");
         capture("preview-header-edited-narrow");
-        action("previewFullButton", 2, false);
+        action("previewOnly", 2, false);
         check(fullName->isVisible() && fullEdited->isVisible() && fullName->property("text").toString() == filename + ".md",
               "Full Preview loses file identity or Edited state");
         capture("preview-header-full-edited");
@@ -107,7 +107,7 @@
     });
     chromeCheck("compact-library-actual-filenames-and-child-opening", [&] {
         backend.setThemePreset("studio"); window->resize(1440, 800);
-        action("sourceModeButton", 0, false);
+        sourceSingle();
         const QString sampleRoot = temporary.filePath("Library samples"); QDir().mkpath(sampleRoot + "/Research");
         const QList<QPair<QString, QString>> files{
             {"First actual file.md", "# A deliberately different heading\n\nA longer public sample excerpt that wraps naturally within the compact library row without becoming a tall card.\n"},

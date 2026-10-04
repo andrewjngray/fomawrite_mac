@@ -85,7 +85,7 @@ void FomawriteTest::visualListReturnSplitsWithAtomicUndo() {
     QScopedPointer<QObject> window(component.create()); QVERIFY2(window, qPrintable(component.errorString()));
     auto *quick = qobject_cast<QQuickWindow *>(window.data());
     auto *editor = window->findChild<QQuickItem *>("sourceEditor");
-    auto *pane = window->findChild<QQuickItem *>("previewPane");
+    auto *pane = window->findChild<QQuickItem *>("visualEditorPane");
     auto *visual = pane ? pane->findChild<QQuickItem *>("visualEditor") : nullptr;
     QVERIFY(quick && editor && pane && visual);
     cycle106KeepNativeFocus(quick);

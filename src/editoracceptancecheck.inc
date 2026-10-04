@@ -93,8 +93,8 @@
         window->resize(1100, 720); backend.setThemePreset("studio");
         const QString text = QString::fromUtf8("# Table keyboard navigation\n\n| Name | Note |\n| --- | --- |\n| café | **bold** |\n| Empty |   |\n\nAfter.\n");
         if (!loadSample("Table navigation", text)) return;
-        action("visualEditToggle", 2, true);
-        auto *visual = pane->findChild<QQuickItem *>("visualEditor");
+        action("visualEditToggle", 0, true);
+        auto *visual = visualPane->findChild<QQuickItem *>("visualEditor");
         const QVariantList cells = backend.visualProjection().value("tableCells").toList();
         if (!check(visual && cells.size() == 6, "Visual table projection is missing six cells")) return;
         visual->setProperty("cursorPosition", cells.first().toMap().value("visualStart")); visual->forceActiveFocus();
