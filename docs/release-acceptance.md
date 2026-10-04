@@ -1,6 +1,12 @@
 # Acceptance ledger — current follow-through and Cycle 59 history
 
-## Current review build — Cycle 117
+## Current review build — Cycle 118
+
+Build **0.3.0-dev14 / macOS 0.3.0 (118)** separates editing mode from document layout. Source / Visual Edit chooses the editable surface; Single / Split chooses whether read-only output Preview is alongside it. The two footer groups remain fixed, and changing either choice preserves the other. Preview-only is explicit reading mode; its unselected editing/layout controls return to the retained editor and editing layout.
+
+Implementation is complete. **178 regressions pass, 0 failed, 0 skipped**, including setup/cleanup. Dev, ordinary/demo and Applications each pass **147 actual-executable checks**, matching embedded resources/version, valid strict signatures and zero QML warnings. All three copies are refreshed to build118. **12 focused Cocoa checks also pass, 0 failed, 0 skipped**, including setup/cleanup. [Verified build identities](../research/cycle-118/verified-builds.json). Cycle117 remains the previous verified baseline below. [Cycle118 status](../research/cycle-118/README.md), [review exercise](../research/usability/cycle-118.md). The completed gate covers all four combinations, repeated switching/divider movement, readable compact Aa labels, inactive editing focus, hidden-Source clipboard/completion refusal, Find transitions, source selection and draft/Undo, separate editor/Preview zoom, version1/version2 state migration and read-only Preview behavior. These gates do not close the older physical/native acceptance gaps.
+
+## Previous verified review build — Cycle 117
 
 Build **0.3.0-dev13 / macOS 0.3.0 (117)** implements Andrew’s pane-footer, Preview identity and compact library feedback. Source appearance belongs to Source, the template picker belongs to Preview, and Visual Edit centres/clamps within the rendered pane; only Source / Split / Full retain fixed right-hand positions. Preview headers show the actual filename and Edited state. Library rows show document icons, actual filenames, short grey dates and compact grey excerpts with real tree indentation.
 
