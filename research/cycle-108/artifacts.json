@@ -1,0 +1,76 @@
+{
+  "applicationVersion": "0.3.0-dev9",
+  "bundleVersion": "0.3.0",
+  "build": "108",
+  "sourceCommit": "8ab29ba1cce65648ef9ab3b4a0596bb37e7dd8ef",
+  "recordedAt": "2026-10-04T04:46:42.390692+00:00",
+  "verification": {
+    "regressionTests": 152,
+    "regressionFailures": 0,
+    "nativeFocusedPassesIncludingSetupCleanup": 6,
+    "nativeStatesPerBundle": 124,
+    "input": "Synthetic Qt events in each bundle\u2019s own isolated native window; screenshots reviewed. Physical OS input/VoiceOver not asserted."
+  },
+  "artifacts": [
+    {
+      "kind": "dev",
+      "path": "/Users/andrewgray/repo/projects/fomawrite_mac/dist/Fomawrite Dev.app",
+      "bundleIdentifier": "io.github.andrewjngray.fomawrite.dev",
+      "shortVersion": "0.3.0",
+      "build": "108",
+      "executableSha256": "634a71de143f0e98cfa04a7ed3e92f2c8515bc8164f07299dc057cc0d83b6bc0",
+      "signatureVerified": true,
+      "nativeCheckPassed": true,
+      "resourceSha256": {
+        "AboutDialog.qml": "12017d5a492af70ffa10843ae236f26b56128d4af152876ff76a548ceef869f5",
+        "DocumentFooter.qml": "a25ab4298cd31d9dbb8f67f0960d12c295151af4f80f5e9c3ba99cc178f88846",
+        "FooterButton.qml": "c7fa2c48acf137903db010239619d33aaa7a28475babdb7bf381640cb087ef5e",
+        "Main.qml": "e58f49599a329d74f527a5386fb439f1f5630141d50c4497ba49dad0fbd87b3f",
+        "PreviewPane.qml": "7d78f89e08545e210e018b1bdbc2e349d671564d1777cd6b8de9209afa5e0f45",
+        "WorkspaceCommands.qml": "545f51421765460d359488ad0652f6674629a40ce49cda074ac969174779a2e1",
+        "WorkspaceLayout.qml": "e2a67baa21504a1677d16e5e556862062c0598f28fe15dafd793e3d1865755aa"
+      },
+      "verificationReport": "dev/bundle-verification.json"
+    },
+    {
+      "kind": "demo",
+      "path": "/Users/andrewgray/repo/projects/fomawrite_mac/dist/Fomawrite.app",
+      "bundleIdentifier": "io.github.andrewjngray.fomawrite",
+      "shortVersion": "0.3.0",
+      "build": "108",
+      "executableSha256": "d0cc629f0a42010920ebb9927809298063cb5db120b81f9c69fd90a2a1241841",
+      "signatureVerified": true,
+      "nativeCheckPassed": true,
+      "resourceSha256": {
+        "AboutDialog.qml": "12017d5a492af70ffa10843ae236f26b56128d4af152876ff76a548ceef869f5",
+        "DocumentFooter.qml": "a25ab4298cd31d9dbb8f67f0960d12c295151af4f80f5e9c3ba99cc178f88846",
+        "FooterButton.qml": "c7fa2c48acf137903db010239619d33aaa7a28475babdb7bf381640cb087ef5e",
+        "Main.qml": "e58f49599a329d74f527a5386fb439f1f5630141d50c4497ba49dad0fbd87b3f",
+        "PreviewPane.qml": "7d78f89e08545e210e018b1bdbc2e349d671564d1777cd6b8de9209afa5e0f45",
+        "WorkspaceCommands.qml": "545f51421765460d359488ad0652f6674629a40ce49cda074ac969174779a2e1",
+        "WorkspaceLayout.qml": "e2a67baa21504a1677d16e5e556862062c0598f28fe15dafd793e3d1865755aa"
+      },
+      "verificationReport": "demo/bundle-verification.json"
+    },
+    {
+      "kind": "applications",
+      "path": "/Applications/Fomawrite.app",
+      "bundleIdentifier": "io.github.andrewjngray.fomawrite",
+      "shortVersion": "0.3.0",
+      "build": "108",
+      "executableSha256": "d0cc629f0a42010920ebb9927809298063cb5db120b81f9c69fd90a2a1241841",
+      "signatureVerified": true,
+      "nativeCheckPassed": true,
+      "resourceSha256": {
+        "AboutDialog.qml": "12017d5a492af70ffa10843ae236f26b56128d4af152876ff76a548ceef869f5",
+        "DocumentFooter.qml": "a25ab4298cd31d9dbb8f67f0960d12c295151af4f80f5e9c3ba99cc178f88846",
+        "FooterButton.qml": "c7fa2c48acf137903db010239619d33aaa7a28475babdb7bf381640cb087ef5e",
+        "Main.qml": "e58f49599a329d74f527a5386fb439f1f5630141d50c4497ba49dad0fbd87b3f",
+        "PreviewPane.qml": "7d78f89e08545e210e018b1bdbc2e349d671564d1777cd6b8de9209afa5e0f45",
+        "WorkspaceCommands.qml": "545f51421765460d359488ad0652f6674629a40ce49cda074ac969174779a2e1",
+        "WorkspaceLayout.qml": "e2a67baa21504a1677d16e5e556862062c0598f28fe15dafd793e3d1865755aa"
+      },
+      "verificationReport": "applications/bundle-verification.json"
+    }
+  ]
+}
