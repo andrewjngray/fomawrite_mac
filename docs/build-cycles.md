@@ -1536,4 +1536,4 @@ Requested: expose Fade In/Out and Always Show in View → Title Bar, as in Andre
 
 [Verification and runnable copies](../research/cycle-121/README.md). [Optional review](../research/usability/cycle-121.md).
 
-Validation: **183 regressions pass**, including preference persistence after reopening. Dev and demo each pass **149 native executable checks** with matching embedded UI/version and strict signatures. Installed-copy verification is recorded in the handoff. Build **0.3.0-dev17 / macOS 0.3.0 (121)**.
+Validation: **183 regressions pass**, including preference persistence after reopening. Dev, demo and Applications each pass **149 native executable checks** with matching embedded UI/version and strict signatures. Installed-copy verification is recorded in the handoff. Build **0.3.0-dev17 / macOS 0.3.0 (121)**.
