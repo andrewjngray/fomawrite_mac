@@ -1486,3 +1486,14 @@ Changes: Tab/Shift-Tab navigate supported cells in row order, including empty ce
 Validation and artifacts: all 173 regressions and 13 focused native checks pass (11 workflows plus setup/cleanup), along with every actual-bundle check in all three refreshed local copies. Tests cover CRLF, Unicode/graphemes, formatting, empty cells, unsupported separators/rows, selection, stale projections, typing and Undo/Redo at narrow/dark/larger zoom. Target `0.3.0-dev12`, macOS `0.3.0 (116)`, verified in stable Dev, ordinary/demo and Applications, with exact identities in the handoff. [Handoff](../research/cycle-116/README.md), [optional exercise](../research/usability/cycle-116.md).
 
 Remaining scope: Andrew’s normal composition review and physical input/accessibility/display checks; safe richer image placement, table row/column restructuring and complex list editing; broader parser/export/interoperability and multi-window acceptance. Public distribution remains a separate decision.
+
+
+## Cycle 117 — pane-owned controls and compact file rows
+
+Planned scope: address Andrew’s review of footer placement, missing Preview document identity and oversized library excerpts.
+
+Changes: Source appearance and Preview template controls follow their respective panes; Visual Edit centres within available rendered-pane space, clamps and compacts as needed; only Source / Split / Full remain fixed at the far right. Preview headers show a document icon, bold actual filename and separate Edited state. Library rows restore document icons and actual filenames with short grey dates alongside, tighter grey two-line excerpts and consistent indentation from real tree depth. Current-folder List rows remain siblings. File actions, stored display choices, Markdown and Undo semantics are retained.
+
+Validation: **176 regressions and 12 focused native checks pass, zero failures/skips**; the native count includes setup/cleanup. Dev, ordinary/demo and Applications each pass 124 footer states, seven daily-writing workflows, five zoom workflows, six acceptance groups and three pane-chrome groups, with zero QML warnings. All three copies are refreshed to `0.3.0-dev13`, macOS `0.3.0 (117)`, with matching resource/version identities and valid strict signatures. [Build identities](../research/cycle-117/verified-builds.json). [Scope and current status](../research/cycle-117/README.md), [optional review exercise](../research/usability/cycle-117.md).
+
+Limits: the previous wider native-window run’s activation refusal remains open, along with physical keyboard/IME, VoiceOver, display-scale and historical parser/export/multi-window acceptance. This presentation cycle is not a parity or public-release claim.

@@ -1,8 +1,14 @@
 # Acceptance ledger — current follow-through and Cycle 59 history
 
-## Current follow-through — Cycles 98–116
+## Current review build — Cycle 117
 
-Current verified local review build: **0.3.0-dev12 / macOS 0.3.0 (116)**. Cycles113–116 add Source formatting ownership, safe inline-link editing, wider actual-executable writing acceptance and keyboard navigation within supported visual table cells. Dev, ordinary/demo and Applications each pass 124 footer states, seven daily-writing workflows, five pane-zoom workflows and six new acceptance groups. All three pass embedded-resource/version comparisons and strict signatures with zero QML warnings. All 173 regressions and 13 focused native checks (11 workflows plus setup/cleanup) pass with no failures/skips; final identities and limits are in the [Cycle116 handoff](../research/cycle-116/README.md). This gate covers affected workflows, not the complete historical menu matrix.
+Build **0.3.0-dev13 / macOS 0.3.0 (117)** implements Andrew’s pane-footer, Preview identity and compact library feedback. Source appearance belongs to Source, the template picker belongs to Preview, and Visual Edit centres/clamps within the rendered pane; only Source / Split / Full retain fixed right-hand positions. Preview headers show the actual filename and Edited state. Library rows show document icons, actual filenames, short grey dates and compact grey excerpts with real tree indentation.
+
+All **176 regressions and 12 focused native checks pass, zero failures/skips**; the native count includes setup/cleanup. Dev, ordinary/demo and Applications each pass 124 footer states, seven daily-writing workflows, five zoom workflows, six acceptance groups and three pane-chrome groups, with zero QML warnings. All three copies are refreshed to build117, with matching resource/version identities and valid strict signatures. [Build identities and gate results](../research/cycle-117/verified-builds.json). [Cycle117 status](../research/cycle-117/README.md), [review exercise](../research/usability/cycle-117.md). This UI work does not close the prior native foreground-activation blocker or the physical input/IME, VoiceOver, display, multi-window and parser/export gaps below.
+
+## Previous verified baseline — Cycles 98–116
+
+Previous verified local review build: **0.3.0-dev12 / macOS 0.3.0 (116)**. Cycles113–116 add Source formatting ownership, safe inline-link editing, wider actual-executable writing acceptance and keyboard navigation within supported visual table cells. Dev, ordinary/demo and Applications each pass 124 footer states, seven daily-writing workflows, five pane-zoom workflows and six new acceptance groups. All three pass embedded-resource/version comparisons and strict signatures with zero QML warnings. All 173 regressions and 13 focused native checks (11 workflows plus setup/cleanup) pass with no failures/skips; final identities and limits are in the [Cycle116 handoff](../research/cycle-116/README.md). This gate covers affected workflows, not the complete historical menu matrix.
 
 | Area | Current bounded evidence | Still open |
 | --- | --- | --- |

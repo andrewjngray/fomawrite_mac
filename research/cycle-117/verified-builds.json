@@ -1,0 +1,70 @@
+{
+  "version": "0.3.0-dev13",
+  "build": "117",
+  "verifiedAt": "2026-10-04T16:11:39.092838+00:00",
+  "sourceCommit": "218954cea1974f1802aac813feb308e84fbcb37f",
+  "publicReleaseChanged": false,
+  "verification": {
+    "fullRegression": {
+      "passed": 176,
+      "failed": 0,
+      "skipped": 0
+    },
+    "focusedNative": {
+      "passed": 12,
+      "failed": 0,
+      "skipped": 0,
+      "includesSetupAndCleanup": true
+    },
+    "perBundle": "124 footer states, 7 daily-writing workflows, 5 pane-zoom workflows, 6 editor acceptance groups and 3 pane/footer/library groups; strict signatures and matching embedded UI",
+    "input": "Synthetic Qt mouse and keyboard events in isolated Cocoa windows",
+    "acceptanceStillOpen": "Physical input, IME, VoiceOver, display scaling and broader native-window scenarios remain separate acceptance work; cycle117 does not close the cycle116 foreground-activation limitation."
+  },
+  "bundles": [
+    {
+      "copy": "Dev",
+      "passed": true,
+      "version": "0.3.0-dev13",
+      "build": "117",
+      "bundleIdentifier": "io.github.andrewjngray.fomawrite.dev",
+      "executableSha256": "a886019cf03e2232d951b37140bea6aea20624d3166ec7fc99adc1d43dadd1a3",
+      "statesChecked": 124,
+      "dailyWritingChecks": 7,
+      "paneZoomChecks": 5,
+      "editorAcceptanceChecks": 6,
+      "paneChromeChecks": 3,
+      "qmlWarnings": 0,
+      "strictSignatureVerified": true
+    },
+    {
+      "copy": "demo",
+      "passed": true,
+      "version": "0.3.0-dev13",
+      "build": "117",
+      "bundleIdentifier": "io.github.andrewjngray.fomawrite",
+      "executableSha256": "502fb616bef1d27c0618e20c5e26b3a2ef57a7a645923b463d32a33a91c1f325",
+      "statesChecked": 124,
+      "dailyWritingChecks": 7,
+      "paneZoomChecks": 5,
+      "editorAcceptanceChecks": 6,
+      "paneChromeChecks": 3,
+      "qmlWarnings": 0,
+      "strictSignatureVerified": true
+    },
+    {
+      "copy": "Applications",
+      "passed": true,
+      "version": "0.3.0-dev13",
+      "build": "117",
+      "bundleIdentifier": "io.github.andrewjngray.fomawrite",
+      "executableSha256": "502fb616bef1d27c0618e20c5e26b3a2ef57a7a645923b463d32a33a91c1f325",
+      "statesChecked": 124,
+      "dailyWritingChecks": 7,
+      "paneZoomChecks": 5,
+      "editorAcceptanceChecks": 6,
+      "paneChromeChecks": 3,
+      "qmlWarnings": 0,
+      "strictSignatureVerified": true
+    }
+  ]
+}
