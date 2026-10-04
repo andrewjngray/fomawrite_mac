@@ -39,6 +39,13 @@ class FomawriteTest : public QObject {
     Q_OBJECT
 
 private slots:
+    void outlineSearchJumpsFromNarrowVisualWithoutChangingDraft();
+    void outlineKeyboardFilteringAndCancelPreserveSourceSelection();
+    void visualListMiddleBreaksPreserveMarkersAndUnicode();
+    void visualListBreaksRejectAmbiguousBoundaries();
+    void visualListReturnSplitsWithAtomicUndo();
+    void findReplaceContinuesFromCaretAndPreservesUndo();
+    void findControlsFitNarrowPanelsAndStayStationary();
     void bundledFooterRapidModesPreserveDraftAndViewport();
     void bundledFooterRoutesFollowResponsivePresentation();
     void footerCompactStylesRemainReachableAcrossModes();
@@ -4657,6 +4664,8 @@ private slots:
         QTRY_COMPARE(visual->property("text").toString(), QString::fromUtf8("• List item\n"));
         QVERIFY(visual->setProperty("cursorPosition", 5));
         QTest::keyClick(quickWindow, Qt::Key_Return);
+        QTRY_COMPARE(editor->property("text").toString(), QStringLiteral("- Lis\n- t item\n"));
+        QVERIFY(QMetaObject::invokeMethod(editor, "undo"));
         QCOMPARE(editor->property("text").toString(), QStringLiteral("- List item\n"));
         QVERIFY(layout->setProperty("layoutMode", originalLayout));
         backend.discardRecovery();
@@ -5223,6 +5232,9 @@ private:
 #include "cycle106-footer.inc"
 #include "cycle107-footer-transitions.inc"
 #include "cycle108-bundled-footer.inc"
+#include "cycle110-outline.inc"
+#include "cycle109-visual-lists.inc"
+#include "cycle111-find.inc"
 #include "cycle100-navigation.inc"
 #include "cycle99-integration.inc"
 #include "sourcevisualmapping-cycle99.inc"

@@ -112,6 +112,7 @@ ApplicationWindow {
     property bool searchUpdating: false
     property var searchMatches: []
     property int searchMatchIndex: -1
+    property int searchAnchor: 0
     property url pendingOpenUrl
     property string pendingOpenFragment: ""
     property string navigationNotice: ""
@@ -462,7 +463,11 @@ ApplicationWindow {
         window: win
         editor: editor
         preview: previewPane
-        onOutlineRequested: { outlineDrawer.headings = backend.documentOutline(editor.text); outlineDrawer.open(); }
+        onOutlineRequested: {
+            outlineDrawer.headings = backend.documentOutline(editor.text);
+            outlineDrawer.showFor(workspaceLayout.effectiveLayoutMode !== 2 && win.lastWritingSurface === "source" ? editor.cursorPosition : -1,
+                win.isInside(win.activeFocusItem, editor) || win.isInside(win.activeFocusItem, previewPane) ? win.activeFocusItem : null);
+        }
         onStatisticsRequested: statisticsDialog.open()
         onTypewriterChanged: editorFlick.ensureCursorVisible()
         onCommandRequested: function(id) {
@@ -576,11 +581,19 @@ ApplicationWindow {
 
     DocumentOutline {
         id: outlineDrawer
+        onFocusRestoreRequested: {
+            if (workspaceLayout.effectiveLayoutMode === 2 || (workspaceLayout.visualEditEnabled && win.lastWritingSurface === "visual"))
+                previewPane.focusRenderedSurface();
+            else editor.forceActiveFocus();
+        }
         onJumpRequested: function(position) {
-            if (workspaceLayout.layoutMode === 2) workspaceLayout.layoutMode = 1;
+            if (workspaceLayout.effectiveLayoutMode === 2)
+                win.setDocumentView(workspaceLayout.availableWidth >= 800 ? 1 : 0);
+            win.cancelDocumentViewportTransition();
+            win.lastWritingSurface = "source";
             editor.cursorPosition = position;
             editor.forceActiveFocus();
-            editorFlick.ensureCursorVisible();
+            Qt.callLater(editorFlick.ensureCursorVisible);
         }
     }
 
@@ -885,7 +898,7 @@ ApplicationWindow {
         CompactMenuItem { id: workspacePreviewView; text: "Preview"; checkable: true; checked: workspaceLayout.effectiveLayoutMode === 2 && !workspaceLayout.visualEditEnabled; onTriggered: { win.selectWritingMode("preview"); workspaceMenu.restoreViewChecks(); } }
         CompactMenuItem { id: workspaceSplitView; text: "Source and preview side by side"; checkable: true; checked: workspaceLayout.effectiveLayoutMode === 1; enabled: documentFooter.canSplit; onTriggered: { win.setDocumentView(1); workspaceMenu.restoreViewChecks(); } }
         MenuSeparator {}
-        CompactMenuItem { text: "Document outline"; onTriggered: workspaceCommands.run("outline") }
+        CompactMenuItem { objectName: "workspaceOutlineEntry"; text: "Document outline"; onTriggered: workspaceCommands.run("outline") }
         CompactMenuItem { text: "Document statistics"; onTriggered: workspaceCommands.run("statistics") }
         CompactMenuItem { text: "Export and share…"; onTriggered: win.openExportHub("pdf") }
         MenuSeparator {}
@@ -1318,6 +1331,7 @@ ApplicationWindow {
     readonly property var editTarget: visualEditorActive ? editor : (activeFocusItem && typeof activeFocusItem.cut === "function" ? activeFocusItem : editor)
 
     function openSearch(withReplace, useSelection) {
+        cancelDocumentViewportTransition();
         var selected = editor.selectedText;
         // Find edits canonical source, including when a narrow split has fallen back to Visual Edit.
         if (workspaceLayout.effectiveLayoutMode === 2) {
@@ -1325,36 +1339,42 @@ ApplicationWindow {
             lastWritingSurface = "source";
             workspaceLayout.layoutMode = workspaceLayout.availableWidth >= 800 ? 1 : 0;
         }
+        if (!searchOpen) searchAnchor = editor.selectionStart;
         searchOpen = true;
         replaceOpen = withReplace;
-        if (useSelection && selected.length > 0) searchField.text = selected;
-        searchField.forceActiveFocus();
-        searchField.selectAll();
+        if (useSelection && selected.length > 0) searchPane.query = selected;
+        searchPane.focusQuery();
         updateSearch();
     }
 
-    function updateSearch() {
-        searchMatches = backend.searchPositions(searchField.text);
+    function updateSearch(position, selectMatch) {
+        var anchor = typeof position === "number" ? position : searchAnchor;
+        searchMatches = backend.searchPositions(searchPane.query);
         searchMatchIndex = searchMatches.length > 0 ? 0 : -1;
-        showSearchMatch();
+        for (var index = 0; index < searchMatches.length; ++index) {
+            if (searchMatches[index] >= anchor) { searchMatchIndex = index; break; }
+        }
+        if (searchOpen) showSearchMatch(selectMatch !== false);
     }
 
     function replaceSearch(all) {
         if (searchMatchIndex < 0) return;
+        cancelDocumentViewportTransition();
         var start = searchMatches[searchMatchIndex];
         searchUpdating = true;
-        backend.replaceMatches(searchField.text, replaceField.text, all ? -1 : start);
+        backend.replaceMatches(searchPane.query, searchPane.replacement, all ? -1 : start);
         searchUpdating = false;
         backend.editorTextChanged();
-        updateSearch();
+        // Continue after the replacement, including when it contains the query.
+        updateSearch(all ? 0 : start + searchPane.replacement.replace(/\r\n?/g, "\n").length);
     }
 
-    function showSearchMatch() {
+    function showSearchMatch(selectMatch) {
         var start = searchMatchIndex >= 0 ? searchMatches[searchMatchIndex] : -1;
         searchUpdating = true;
-        backend.setSearchHighlight(searchField.text, start);
-        if (start >= 0) {
-            editor.select(start, start + searchField.text.length);
+        backend.setSearchHighlight(searchPane.query, start);
+        if (start >= 0 && selectMatch !== false) {
+            editor.select(start, start + searchPane.query.length);
             editorFlick.ensureCursorVisible();
         }
         searchUpdating = false;
@@ -1368,14 +1388,14 @@ ApplicationWindow {
         showSearchMatch();
     }
 
-    function closeSearch() {
+    function closeSearch(restoreFocus) {
         searchOpen = false;
         searchUpdating = true;
         backend.setSearchHighlight("", -1);
         editor.deselect();
         searchUpdating = false;
         replaceOpen = false;
-        editor.forceActiveFocus();
+        if (restoreFocus !== false) editor.forceActiveFocus();
     }
 
     Shortcut {
@@ -2643,6 +2663,7 @@ ApplicationWindow {
         Rectangle {
             id: editorPane
             objectName: "editorPane"
+            onVisibleChanged: if (!visible && win.searchOpen) win.closeSearch(false)
             color: backend.palette.page
             visible: workspaceLayout.effectiveLayoutMode !== 2
             SplitView.fillWidth: true
@@ -3158,16 +3179,16 @@ ApplicationWindow {
                 }
 
                 onTextChanged: {
-                    // Real editing or opening a document takes precedence over
-                    // any outstanding layout-only scroll restoration.
+                    if (win.searchUpdating) return;
+                    var contentChanged = backend.editorTextChanged();
+                    if (!contentChanged) return;
+                    // Highlight/typography notifications must not cancel a view
+                    // transaction; actual writing always takes precedence.
                     win.cancelDocumentViewportTransition();
                     if (workspaceSettings.styleCheckCustom || workspaceSettings.styleCheckFillers)
                         customReviewRefreshTimer.restart();
-                    if (win.searchUpdating)
-                        return;
-                    var contentChanged = backend.editorTextChanged();
-                    if (win.searchOpen && contentChanged)
-                        win.updateSearch();
+                    if (win.searchOpen)
+                        win.updateSearch(editor.cursorPosition, !editor.activeFocus);
                 }
 
                 Text {
@@ -3192,7 +3213,7 @@ ApplicationWindow {
             }
         }
 
-        Pane {
+        DocumentFindBar {
             id: searchPane
             anchors.top: parent.top
             anchors.left: parent.left
@@ -3200,152 +3221,20 @@ ApplicationWindow {
             anchors.topMargin: 12
             anchors.leftMargin: 20
             anchors.rightMargin: 20
-            height: win.scaledSize(win.replaceOpen ? 88 : 36)
             visible: win.searchOpen
+            replaceVisible: win.replaceOpen
+            matchCount: win.searchMatches.length
+            matchIndex: win.searchMatchIndex
             z: 10
-            leftPadding: 0
-            rightPadding: 0
-            topPadding: 0
-            bottomPadding: 0
-            Material.elevation: 0
-
-            background: Item {}
-
-            RowLayout {
-                anchors.fill: parent
-                spacing: 8
-
-                Item {
-                    Layout.fillWidth: true
-                    Layout.fillHeight: true
-                    Rectangle {
-                        anchors.fill: parent
-                        radius: 8
-                        color: backend.palette.library
-                        border.color: backend.palette.border
-                    }
-
-                    TextInput {
-                        id: searchField
-                        objectName: "searchField"
-                        anchors.left: parent.left
-                        anchors.right: parent.right
-                        anchors.leftMargin: 8; anchors.rightMargin: 8
-                        anchors.top: parent.top
-                        height: win.replaceOpen ? parent.height / 2 : parent.height
-                        verticalAlignment: TextInput.AlignVCenter
-                        selectByMouse: true
-                        color: win.textColor
-                        selectionColor: win.selectionFill
-                        selectedTextColor: "#ffffff"
-                        font.pixelSize: win.scaledSize(13)
-                        clip: true
-                        onTextChanged: win.updateSearch()
-                        Keys.onReturnPressed: function(event) {
-                            win.moveSearch((event.modifiers & Qt.ShiftModifier) ? -1 : 1);
-                            event.accepted = true;
-                        }
-                        Keys.onEscapePressed: function(event) {
-                            win.closeSearch();
-                            event.accepted = true;
-                        }
-                    }
-
-                    TextInput {
-                        id: replaceField
-                        objectName: "replaceField"
-                        anchors.left: parent.left
-                        anchors.right: parent.right
-                        anchors.leftMargin: 8; anchors.rightMargin: 8
-                        anchors.bottom: parent.bottom
-                        height: parent.height / 2
-                        visible: win.replaceOpen
-                        verticalAlignment: TextInput.AlignVCenter
-                        color: win.textColor
-                        selectionColor: win.selectionFill
-                        selectedTextColor: "#ffffff"
-                        font.pixelSize: win.scaledSize(13)
-                        Keys.onReturnPressed: replaceCurrentButton.clicked()
-                    }
-
-                    Label {
-                        x: 8
-                        anchors.verticalCenter: replaceField.verticalCenter
-                        text: "Replace with"
-                        visible: win.replaceOpen && replaceField.text.length === 0
-                        color: win.mutedColor
-                        font.pixelSize: win.scaledSize(13)
-                    }
-
-                    Label {
-                        x: 8
-                        anchors.verticalCenter: searchField.verticalCenter
-                        text: "Find in document…"
-                        visible: searchField.text.length === 0
-                        color: win.mutedColor
-                        font.pixelSize: win.scaledSize(13)
-                    }
-                }
-
-                Label {
-                    visible: searchField.text.length > 0
-                    Layout.preferredWidth: win.scaledSize(58)
-                    Layout.fillHeight: true
-                    horizontalAlignment: Text.AlignHCenter
-                    verticalAlignment: Text.AlignVCenter
-                    text: win.searchMatches.length === 0
-                        ? "0/0"
-                        : (win.searchMatchIndex + 1) + "/" + win.searchMatches.length
-                    color: backend.palette.text
-                    font.pixelSize: win.scaledSize(12)
-                }
-
-                Button {
-                    id: replaceCurrentButton
-                    visible: win.replaceOpen
-                    text: "Replace"
-                    enabled: win.searchMatches.length > 0
-                    onClicked: win.replaceSearch(false)
-                }
-
-                Button {
-                    objectName: "replaceAllButton"
-                    visible: win.replaceOpen
-                    text: "All"
-                    enabled: win.searchMatches.length > 0
-                    onClicked: win.replaceSearch(true)
-                }
-
-                Rectangle {
-                    visible: searchField.text.length > 0
-                    Layout.preferredWidth: 1
-                    Layout.preferredHeight: 24
-                    color: backend.palette.border
-                }
-
-                SearchIconButton {
-                    iconName: "up"
-                    visible: searchField.text.length > 0
-                    Accessible.name: "Previous match"
-                    iconColor: backend.palette.text
-                    onClicked: win.moveSearch(-1)
-                }
-
-                SearchIconButton {
-                    iconName: "down"
-                    visible: searchField.text.length > 0
-                    Accessible.name: "Next match"
-                    iconColor: backend.palette.text
-                    onClicked: win.moveSearch(1)
-                }
-
-                SearchIconButton {
-                    iconName: "close"
-                    Accessible.name: "Close find"
-                    iconColor: backend.palette.text
-                    onClicked: win.closeSearch()
-                }
+            onQueryEdited: if (win.searchOpen) win.updateSearch()
+            onMoveRequested: function(direction) { win.moveSearch(direction); }
+            onReplaceRequested: function(all) { win.replaceSearch(all); }
+            onReplaceToggled: {
+                win.replaceOpen = !win.replaceOpen;
+                if (win.replaceOpen) focusReplacement();
+                else focusQuery();
             }
+            onCloseRequested: win.closeSearch()
         }
     }
 

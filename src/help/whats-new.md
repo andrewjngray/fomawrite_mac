@@ -1,6 +1,14 @@
 # What’s New in Fomawrite
 
-Recent local improvements include:
+Build111 adds:
+
+- a searchable document outline with current-section markers and keyboard navigation;
+- a responsive Find/Replace bar with clear result status, accessible controls and forward replacement progress;
+- safe Return splitting in simple visual bullet, numbered and task lists;
+- a fix that preserves Redo history when paragraph formatting is restored;
+- continued verification of stationary Source / Split / Full controls in the actual local app bundles.
+
+Earlier local improvements include:
 
 - clearer File and Edit menus with guarded document operations;
 - ordered tasks and conservative Clear Styles;

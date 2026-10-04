@@ -466,41 +466,99 @@ std::optional<SourceVisualMapping::VisualBreakEdit> SourceVisualMapping::sourceE
     if (softBreak) return std::nullopt;
     for (const Block &block : m_blocks) {
         if (block.kind != BlockKind::ListItem || !block.editable
-                || visualPosition != block.visual.end()) continue;
+                || visualPosition < block.visual.start || visualPosition > block.visual.end()) continue;
         const QString line = m_source.mid(block.source.start, block.source.length);
         static const QRegularExpression item(QStringLiteral(
             "^( {0,3})([-+*]|[0-9]{1,9}[.)])([ \\t]+)(?:\\[([ xX])\\]([ \\t]+))?(.*)$"));
         const auto match = item.match(line);
         if (!match.hasMatch()) return std::nullopt;
-        SourceEdit edit;
-        int nextSourceStart;
+        const bool task = !match.captured(4).isEmpty();
+        const QString oldMarker = match.captured(2);
+        const QString visualPrefix = match.captured(1) + (task
+            ? (match.captured(4).compare(QStringLiteral("x"), Qt::CaseInsensitive) == 0
+                ? QString::fromUtf8("☑ ") : QString::fromUtf8("☐ "))
+            : oldMarker.front().isDigit() ? oldMarker + QLatin1Char(' ') : QString::fromUtf8("• "));
+        const int bodyVisualStart = block.visual.start + visualPrefix.size();
+        const int bodySourceStart = block.source.start + match.capturedStart(6);
+        if (visualPosition < bodyVisualStart) return std::nullopt;
         if (match.captured(6).isEmpty()) {
-            edit = {block.source, QString()};
-            nextSourceStart = block.source.start;
-        } else {
-            QString marker = match.captured(2);
-            if (marker.front().isDigit()) {
-                const QString digits = marker.left(marker.size() - 1);
-                bool valid = false;
-                const int number = digits.toInt(&valid);
-                if (!valid || number >= 999999999) return std::nullopt;
-                marker = QString::number(number + 1).rightJustified(digits.size(), QLatin1Char('0')) + marker.back();
+            const SourceEdit edit{block.source, QString()};
+            QString candidate = m_source;
+            candidate.replace(edit.source.start, edit.source.length, edit.replacement);
+            const auto projected = create(candidate);
+            for (const auto &nextBlock : projected.blocks()) {
+                if (nextBlock.source.start == block.source.start && nextBlock.editable)
+                    return VisualBreakEdit{edit, nextBlock.visual.end()};
             }
-            QString prefix = match.captured(1) + marker + match.captured(3);
-            if (!match.captured(4).isEmpty()) prefix += QStringLiteral("[ ]") + match.captured(5);
-            // Keep this file's line ending convention, including a final item.
-            const bool crlf = m_source.mid(block.source.end(), 2) == QStringLiteral("\r\n")
-                || (block.source.end() == m_source.size() && m_source.contains(QStringLiteral("\r\n")));
-            const QString newline = crlf ? QStringLiteral("\r\n") : QStringLiteral("\n");
-            edit = {{block.source.end(), 0}, newline + prefix};
-            nextSourceStart = block.source.end() + newline.size();
+            return std::nullopt;
         }
-        QString candidate = m_source;
-        candidate.replace(edit.source.start, edit.source.length, edit.replacement);
-        const auto projected = create(candidate);
-        for (const auto &nextBlock : projected.blocks()) {
-            if (nextBlock.source.start == nextSourceStart && nextBlock.editable)
-                return VisualBreakEdit{edit, nextBlock.visual.end()};
+
+        const bool splitting = visualPosition < block.visual.end();
+        if (splitting) {
+            // A following indented block or lazy continuation belongs to this
+            // item. Moving its parentage would require a structural list parser.
+            int next = m_source.indexOf(QLatin1Char('\n'), block.source.end());
+            bool separated = false;
+            while (next >= 0 && ++next < m_source.size()) {
+                const int end = m_source.indexOf(QLatin1Char('\n'), next);
+                const QString following = m_source.mid(next, (end < 0 ? m_source.size() : end) - next);
+                if (following.trimmed().isEmpty()) { separated = true; next = end; continue; }
+                int indentation = 0;
+                while (indentation < following.size() && following.at(indentation) == QLatin1Char(' ')) ++indentation;
+                if ((indentation < following.size() && following.at(indentation) == QLatin1Char('\t'))
+                        || indentation > match.capturedLength(1)) return std::nullopt;
+                if (!separated && !item.match(following).hasMatch()) return std::nullopt;
+                break;
+            }
+            // A split cannot cut through the contents of an inline construct.
+            // Complete strong/emphasis/link/code spans on either side remain
+            // untouched, including their exact source delimiters.
+            for (const auto &format : m_visualFormatSpans)
+                if (format.visual.start < visualPosition && visualPosition < format.visual.end())
+                    return std::nullopt;
+        }
+
+        QString marker = oldMarker;
+        if (marker.front().isDigit()) {
+            const QString digits = marker.left(marker.size() - 1);
+            bool valid = false;
+            const int number = digits.toInt(&valid);
+            if (!valid || number >= 999999999) return std::nullopt;
+            marker = QString::number(number + 1).rightJustified(digits.size(), QLatin1Char('0')) + marker.back();
+        }
+        QString prefix = match.captured(1) + marker + match.captured(3);
+        if (task) prefix += QStringLiteral("[ ]") + match.captured(5);
+        const QString nextVisualPrefix = match.captured(1) + (task ? QString::fromUtf8("☐ ")
+            : marker.front().isDigit() ? marker + QLatin1Char(' ') : QString::fromUtf8("• "));
+        // Keep this item's line ending convention, including a final item.
+        const bool crlf = m_source.mid(block.source.end(), 2) == QStringLiteral("\r\n")
+            || (block.source.end() == m_source.size() && m_source.contains(QStringLiteral("\r\n")));
+        const QString newline = crlf ? QStringLiteral("\r\n") : QStringLiteral("\n");
+        QVector<int> anchors;
+        if (visualPosition == block.visual.end()) anchors.append(block.source.end());
+        if (visualPosition == bodyVisualStart) anchors.append(bodySourceStart);
+        for (const Mapping &mapping : m_mappings) {
+            if (visualPosition < mapping.visual.start || visualPosition > mapping.visual.end()) continue;
+            const int anchor = mapping.source.start + visualPosition - mapping.visual.start;
+            if (bodySourceStart <= anchor && anchor <= block.source.end() && !anchors.contains(anchor)) anchors.append(anchor);
+        }
+        QString expectedVisual = m_visual;
+        expectedVisual.insert(visualPosition, QLatin1Char('\n') + nextVisualPrefix);
+        for (int anchor : anchors) {
+            if (!graphemeBoundary(m_source, anchor)) continue;
+            // Do not turn an ordinary suffix into a heading, nested list,
+            // quote or other block merely because it begins a new item.
+            if (splitting && !isSafeBody(m_source.mid(anchor, block.source.end() - anchor))) continue;
+            const SourceEdit edit{{anchor, 0}, newline + prefix};
+            QString candidate = m_source;
+            candidate.insert(anchor, edit.replacement);
+            const auto projected = create(candidate);
+            if (projected.visualText() != expectedVisual) continue;
+            const int nextSourceStart = anchor + newline.size();
+            for (const auto &nextBlock : projected.blocks()) {
+                if (nextBlock.source.start == nextSourceStart && nextBlock.kind == BlockKind::ListItem && nextBlock.editable)
+                    return VisualBreakEdit{edit, visualPosition + 1 + int(nextVisualPrefix.size())};
+            }
         }
         return std::nullopt;
     }

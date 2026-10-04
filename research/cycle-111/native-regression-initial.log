@@ -1,0 +1,26 @@
+********* Start testing of FomawriteTest *********
+Config: Using QtTest library 6.11.2, Qt 6.11.2 (arm64-little_endian-lp64 shared (dynamic) release build; by Apple LLVM 21.0.0 (clang-2100.1.1.101)), macos 27.0.1
+PASS   : FomawriteTest::initTestCase()
+PASS   : FomawriteTest::visualListMiddleBreaksPreserveMarkersAndUnicode()
+PASS   : FomawriteTest::visualListBreaksRejectAmbiguousBoundaries()
+FAIL!  : FomawriteTest::visualListReturnSplitsWithAtomicUndo() Compared values are not the same
+   Actual   (editor->property("text").toString()): "# Tasks\n\n03) [X] caf\u00E9\uD83D\uDE80\u6771\u4EAC\n04) [ ] Preserve this item.\n"
+   Expected (expected)                           : "# Tasks\n\n03) [X] caf\u00E9\uD83D\uDE80\n04) [ ] \u6771\u4EAC\n04) [ ] Preserve this item.\n"
+   Loc: [../tests/cycle109-visual-lists.inc(106)]
+QINFO  : FomawriteTest::visualListReturnSplitsWithAtomicUndo() Excluded unsolicited native text events during mouse-only QA: 2
+FAIL!  : FomawriteTest::outlineSearchJumpsFromNarrowVisualWithoutChangingDraft() '!outline->property("opened").toBool()' returned FALSE. ()
+   Loc: [../tests/cycle110-outline.inc(56)]
+QINFO  : FomawriteTest::outlineSearchJumpsFromNarrowVisualWithoutChangingDraft() Excluded unsolicited native text events during mouse-only QA: 2
+FAIL!  : FomawriteTest::outlineKeyboardFilteringAndCancelPreserveSourceSelection() Compared values are not the same
+   Actual   (list->property("currentIndex").toInt()): 1
+   Expected (2)                                     : 2
+   Loc: [../tests/cycle110-outline.inc(114)]
+QINFO  : FomawriteTest::outlineKeyboardFilteringAndCancelPreserveSourceSelection() Excluded unsolicited native text events during mouse-only QA: 2
+FAIL!  : FomawriteTest::findReplaceContinuesFromCaretAndPreservesUndo() 'cycle102Click(quick, footer->findChild<QQuickItem *>("sourceModeButton"))' returned FALSE. ()
+   Loc: [../tests/cycle111-find.inc(24)]
+PASS   : FomawriteTest::findControlsFitNarrowPanelsAndStayStationary()
+PASS   : FomawriteTest::bundledFooterRapidModesPreserveDraftAndViewport()
+PASS   : FomawriteTest::bundledFooterRoutesFollowResponsivePresentation()
+PASS   : FomawriteTest::cleanupTestCase()
+Totals: 7 passed, 4 failed, 0 skipped, 0 blacklisted, 39915ms
+********* Finished testing of FomawriteTest *********

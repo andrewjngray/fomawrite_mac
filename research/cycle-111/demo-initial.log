@@ -1,0 +1,44 @@
+Document view check: FAIL 124 footer states, 7 daily-writing checks; report: /Users/andrewgray/repo/projects/fomawrite_mac/research/cycle-111/demo/report.json
+width-1440-pass-0-step-1: control is clipped: visualEditToggle
+width-1440-pass-0-step-1: control moved: visualEditToggle
+width-1440-pass-0-step-1: control is clipped: sourceModeButton
+width-1440-pass-0-step-1: control moved: sourceModeButton
+width-1440-pass-0-step-1: control is clipped: previewSplitButton
+width-1440-pass-0-step-1: control moved: previewSplitButton
+width-1440-pass-0-step-1: control is clipped: previewFullButton
+width-1440-pass-0-step-1: control moved: previewFullButton
+width-1440-pass-0-step-1: control visibility changed: sourceAppearanceButton
+width-1440-pass-0-step-1: control visibility changed: previewTemplateButton
+width-1440-pass-0-step-1: control visibility changed: footerStylesButton
+width-1440-pass-0-step-1: control is clipped: footerStylesButton
+width-1440-pass-0-step-1: control moved: footerStylesButton
+width-1440-pass-0-step-5: control is clipped: visualEditToggle
+width-1440-pass-0-step-5: control moved: visualEditToggle
+width-1440-pass-0-step-5: control is clipped: sourceModeButton
+width-1440-pass-0-step-5: control moved: sourceModeButton
+width-1440-pass-0-step-5: control is clipped: previewSplitButton
+width-1440-pass-0-step-5: control moved: previewSplitButton
+width-1440-pass-0-step-5: control is clipped: previewFullButton
+width-1440-pass-0-step-5: control moved: previewFullButton
+width-1440-pass-0-step-5: control visibility changed: sourceAppearanceButton
+width-1440-pass-0-step-5: control visibility changed: previewTemplateButton
+width-1440-pass-0-step-5: control visibility changed: footerStylesButton
+width-1440-pass-0-step-5: control is clipped: footerStylesButton
+width-1440-pass-0-step-5: control moved: footerStylesButton
+Cannot click visible control: sourceModeButton
+Click sourceModeButton did not settle in mode 0, visual 0
+width-1440-pass-0-step-6: control is clipped: visualEditToggle
+width-1440-pass-0-step-6: control moved: visualEditToggle
+width-1440-pass-0-step-6: control is clipped: sourceModeButton
+width-1440-pass-0-step-6: control moved: sourceModeButton
+width-1440-pass-0-step-6: control is clipped: previewSplitButton
+width-1440-pass-0-step-6: control moved: previewSplitButton
+width-1440-pass-0-step-6: control is clipped: previewFullButton
+width-1440-pass-0-step-6: control moved: previewFullButton
+width-1440-pass-0-step-6: control visibility changed: sourceAppearanceButton
+width-1440-pass-0-step-6: control visibility changed: previewTemplateButton
+width-1440-pass-0-step-6: control visibility changed: footerStylesButton
+width-1440-pass-0-step-6: control is clipped: footerStylesButton
+width-1440-pass-0-step-6: control moved: footerStylesButton
+Cannot click visible control: previewFullButton
+Click previewFullButton did not settle in mode 2, visual 0

@@ -1413,3 +1413,30 @@ Verification: production build/package pass; **152 regression tests pass**, incl
 Limits: external macOS Accessibility was unavailable, so native verification uses synthetic Qt events in the application's own isolated window, not physical OS input. Original screenshots match the old separate-footer presentation, but their originating process is unproven. Physical VoiceOver/display scaling and arbitrary restored workspaces remain acceptance checks. Public RC1 is unchanged.
 
 Runnable artifacts: `0.3.0-dev9`, macOS `0.3.0 (108)` at stable Dev, ordinary/demo and Applications paths; final identities in the [artifact record](../research/cycle-108/artifacts.json). [Optional review exercise](../research/usability/cycle-108.md).
+
+
+## Cycle 109 — safe list splitting in Visual Edit
+
+Planned scope: improve everyday list writing with bounded mid-item Return, preserving Markdown and Undo.
+
+Changes: supported single-line bullet, ordered and task items split at the caret using one validated insertion. Marker style, indentation, spacing and line endings survive; new tasks are unchecked and following numbered source is not rewritten. Unicode graphemes, inline-construct interiors and nested/continued structures remain protected. Redundant typography writes are skipped to preserve remaining Redo history.
+
+Verification: exact-source mapping and bundled-QML keyboard tests cover supported/refused splits, stale projections, follow-on typing, Undo/Redo and saved-file preservation. All159 regressions and the focused native checks pass; refreshed-bundle verification is recorded in the [combined Cycle111 handoff](../research/cycle-111/README.md). Target: `0.3.0-dev10`, macOS `0.3.0 (111)`. [Scope and limits](../research/cycle-109/README.md), [optional exercise](../research/usability/cycle-109.md). Shift-Return/list restructuring and general WYSIWYG remain outside this scope.
+
+## Cycle 110 — searchable document outline
+
+Planned scope: make long-document heading navigation easier without altering source or selection while browsing.
+
+Changes: heading search, result counts, explicit hierarchy and current Source section; Up/Down/Home/End navigation; exact-offset activation after the drawer closes; Escape/Close focus restoration; clear empty/no-match feedback. Narrow Full Visual jumps reveal Source through the shared view route. Search fields use the shared rounded 34px treatment.
+
+Verification: bundled-QML tests cover Unicode/fenced/YAML headings, keyboard filtering, cancellation, selection, exact destination and Undo preservation. All outline regressions and final native scenarios pass; integrated checks are recorded in the [Cycle111 handoff](../research/cycle-111/README.md). [Detailed scope](../research/cycle-110/README.md), [optional exercise](../research/usability/cycle-110.md). No heading reordering or parser-parity claim is included.
+
+## Cycle 111 — Find/Replace polish and integrated writing review
+
+Planned scope: provide a clear, consistent Find/Replace surface and finish the authorized daily-writing sprint after Cycles109–110.
+
+Changes: rounded search/replacement fields, stable grouped navigation, useful match counts, nearest-caret search, advance-after-replacement behavior, keyboard Return/Shift-Return/Escape, narrow/dark support, and cancellation of obsolete view restoration when Find opens. Source typing updates results without selecting another match; hiding Source closes Find.
+
+Verification and artifacts: **159 regression tests pass**,11 focused native checks and4 final Find checks pass. Each Dev/demo/Applications bundle passes124 footer states plus seven writing workflows, strict signatures and embedded-resource/version comparison. The checker now explicitly renders frames before measuring layout, retaining every geometry assertion after two intermediate-layout failures. See the [handoff record](../research/cycle-111/README.md). All local copies are `0.3.0-dev10`, macOS `0.3.0 (111)`. [Optional exercise](../research/usability/cycle-111.md).
+
+Limits: diagnostic input is synthetic Qt input in the actual app's isolated temporary window. Physical VoiceOver/input/display acceptance remains open. No Cycle112 implementation, notarization or public release is included; further product work should follow Andrew's review.

@@ -224,7 +224,7 @@ Rectangle {
     }
     onVisualEditEnabledChanged: {
         visualStatus = visualEditEnabled
-            ? "Edit text, simple table cells and image captions. Return continues simple lists; unsupported structures stay in Source."
+            ? "Edit text, simple table cells and image captions. Return splits or continues simple list items; unsupported structures stay in Source."
             : "Rendered preview is read-only.";
         if (visualEditEnabled)
             Qt.callLater(loadVisualProjection);
@@ -320,7 +320,7 @@ Rectangle {
                 event.accepted = true;
             }
             Accessible.name: "Visual Edit: editable Markdown text"
-            Accessible.description: "Edits supported text, image descriptions and simple table cells. Return continues simple lists. Other structures use Source."
+            Accessible.description: "Edits supported text, image descriptions and simple table cells. Return splits or continues simple list items. Other structures use Source."
         }
         Label {
             anchors.centerIn: parent

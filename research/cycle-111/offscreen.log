@@ -1,0 +1,4 @@
+qt.qpa.fonts: Populating font family aliases took 52 ms. Replace uses of missing font family "Sans Serif" with one that exists to avoid this cost. 
+Document view check: FAIL 124 footer states, 7 daily-writing checks; report: /Users/andrewgray/repo/projects/fomawrite_mac/research/cycle-111/offscreen/report.json
+Find navigation changed the draft
+About dialog did not open

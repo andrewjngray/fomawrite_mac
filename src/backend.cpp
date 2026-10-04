@@ -2558,12 +2558,26 @@ void Backend::reapplyTypographyToChange() {
     const int start = qBound(0, m_lastChangePos, maxPos);
     const int end = qBound(start, m_lastChangePos + m_lastChangeAdded, maxPos);
 
+    QList<QTextBlock> unformatted;
+    for (QTextBlock block = m_document->findBlock(start);
+         block.isValid() && block.position() <= end; block = block.next()) {
+        const auto format = block.blockFormat();
+        if (format.lineHeightType() != QTextBlockFormat::ProportionalHeight
+                || !qFuzzyCompare(format.lineHeight(), qreal(sourceLineHeightPercent)))
+            unformatted.append(block);
+    }
+    // New blocks normally inherit typography, and Redo restores it with the
+    // original edit. Even merging an identical format creates an undo command
+    // and discards the remaining redo history, so leave those blocks alone.
+    if (unformatted.isEmpty()) return;
+
     m_formattingTypography = true;
     QTextCursor cursor(m_document);
     cursor.joinPreviousEditBlock();
-    cursor.setPosition(start);
-    cursor.setPosition(end, QTextCursor::KeepAnchor);
-    cursor.mergeBlockFormat(blockFormat);
+    for (const QTextBlock &block : unformatted) {
+        cursor.setPosition(block.position());
+        cursor.mergeBlockFormat(blockFormat);
+    }
     cursor.endEditBlock();
     m_formattingTypography = false;
 }

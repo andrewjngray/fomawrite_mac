@@ -15,6 +15,7 @@
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QKeyEvent>
 #include <QMouseEvent>
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
@@ -56,6 +57,20 @@ void settle(int milliseconds = 60) {
     QElapsedTimer timer;
     timer.start();
     waitUntil([&] { return timer.elapsed() >= milliseconds; }, milliseconds + 100);
+}
+
+// A nonactivating native window can be occluded by another app, which stops
+// Qt Quick's automatic render/polish frames. Flush a fixed number of real
+// frames before reading hit targets or asserting geometry; never wait for the
+// geometry itself to match an expected result.
+bool renderBarrier(QQuickWindow *window) {
+    if (!window) return false;
+    for (int frame = 0; frame < 2; ++frame) {
+        window->requestUpdate();
+        if (window->grabWindow().isNull()) return false;
+        QCoreApplication::processEvents(QEventLoop::AllEvents, 10);
+    }
+    return true;
 }
 
 QString sha256(const QByteArray &bytes) {
@@ -108,6 +123,7 @@ private:
 
 bool click(QQuickWindow *window, QQuickItem *button, bool allowDisabled = false) {
     settle(30); // Let RowLayout and the text labels finish their deferred polish.
+    if (!renderBarrier(window)) return false;
     if (!button || !button->isVisible() || (!allowDisabled && !button->isEnabled())) return false;
     const QPointF point = bounds(button).center();
     if (!QRectF(QPointF(), window->size()).contains(point)) return false;
@@ -120,6 +136,26 @@ bool click(QQuickWindow *window, QQuickItem *button, bool allowDisabled = false)
     QCoreApplication::sendEvent(window, &release);
     QCoreApplication::processEvents();
     return true;
+}
+
+// Deliver keyboard input through the same QQuickWindow dispatch used by an
+// actual editor. No OS-level events or activation of the user's other apps.
+void key(QQuickWindow *window, int value, const QString &text = {},
+         Qt::KeyboardModifiers modifiers = Qt::NoModifier) {
+    QKeyEvent press(QEvent::KeyPress, value, modifiers, text);
+    QCoreApplication::sendEvent(window, &press);
+    QKeyEvent release(QEvent::KeyRelease, value, modifiers, text);
+    QCoreApplication::sendEvent(window, &release);
+    QCoreApplication::processEvents();
+}
+
+bool enterText(QQuickWindow *window, QQuickItem *field, const QString &text) {
+    if (!click(window, field)) return false;
+    field->forceActiveFocus();
+    if (!QMetaObject::invokeMethod(field, "selectAll")) return false;
+    if (text.isEmpty()) key(window, Qt::Key_Backspace);
+    else key(window, Qt::Key_unknown, text);
+    return waitUntil([&] { return field->property("text").toString() == text; });
 }
 
 // Qt has no AppDataLocation setter. A unique, previously absent test-mode
@@ -157,6 +193,7 @@ int runDocumentViewCheck(QApplication &app, const QString &outputDirectory) {
     }
     QStringList failures;
     QJsonArray scenarios;
+    QJsonArray dailyWritingChecks;
     QJsonArray screenshots;
     QJsonArray qmlWarnings;
     QJsonObject report{{"schema", 1}, {"startedAt", QDateTime::currentDateTimeUtc().toString(Qt::ISODate)},
@@ -165,7 +202,7 @@ int runDocumentViewCheck(QApplication &app, const QString &outputDirectory) {
                        {"executableSha256", fileHash(app.applicationFilePath())},
                        {"platform", QGuiApplication::platformName()},
                        {"qmlEntry", "qrc:/Main.qml"},
-                       {"input", "Synthetic Qt window mouse events; native input rejected"}};
+                       {"input", "Synthetic Qt window mouse and key events; native input rejected"}};
     const auto check = [&](bool condition, const QString &message) {
         if (!condition) failures.append(message);
         return condition;
@@ -175,6 +212,7 @@ int runDocumentViewCheck(QApplication &app, const QString &outputDirectory) {
         report.insert("passed", failures.isEmpty());
         report.insert("failures", QJsonArray::fromStringList(failures));
         report.insert("scenarios", scenarios);
+        report.insert("dailyWritingChecks", dailyWritingChecks);
         report.insert("screenshots", screenshots);
         report.insert("qmlWarnings", qmlWarnings);
         report.insert("finishedAt", QDateTime::currentDateTimeUtc().toString(Qt::ISODate));
@@ -185,14 +223,15 @@ int runDocumentViewCheck(QApplication &app, const QString &outputDirectory) {
             return 2;
         }
         qInfo().noquote() << "Document view check:" << (failures.isEmpty() ? "PASS" : "FAIL")
-                          << scenarios.size() << "states; report:" << file.fileName();
+                          << scenarios.size() << "footer states," << dailyWritingChecks.size() << "daily-writing checks; report:" << file.fileName();
         for (const QString &failure : failures) qWarning().noquote() << failure;
         return failures.isEmpty() ? 0 : 1;
     };
     QJsonObject resources;
     for (const QString &name : {QStringLiteral("Main.qml"), QStringLiteral("DocumentFooter.qml"),
             QStringLiteral("FooterButton.qml"), QStringLiteral("PreviewPane.qml"),
-            QStringLiteral("WorkspaceLayout.qml"), QStringLiteral("WorkspaceCommands.qml"), QStringLiteral("AboutDialog.qml")}) {
+            QStringLiteral("WorkspaceLayout.qml"), QStringLiteral("WorkspaceCommands.qml"), QStringLiteral("AboutDialog.qml"),
+            QStringLiteral("DocumentFindBar.qml"), QStringLiteral("DocumentOutline.qml")}) {
         const QString hash = fileHash(":/" + name);
         check(!hash.isEmpty(), "Bundled resource missing: " + name);
         resources.insert(name, hash);
@@ -310,6 +349,9 @@ int runDocumentViewCheck(QApplication &app, const QString &outputDirectory) {
         if (check(!image.isNull() && image.save(path), "Cannot capture native window: " + name)) screenshots.append(path);
     };
     const auto record = [&](const QString &step, const QMap<QString, QRectF> &expectedBounds) {
+        check(renderBarrier(window), step + ": cannot render geometry frame");
+        check(waitUntil(ready), step + ": viewport did not settle after rendering");
+        check(renderBarrier(window), step + ": cannot render settled geometry frame");
         QJsonObject controls;
         const int mode = layout->property("effectiveLayoutMode").toInt();
         const bool visual = mode != 0 && layout->property("visualEditEnabled").toBool();
@@ -365,6 +407,7 @@ int runDocumentViewCheck(QApplication &app, const QString &outputDirectory) {
         window->resize(width, 800);
         settle(100);
         action("sourceModeButton", 0, false);
+        check(renderBarrier(window), "Cannot render footer baseline at width " + QString::number(width));
         QMap<QString, QRectF> baseline;
         for (const QString &name : controlNames)
             if (buttons.value(name)->isVisible()) baseline.insert(name, bounds(buttons.value(name)));
@@ -388,6 +431,7 @@ int runDocumentViewCheck(QApplication &app, const QString &outputDirectory) {
     // Explicit view clicks resolve the currently visible narrow arrangement,
     // including a remembered Split request whose restoration margin is unmet.
     const auto currentBounds = [&] {
+        check(renderBarrier(window), "Cannot render responsive footer baseline");
         QMap<QString, QRectF> result;
         for (const QString &name : controlNames)
             if (buttons.value(name)->isVisible()) result.insert(name, bounds(buttons.value(name)));
@@ -466,9 +510,258 @@ int runDocumentViewCheck(QApplication &app, const QString &outputDirectory) {
     check(editor->property("text").toString() == draft, "Draft Redo no longer restores unsaved source");
     check(sample.open(QIODevice::ReadOnly), "Cannot re-read saved fixture");
     check(sample.readAll() == saved.toUtf8(), "Disposable saved document was changed by view clicks");
+    // The same shipped executable also exercises the daily writing interfaces.
+    // Keep these separate from the original 124 footer-state records so changes
+    // in navigation/search do not weaken that stable-placement regression gate.
+    const auto daily = [&](const QString &name, const std::function<void()> &exercise) {
+        const qsizetype before = failures.size();
+        exercise();
+        dailyWritingChecks.append(QJsonObject{{"name", name}, {"passed", failures.size() == before},
+            {"newFailures", int(failures.size() - before)}, {"windowWidth", window->width()},
+            {"effectiveLayoutMode", layout->property("effectiveLayoutMode").toInt()},
+            {"sourceSha256", sha256(editor->property("text").toString().toUtf8())},
+            {"documentRevision", backend.documentRevision()}});
+    };
+    const auto child = [&](const char *name) { return window->findChild<QQuickItem *>(name); };
+    const auto loadSample = [&](const QString &name, const QString &text) {
+        action("sourceModeButton", 0, false);
+        const QString path = temporary.filePath(name + ".md");
+        QFile file(path);
+        if (!check(file.open(QIODevice::WriteOnly), "Cannot create daily writing sample: " + name)) return false;
+        file.write(text.toUtf8()); file.close();
+        if (!check(backend.open(QUrl::fromLocalFile(path)), "Cannot load daily writing sample: " + name)) return false;
+        check(waitUntil([&] { return editor->property("text").toString() == text; }), "Sample did not reach editor: " + name);
+        settle(180);
+        return true;
+    };
+    auto *findBar = child("documentFindBar");
+    auto *findField = child("searchField");
+    auto *replaceField = child("replaceField");
+    auto *searchButton = child("documentSearchButton");
+    auto *previousMatch = child("findPreviousButton");
+    auto *nextMatch = child("findNextButton");
+    auto *closeFind = child("findCloseButton");
+    auto *replaceToggle = child("findReplaceToggle");
+    auto *replaceCurrent = child("replaceCurrentButton");
+    auto *replaceAll = child("replaceAllButton");
+    auto *matchStatus = child("searchMatchStatus");
+    const bool findAvailable = check(findBar && findField && replaceField && searchButton
+        && previousMatch && nextMatch && closeFind && replaceToggle && replaceCurrent && replaceAll && matchStatus,
+        "Shipped Find interface is missing named interactive controls");
+    if (findAvailable) {
+        const QString original = QString::fromUtf8("# Finding words\n\ncafé one.\n\nA quiet passage.\n\ncafé two.\n\ncafé three.\n");
+        const QString addition = "\nAn unsaved ending.\n";
+        const QString findDraft = original + addition;
+        const int second = original.indexOf(QString::fromUtf8("café two"));
+        window->resize(1440, 800);
+        backend.setThemePreset("studio");
+        if (loadSample("Find and replace", original)) {
+            QMetaObject::invokeMethod(editor, "insert", Q_ARG(int, original.size()), Q_ARG(QString, addition));
+            editor->setProperty("cursorPosition", second - 2);
+            settle(100);
+            const bool untouchedDirtyState = backend.modified();
+            daily("find-nearest-match-and-keyboard-navigation", [&] {
+                check(click(window, searchButton), "Cannot click document Find button");
+                check(waitUntil([&] { return findBar->isVisible() && findField->hasActiveFocus(); }), "Find did not take query focus");
+                QMap<QString, QRectF> findBounds;
+                for (auto *control : {previousMatch, nextMatch, closeFind}) findBounds.insert(control->objectName(), bounds(control));
+                check(enterText(window, findField, QString::fromUtf8("café")), "Cannot type Unicode Find query");
+                check(waitUntil([&] { return window->property("searchMatchIndex").toInt() == 1; }), "Find did not choose nearest following match");
+                check(editor->property("selectionStart").toInt() == second, "Nearest query selected wrong source range");
+                check(click(window, nextMatch), "Cannot click Next match");
+                check(window->property("searchMatchIndex").toInt() == 2, "Next match did not advance");
+                check(click(window, nextMatch), "Cannot click wrapping Next match");
+                check(window->property("searchMatchIndex").toInt() == 0, "Next match did not wrap");
+                check(click(window, previousMatch), "Cannot click Previous match");
+                check(window->property("searchMatchIndex").toInt() == 2, "Previous match did not wrap");
+                findField->forceActiveFocus();
+                key(window, Qt::Key_Return, {}, Qt::ShiftModifier);
+                check(window->property("searchMatchIndex").toInt() == 1, "Shift Return did not find previous match");
+                for (auto *control : {previousMatch, nextMatch, closeFind})
+                    check(bounds(control) == findBounds.value(control->objectName()), "Find navigation moved when the query gained results");
+                check(editor->property("text").toString() == findDraft && backend.modified() == untouchedDirtyState,
+                      "Find navigation changed the draft");
+                capture("daily-find-wide");
+            });
+            daily("replace-current-advances-and-replace-all-is-undoable", [&] {
+                check(click(window, replaceToggle), "Cannot show replacement row");
+                check(waitUntil([&] { return replaceField->isVisible(); }), "Replacement row did not appear");
+                check(enterText(window, replaceField, "bistro"), "Cannot type replacement text");
+                check(click(window, replaceCurrent), "Cannot click Replace current");
+                QString afterCurrent = findDraft;
+                afterCurrent.replace(second, QString::fromUtf8("café").size(), "bistro");
+                check(waitUntil([&] { return editor->property("text").toString() == afterCurrent; }), "Replace current changed the wrong text");
+                check(editor->property("selectionStart").toInt() == afterCurrent.lastIndexOf(QString::fromUtf8("café")),
+                      "Replace current jumped back instead of advancing");
+                capture("daily-replace-wide");
+                check(click(window, replaceAll), "Cannot click Replace all");
+                QString afterAll = findDraft;
+                afterAll.replace(QString::fromUtf8("café"), "bistro");
+                check(waitUntil([&] { return editor->property("text").toString() == afterAll; }), "Replace all did not update every remaining match");
+                check(!previousMatch->isEnabled() && !nextMatch->isEnabled()
+                      && !replaceCurrent->isEnabled() && !replaceAll->isEnabled()
+                      && matchStatus->property("text").toString() == "No matches", "No-match status/navigation is inconsistent");
+                QMetaObject::invokeMethod(editor, "undo");
+                check(editor->property("text").toString() == afterCurrent, "Replace all was not one undo unit");
+                QMetaObject::invokeMethod(editor, "undo");
+                check(editor->property("text").toString() == findDraft, "Replace current Undo did not preserve the unsaved ending");
+                QMetaObject::invokeMethod(editor, "redo");
+                QMetaObject::invokeMethod(editor, "redo");
+                check(editor->property("text").toString() == afterAll, "Replacement Redo did not restore exact draft");
+                replaceField->forceActiveFocus();
+                key(window, Qt::Key_Escape);
+                check(waitUntil([&] { return !findBar->isVisible() && editor->hasActiveFocus(); }), "Escape in replacement field did not close Find and restore Source focus");
+            });
+            daily("find-narrow-layout-and-escape", [&] {
+                window->resize(720, 800);
+                settle(100);
+                action("visualEditToggle", 2, true);
+                check(click(window, searchButton), "Cannot open Find from narrow Visual Edit");
+                check(waitUntil([&] { return findBar->isVisible() && layout->property("effectiveLayoutMode").toInt() == 0; }),
+                      "Find from narrow Visual Edit did not reveal Source");
+                check(enterText(window, findField, "missing-phrase"), "Cannot enter no-match query");
+                check(click(window, replaceToggle), "Cannot reveal narrow replacement row");
+                settle(80);
+                for (auto *control : {findField, replaceField, previousMatch, nextMatch, closeFind, replaceToggle, replaceCurrent, replaceAll, matchStatus}) {
+                    check(control->isVisible() && bounds(findBar).adjusted(-0.5, -0.5, 0.5, 0.5).contains(bounds(control)),
+                          "Narrow Find control is outside its bar: " + control->objectName());
+                }
+                check(findField->width() >= 80 && replaceField->width() >= 80, "Narrow Find text fields are unusably small");
+                check(bounds(findField).right() <= bounds(previousMatch).left()
+                      && bounds(replaceField).right() <= bounds(replaceCurrent).left(), "Narrow Find fields overlap buttons");
+                check(matchStatus->property("text").toString() == "No matches", "Narrow Find does not explain no results");
+                capture("daily-find-narrow");
+                backend.setThemePreset("dark"); settle(80);
+                capture("daily-find-narrow-dark");
+                findField->forceActiveFocus();
+                key(window, Qt::Key_Escape);
+                check(waitUntil([&] { return !findBar->isVisible() && editor->hasActiveFocus(); }), "Escape in query field did not restore Source focus");
+                QFile file(temporary.filePath("Find and replace.md"));
+                check(file.open(QIODevice::ReadOnly) && file.readAll() == original.toUtf8(), "Find/Replace saved the diagnostic draft without request");
+            });
+        }
+    }
+
+    auto *outline = window->findChild<QObject *>("documentOutline");
+    auto *outlineSearch = child("documentOutlineSearch");
+    auto *outlineList = child("documentOutlineList");
+    auto *workspaceButton = child("topChromeLibraryButton");
+    auto *outlineEntry = child("workspaceOutlineEntry");
+    if (check(outline && outlineSearch && outlineList && workspaceButton && outlineEntry, "Shipped searchable Outline controls are missing")) {
+        const QString outlineSource = QString::fromUtf8("# First chapter\n\nAn opening.\n\n## Second café chapter\n\nA middle passage.\n\n## Last scene\n\nA closing.\n");
+        const int middleHeading = outlineSource.indexOf("## Second");
+        const int lastHeading = outlineSource.indexOf("## Last");
+        backend.setThemePreset("studio");
+        window->resize(1440, 800); settle(100);
+        if (loadSample("Chapter outline", outlineSource)) {
+            const auto openOutline = [&] {
+                check(click(window, workspaceButton), "Cannot open workspace menu for Outline");
+                check(waitUntil([&] { return outlineEntry->isVisible(); }), "Outline menu entry did not appear");
+                check(click(window, outlineEntry), "Cannot click Document outline menu entry");
+                check(waitUntil([&] { return outline->property("opened").toBool() && outlineSearch->hasActiveFocus(); }), "Outline did not open with search focus");
+            };
+            daily("outline-current-section-filter-and-dismiss", [&] {
+                const int start = outlineSource.indexOf("middle passage");
+                QMetaObject::invokeMethod(editor, "select", Q_ARG(int, start), Q_ARG(int, start + 6));
+                editor->forceActiveFocus();
+                settle(50);
+                openOutline();
+                check(outlineList->property("currentIndex").toInt() == 1, "Outline did not preselect the current chapter");
+                check(enterText(window, outlineSearch, QString::fromUtf8("CAFÉ second")), "Cannot type multi-term heading search");
+                check(waitUntil([&] { return outlineList->property("count").toInt() == 1; }), "Outline did not filter terms case-insensitively");
+                capture("daily-outline-filtered");
+                check(enterText(window, outlineSearch, "not present in any heading"), "Cannot type no-result Outline search");
+                check(waitUntil([&] { return outlineList->property("count").toInt() == 0; }), "Outline no-result filter kept headings visible");
+                key(window, Qt::Key_Return);
+                check(outline->property("visible").toBool()
+                      && editor->property("selectionStart").toInt() == start, "Empty Outline Enter navigated or dismissed unexpectedly");
+                key(window, Qt::Key_Escape);
+                check(waitUntil([&] { return !outline->property("visible").toBool(); }), "Escape did not dismiss Outline");
+                check(editor->property("selectionStart").toInt() == start && editor->property("selectionEnd").toInt() == start + 6,
+                      "Dismissing Outline changed the document selection");
+                check(editor->property("text").toString() == outlineSource, "Outline search changed source text");
+            });
+            daily("outline-keyboard-jump-and-narrow-visual-source-routing", [&] {
+                openOutline();
+                key(window, Qt::Key_Down);
+                check(outlineList->property("currentIndex").toInt() == 2, "Outline Down did not move the selected result");
+                key(window, Qt::Key_Return);
+                check(waitUntil([&] { return !outline->property("visible").toBool() && editor->property("cursorPosition").toInt() == lastHeading; }),
+                      "Outline Enter did not jump to the exact heading source offset");
+                window->resize(720, 800); settle(100);
+                action("visualEditToggle", 2, true);
+                openOutline();
+                check(enterText(window, outlineSearch, "second"), "Cannot filter Outline in narrow Visual Edit");
+                capture("daily-outline-narrow-visual");
+                key(window, Qt::Key_Return);
+                check(waitUntil([&] { return !outline->property("visible").toBool()
+                    && layout->property("effectiveLayoutMode").toInt() == 0 && editor->hasActiveFocus()
+                    && editor->property("cursorPosition").toInt() == middleHeading; }),
+                    "Narrow Outline jump did not reveal and focus the exact Source heading");
+                check(editor->property("text").toString() == outlineSource && !backend.modified(), "Heading navigation modified the document");
+                capture("daily-outline-jump-source");
+            });
+        }
+    }
+
+    daily("visual-list-middle-return-and-undo", [&] {
+        window->resize(1440, 800); settle(100);
+        const QList<QPair<QString, QString>> samples{
+            {QString::fromUtf8("- café猫\n"), QString::fromUtf8("- café\n- 猫\n")},
+            {QStringLiteral("7) alphabeta\n"), QStringLiteral("7) alpha\n8) beta\n")},
+            {QStringLiteral("- [x] alphabeta\n"), QStringLiteral("- [x] alpha\n- [ ] beta\n")},
+            {QString::fromUtf8("# Tasks\n\n03) [X] café🚀東京\n04) [ ] Preserve this item.\n"),
+             QString::fromUtf8("# Tasks\n\n03) [X] café🚀\n04) [ ] 東京\n04) [ ] Preserve this item.\n")}};
+        for (int index = 0; index < samples.size(); ++index) {
+            const auto &entry = samples.at(index);
+            if (!loadSample("List split " + QString::number(index), entry.first)) return;
+            action("visualEditToggle", 2, true);
+            auto *visualEditor = pane->findChild<QQuickItem *>("visualEditor");
+            if (!check(visualEditor, "Visual editor missing for list split")) return;
+            check(waitUntil(ready), "Visual list fixture did not settle");
+            const QString projected = visualEditor->property("text").toString();
+            const QString left = index == 0 ? QString::fromUtf8("café") : index == 3 ? QString::fromUtf8("café🚀") : "alpha";
+            const int point = projected.indexOf(left) + left.size();
+            check(point >= left.size(), "List text missing in editable projection");
+            visualEditor->setProperty("cursorPosition", point);
+            visualEditor->forceActiveFocus();
+            if (index == 3) capture("daily-list-before-return");
+            key(window, Qt::Key_Return);
+            check(waitUntil([&] { return editor->property("text").toString() == entry.second; }), "Visual middle Return did not preserve exact list Markdown: " + QString::number(index));
+            if (index == 3) capture("daily-list-after-return");
+            QMetaObject::invokeMethod(editor, "undo");
+            check(editor->property("text").toString() == entry.first, "Visual split was not one exact undo step");
+            QMetaObject::invokeMethod(editor, "redo");
+            check(editor->property("text").toString() == entry.second, "Visual list split Redo changed source bytes");
+        }
+    });
+
+    daily("visual-list-formatting-boundary-refuses-unsafe-return", [&] {
+        const QString formatted = "- **alphabeta**\n";
+        if (!loadSample("Protected list formatting", formatted)) return;
+        action("visualEditToggle", 2, true);
+        auto *visualEditor = pane->findChild<QQuickItem *>("visualEditor");
+        if (!check(visualEditor, "Visual editor missing for protected split")) return;
+        check(waitUntil(ready), "Protected visual fixture did not settle");
+        const int beforeRevision = backend.documentRevision();
+        const int point = visualEditor->property("text").toString().indexOf("alpha") + 5;
+        visualEditor->setProperty("cursorPosition", point);
+        visualEditor->forceActiveFocus();
+        key(window, Qt::Key_Return);
+        settle(100);
+        check(editor->property("text").toString() == formatted && backend.documentRevision() == beforeRevision,
+              "Unsafe break inside bold list text changed the canonical document");
+        check(pane->property("visualStatus").toString().contains("Source"), "Refused structural break did not explain Source fallback");
+    });
+
     if (auto *about = window->findChild<QObject *>("aboutDialog")) {
         check(QMetaObject::invokeMethod(about, "open"), "Cannot open bundled About dialog");
-        check(waitUntil([&] { return about->property("opened").toBool(); }), "About dialog did not open");
+        check(waitUntil([&] {
+            // Offscreen platforms need an explicit frame for render-thread
+            // popup animations while the diagnostic drives its event loop.
+            if (QGuiApplication::platformName() == "offscreen") window->grabWindow();
+            return about->property("opened").toBool();
+        }), "About dialog did not open");
         auto *pathLabel = about->findChild<QObject *>("runningApplicationPath");
         check(pathLabel && QFileInfo(pathLabel->property("text").toString()).canonicalFilePath()
               == QFileInfo(app.applicationFilePath()).canonicalFilePath(), "About identifies the wrong running executable");

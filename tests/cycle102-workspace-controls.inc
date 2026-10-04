@@ -23,6 +23,20 @@ public:
         return false;
     }
 };
+// QtTest's QWindow key helper labels its events spontaneous on Cocoa, just
+// like OS input. Keyboard fixtures send explicit events through the window so
+// the isolation filter can still reject unrelated native typing/IME commits.
+void cycle111KeyClick(QQuickWindow *window, Qt::Key key, const QString &text = {}) {
+    QKeyEvent press(QEvent::KeyPress, key, Qt::NoModifier, text);
+    QCoreApplication::sendEvent(window, &press);
+    QKeyEvent release(QEvent::KeyRelease, key, Qt::NoModifier, text);
+    QCoreApplication::sendEvent(window, &release);
+    QCoreApplication::processEvents();
+}
+void cycle111KeyClick(QQuickWindow *window, char key) {
+    const QChar character = QChar::fromLatin1(key);
+    cycle111KeyClick(window, Qt::Key(character.toUpper().unicode()), QString(character));
+}
 bool cycle102Click(QQuickWindow *window, QQuickItem *item) {
     // Let Qt Quick polish geometry after the preceding visibility change.
     QTest::qWait(30);

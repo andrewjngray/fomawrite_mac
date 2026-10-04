@@ -1,0 +1,4 @@
+Closed the previous build-directory app before final verification.
+Previous Applications copy preserved at /private/tmp/Fomawrite-before-build111-20261004-185408.app
+Installed and strict-signature verified build111 at /Applications/Fomawrite.app
+Final diagnostic-only rebuild installed; previous candidate preserved at /private/tmp/Fomawrite-before-final111-20261004-190214.app

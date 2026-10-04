@@ -92,8 +92,9 @@ public:
     std::optional<SourceEdit> sourceEditForVisualReplacement(
         Span visual, const QString &replacement) const;
 
-    // Return at the end of a simple list item continues its exact marker style;
-    // an empty item exits the list. Other structural changes stay in Source.
+    // Return splits a simple single-line list item at a safe mapped boundary,
+    // or continues it at the end, preserving its exact marker style. An empty
+    // item exits the list. Ambiguous continuations/inline splits stay in Source.
     std::optional<VisualBreakEdit> sourceEditForVisualBreak(
         int visualPosition, bool softBreak = false) const;
 
