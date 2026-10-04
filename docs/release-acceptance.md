@@ -1,6 +1,10 @@
 # Acceptance ledger — current follow-through and Cycle 59 history
 
-## Current review build — Cycle 118
+## Current review build — Cycle 119
+
+Build **0.3.0-dev15 / macOS 0.3.0 (119)** puts editing controls under the left editor and publishing controls under the read-only right output pane. Web and PDF reuse the export renderer. Auto-hide document bars preserve geometry and recover through edge hover, menus and keyboard access. Dev, demo and Applications each pass **149 actual-executable checks**, matching UI/version, strict signatures and zero QML warnings. The full regression run passed 181 cases with one stale label expectation; the corrected final focused rerun passed **8/8**. No known failure remains. See the [Cycle119 handoff](../research/cycle-119/README.md) and [verified identities](../research/cycle-119/verified-builds.json). Prior physical input, accessibility and parser/export limitations remain open.
+
+## Previous verified review build — Cycle 118
 
 Build **0.3.0-dev14 / macOS 0.3.0 (118)** separates editing mode from document layout. Source / Visual Edit chooses the editable surface; Single / Split chooses whether read-only output Preview is alongside it. The two footer groups remain fixed, and changing either choice preserves the other. Preview-only is explicit reading mode; its unselected editing/layout controls return to the retained editor and editing layout.
 

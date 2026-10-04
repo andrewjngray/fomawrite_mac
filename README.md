@@ -6,7 +6,7 @@ The current app supports a resizable library and organizer, live preview, native
 
 ## Build and run
 
-On macOS, install Apple's Command Line Tools and Homebrew Qt (`brew install qtbase qtdeclarative qttools`), then run:
+On macOS, install Apple's Command Line Tools and Homebrew Qt (`brew install qtbase qtdeclarative qttools qtwebengine`), then run:
 
 ```sh
 ./bin/build
@@ -46,8 +46,8 @@ The upstream Omawrite code is copyright David Heinemeier Hansson and remains und
 
 ## Current workspace review build
 
-Cycle **118** is **0.3.0-dev14**, macOS **0.3.0 (118)**. It separates two independent choices: **Editing: Source / Visual Edit** and **Layout: Single / Split**. Single shows the chosen editor; Split keeps that same editor on the left and adds read-only output Preview on the right. Preview-only remains a separate reading action. Both footer capsules keep their positions through editing/layout changes; appearance and template menus remain beneath the panes they describe, with readable compact Aa labels. Saved workspace choices migrate to the independent model. Hidden Source selections cannot become formatting, clipboard or completion targets; Find explicitly reveals Source in the existing layout.
+Cycle **119** is **0.3.0-dev15**, macOS **0.3.0 (119)**. The left pane owns **Source / Visual Edit** and writing appearance. The right pane is read-only publishing output with **Web / PDF** and its output style. **Single / Split** remains a separate group at the far right. Web renders the exported HTML; PDF displays the actual exported pages, including paper settings and page furniture.
 
-Implementation is complete and **178 regressions pass, with no failures or skips**. Dev, ordinary/demo and Applications are refreshed to build118 and each passes 147 actual-executable checks with matching embedded UI/version, valid strict signatures and no QML warnings. **12 focused Cocoa tests also pass, with no failures or skips**, including setup/cleanup. See the [Cycle118 handoff](research/cycle-118/README.md), [verified build identities](research/cycle-118/verified-builds.json) and [acceptance ledger](docs/release-acceptance.md). Confirm the running version/path in About. The old public GitHub RC1 remains an earlier release.
+Document bars hide while typing or scrolling and return at the corresponding edge, without changing the document geometry. Keyboard access and open menus keep controls reachable. Turn off **View → Auto-Hide Document Bars** for always-visible controls. Verification status and local review paths are in the [Cycle119 handoff](research/cycle-119/README.md).
 
 Visual Edit preserves canonical Markdown and keeps explicit Source fallback for complex/nested structures and unsupported multiline operations. Physical input, VoiceOver, display testing and the earlier native foreground-activation limitation remain open. [The workspace plan](docs/workspace-ui-redesign-plan.md) records the design direction and remaining acceptance work.
