@@ -7,30 +7,6 @@ void cycle106KeepNativeFocus(QQuickWindow *window) {
     Q_UNUSED(window);
 #endif
 }
-// Menus can receive macOS input-method commits even with a non-activating
-// window. This mouse-only fixture rejects unsolicited native text events;
-// keyboard editing/filter behavior is tested separately with targeted Qt keys.
-class Cycle106MouseInputIsolation : public QObject {
-    QQuickWindow *window;
-    int excludedEvents = 0;
-public:
-    explicit Cycle106MouseInputIsolation(QQuickWindow *target) : window(target) { qApp->installEventFilter(this); }
-    ~Cycle106MouseInputIsolation() override {
-        qApp->removeEventFilter(this);
-        if (excludedEvents) qInfo() << "Excluded unsolicited native text events during mouse-only QA:" << excludedEvents;
-    }
-    bool eventFilter(QObject *target, QEvent *event) override {
-        if (QGuiApplication::platformName() != "cocoa" || target != window) return false;
-        const bool nativeKey = event->spontaneous()
-            && (event->type() == QEvent::KeyPress || event->type() == QEvent::KeyRelease);
-        if (nativeKey || event->type() == QEvent::InputMethod) {
-            ++excludedEvents;
-            event->accept();
-            return true;
-        }
-        return false;
-    }
-};
 bool cycle106MenuFits(QQuickWindow *window, QObject *menu, QQuickItem *anchor) {
     auto *parent = qvariant_cast<QQuickItem *>(menu->property("parent"));
     if (!parent || !menu->property("opened").toBool()) return false;
@@ -44,38 +20,36 @@ bool cycle106MenuFits(QQuickWindow *window, QObject *menu, QQuickItem *anchor) {
     return fits;
 }
 bool cycle106FootersAlign(QObject *window) {
-    QRectF baseline;
-    int visibleCount = 0;
+    auto *document = window->findChild<QQuickItem *>("documentFooter");
+    if (!document || !document->isVisible()) return false;
+    const auto baseline = cycle103SceneBounds(document);
+    if (qAbs(baseline.height() - 52) > 0.1) return false;
     for (const auto &[footerName, paneName] : {
-             std::pair{"organizerFooter", "organizerSlot"}, std::pair{"libraryFooter", "filesSlot"},
-             std::pair{"sourceFooter", "editorPane"}, std::pair{"previewFooter", "previewPane"}}) {
+             std::pair{"organizerFooter", "organizerSlot"}, std::pair{"libraryFooter", "filesSlot"}}) {
         auto *pane = window->findChild<QQuickItem *>(paneName);
         auto *footer = pane ? pane->findChild<QQuickItem *>(footerName) : nullptr;
         if (!footer || !pane) return false;
         if (!pane->isVisible()) continue;
-        if (!footer->isVisible()) return false;
         const auto bar = cycle103SceneBounds(footer), area = cycle103SceneBounds(pane);
-        if (qAbs(bar.left() - area.left()) > 0.1 || qAbs(bar.right() - area.right()) > 0.1
-                || qAbs(bar.bottom() - area.bottom()) > 0.1 || qAbs(bar.height() - 52) > 0.1) {
-            qWarning() << "Footer is disconnected from its pane:" << footerName << bar << area;
-            return false;
-        }
-        if (visibleCount++ && (qAbs(bar.top() - baseline.top()) > 0.1 || qAbs(bar.bottom() - baseline.bottom()) > 0.1)) {
+        if (!footer->isVisible() || qAbs(bar.left() - area.left()) > 0.1
+                || qAbs(bar.right() - area.right()) > 0.1 || qAbs(bar.bottom() - area.bottom()) > 0.1
+                || qAbs(bar.height() - 52) > 0.1 || qAbs(bar.top() - baseline.top()) > 0.1) {
             qWarning() << "Footer baselines differ:" << footerName << bar << baseline;
             return false;
         }
-        baseline = bar;
     }
-    return visibleCount > 0;
+    return true;
 }
 bool cycle106FooterControlsFit(QObject *window) {
     QList<QPair<QString, QRectF>> visible;
     for (const char *name : {"libraryFilter", "sourceModeButton", "sourceAppearanceButton", "toolbarStatistic",
-                            "previewTemplateButton", "visualEditToggle", "visualEditSourceButton", "previewSplitButton", "previewFullButton"}) {
-        auto *item = window->findChild<QQuickItem *>(name);
+                            "previewTemplateButton", "visualEditToggle", "footerStylesButton", "previewSplitButton", "previewFullButton"}) {
+        auto *document = window->findChild<QQuickItem *>("documentFooter");
+        auto *item = document ? document->findChild<QQuickItem *>(name) : nullptr;
+        if (QString::fromLatin1(name) == "libraryFilter") item = window->findChild<QQuickItem *>(name);
         if (!item || !item->isVisible()) continue;
         auto *footer = item->parentItem();
-        while (footer && !QStringList{"libraryFooter", "sourceFooter", "previewFooter"}.contains(footer->objectName()))
+        while (footer && !QStringList{"libraryFooter", "documentFooter"}.contains(footer->objectName()))
             footer = footer->parentItem();
         if (!footer || item->width() <= 0 || item->height() < 32) return false;
         const auto bounds = cycle103SceneBounds(item);
@@ -106,11 +80,11 @@ void FomawriteTest::footerModesAndTemplatesPreserveDraftAndUndo() {
     auto *layout = window->findChild<QObject *>("workspaceLayout");
     auto *editor = window->findChild<QQuickItem *>("sourceEditor");
     auto *pane = window->findChild<QQuickItem *>("previewPane");
-    auto *mode = window->findChild<QQuickItem *>("sourceModeButton");
-    auto *menu = window->findChild<QObject *>("sourceModeMenu");
-    auto *templateButton = pane ? pane->findChild<QQuickItem *>("previewTemplateButton") : nullptr;
+    auto *footer = window->findChild<QQuickItem *>("documentFooter");
+    auto *mode = footer ? footer->findChild<QQuickItem *>("sourceModeButton") : nullptr;
+    auto *templateButton = footer ? footer->findChild<QQuickItem *>("previewTemplateButton") : nullptr;
     auto *templateMenu = window->findChild<QObject *>("previewTemplateMenu");
-    QVERIFY(quick && layout && editor && pane && mode && menu && templateButton && templateMenu);
+    QVERIFY(quick && layout && editor && pane && mode && templateButton && templateMenu);
     Cycle106MouseInputIsolation mouseInput(quick);
     cycle106KeepNativeFocus(quick);
     quick->resize(1440, 800); quick->show();
@@ -123,46 +97,36 @@ void FomawriteTest::footerModesAndTemplatesPreserveDraftAndUndo() {
                                      Q_ARG(QString, QStringLiteral("Unsaved addition."))));
     const QString draft = editor->property("text").toString();
 
-    QVERIFY(cycle102Click(quick, mode));
-    QTRY_VERIFY(menu->property("opened").toBool());
-    QTRY_VERIFY(cycle106MenuFits(quick, menu, mode));
-    QVERIFY(cycle102Click(quick, window->findChild<QQuickItem *>("sourceModeSplit")));
+    auto *split = footer->findChild<QQuickItem *>("previewSplitButton");
+    auto *full = footer->findChild<QQuickItem *>("previewFullButton");
+    auto *visual = footer->findChild<QQuickItem *>("visualEditToggle");
+    QVERIFY(split && full && visual);
+    QVERIFY(cycle102Click(quick, split));
     QTRY_COMPARE(layout->property("effectiveLayoutMode").toInt(), 1);
     QTRY_VERIFY(editor->isVisible() && pane->isVisible());
-    QVERIFY(cycle102Click(quick, mode));
-    QTRY_VERIFY(menu->property("opened").toBool());
-    auto *selectedSplit = window->findChild<QQuickItem *>("sourceModeSplit");
-    QVERIFY(cycle102Click(quick, selectedSplit));
-    QVERIFY(selectedSplit->property("checked").toBool());
-    QVERIFY(cycle102Click(quick, pane->findChild<QQuickItem *>("previewFullButton")));
+    QVERIFY(cycle102Click(quick, split));
+    QVERIFY(split->property("checked").toBool());
+    QVERIFY(cycle102Click(quick, full));
     QTRY_COMPARE(layout->property("effectiveLayoutMode").toInt(), 2);
-    QVERIFY(cycle102Click(quick, pane->findChild<QQuickItem *>("visualEditToggle")));
+    QVERIFY(cycle102Click(quick, visual));
     QTRY_VERIFY(layout->property("visualEditEnabled").toBool());
     QTRY_VERIFY(pane->findChild<QQuickItem *>("visualEditor")->isVisible());
-    QVERIFY(cycle102Click(quick, pane->findChild<QQuickItem *>("visualEditSourceButton")));
+    QVERIFY(cycle102Click(quick, mode));
     QTRY_COMPARE(layout->property("effectiveLayoutMode").toInt(), 0);
     QTRY_VERIFY(!layout->property("visualEditEnabled").toBool());
-    QVERIFY(cycle102Click(quick, mode));
-    QTRY_VERIFY(menu->property("opened").toBool());
-    QVERIFY(cycle102Click(quick, window->findChild<QQuickItem *>("sourceVisualEditButton")));
+    QVERIFY(mode->property("checked").toBool());
+    QVERIFY(cycle102Click(quick, visual));
     QTRY_COMPARE(layout->property("effectiveLayoutMode").toInt(), 2);
     QTRY_VERIFY(layout->property("visualEditEnabled").toBool());
-    QVERIFY(cycle102Click(quick, pane->findChild<QQuickItem *>("visualEditToggle")));
+    QVERIFY(cycle102Click(quick, visual));
     QTRY_VERIFY(!layout->property("visualEditEnabled").toBool());
-    QVERIFY(cycle102Click(quick, pane->findChild<QQuickItem *>("previewSplitButton")));
+    QVERIFY(cycle102Click(quick, split));
     QTRY_COMPARE(layout->property("effectiveLayoutMode").toInt(), 1);
     QVERIFY(cycle102Click(quick, mode));
-    QTRY_VERIFY(menu->property("opened").toBool());
-    QVERIFY(cycle102Click(quick, window->findChild<QQuickItem *>("sourceModeSource")));
     QTRY_COMPARE(layout->property("effectiveLayoutMode").toInt(), 0);
     QVERIFY(cycle102Click(quick, mode));
-    QTRY_VERIFY(menu->property("opened").toBool());
-    auto *selectedSource = window->findChild<QQuickItem *>("sourceModeSource");
-    QVERIFY(cycle102Click(quick, selectedSource));
-    QVERIFY(selectedSource->property("checked").toBool());
-    QVERIFY(cycle102Click(quick, mode));
-    QTRY_VERIFY(menu->property("opened").toBool());
-    QVERIFY(cycle102Click(quick, window->findChild<QQuickItem *>("sourceModePreview")));
+    QVERIFY(mode->property("checked").toBool());
+    QVERIFY(cycle102Click(quick, full));
     QTRY_COMPARE(layout->property("effectiveLayoutMode").toInt(), 2);
     QTRY_VERIFY(!layout->property("visualEditEnabled").toBool());
 
@@ -215,6 +179,9 @@ void FomawriteTest::footerAppearanceAndStatisticsWorkByClick() {
     cycle106KeepNativeFocus(quick);
     quick->resize(960, 520); quick->show();
     QVERIFY(QMetaObject::invokeMethod(window.data(), "applyReferenceWorkspace"));
+    auto *layout = window->findChild<QObject *>("workspaceLayout"); QVERIFY(layout);
+    layout->setProperty("organizerVisible", false);
+    layout->setProperty("filesVisible", false);
     const QString source = QString::fromUtf8("# A quieter footer\n\nRead a café draft — 你好.\n");
     editor->setProperty("text", source);
     QVERIFY(QMetaObject::invokeMethod(editor, "insert", Q_ARG(int, source.size()), Q_ARG(QString, QStringLiteral("Unsaved addition."))));
@@ -299,7 +266,8 @@ void FomawriteTest::footerControlsAndMenusRemainReachableWhenResized() {
     auto *pane = window->findChild<QQuickItem *>("previewPane");
     auto *appearance = window->findChild<QQuickItem *>("sourceAppearanceButton");
     auto *appearanceMenu = window->findChild<QObject *>("sourceAppearanceMenu");
-    auto *templateButton = pane ? pane->findChild<QQuickItem *>("previewTemplateButton") : nullptr;
+    auto *footer = window->findChild<QQuickItem *>("documentFooter");
+    auto *templateButton = footer ? footer->findChild<QQuickItem *>("previewTemplateButton") : nullptr;
     auto *templateMenu = window->findChild<QObject *>("previewTemplateMenu");
     QVERIFY(quick && layout && library && editor && pane && appearance && appearanceMenu && templateButton && templateMenu);
     cycle106KeepNativeFocus(quick);
@@ -353,20 +321,20 @@ void FomawriteTest::footerControlsAndMenusRemainReachableWhenResized() {
                     QVERIFY(cycle102Capture(quick, QString("cycle106-footer-%1-%2-%3").arg(mode).arg(width).arg(dark ? "dark" : "light")));
             }
         }
-        // Visual Edit substitutes the Source return button without losing the mode capsule.
+        // Visual Edit keeps the same Source return segment and view capsule.
         quick->resize(960, 520);
         QTest::qWait(50);
         layout->setProperty("layoutMode", 1);
         layout->setProperty("visualEditEnabled", true);
         QTRY_VERIFY(cycle106FootersAlign(window.data()));
         QTRY_VERIFY(cycle106FooterControlsFit(window.data()));
-        QVERIFY(cycle102Click(quick, pane->findChild<QQuickItem *>("previewFullButton")));
+        QVERIFY(cycle102Click(quick, footer->findChild<QQuickItem *>("previewFullButton")));
         QTRY_COMPARE(layout->property("effectiveLayoutMode").toInt(), 2);
         QTRY_VERIFY(cycle106FootersAlign(window.data()));
         QTRY_VERIFY(cycle106FooterControlsFit(window.data()));
-        QVERIFY(cycle102Click(quick, pane->findChild<QQuickItem *>("previewSplitButton")));
+        QVERIFY(cycle102Click(quick, footer->findChild<QQuickItem *>("previewSplitButton")));
         QTRY_COMPARE(layout->property("effectiveLayoutMode").toInt(), 1);
-        QVERIFY(cycle102Click(quick, pane->findChild<QQuickItem *>("visualEditSourceButton")));
+        QVERIFY(cycle102Click(quick, footer->findChild<QQuickItem *>("sourceModeButton")));
         QTRY_COMPARE(layout->property("effectiveLayoutMode").toInt(), 0);
         QTRY_VERIFY(cycle106FootersAlign(window.data()));
         QTRY_VERIFY(cycle106FooterControlsFit(window.data()));
@@ -380,8 +348,8 @@ void FomawriteTest::footerControlsAndMenusRemainReachableWhenResized() {
     auto *notice = window->findChild<QQuickItem *>("navigationNotice"); QVERIFY(notice);
     QTRY_VERIFY(notice->isVisible());
     QCOMPARE(window->property("navigationNotice").toString(), backend.status());
-    auto *previewFooter = pane->findChild<QQuickItem *>("previewFooter"); QVERIFY(previewFooter);
-    QVERIFY(cycle103SceneBounds(notice).bottom() + 9 <= cycle103SceneBounds(previewFooter).top());
+    QVERIFY(footer);
+    QVERIFY(cycle103SceneBounds(notice).bottom() + 9 <= cycle103SceneBounds(footer).top());
     QQuickItem *dismiss = nullptr;
     for (auto *child : notice->findChildren<QQuickItem *>())
         if (child->property("hint").toString() == "Dismiss message") dismiss = child;

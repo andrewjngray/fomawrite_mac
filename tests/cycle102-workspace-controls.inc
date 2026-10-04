@@ -1,4 +1,28 @@
 namespace {
+// Menus can receive macOS input-method commits even with a non-activating
+// window. This mouse-only fixture rejects unsolicited native text events;
+// keyboard editing/filter behavior is tested separately with targeted Qt keys.
+class Cycle106MouseInputIsolation : public QObject {
+    QQuickWindow *window;
+    int excludedEvents = 0;
+public:
+    explicit Cycle106MouseInputIsolation(QQuickWindow *target) : window(target) { qApp->installEventFilter(this); }
+    ~Cycle106MouseInputIsolation() override {
+        qApp->removeEventFilter(this);
+        if (excludedEvents) qInfo() << "Excluded unsolicited native text events during mouse-only QA:" << excludedEvents;
+    }
+    bool eventFilter(QObject *target, QEvent *event) override {
+        if (QGuiApplication::platformName() != "cocoa" || target != window) return false;
+        const bool nativeKey = event->spontaneous()
+            && (event->type() == QEvent::KeyPress || event->type() == QEvent::KeyRelease);
+        if (nativeKey || event->type() == QEvent::InputMethod) {
+            ++excludedEvents;
+            event->accept();
+            return true;
+        }
+        return false;
+    }
+};
 bool cycle102Click(QQuickWindow *window, QQuickItem *item) {
     // Let Qt Quick polish geometry after the preceding visibility change.
     QTest::qWait(30);
@@ -155,13 +179,15 @@ void FomawriteTest::previewTemplateFooterAndNativeMenuShareState() {
     auto *editor = window->findChild<QObject *>("sourceEditor");
     auto *pane = window->findChild<QQuickItem *>("previewPane");
     QVERIFY(pane);
-    auto *button = pane->findChild<QQuickItem *>("previewTemplateButton");
+    auto *footer = window->findChild<QQuickItem *>("documentFooter");
+    auto *button = footer ? footer->findChild<QQuickItem *>("previewTemplateButton") : nullptr;
     auto *menu = window->findChild<QObject *>("previewTemplateMenu");
     auto *palatino = window->findChild<QQuickItem *>("previewTemplate6");
     auto *nativeView = window->findChild<QObject *>("nativeViewMenu");
     auto *nativePalatino = window->findChild<QObject *>("nativeTemplate6");
     auto *nativeHelvetica = window->findChild<QObject *>("nativeTemplate5");
     QVERIFY(quick && layout && editor && button && menu && palatino && nativeView && nativePalatino && nativeHelvetica);
+    Cycle106MouseInputIsolation mouseInput(quick);
     const int originalStyle = backend.outputStyle();
     const auto cleanup = qScopeGuard([&] { backend.setOutputStyle(originalStyle); backend.discardRecovery(); });
     quick->resize(1100, 800);
@@ -210,10 +236,7 @@ void FomawriteTest::previewTemplateFooterAndNativeMenuShareState() {
     QVERIFY(!drawer->property("visible").toBool());
     QTRY_VERIFY(button->isVisible());
     QVERIFY(cycle102Capture(quick, "cycle102-before-template-click"));
-    QSignalSpy menuRequested(pane, SIGNAL(templateMenuRequested(QVariant)));
-    QVERIFY(menuRequested.isValid());
     QVERIFY(cycle102Click(quick, button));
-    QCOMPARE(menuRequested.count(), 1);
     QTRY_VERIFY(menu->property("opened").toBool());
     auto *menuParent = qvariant_cast<QQuickItem *>(menu->property("parent"));
     QVERIFY(menuParent);
@@ -251,12 +274,14 @@ void FomawriteTest::previewTemplateRemainsReachableInNarrowSplit() {
     auto *layout = window->findChild<QObject *>("workspaceLayout");
     auto *pane = window->findChild<QQuickItem *>("previewPane");
     QVERIFY(pane);
-    auto *button = pane->findChild<QQuickItem *>("previewTemplateButton");
+    auto *footer = window->findChild<QQuickItem *>("documentFooter");
+    auto *button = footer ? footer->findChild<QQuickItem *>("previewTemplateButton") : nullptr;
     auto *menu = window->findChild<QObject *>("previewTemplateMenu");
-    auto *visual = pane->findChild<QQuickItem *>("visualEditToggle");
-    auto *split = pane->findChild<QQuickItem *>("previewSplitButton");
-    auto *full = pane->findChild<QQuickItem *>("previewFullButton");
+    auto *visual = footer->findChild<QQuickItem *>("visualEditToggle");
+    auto *split = footer->findChild<QQuickItem *>("previewSplitButton");
+    auto *full = footer->findChild<QQuickItem *>("previewFullButton");
     QVERIFY(quick && layout && pane && button && menu && visual && split && full);
+    Cycle106MouseInputIsolation mouseInput(quick);
     const int originalStyle = backend.outputStyle();
     const auto cleanup = qScopeGuard([&] { backend.setOutputStyle(originalStyle); });
     quick->resize(960, 760);
@@ -278,8 +303,8 @@ void FomawriteTest::previewTemplateRemainsReachableInNarrowSplit() {
             QCoreApplication::processEvents();
             QRectF previous;
             for (auto *control : {button, visual, split, full}) {
-                const QRectF bounds = control->mapRectToItem(pane, control->boundingRect());
-                QVERIFY2(bounds.left() >= 11 && bounds.right() <= pane->width() - 11,
+                const QRectF bounds = control->mapRectToItem(footer, control->boundingRect());
+                QVERIFY2(bounds.left() >= 11 && bounds.right() <= footer->width() - 11,
                          qPrintable(QString("%1 outside %2px footer: x=%3 width=%4").arg(control->objectName()).arg(width).arg(bounds.x()).arg(bounds.width())));
                 QVERIFY(bounds.height() >= 32);
                 if (!previous.isNull()) {

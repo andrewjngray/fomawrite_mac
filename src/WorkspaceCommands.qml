@@ -124,6 +124,7 @@ QtObject {
         if (["quickOpen", "refreshTags"].indexOf(id) >= 0) return library.rootFolder.toString() !== "";
         if (id === "spelling") return window.isMac && editor.length > 0;
         if (id === "organizer") return true;
+        if (id === "split") return layoutState.availableWidth >= 800;
         if (id === "larger") return settings.writingSize < 32;
         if (id === "smaller") return settings.writingSize > 12;
         return entry(id) !== null;
@@ -212,11 +213,11 @@ QtObject {
         case "writingEditorial": settings.writingAppearance = "editorial"; break;
         case "writingBook": settings.writingAppearance = "book"; break;
         case "editor": window.selectWritingMode("source"); break;
-        case "split": layoutState.layoutMode = 1; break;
+        case "split": window.setDocumentView(1); break;
         case "preview": window.selectWritingMode("preview"); break;
-        case "togglePreview": layoutState.layoutMode = layoutState.layoutMode === 0 ? 1 : 0; break;
+        case "togglePreview": window.setDocumentView(layoutState.effectiveLayoutMode === 0 ? (layoutState.availableWidth >= 800 ? 1 : 2) : 0); break;
         case "reloadPreview": preview.reload(); break;
-        case "webPreview": if (layoutState.layoutMode === 0) layoutState.layoutMode = 1; break;
+        case "webPreview": if (layoutState.effectiveLayoutMode === 0) window.setDocumentView(layoutState.availableWidth >= 800 ? 1 : 2); break;
         case "titleBarFade": settings.titleBarMode = 0; break;
         case "titleBarAlways": settings.titleBarMode = 1; break;
         case "toolbarFade": settings.toolbarVisibilityMode = 0; break;

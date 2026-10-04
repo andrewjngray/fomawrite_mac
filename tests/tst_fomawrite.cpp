@@ -39,6 +39,9 @@ class FomawriteTest : public QObject {
     Q_OBJECT
 
 private slots:
+    void footerCompactStylesRemainReachableAcrossModes();
+    void footerViewControlsStayStationaryAcrossModes();
+    void footerViewCyclesPreserveDraftSelectionAndWidths();
     void footerModesAndTemplatesPreserveDraftAndUndo();
     void footerAppearanceAndStatisticsWorkByClick();
     void footerControlsAndMenusRemainReachableWhenResized();
@@ -4948,7 +4951,8 @@ private slots:
         auto *layout = window->findChild<QObject *>("workspaceLayout");
         auto *source = window->findChild<QObject *>(QStringLiteral("sourceEditor"));
         auto *pane = window->findChild<QObject *>(QStringLiteral("previewPane"));
-        auto *sourceButton = pane ? pane->findChild<QObject *>(QStringLiteral("visualEditSourceButton")) : nullptr;
+        auto *footer = window->findChild<QObject *>(QStringLiteral("documentFooter"));
+        auto *sourceButton = footer ? footer->findChild<QObject *>(QStringLiteral("sourceModeButton")) : nullptr;
         QVERIFY(settings && source && pane && sourceButton);
         const QString markdown = QStringLiteral("# Heading\n\nA safe paragraph.\n");
         QVERIFY(source->setProperty("text", markdown));
@@ -5214,6 +5218,7 @@ private:
 #include "cycle103-inline.inc"
 #include "cycle104-controls.inc"
 #include "cycle106-footer.inc"
+#include "cycle107-footer-transitions.inc"
 #include "cycle100-navigation.inc"
 #include "cycle99-integration.inc"
 #include "sourcevisualmapping-cycle99.inc"

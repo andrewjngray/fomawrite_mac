@@ -49,7 +49,7 @@ QtObject {
         var mode = modeAt(level)
         return (organizerVisible && level < 1 ? 184 : 0)
                 + (filesVisible && level < 2 ? 232 : 0)
-                + (mode === 1 ? 800 : mode === 2 ? 320 : 480)
+                + (mode === 1 ? 800 : 320)
     }
 
     function recalculate(resetContraction) {
@@ -78,7 +78,7 @@ QtObject {
         var organizer = showOrganizer ? boundedWidth(organizerWidth, 184, 288, 208) : 0
         var files = showFiles ? boundedWidth(fileWidth, 232, 420, 288) : 0
         var preview = mode === 1 ? boundedWidth(previewWidth, 320, 2400, 420) : 0
-        var documentMinimum = mode === 2 ? 320 : 480
+        var documentMinimum = mode === 1 ? 480 : 320
         var excess = Math.max(0, organizer + files + preview + documentMinimum - width)
         var reduction = showOrganizer ? Math.min(excess, organizer - 184) : 0
         organizer -= reduction

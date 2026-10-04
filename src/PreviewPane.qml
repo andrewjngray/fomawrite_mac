@@ -8,6 +8,9 @@ Rectangle {
     property string visualEditorObjectName: "visualEditor"
     property bool allowVisualEdit: true
     property bool showFooter: true
+    property real bottomInset: 0
+    property bool suspendViewportUpdates: false
+    readonly property bool viewportRefreshPending: refreshTimer.running || visualRefreshTimer.running
     property bool tonalLayoutButtons: false
     required property var renderer
     property string markdown: ""
@@ -48,7 +51,20 @@ Rectangle {
     property string visualSourceSnapshot: ""
     property bool synchronizingVisualText: false
     signal scrollFractionChanged(real fraction)
+    signal viewportInteraction()
     function focusVisualEditor() { visualText.forceActiveFocus(); }
+    function focusRenderedSurface() {
+        if (visualEditEnabled) visualText.forceActiveFocus();
+        else previewText.forceActiveFocus();
+    }
+    function viewportFraction() {
+        return Math.max(0, Math.min(1, previewScroll.contentY
+            / Math.max(1, previewScroll.contentHeight - previewScroll.height)));
+    }
+    function viewportGeometry() {
+        return [previewScroll.width, previewScroll.height, previewScroll.contentHeight].join(":");
+    }
+    function stopViewportMotion() { previewScroll.cancelFlick(); }
     function scrollToFraction(fraction) { previewScroll.contentY = Math.max(0, previewScroll.contentHeight - previewScroll.height) * fraction; }
     signal anchorNavigationFailed(string anchor)
     function jumpToAnchor(anchor) {
@@ -140,7 +156,7 @@ Rectangle {
         Qt.callLater(ensureVisualCursorVisible);
     }
     function ensureVisualCursorVisible() {
-        if (!visualEditEnabled || !visualText.activeFocus || synchronizingVisualText)
+        if (!visualEditEnabled || !visualText.activeFocus || synchronizingVisualText || suspendViewportUpdates)
             return;
         var caret = visualText.cursorRectangle;
         var top = visualText.y + caret.y;
@@ -222,15 +238,17 @@ Rectangle {
         id: previewScroll
         objectName: "previewScroll"
         anchors.fill: parent
-        anchors.bottomMargin: root.showFooter ? previewFooter.height : 0
+        anchors.bottomMargin: root.showFooter ? previewFooter.height : root.bottomInset
         anchors.topMargin: imageContext.visible ? imageContext.height : 0
         clip: true
         contentWidth: width
         contentHeight: Math.max(height, root.visualEditEnabled
             ? visualText.y + visualText.implicitHeight + 64
-            : Math.max(previewText.implicitHeight, visualText.implicitHeight) + 100)
+            : previewText.implicitHeight + 100)
         boundsBehavior: Flickable.StopAtBounds
-        onContentYChanged: root.scrollFractionChanged(contentY / Math.max(1, contentHeight - height))
+        onMovementStarted: root.viewportInteraction()
+        onContentYChanged: if (root.visible && !root.suspendViewportUpdates)
+            root.scrollFractionChanged(contentY / Math.max(1, contentHeight - height))
         ScrollBar.vertical: ScrollBar {}
         TextEdit {
             id: previewText
@@ -251,6 +269,7 @@ Rectangle {
             selectionColor: backend.palette.selection
             selectedTextColor: "white"
             onLinkActivated: function(link) { if (String(link).charAt(0) === "#") root.jumpToAnchor(String(link).slice(1)); else root.linkRequested(link); }
+            Keys.onPressed: root.viewportInteraction()
             Accessible.name: "Preview: read-only rendered Markdown"
             visible: !root.visualEditEnabled
         }
@@ -278,6 +297,7 @@ Rectangle {
             onActiveFocusChanged: if (activeFocus) Qt.callLater(root.ensureVisualCursorVisible)
             Keys.priority: Keys.BeforeItem
             Keys.onPressed: function(event) {
+                root.viewportInteraction();
                 if (!(event.modifiers & Qt.ControlModifier))
                     return;
                 if (event.key === Qt.Key_Y
@@ -290,10 +310,12 @@ Rectangle {
                 }
             }
             Keys.onReturnPressed: function(event) {
+                root.viewportInteraction();
                 root.insertVisualBreak(event.modifiers & Qt.ShiftModifier);
                 event.accepted = true;
             }
             Keys.onEnterPressed: function(event) {
+                root.viewportInteraction();
                 root.insertVisualBreak(event.modifiers & Qt.ShiftModifier);
                 event.accepted = true;
             }
@@ -388,7 +410,7 @@ Rectangle {
         anchors.left: parent.left; anchors.right: parent.right
         anchors.bottom: parent.bottom
         anchors.margins: 12
-        anchors.bottomMargin: root.showFooter ? previewFooter.height + 10 : 12
+        anchors.bottomMargin: (root.showFooter ? previewFooter.height : root.bottomInset) + 12
         height: visualNoticeText.implicitHeight + 60
         z: 4
         radius: 8

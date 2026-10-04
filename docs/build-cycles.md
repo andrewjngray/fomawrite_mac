@@ -1389,3 +1389,14 @@ Changes: shared 52px workspace footer and header-derived 13px rounded controls; 
 Verification: production/final package build passes; **147 regression tests pass**; five affected native Cocoa workflows pass (**7/0/0** including setup/cleanup). Actual clicks cover all footer mode/template/appearance actions, rapid repeats, selection state and exact draft/Undo preservation. Geometry and native screenshots cover short/narrow/light/dark layouts and 320px Preview. Native mouse-only QA is isolated from unsolicited OS typing; separate filter keyboard checks remain. [Evidence and limits](../research/cycle-106/README.md).
 
 Runnable artifacts: stable Dev, ordinary demo/package and Applications are synchronized to `0.3.0-dev7`, macOS `0.3.0 (106)`, with strict signatures verified and matching demo/Applications executables. [Optional exercise](../research/usability/cycle-106.md). Physical VoiceOver/display-scale checks and Andrew's normal writing acceptance remain open. Next product work follows his footer review; image/table/list ergonomics and optional public distribution remain separate scopes.
+
+
+## Cycle 107 — stable document view switching
+
+Planned scope: deeply check Andrew's report that lower controls relocate through Source, Split, Full and Visual Edit, and fix inconsistent view and scrolling behavior.
+
+Changes: a single document footer keeps all four view controls at the lower right; independent writing-appearance/template controls remain at the left or in a compact Aa menu. Split visibly disables below its minimum usable width. Source-only and Full use matching minimum widths. View changes preserve reading positions while layout and rendering settle, suppress hidden-caret/synchronized-scroll feedback, restore writing focus and retain F6 navigation. Preview no longer counts the hidden visual document's stale height. Button presses dismiss tooltip overlays. Shared standards now require stationary controls and repeat-cycle verification.
+
+Verification and artifact status: see the [Cycle 107 evidence record](../research/cycle-107/README.md) for the final test gate, native screenshots, limits and exact bundle identities. Target version: `0.3.0-dev8`, macOS `0.3.0 (107)`, stable Dev, ordinary demo/package and Applications. [Optional review exercise](../research/usability/cycle-107.md).
+
+Next: Andrew's review of the actual repeated-switch behavior. Physical VoiceOver/display-scale checks remain open. Image/table/list ergonomics and optional public distribution remain separate scopes.

@@ -45,6 +45,9 @@ Button {
         if (hovered) hoverDelay.restart()
         else hoverDelay.stop()
     }
+    // A pressed menu trigger must not cover its popup with a delayed tooltip.
+    // Hovering again after leaving the button starts a fresh delay.
+    onPressed: { tooltipReady = false; hoverDelay.stop() }
     onHintChanged: { tooltipReady = false; if (hovered) hoverDelay.restart() }
     Timer { id: hoverDelay; interval: control.tooltipDelay; onTriggered: control.tooltipReady = control.hovered }
     ToolTip.visible: hovered && tooltipReady && hint !== ""

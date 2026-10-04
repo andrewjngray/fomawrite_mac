@@ -21,6 +21,7 @@ ToolbarButton {
             anchors.verticalCenter: parent.verticalCenter
         }
         Text {
+            objectName: "footerButtonLabel"
             text: control.text
             font: control.font
             color: control.iconColor

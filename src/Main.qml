@@ -49,6 +49,64 @@ ApplicationWindow {
         Qt.callLater(function() { editor.cursorPosition = Math.max(0, Math.min(position, editor.length)); editorFlick.ensureCursorVisible(); });
     }
     property bool synchronizingScroll: false
+    property var documentViewportTransition: null
+    readonly property bool changingDocumentView: documentViewportTransition !== null
+
+    // A view change can rewrap both documents several times while SplitView
+    // settles. Keep their reading positions independent during that reflow;
+    // programmatic clamps must not become synchronized-scroll gestures.
+    function beginDocumentViewportTransition() {
+        if (!documentViewportTransition) {
+            editorFlick.cancelFlick();
+            wheelScroll.stop();
+            previewPane.stopViewportMotion();
+            documentViewportTransition = {
+                sourceFraction: Math.max(0, Math.min(1, editorFlick.contentY
+                    / Math.max(1, editorFlick.contentHeight - editorFlick.height))),
+                previewFraction: previewPane.viewportFraction(),
+                geometry: "", stablePasses: 0, passes: 0
+            };
+        }
+        documentViewportTransition.geometry = "";
+        documentViewportTransition.stablePasses = 0;
+        documentViewportTransition.passes = 0;
+        documentViewportTransition.focusApplied = false;
+        documentViewportSettle.restart();
+    }
+    function cancelDocumentViewportTransition() {
+        documentViewportSettle.stop();
+        documentViewportTransition = null;
+    }
+    function settleDocumentViewportTransition() {
+        var state = documentViewportTransition;
+        if (!state) return;
+        if (!state.focusApplied && state.focusTarget) {
+            state.focusApplied = true;
+            // Restore editing focus while caret-driven scrolling is suspended.
+            // The saved viewport is reapplied after focus and deferred layout.
+            if (state.focusTarget === "source" && editorPane.visible)
+                editor.forceActiveFocus();
+            else if (previewPane.visible)
+                previewPane.focusRenderedSurface();
+        }
+        var geometry = [editorFlick.width, editorFlick.height, editorFlick.contentHeight,
+                        previewPane.viewportGeometry()].join(":");
+        editorFlick.contentY = state.sourceFraction * Math.max(0, editorFlick.contentHeight - editorFlick.height);
+        previewPane.scrollToFraction(state.previewFraction);
+        state.stablePasses = geometry === state.geometry ? state.stablePasses + 1 : 0;
+        state.geometry = geometry;
+        ++state.passes;
+        // Two unchanged frames include deferred rich-text styling and layout.
+        // A bound also releases the transaction if a display keeps resizing.
+        if ((state.stablePasses >= 2 && !previewPane.viewportRefreshPending) || state.passes >= 16)
+            cancelDocumentViewportTransition();
+    }
+    Timer {
+        id: documentViewportSettle
+        interval: 16
+        repeat: true
+        onTriggered: win.settleDocumentViewportTransition()
+    }
     property bool closeConfirmed: false
     property bool searchOpen: false
     property bool searchUpdating: false
@@ -166,7 +224,8 @@ ApplicationWindow {
                              ? "preview" : "source");
     }
     readonly property bool workspaceOwnsKeyboard: !navigationDrawer.visible && (!activeFocusItem
-        || isInside(activeFocusItem, workspaceSplit) || isInside(activeFocusItem, topChrome))
+        || isInside(activeFocusItem, workspaceSplit) || isInside(activeFocusItem, topChrome)
+        || isInside(activeFocusItem, documentFooter))
     function cycleWorkspaceFocus(reverse) {
         var regions = [];
         if (organizerSlot.visible) regions.push("organizer");
@@ -184,8 +243,13 @@ ApplicationWindow {
     function rescueHiddenWorkspaceFocus() {
         if (navigationDrawer.visible) return;
         var item = activeFocusItem;
-        if (item && !item.visible && (isInside(item, workspaceSplit) || isInside(item, topChrome)))
+        if (item && !item.visible && (isInside(item, workspaceSplit) || isInside(item, topChrome)
+                                     || isInside(item, documentFooter)))
             focusWritingSurface();
+    }
+    Connections {
+        target: documentFooter
+        function onCompactChanged() { Qt.callLater(win.rescueHiddenWorkspaceFocus); }
     }
     Shortcut {
         sequence: "F6"; context: Qt.WindowShortcut; enabled: win.workspaceOwnsKeyboard
@@ -258,18 +322,36 @@ ApplicationWindow {
             }
         });
     }
+    function setDocumentView(mode) {
+        if (mode === 1 && !documentFooter.canSplit) return;
+        beginDocumentViewportTransition();
+        if (mode === 0) {
+            workspaceLayout.visualEditEnabled = false;
+            previewPane.visualEditEnabled = false;
+            lastWritingSurface = "source";
+        }
+        workspaceLayout.layoutMode = mode;
+        // Changing the arrangement is not a request to jump to an old caret.
+        documentViewportTransition.focusTarget = mode === 0 ? "source"
+            : mode === 2 ? "preview"
+            : lastWritingSurface === "visual" && workspaceLayout.visualEditEnabled ? "preview" : "source";
+    }
+    function toggleVisualEditing() {
+        beginDocumentViewportTransition();
+        var enabled = !workspaceLayout.visualEditEnabled;
+        workspaceLayout.visualEditEnabled = enabled;
+        previewPane.visualEditEnabled = enabled;
+        if (enabled && workspaceLayout.effectiveLayoutMode === 0)
+            workspaceLayout.layoutMode = 2;
+        lastWritingSurface = enabled ? "visual" : "source";
+        documentViewportTransition.focusTarget = "preview";
+    }
     function selectWritingMode(mode) {
+        beginDocumentViewportTransition();
         workspaceLayout.visualEditEnabled = mode === "visual";
         previewPane.visualEditEnabled = workspaceLayout.visualEditEnabled;
-        if (mode === "source") {
-            workspaceLayout.layoutMode = 0;
-            lastWritingSurface = "source";
-            Qt.callLater(function() { editor.forceActiveFocus(); editorFlick.ensureCursorVisible(); });
-        } else {
-            workspaceLayout.layoutMode = 2;
-            lastWritingSurface = mode === "visual" ? "visual" : "source";
-            if (mode === "visual") Qt.callLater(function() { previewPane.focusVisualEditor(); });
-        }
+        lastWritingSurface = mode === "visual" ? "visual" : "source";
+        setDocumentView(mode === "source" ? 0 : 2);
     }
     function applyStudioWorkspace() {
         backend.themePreset = "studio";
@@ -449,7 +531,7 @@ ApplicationWindow {
         z: 20
         anchors.horizontalCenter: parent.horizontalCenter
         anchors.bottom: parent.bottom
-        anchors.bottomMargin: sourceFooter.height + 10
+        anchors.bottomMargin: documentFooter.height + 10
         width: Math.min(440, parent.width - 32)
         height: navigationNoticeLabel.implicitHeight + 28
         radius: 8
@@ -725,6 +807,32 @@ ApplicationWindow {
     }
 
     CompactMenu {
+        id: sourceAppearanceMenu
+        objectName: "sourceAppearanceMenu"
+        width: 220
+        CompactMenuItem { objectName: "sourceAppearanceManuscript"; text: "Manuscript"; checkable: true; autoExclusive: true; checked: win.activeWritingAppearance === "manuscript"; onTriggered: workspaceCommands.run("writingManuscript") }
+        CompactMenuItem { objectName: "sourceAppearanceEditorial"; text: "Editorial"; checkable: true; autoExclusive: true; checked: win.activeWritingAppearance === "editorial"; onTriggered: workspaceCommands.run("writingEditorial") }
+        CompactMenuItem { objectName: "sourceAppearanceBook"; text: "Book"; checkable: true; autoExclusive: true; checked: win.activeWritingAppearance === "book"; onTriggered: workspaceCommands.run("writingBook") }
+        MenuSeparator {}
+        CompactMenuItem { objectName: "sourceAppearanceLarger"; text: "Larger text"; enabled: workspaceSettings.writingSize < 32; onTriggered: workspaceCommands.run("larger") }
+        CompactMenuItem { objectName: "sourceAppearanceSmaller"; text: "Smaller text"; enabled: workspaceSettings.writingSize > 12; onTriggered: workspaceCommands.run("smaller") }
+        CompactMenuItem { objectName: "sourceAppearanceReset"; text: "Reset text size"; onTriggered: workspaceCommands.run("resetSize") }
+    }
+    CompactMenu {
+        id: footerStylesMenu
+        objectName: "footerStylesMenu"
+        width: 230
+        CompactMenuItem {
+            objectName: "footerWritingStylesEntry"; text: "Writing appearance…"
+            onTriggered: Qt.callLater(function() { win.openAnchoredMenu(sourceAppearanceMenu, documentFooter.stylesAnchor); })
+        }
+        CompactMenuItem {
+            objectName: "footerPreviewTemplatesEntry"; text: "Preview template…"
+            onTriggered: Qt.callLater(function() { win.openAnchoredMenu(previewTemplateMenu, documentFooter.stylesAnchor); })
+        }
+    }
+
+    CompactMenu {
         id: previewTemplateMenu
         objectName: "previewTemplateMenu"
         width: 246
@@ -750,7 +858,7 @@ ApplicationWindow {
         CompactMenuItem { text: "Source"; checkable: true; checked: workspaceLayout.layoutMode === 0; onTriggered: win.selectWritingMode("source") }
         CompactMenuItem { text: "Visual Edit"; checkable: true; checked: workspaceLayout.visualEditEnabled; onTriggered: win.selectWritingMode("visual") }
         CompactMenuItem { text: "Preview"; checkable: true; checked: workspaceLayout.layoutMode === 2 && !workspaceLayout.visualEditEnabled; onTriggered: win.selectWritingMode("preview") }
-        CompactMenuItem { text: "Source and preview side by side"; checkable: true; checked: workspaceLayout.layoutMode === 1; onTriggered: workspaceLayout.layoutMode = 1 }
+        CompactMenuItem { text: "Source and preview side by side"; checkable: true; checked: workspaceLayout.effectiveLayoutMode === 1; enabled: documentFooter.canSplit; onTriggered: win.setDocumentView(1) }
         MenuSeparator {}
         CompactMenuItem { text: "Document outline"; onTriggered: workspaceCommands.run("outline") }
         CompactMenuItem { text: "Document statistics"; onTriggered: workspaceCommands.run("statistics") }
@@ -1158,8 +1266,7 @@ ApplicationWindow {
             // Routine dirty-state updates stay quiet while the user is typing.
             var message = backend.status;
             if (!message || message === "Unsaved") return;
-            var sourceStatusVisible = workspaceLayout.effectiveLayoutMode !== 2
-                    && sourceFooter.visible && sourceFooterStatus.visible;
+            var sourceStatusVisible = documentFooter.statusVisible;
             if (!workspaceLayout.effectiveOrganizerVisible && !sourceStatusVisible)
                 win.showNavigationNotice(message);
         }
@@ -1817,6 +1924,7 @@ ApplicationWindow {
         target: backend
 
         function onDocumentLoaded() {
+            win.cancelDocumentViewportTransition();
             Qt.callLater(function() {
                 editor.cursorPosition = 0;
                 editorFlick.contentY = 0;
@@ -2546,7 +2654,7 @@ ApplicationWindow {
         Flickable {
             id: editorFlick
             onContentYChanged: {
-                if (!workspaceSettings.synchronizedScroll || win.synchronizingScroll || workspaceLayout.effectiveLayoutMode !== 1) return;
+                if (!workspaceSettings.synchronizedScroll || win.synchronizingScroll || win.changingDocumentView || workspaceLayout.effectiveLayoutMode !== 1) return;
                 win.synchronizingScroll = true;
                 previewPane.scrollToFraction(contentY / Math.max(1, contentHeight - height));
                 win.synchronizingScroll = false;
@@ -2555,7 +2663,7 @@ ApplicationWindow {
             anchors.fill: parent
             anchors.leftMargin: 24
             anchors.rightMargin: 24
-            anchors.bottomMargin: sourceFooter.height
+            anchors.bottomMargin: documentFooter.height
             anchors.topMargin: documentMeta.y + documentMeta.height
             clip: true
             contentWidth: width
@@ -2676,6 +2784,7 @@ ApplicationWindow {
                 // finger scrolling carries pixel-precise pixelDelta.
                 acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
                 onWheel: function(wheel) {
+                    win.cancelDocumentViewportTransition();
                     scrollLinger.restart();
                     if (wheel.pixelDelta.y !== 0)
                         editorFlick.scrollTo(editorFlick.clampContentY(editorFlick.contentY - wheel.pixelDelta.y));
@@ -2685,7 +2794,7 @@ ApplicationWindow {
                 }
             }
 
-            onMovementStarted: wheelScroll.stop()
+            onMovementStarted: { win.cancelDocumentViewportTransition(); wheelScroll.stop(); }
 
             function scrollByWheel(wheel) {
                 // High-resolution wheels report fractional notches; feed
@@ -2731,6 +2840,7 @@ ApplicationWindow {
             // Keep the editing caret within the viewport so writing past the
             // bottom edge scrolls the page along with the text.
             function ensureCursorVisible() {
+                if (win.changingDocumentView) return;
                 if (workspaceSettings.typewriter && editor.selectionStart === editor.selectionEnd) {
                     scrollTo(clampContentY(editor.y + editor.cursorRectangle.y - height / 2 + editor.cursorRectangle.height / 2));
                     return;
@@ -2777,7 +2887,9 @@ ApplicationWindow {
                     width: 1
                     color: win.strongTextColor
                 }
-                onCursorRectangleChanged: editorFlick.ensureCursorVisible()
+                // Reflowing an inactive Source pane must not pull the preview
+                // back to an old caret through synchronized scrolling.
+                onCursorRectangleChanged: if (activeFocus && editorPane.visible) editorFlick.ensureCursorVisible()
                 onCursorPositionChanged: backend.setFocusPosition(cursorPosition, workspaceSettings.paragraphFocus, workspaceSettings.sentenceFocus)
 
                 function replaceSelectionWith(replacement) {
@@ -2958,6 +3070,7 @@ ApplicationWindow {
 
                 Keys.priority: Keys.BeforeItem
                 Keys.onPressed: function(event) {
+                    win.cancelDocumentViewportTransition();
                     if ((event.key === Qt.Key_C || event.key === Qt.Key_X) && (event.modifiers & Qt.ControlModifier)
                         && !(event.modifiers & (Qt.AltModifier | Qt.MetaModifier | Qt.ShiftModifier))) {
                         if (backend.copySelection(selectionStart, selectionEnd, "markdown") && event.key === Qt.Key_X) remove(selectionStart, selectionEnd);
@@ -3012,6 +3125,9 @@ ApplicationWindow {
                 }
 
                 onTextChanged: {
+                    // Real editing or opening a document takes precedence over
+                    // any outstanding layout-only scroll restoration.
+                    win.cancelDocumentViewportTransition();
                     if (workspaceSettings.styleCheckCustom || workspaceSettings.styleCheckFillers)
                         customReviewRefreshTimer.restart();
                     if (win.searchUpdating)
@@ -3042,73 +3158,6 @@ ApplicationWindow {
                 }
             }
         }
-
-        WorkspaceFooter {
-            id: sourceFooter
-            objectName: "sourceFooter"
-            anchors.left: parent.left; anchors.right: parent.right; anchors.bottom: parent.bottom
-            RowLayout {
-                anchors.fill: parent; anchors.leftMargin: 12; anchors.rightMargin: 12; spacing: 8
-                FooterButton {
-                    objectName: "sourceModeButton"
-                    text: "Source"
-                    menuIndicator: true
-                    hint: "Choose document view — " + backend.status
-                    onClicked: win.openAnchoredMenu(sourceModeMenu, this)
-                }
-                Label {
-                    id: sourceFooterStatus
-                    objectName: "sourceFooterStatus"
-                    visible: workspaceSettings.toolbarMode !== 1 && sourceFooter.width >= 660
-                             && !workspaceLayout.effectiveOrganizerVisible
-                    text: backend.status
-                    font.family: Qt.application.font.family; font.pixelSize: 13
-                    color: backend.palette.muted
-                    elide: Text.ElideRight
-                    Layout.fillWidth: true; Layout.minimumWidth: 0
-                    Accessible.name: "Document status: " + backend.status
-                    ToolTip.visible: footerStatusHover.hovered; ToolTip.text: text
-                    HoverHandler { id: footerStatusHover }
-                }
-                Item { Layout.fillWidth: true; visible: !sourceFooterStatus.visible && workspaceSettings.toolbarMode !== 1 }
-                FooterButton {
-                    objectName: "toolbarStatistic"
-                    visible: workspaceSettings.toolbarMode === 1
-                    text: win.compactToolbarStatistics(); hint: text
-                    Layout.fillWidth: true; Layout.minimumWidth: 34
-                    onClicked: workspaceCommands.run("statistics")
-                }
-                FooterButton {
-                    objectName: "sourceAppearanceButton"
-                    text: win.activeWritingAppearance === "editorial" ? "Editorial" : win.activeWritingAppearance === "book" ? "Book" : "Manuscript"
-                    menuIndicator: true
-                    hint: "Choose writing appearance"
-                    onClicked: win.openAnchoredMenu(sourceAppearanceMenu, this)
-                }
-            }
-        }
-        CompactMenu {
-            id: sourceModeMenu
-            objectName: "sourceModeMenu"
-            width: 220
-            CompactMenuItem { objectName: "sourceModeSource"; text: "Source"; checkable: true; autoExclusive: true; checked: workspaceLayout.layoutMode === 0; onTriggered: win.selectWritingMode("source") }
-            CompactMenuItem { objectName: "sourceVisualEditButton"; text: "Visual Edit"; onTriggered: win.selectWritingMode("visual") }
-            CompactMenuItem { objectName: "sourceModeSplit"; text: "Split"; checkable: true; autoExclusive: true; checked: workspaceLayout.layoutMode === 1; onTriggered: workspaceLayout.layoutMode = 1 }
-            CompactMenuItem { objectName: "sourceModePreview"; text: "Preview"; onTriggered: win.selectWritingMode("preview") }
-        }
-        CompactMenu {
-            id: sourceAppearanceMenu
-            objectName: "sourceAppearanceMenu"
-            width: 220
-            CompactMenuItem { objectName: "sourceAppearanceManuscript"; text: "Manuscript"; checkable: true; autoExclusive: true; checked: win.activeWritingAppearance === "manuscript"; onTriggered: workspaceCommands.run("writingManuscript") }
-            CompactMenuItem { objectName: "sourceAppearanceEditorial"; text: "Editorial"; checkable: true; autoExclusive: true; checked: win.activeWritingAppearance === "editorial"; onTriggered: workspaceCommands.run("writingEditorial") }
-            CompactMenuItem { objectName: "sourceAppearanceBook"; text: "Book"; checkable: true; autoExclusive: true; checked: win.activeWritingAppearance === "book"; onTriggered: workspaceCommands.run("writingBook") }
-            MenuSeparator {}
-            CompactMenuItem { objectName: "sourceAppearanceLarger"; text: "Larger text"; enabled: workspaceSettings.writingSize < 32; onTriggered: workspaceCommands.run("larger") }
-            CompactMenuItem { objectName: "sourceAppearanceSmaller"; text: "Smaller text"; enabled: workspaceSettings.writingSize > 12; onTriggered: workspaceCommands.run("smaller") }
-            CompactMenuItem { objectName: "sourceAppearanceReset"; text: "Reset text size"; onTriggered: workspaceCommands.run("resetSize") }
-        }
-
 
         Pane {
             id: searchPane
@@ -3269,10 +3318,14 @@ ApplicationWindow {
 
         PreviewPane {
             id: previewPane
+            showFooter: false
+            bottomInset: documentFooter.height
+            suspendViewportUpdates: win.changingDocumentView
+            onViewportInteraction: win.cancelDocumentViewportTransition()
             renderer: win.appBackend
             onTemplateMenuRequested: function(anchor) { win.openAnchoredMenu(previewTemplateMenu, anchor); }
             onScrollFractionChanged: function(fraction) {
-                if (!workspaceSettings.synchronizedScroll || win.synchronizingScroll || workspaceLayout.effectiveLayoutMode !== 1) return;
+                if (!workspaceSettings.synchronizedScroll || win.synchronizingScroll || win.changingDocumentView || workspaceLayout.effectiveLayoutMode !== 1) return;
                 win.synchronizingScroll = true;
                 editorFlick.contentY = Math.max(0, editorFlick.contentHeight - editorFlick.height) * fraction;
                 win.synchronizingScroll = false;
@@ -3304,12 +3357,7 @@ ApplicationWindow {
             visualTypeface: win.editorFontFamily
             visualTextSize: win.editorFontPixelSize + (win.activeWritingAppearance === "manuscript" ? win.scaledSize(1) : 0)
             visualTopInset: height < 600 ? 32 : 64
-            onLayoutRequested: function(mode) {
-                // Split/Full change arrangement; the explicit Preview command changes editing mode.
-                workspaceLayout.layoutMode = mode;
-                if (mode === 2 && visualEditEnabled)
-                    Qt.callLater(function() { previewPane.focusVisualEditor(); });
-            }
+            onLayoutRequested: function(mode) { win.setDocumentView(mode); }
             onAnchorNavigationFailed: function(anchor) {
                 win.showNavigationNotice("Heading or anchor “" + anchor + "” was not found in this document.");
             }
@@ -3321,6 +3369,30 @@ ApplicationWindow {
                     backend.openExternalUrl(resolved);
             }
         }
+    }
+
+    DocumentFooter {
+        id: documentFooter
+        objectName: "documentFooter"
+        x: editorPane.visible ? editorPane.x : previewPane.x
+        anchors.bottom: parent.bottom
+        width: parent.width - x
+        z: 2
+        layoutMode: workspaceLayout.effectiveLayoutMode
+        visualEditing: workspaceLayout.visualEditEnabled
+        canSplit: workspaceLayout.availableWidth >= 800
+        writingAppearance: win.activeWritingAppearance === "editorial" ? "Editorial" : win.activeWritingAppearance === "book" ? "Book" : "Manuscript"
+        previewTemplate: backend.outputTemplateName
+        statusText: backend.status
+        showStatus: !workspaceLayout.effectiveOrganizerVisible
+        showStatistics: workspaceSettings.toolbarMode === 1
+        statisticsText: win.compactToolbarStatistics()
+        onViewRequested: function(mode) { win.setDocumentView(mode); }
+        onVisualEditRequested: win.toggleVisualEditing()
+        onAppearanceMenuRequested: function(anchor) { win.openAnchoredMenu(sourceAppearanceMenu, anchor); }
+        onTemplateMenuRequested: function(anchor) { win.openAnchoredMenu(previewTemplateMenu, anchor); }
+        onStylesMenuRequested: function(anchor) { win.openAnchoredMenu(footerStylesMenu, anchor); }
+        onStatisticsRequested: workspaceCommands.run("statistics")
     }
 
     Component.onCompleted: {
