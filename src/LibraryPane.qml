@@ -74,7 +74,7 @@ Rectangle {
         anchors.leftMargin: 8
         anchors.rightMargin: 8
         anchors.topMargin: 20
-        anchors.bottomMargin: 8
+        anchors.bottomMargin: libraryFooter.height + 8
         spacing: 10
         RowLayout {
             objectName: "librarySortBar"
@@ -281,15 +281,21 @@ Rectangle {
                 font.pixelSize: 13
             }
         }
+    }
+    WorkspaceFooter {
+        id: libraryFooter
+        objectName: "libraryFooter"
+        anchors.left: parent.left; anchors.right: parent.right; anchors.bottom: parent.bottom
+        color: backend.palette.library
         Basic.TextField {
             id: filterField
             objectName: "libraryFilter"
             visible: displaySettings.showFilterBar
-            Layout.fillWidth: true
-            Layout.minimumWidth: 0
-            Layout.maximumWidth: Math.max(0, root.width - 16)
+            anchors.left: parent.left; anchors.right: parent.right
+            anchors.leftMargin: 12; anchors.rightMargin: 12
+            anchors.verticalCenter: parent.verticalCenter
             implicitWidth: 1
-            implicitHeight: 32
+            implicitHeight: 34
             placeholderText: "Filter files"
             padding: 4
             leftPadding: 32
@@ -309,10 +315,10 @@ Rectangle {
             Accessible.name: "Filter visible library files"
             LineIcon { name: "filter"; ink: backend.palette.muted; width: 16; height: 16; x: 10; anchors.verticalCenter: parent.verticalCenter }
             background: Rectangle {
-                radius: 6
-                color: backend.palette.field
+                radius: 17
+                color: backend.palette.control
                 border.width: filterField.activeFocus ? 2 : 1
-                border.color: filterField.activeFocus ? backend.palette.focus : backend.palette.border
+                border.color: filterField.activeFocus ? backend.palette.focus : backend.palette.toolbarBorder
             }
             Keys.onEscapePressed: { text = ""; root.library.filter = ""; }
         }

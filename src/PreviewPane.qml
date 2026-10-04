@@ -222,7 +222,7 @@ Rectangle {
         id: previewScroll
         objectName: "previewScroll"
         anchors.fill: parent
-        anchors.bottomMargin: root.showFooter ? 48 : 0
+        anchors.bottomMargin: root.showFooter ? previewFooter.height : 0
         anchors.topMargin: imageContext.visible ? imageContext.height : 0
         clip: true
         contentWidth: width
@@ -388,7 +388,7 @@ Rectangle {
         anchors.left: parent.left; anchors.right: parent.right
         anchors.bottom: parent.bottom
         anchors.margins: 12
-        anchors.bottomMargin: root.showFooter ? 58 : 12
+        anchors.bottomMargin: root.showFooter ? previewFooter.height + 10 : 12
         height: visualNoticeText.implicitHeight + 60
         z: 4
         radius: 8
@@ -415,123 +415,88 @@ Rectangle {
             ChromeButton { text: "Dismiss"; tonal: true; onClicked: root.visualNotice = "" }
         }
     }
-    component FooterButton: ChromeButton {
-        id: footerButton
-        tonal: true
-        implicitHeight: 32
-        // Measure unelided text independently of the width assigned by the
-        // layout. A control's fitted contentItem width is not its text width.
-        implicitWidth: Math.max(text === "Visual Edit" ? 92 : text === "Source" ? 68 : 52,
-                                footerLabelMetrics.width + 16)
-        Layout.minimumWidth: implicitWidth
-        Layout.preferredWidth: implicitWidth
-        Layout.maximumWidth: implicitWidth
-        Layout.minimumHeight: 32
-        font.pixelSize: 12
-        TextMetrics {
-            id: footerLabelMetrics
-            text: footerButton.text
-            font: footerButton.font
-        }
-        contentItem: Text {
-            id: footerLabel
-            text: footerButton.text
-            font: footerButton.font
-            color: backend.palette.text
-            opacity: footerButton.enabled ? 1 : 0.45
-            horizontalAlignment: Text.AlignHCenter
-            verticalAlignment: Text.AlignVCenter
-            elide: Text.ElideRight
-        }
-        background: Rectangle {
-            radius: 6
-            color: footerButton.down ? backend.palette.controlPressed
-                : footerButton.checked ? backend.palette.controlSelected
-                : footerButton.hovered && footerButton.enabled ? backend.palette.controlHover
-                : backend.palette.control
-            border.width: footerButton.activeFocus ? 2 : 1
-            border.color: footerButton.activeFocus ? backend.palette.focus : backend.palette.controlBorder
-            opacity: footerButton.enabled ? 1 : 0.55
-        }
-    }
-    Rectangle {
+    WorkspaceFooter {
+        id: previewFooter
+        objectName: "previewFooter"
         anchors.left: parent.left; anchors.right: parent.right; anchors.bottom: parent.bottom
         visible: root.showFooter
-        height: 48; color: backend.palette.panel
-        Rectangle { width: parent.width; height: 1; color: backend.palette.border }
         RowLayout {
-            anchors.fill: parent; anchors.leftMargin: 12; anchors.rightMargin: 12
-            spacing: 4
+            anchors.fill: parent
+            anchors.leftMargin: 12; anchors.rightMargin: 12
+            spacing: 6
             FooterButton {
                 id: templateButton
                 objectName: "previewTemplateButton"
                 visible: !root.visualEditEnabled
                 text: (root.width >= 560 ? "Preview · " : "") + root.renderer.outputTemplateName
                 hint: "Choose preview template. Current template: " + root.renderer.outputTemplateName
-                darkMode: root.darkMode
-                implicitWidth: templateLabelMetrics.width + 40
-                Layout.minimumWidth: 80
+                menuIndicator: true
                 Layout.fillWidth: true
+                Layout.minimumWidth: 72
+                Layout.maximumWidth: implicitWidth
                 onClicked: root.templateMenuRequested(templateButton)
-                TextMetrics {
-                    id: templateLabelMetrics
-                    text: templateButton.text
-                    font: templateButton.font
-                }
-                contentItem: Item {
-                    opacity: templateButton.enabled ? 1 : 0.45
-                    Text {
-                        text: templateButton.text
-                        font: templateButton.font
-                        color: backend.palette.text
-                        width: Math.max(0, parent.width - 20)
-                        anchors.verticalCenter: parent.verticalCenter
-                        elide: Text.ElideRight
-                    }
-                    LineIcon {
-                        name: "down"
-                        ink: backend.palette.muted
-                        width: 12; height: 12
-                        anchors.right: parent.right
-                        anchors.verticalCenter: parent.verticalCenter
-                    }
-                }
             }
             Label {
                 visible: root.visualEditEnabled && root.width >= 560
-                text: root.visualStatus
+                text: "Visual Edit"
                 font.family: Qt.application.font.family
-                font.pixelSize: 12
+                font.pixelSize: 13
                 color: backend.palette.muted
                 elide: Text.ElideRight
                 Layout.fillWidth: true
                 Layout.minimumWidth: 0
-                Accessible.name: text
+                Accessible.name: root.visualStatus
                 ToolTip.visible: statusHover.hovered
-                ToolTip.text: text
+                ToolTip.text: root.visualStatus
                 HoverHandler { id: statusHover }
             }
-            Item { Layout.fillWidth: true }
+            Item { Layout.fillWidth: true; Layout.minimumWidth: 0 }
             FooterButton {
                 objectName: "visualEditToggle"
                 visible: root.allowVisualEdit
                 text: "Visual Edit"
                 hint: root.visualEditEnabled ? "Switch to read-only Preview" : "Switch to Visual Edit for supported text"
-                darkMode: root.darkMode
                 checkable: true
                 checked: root.visualEditEnabled
-                onClicked: root.visualEditEnabled = !root.visualEditEnabled
+                Layout.minimumWidth: implicitWidth
+                onClicked: {
+                    root.visualEditEnabled = !root.visualEditEnabled;
+                    if (root.visualEditEnabled)
+                        Qt.callLater(root.focusVisualEditor);
+                }
             }
             FooterButton {
                 objectName: "visualEditSourceButton"
                 visible: root.visualEditEnabled
                 text: "Source"
                 hint: "Edit Markdown source"
-                darkMode: root.darkMode
+                Layout.minimumWidth: implicitWidth
                 onClicked: root.sourceEditRequested()
             }
-            FooterButton { objectName: "previewSplitButton"; text: "Split"; hint: "Show Source and Preview side by side"; darkMode: root.darkMode; checked: root.layoutMode === 1; onClicked: root.layoutRequested(1) }
-            FooterButton { objectName: "previewFullButton"; text: "Full"; hint: root.visualEditEnabled ? "Show Visual Edit across the document area" : "Show read-only Preview across the document area"; darkMode: root.darkMode; checked: root.layoutMode === 2; onClicked: root.layoutRequested(2) }
+            ToolbarGroup {
+                objectName: "previewLayoutControls"
+                Layout.minimumWidth: implicitWidth
+                FooterButton {
+                    objectName: "previewSplitButton"
+                    text: "Split"
+                    hint: "Show Source and Preview side by side"
+                    grouped: true
+                    checked: root.layoutMode === 1
+                    Accessible.checkable: true
+                    Accessible.checked: checked
+                    onClicked: root.layoutRequested(1)
+                }
+                FooterButton {
+                    objectName: "previewFullButton"
+                    text: "Full"
+                    hint: root.visualEditEnabled ? "Show Visual Edit across the document area" : "Show read-only Preview across the document area"
+                    grouped: true
+                    checked: root.layoutMode === 2
+                    Accessible.checkable: true
+                    Accessible.checked: checked
+                    onClicked: root.layoutRequested(2)
+                }
+            }
         }
     }
 

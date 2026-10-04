@@ -442,20 +442,6 @@ ApplicationWindow {
         }
     }
 
-    footer: ToolBar {
-        implicitHeight: 18
-        background: Rectangle { color: backend.palette.panel }
-        Label {
-            anchors.fill: parent; anchors.leftMargin: 12; anchors.rightMargin: 12
-            text: backend.status; font.pixelSize: 10; color: win.mutedColor
-            elide: Text.ElideRight; verticalAlignment: Text.AlignVCenter
-            Accessible.name: "Document status: " + backend.status
-            ToolTip.visible: statusHover.hovered
-            ToolTip.text: backend.status
-            HoverHandler { id: statusHover }
-        }
-    }
-
     Timer { id: navigationNoticeTimer; interval: 7000; onTriggered: win.navigationNotice = "" }
     Rectangle {
         objectName: "navigationNotice"
@@ -463,7 +449,7 @@ ApplicationWindow {
         z: 20
         anchors.horizontalCenter: parent.horizontalCenter
         anchors.bottom: parent.bottom
-        anchors.bottomMargin: 28
+        anchors.bottomMargin: sourceFooter.height + 10
         width: Math.min(440, parent.width - 32)
         height: navigationNoticeLabel.implicitHeight + 28
         radius: 8
@@ -485,7 +471,7 @@ ApplicationWindow {
             anchors.right: parent.right; anchors.rightMargin: 6
             anchors.verticalCenter: parent.verticalCenter
             text: "×"
-            hint: "Dismiss navigation message"
+            hint: "Dismiss message"
             onClicked: win.navigationNotice = ""
         }
     }
@@ -742,16 +728,16 @@ ApplicationWindow {
         id: previewTemplateMenu
         objectName: "previewTemplateMenu"
         width: 246
-        CompactMenuItem { objectName: "previewTemplate0"; text: "Modern (Sans)"; checkable: true; checked: backend.outputStyle === 0; onTriggered: backend.setOutputStyle(0) }
-        CompactMenuItem { objectName: "previewTemplate1"; text: "Classic (Serif)"; checkable: true; checked: backend.outputStyle === 1; onTriggered: backend.setOutputStyle(1) }
-        CompactMenuItem { objectName: "previewTemplate2"; text: "Manuscript (Mono)"; checkable: true; checked: backend.outputStyle === 2; onTriggered: backend.setOutputStyle(2) }
+        CompactMenuItem { objectName: "previewTemplate0"; text: "Modern (Sans)"; checkable: true; autoExclusive: true; checked: backend.outputStyle === 0; onTriggered: backend.setOutputStyle(0) }
+        CompactMenuItem { objectName: "previewTemplate1"; text: "Classic (Serif)"; checkable: true; autoExclusive: true; checked: backend.outputStyle === 1; onTriggered: backend.setOutputStyle(1) }
+        CompactMenuItem { objectName: "previewTemplate2"; text: "Manuscript (Mono)"; checkable: true; autoExclusive: true; checked: backend.outputStyle === 2; onTriggered: backend.setOutputStyle(2) }
         MenuSeparator {}
-        CompactMenuItem { objectName: "previewTemplate4"; text: "GitHub"; checkable: true; checked: backend.outputStyle === 4; onTriggered: backend.setOutputStyle(4) }
-        CompactMenuItem { objectName: "previewTemplate5"; text: "Helvetica"; checkable: true; checked: backend.outputStyle === 5; onTriggered: backend.setOutputStyle(5) }
-        CompactMenuItem { objectName: "previewTemplate6"; text: "Palatino"; checkable: true; checked: backend.outputStyle === 6; onTriggered: backend.setOutputStyle(6) }
-        CompactMenuItem { objectName: "previewTemplate7"; text: "MLA Draft"; checkable: true; checked: backend.outputStyle === 7; onTriggered: backend.setOutputStyle(7) }
+        CompactMenuItem { objectName: "previewTemplate4"; text: "GitHub"; checkable: true; autoExclusive: true; checked: backend.outputStyle === 4; onTriggered: backend.setOutputStyle(4) }
+        CompactMenuItem { objectName: "previewTemplate5"; text: "Helvetica"; checkable: true; autoExclusive: true; checked: backend.outputStyle === 5; onTriggered: backend.setOutputStyle(5) }
+        CompactMenuItem { objectName: "previewTemplate6"; text: "Palatino"; checkable: true; autoExclusive: true; checked: backend.outputStyle === 6; onTriggered: backend.setOutputStyle(6) }
+        CompactMenuItem { objectName: "previewTemplate7"; text: "MLA Draft"; checkable: true; autoExclusive: true; checked: backend.outputStyle === 7; onTriggered: backend.setOutputStyle(7) }
         MenuSeparator {}
-        CompactMenuItem { objectName: "previewTemplate3"; text: "Custom"; checkable: true; checked: backend.outputStyle === 3; onTriggered: backend.setOutputStyle(3) }
+        CompactMenuItem { objectName: "previewTemplate3"; text: "Custom"; checkable: true; autoExclusive: true; checked: backend.outputStyle === 3; onTriggered: backend.setOutputStyle(3) }
         CompactMenuItem { objectName: "previewTemplateCustomLoad"; text: "Load Custom Template…"; onTriggered: outputStyleDialog.open() }
     }
     CompactMenu {
@@ -1167,6 +1153,16 @@ ApplicationWindow {
 
     Connections {
         target: backend
+        function onStatusChanged() {
+            // Pane contraction must not hide command failures or save feedback.
+            // Routine dirty-state updates stay quiet while the user is typing.
+            var message = backend.status;
+            if (!message || message === "Unsaved") return;
+            var sourceStatusVisible = workspaceLayout.effectiveLayoutMode !== 2
+                    && sourceFooter.visible && sourceFooterStatus.visible;
+            if (!workspaceLayout.effectiveOrganizerVisible && !sourceStatusVisible)
+                win.showNavigationNotice(message);
+        }
     }
 
     FontMetrics {
@@ -2559,7 +2555,7 @@ ApplicationWindow {
             anchors.fill: parent
             anchors.leftMargin: 24
             anchors.rightMargin: 24
-            anchors.bottomMargin: 38
+            anchors.bottomMargin: sourceFooter.height
             anchors.topMargin: documentMeta.y + documentMeta.height
             clip: true
             contentWidth: width
@@ -3047,41 +3043,70 @@ ApplicationWindow {
             }
         }
 
-        Rectangle {
+        WorkspaceFooter {
+            id: sourceFooter
             objectName: "sourceFooter"
             anchors.left: parent.left; anchors.right: parent.right; anchors.bottom: parent.bottom
-            height: 38
-            color: backend.palette.page
-            Rectangle { width: parent.width; height: 1; color: backend.palette.border }
             RowLayout {
-                anchors.fill: parent; anchors.leftMargin: 24; anchors.rightMargin: 24; spacing: 8
-                ChromeButton {
+                anchors.fill: parent; anchors.leftMargin: 12; anchors.rightMargin: 12; spacing: 8
+                FooterButton {
                     objectName: "sourceModeButton"
-                    visible: workspaceSettings.toolbarMode !== 1
-                    text: "Source · " + (win.activeWritingAppearance === "editorial" ? "Editorial" : win.activeWritingAppearance === "book" ? "Book" : "Manuscript")
-                    font.pixelSize: 12; leftPadding: 0; rightPadding: 0
-                    hint: "Writing mode — " + backend.status
+                    text: "Source"
+                    menuIndicator: true
+                    hint: "Choose document view — " + backend.status
                     onClicked: win.openAnchoredMenu(sourceModeMenu, this)
                 }
-                Item { Layout.fillWidth: true }
-                ChromeButton { objectName: "toolbarStatistic"; visible: workspaceSettings.toolbarMode === 1; text: win.compactToolbarStatistics(); hint: text; Layout.fillWidth: true; onClicked: workspaceCommands.run("statistics") }
-                ChromeButton {
+                Label {
+                    id: sourceFooterStatus
+                    objectName: "sourceFooterStatus"
+                    visible: workspaceSettings.toolbarMode !== 1 && sourceFooter.width >= 660
+                             && !workspaceLayout.effectiveOrganizerVisible
+                    text: backend.status
+                    font.family: Qt.application.font.family; font.pixelSize: 13
+                    color: backend.palette.muted
+                    elide: Text.ElideRight
+                    Layout.fillWidth: true; Layout.minimumWidth: 0
+                    Accessible.name: "Document status: " + backend.status
+                    ToolTip.visible: footerStatusHover.hovered; ToolTip.text: text
+                    HoverHandler { id: footerStatusHover }
+                }
+                Item { Layout.fillWidth: true; visible: !sourceFooterStatus.visible && workspaceSettings.toolbarMode !== 1 }
+                FooterButton {
+                    objectName: "toolbarStatistic"
+                    visible: workspaceSettings.toolbarMode === 1
+                    text: win.compactToolbarStatistics(); hint: text
+                    Layout.fillWidth: true; Layout.minimumWidth: 34
+                    onClicked: workspaceCommands.run("statistics")
+                }
+                FooterButton {
                     objectName: "sourceAppearanceButton"
-                    visible: workspaceSettings.toolbarMode !== 1
-                    text: (win.activeWritingAppearance === "editorial" ? "Editorial" : win.activeWritingAppearance === "book" ? "Book" : "Manuscript") + "⌄"
-                    font.pixelSize: 12; rightPadding: 0
-                    hint: "Writing appearance"
-                    onClicked: win.openAnchoredMenu(writingOptions, this)
+                    text: win.activeWritingAppearance === "editorial" ? "Editorial" : win.activeWritingAppearance === "book" ? "Book" : "Manuscript"
+                    menuIndicator: true
+                    hint: "Choose writing appearance"
+                    onClicked: win.openAnchoredMenu(sourceAppearanceMenu, this)
                 }
             }
         }
         CompactMenu {
             id: sourceModeMenu
+            objectName: "sourceModeMenu"
             width: 220
-            CompactMenuItem { text: "Source"; checkable: true; checked: workspaceLayout.layoutMode === 0; onTriggered: win.selectWritingMode("source") }
+            CompactMenuItem { objectName: "sourceModeSource"; text: "Source"; checkable: true; autoExclusive: true; checked: workspaceLayout.layoutMode === 0; onTriggered: win.selectWritingMode("source") }
             CompactMenuItem { objectName: "sourceVisualEditButton"; text: "Visual Edit"; onTriggered: win.selectWritingMode("visual") }
-            CompactMenuItem { text: "Split"; checkable: true; checked: workspaceLayout.layoutMode === 1; onTriggered: workspaceLayout.layoutMode = 1 }
-            CompactMenuItem { text: "Preview"; onTriggered: win.selectWritingMode("preview") }
+            CompactMenuItem { objectName: "sourceModeSplit"; text: "Split"; checkable: true; autoExclusive: true; checked: workspaceLayout.layoutMode === 1; onTriggered: workspaceLayout.layoutMode = 1 }
+            CompactMenuItem { objectName: "sourceModePreview"; text: "Preview"; onTriggered: win.selectWritingMode("preview") }
+        }
+        CompactMenu {
+            id: sourceAppearanceMenu
+            objectName: "sourceAppearanceMenu"
+            width: 220
+            CompactMenuItem { objectName: "sourceAppearanceManuscript"; text: "Manuscript"; checkable: true; autoExclusive: true; checked: win.activeWritingAppearance === "manuscript"; onTriggered: workspaceCommands.run("writingManuscript") }
+            CompactMenuItem { objectName: "sourceAppearanceEditorial"; text: "Editorial"; checkable: true; autoExclusive: true; checked: win.activeWritingAppearance === "editorial"; onTriggered: workspaceCommands.run("writingEditorial") }
+            CompactMenuItem { objectName: "sourceAppearanceBook"; text: "Book"; checkable: true; autoExclusive: true; checked: win.activeWritingAppearance === "book"; onTriggered: workspaceCommands.run("writingBook") }
+            MenuSeparator {}
+            CompactMenuItem { objectName: "sourceAppearanceLarger"; text: "Larger text"; enabled: workspaceSettings.writingSize < 32; onTriggered: workspaceCommands.run("larger") }
+            CompactMenuItem { objectName: "sourceAppearanceSmaller"; text: "Smaller text"; enabled: workspaceSettings.writingSize > 12; onTriggered: workspaceCommands.run("smaller") }
+            CompactMenuItem { objectName: "sourceAppearanceReset"; text: "Reset text size"; onTriggered: workspaceCommands.run("resetSize") }
         }
 
 

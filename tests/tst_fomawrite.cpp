@@ -39,6 +39,9 @@ class FomawriteTest : public QObject {
     Q_OBJECT
 
 private slots:
+    void footerModesAndTemplatesPreserveDraftAndUndo();
+    void footerAppearanceAndStatisticsWorkByClick();
+    void footerControlsAndMenusRemainReachableWhenResized();
     void headerQuickZoomPreservesMarkdownAndUndo();
     void headerQuickControlsStayReachableWhenResized();
     void folderHeaderButtonRequestsFolderPicker();
@@ -5210,6 +5213,7 @@ private:
 #include "cycle103-concept.inc"
 #include "cycle103-inline.inc"
 #include "cycle104-controls.inc"
+#include "cycle106-footer.inc"
 #include "cycle100-navigation.inc"
 #include "cycle99-integration.inc"
 #include "sourcevisualmapping-cycle99.inc"

@@ -119,7 +119,7 @@ Rectangle {
         anchors.leftMargin: 8
         anchors.rightMargin: 8
         anchors.topMargin: 20
-        anchors.bottomMargin: 8
+        anchors.bottomMargin: organizerFooter.height + 8
         contentWidth: availableWidth
         clip: true
         ColumnLayout {
@@ -359,6 +359,23 @@ Rectangle {
                 }
             }
             onRejected: overlapDialog.close()
+        }
+    }
+
+    WorkspaceFooter {
+        id: organizerFooter
+        objectName: "organizerFooter"
+        anchors.left: parent.left; anchors.right: parent.right; anchors.bottom: parent.bottom
+        color: backend.palette.organizer
+        Label {
+            anchors.fill: parent; anchors.leftMargin: 12; anchors.rightMargin: 12
+            text: backend.status
+            font.family: Qt.application.font.family; font.pixelSize: 13
+            color: backend.palette.muted
+            elide: Text.ElideRight; verticalAlignment: Text.AlignVCenter
+            Accessible.name: "Document status: " + backend.status
+            ToolTip.visible: statusHover.hovered; ToolTip.text: backend.status
+            HoverHandler { id: statusHover }
         }
     }
 

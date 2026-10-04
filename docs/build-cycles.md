@@ -1378,3 +1378,14 @@ Changes: 34px circle/capsule surfaces, 32px segments, 18px glyphs, darker theme-
 Validation: **144 regression tests pass**, build passes, and six existing native Cocoa checks pass (**8/0/0** including setup/cleanup). Native wide/reference/narrow/dark screenshots received a separate visual review with no blockers. Existing tests cover command clicks, exact Markdown/Undo/export preservation, resize fit and pane restoration. [Evidence](../research/cycle-105/README.md). No tests added merely to mirror visual properties.
 
 Runnable artifacts: stable Dev, demo/package and Applications, all `0.3.0-dev6`, macOS `0.3.0 (105)`, strict-signature verified; demo/Applications executables match. Physical VoiceOver/display review and Andrew’s visual acceptance remain open. [Optional exercise](../research/usability/cycle-105.md). Next product work follows that feedback; bounded image/table/list ergonomics and optional distribution remain separate scopes.
+
+
+## Cycle 106 — consistent, functional workspace footers
+
+Planned scope: fix Andrew's report that bottom controls differ from the header, fail on clicks and do not line up between columns.
+
+Changes: shared 52px workspace footer and header-derived 13px rounded controls; one aligned rule across navigation/Source/Preview; removal of the orphan global status strip; grouped Split/Full; direct appearance menu; visible dropdown chevrons; focused Visual Edit entry; accessible layout selection; rounded Library filter. Status stays visible when its usual pane is collapsed. Immediate menu transitions prevent a closing fade from swallowing a rapid reopening click. Radio-style menu items retain selection on reselection. Shared standards are recorded in the workspace UI guide.
+
+Verification: production/final package build passes; **147 regression tests pass**; five affected native Cocoa workflows pass (**7/0/0** including setup/cleanup). Actual clicks cover all footer mode/template/appearance actions, rapid repeats, selection state and exact draft/Undo preservation. Geometry and native screenshots cover short/narrow/light/dark layouts and 320px Preview. Native mouse-only QA is isolated from unsolicited OS typing; separate filter keyboard checks remain. [Evidence and limits](../research/cycle-106/README.md).
+
+Runnable artifacts: stable Dev, ordinary demo/package and Applications are synchronized to `0.3.0-dev7`, macOS `0.3.0 (106)`, with strict signatures verified and matching demo/Applications executables. [Optional exercise](../research/usability/cycle-106.md). Physical VoiceOver/display-scale checks and Andrew's normal writing acceptance remain open. Next product work follows his footer review; image/table/list ergonomics and optional public distribution remain separate scopes.

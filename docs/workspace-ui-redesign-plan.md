@@ -1,6 +1,6 @@
 # Fomawrite workspace UI redesign plan
 
-Planning date: 3 October 2026. Original baseline: `52af519`. Cycles 90–100 and 102 implemented the workspace and editing foundations, but Andrew’s 4 October visual comparison rejected the remaining gap between the approved concept and the shipped app. Cycle 103 follows the concept’s actual geometry, typography, icons and writing presentation; Cycle 104 refines the folder heading and formatting tools and adds quick text sizing. Cycle 105 follows the Ulysses toolbar reference with cleaner glyphs and uninterrupted formatting capsules. The current target is `0.3.0-dev6`, macOS `0.3.0 (105)`. [Native screenshots and verification](../research/cycle-105/README.md). Visual sign-off from Andrew remains pending.
+Planning date: 3 October 2026. Original baseline: `52af519`. Cycles 90–100 and 102 implemented the workspace and editing foundations, but Andrew’s 4 October visual comparison rejected the remaining gap between the approved concept and the shipped app. Cycle 103 follows the concept’s actual geometry, typography, icons and writing presentation; Cycle 104 refines the folder heading and formatting tools and adds quick text sizing. Cycle 105 follows the Ulysses toolbar reference with cleaner glyphs and uninterrupted formatting capsules. Cycle 106 applies that same control family to aligned workspace footers and verifies their real menu actions. The current target is `0.3.0-dev7`, macOS `0.3.0 (106)`. [Native screenshots and verification](../research/cycle-106/README.md). Visual sign-off from Andrew remains pending.
 
 The approved direction makes Fomawrite a composed writing workspace. Andrew's preferred reference is the Ulysses window in his three-app comparison: a quiet gray organizer, clean document list, warm writing canvas, and clearly grouped controls belonging to each column. Preserve Fomawrite's blue folders, local Markdown files and existing editing protections.
 
@@ -35,7 +35,7 @@ After Cycles 103–104’s visual and toolbar feedback, the next product work re
 - Existing guidance: [editor surface work](editor-surface-redesign.md), [dialog guide](dialog-style-guide.md), [build log](build-cycles.md), [acceptance ledger](release-acceptance.md).
 - Baseline validation: Cycle 89 records 118 passing tests and native window-routing checks. Those are historical results, not tests rerun for this document. Installed, packaged and Dev copies must be identified by commit before future comparisons; their presence alone does not establish that they match.
 - The interactive concept demonstrates composition, blue folders, control grouping and writing appearances. Its simplified widths, breakpoints and appearance selector are illustrative; the written fit rules govern implementation. It is not native layout, complete feature or accessibility acceptance.
-- The original planning pass produced a plan and illustrative concept without changing app code. Andrew subsequently authorized the implementation checkpoint above; current verification and deployment status belong in the Cycle 105 handoff; the Cycle 97 record preserves its earlier verified checkpoint.
+- The original planning pass produced a plan and illustrative concept without changing app code. Andrew subsequently authorized the implementation checkpoint above; current verification and deployment status belong in the Cycle 106 handoff; the Cycle 97 record preserves its earlier verified checkpoint.
 
 ## What exists and what must change
 
@@ -148,6 +148,16 @@ The window's current 720-pixel minimum remains initially. A lower window minimum
 Do not introduce horizontal scrolling for the whole writing workspace. Export is a different task surface: its horizontal band scrolling at narrow widths is an intentional existing behavior and must remain available.
 
 **Persistence:** pane visibility and widths are per window/workspace, restored with that window. New windows inherit reasonable defaults rather than live-mirroring another window's changes. Migrate the current shared settings once, without changing theme, writing appearance, root folder or document mode. Integrate a versioned pane-state object into the existing per-window checkpoint and restoration in `src/main.cpp`, with defaults for older checkpoints. Persist desired widths before responsive contraction, never the temporarily constrained widths. Native tab grouping does not make layouts shared; untitled recovery retains its existing policy. Remembered widths are clamped to the current display. Validate new-window, tab-detach and workspace-restoration behavior explicitly.
+
+### Workspace footer standard — Cycle 106
+
+- Every visible workspace column uses `WorkspaceFooter`: 52 logical pixels, a one-pixel top rule, the owning pane's surface color and the pane's exact width. Reserve that same height in the scroll area. Do not add a second global status strip beneath it.
+- Footer controls use `FooterButton`, derived from the header's `ToolbarButton`: system UI type at 13px, 34px standalone capsules, 32px segments inside a 34px `ToolbarGroup`, shared ink/border tokens and visible hover, pressed, selected and keyboard-focus states. Keep 12px horizontal insets and 6–8px gaps between groups.
+- Show chevrons for menus. Source chooses the document view; Manuscript/Editorial/Book chooses writing appearance. Preview chooses the output template. Writing appearance must never silently change the export template.
+- Group Split/Full into one capsule. Keep Visual Edit and its Source return route reachable. At the 320px preview minimum, shorten/elide only the template label; retain its complete accessible name and tooltip and all action targets.
+- Footer menus open above their controls within the usable window. Menu transitions are immediate so a closing animation cannot swallow the next opening click; radio-style choices remain checked when reselected. Prefer a short, direct menu here; the full appearance/settings menu remains in the header. Repeated clicks after changing modes or appearance must work, not merely the first opening.
+- The Library filter uses the same 34px rounded field and baseline. Status belongs within a column footer; when those labels are hidden, substantive status changes remain visible above the footer without blocking its controls.
+- Verify actual menu selections, keyboard filter entry, repeated opening, draft/Undo preservation, menu bounds and aligned column rules in Source/Split/Preview/Visual Edit, light/dark and narrow/short windows. Screenshots must come from the running app using synthetic documents.
 
 ## Writing appearance and mode clarity
 

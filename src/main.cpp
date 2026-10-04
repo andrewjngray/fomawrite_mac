@@ -133,7 +133,7 @@ int main(int argc, char *argv[]) {
     app.setOrganizationName(QStringLiteral("AndrewGray"));
     app.setOrganizationDomain(QStringLiteral("andrewjngray.github.io"));
     app.setApplicationDisplayName(QStringLiteral("Fomawrite"));
-    app.setApplicationVersion(QStringLiteral("0.3.0-dev6"));
+    app.setApplicationVersion(QStringLiteral("0.3.0-dev7"));
 #ifdef FOMAWRITE_CONTEXT_SMOKE
     // A separately compiled integration test runs the real window manager with
     // disposable settings and documents, never the user's workspace.

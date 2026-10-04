@@ -169,6 +169,9 @@ void FomawriteTest::previewTemplateFooterAndNativeMenuShareState() {
     layout->setProperty("visualEditEnabled", false);
     layout->setProperty("organizerVisible", false);
     layout->setProperty("filesVisible", false);
+#ifdef Q_OS_MACOS
+    if (QGuiApplication::platformName() == "cocoa") quick->setFlag(Qt::WindowDoesNotAcceptFocus);
+#endif
     quick->show();
     const QString source = QStringLiteral("# Preview templates\n\nChoose a template without changing the Markdown.\n");
     editor->setProperty("text", source);
@@ -261,6 +264,9 @@ void FomawriteTest::previewTemplateRemainsReachableInNarrowSplit() {
     layout->setProperty("filesVisible", false);
     layout->setProperty("layoutMode", 1);
     layout->setProperty("visualEditEnabled", false);
+#ifdef Q_OS_MACOS
+    if (QGuiApplication::platformName() == "cocoa") quick->setFlag(Qt::WindowDoesNotAcceptFocus);
+#endif
     quick->show();
     // Long names must elide while retaining the dropdown affordance and hit area.
     for (int width : {320, 360}) {
@@ -276,7 +282,11 @@ void FomawriteTest::previewTemplateRemainsReachableInNarrowSplit() {
                 QVERIFY2(bounds.left() >= 11 && bounds.right() <= pane->width() - 11,
                          qPrintable(QString("%1 outside %2px footer: x=%3 width=%4").arg(control->objectName()).arg(width).arg(bounds.x()).arg(bounds.width())));
                 QVERIFY(bounds.height() >= 32);
-                if (!previous.isNull()) QVERIFY(previous.right() + 3 <= bounds.left());
+                if (!previous.isNull()) {
+                    // Split and Full are adjacent segments of one capsule.
+                    const qreal gap = control == full ? 0 : 3;
+                    QVERIFY(previous.right() + gap <= bounds.left());
+                }
                 previous = bounds;
             }
             QVERIFY(cycle102Click(quick, button));

@@ -10,6 +10,10 @@ Menu {
     font.family: Qt.application.font.family
     font.pixelSize: 13
     popupType: Popup.Item
+    // Respond immediately when a footer menu is reopened after a command.
+    // Material’s exit fade can otherwise consume the next opening click.
+    enter: Transition {}
+    exit: Transition {}
     background: Rectangle {
         radius: 8
         color: backend.palette.popover || backend.palette.panel

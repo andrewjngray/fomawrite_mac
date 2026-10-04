@@ -7,6 +7,8 @@
         <file>WorkspaceHeader.qml</file>
         <file>ToolbarButton.qml</file>
         <file>ToolbarGroup.qml</file>
+        <file>WorkspaceFooter.qml</file>
+        <file>FooterButton.qml</file>
         <file>NativeCommandMenuItem.qml</file>
         <file>RecentFilesMenu.qml</file>
         <file>ChromeButton.qml</file>
