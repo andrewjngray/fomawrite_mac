@@ -31,6 +31,7 @@
 #include <QThread>
 #include <QUuid>
 #include <functional>
+#include <tuple>
 
 #ifdef Q_OS_MACOS
 void configureMacWindowChrome(QWindow *window);
@@ -40,8 +41,8 @@ void applyMacWindowTheme(QWindow *window, bool followSystem, bool dark);
 namespace {
 const QStringList viewNames{QStringLiteral("visualEditToggle"), QStringLiteral("sourceModeButton"),
                            QStringLiteral("previewSplitButton"), QStringLiteral("previewFullButton")};
-const QStringList controlNames = viewNames + QStringList{QStringLiteral("sourceAppearanceButton"),
-    QStringLiteral("previewTemplateButton"), QStringLiteral("footerStylesButton")};
+const QStringList stationaryNames{QStringLiteral("sourceModeButton"), QStringLiteral("previewSplitButton"), QStringLiteral("previewFullButton")};
+const QStringList controlNames = viewNames + QStringList{QStringLiteral("sourceAppearanceButton"), QStringLiteral("previewTemplateButton")};
 
 bool waitUntil(const std::function<bool()> &condition, int timeout = 3000) {
     QElapsedTimer timer;
@@ -219,6 +220,7 @@ int runDocumentViewCheck(QApplication &app, const QString &outputDirectory) {
     QJsonArray dailyWritingChecks;
     QJsonArray paneZoomChecks;
     QJsonArray editorAcceptanceChecks;
+    QJsonArray paneChromeChecks;
     QJsonArray paneZoomReadings;
     QJsonArray paneZoomDividerEvents;
     QJsonArray screenshots;
@@ -242,6 +244,7 @@ int runDocumentViewCheck(QApplication &app, const QString &outputDirectory) {
         report.insert("dailyWritingChecks", dailyWritingChecks);
         report.insert("paneZoomChecks", paneZoomChecks);
         report.insert("editorAcceptanceChecks", editorAcceptanceChecks);
+        report.insert("paneChromeChecks", paneChromeChecks);
         report.insert("paneZoomReadings", paneZoomReadings);
         report.insert("paneZoomDividerEvents", paneZoomDividerEvents);
         report.insert("screenshots", screenshots);
@@ -260,7 +263,7 @@ int runDocumentViewCheck(QApplication &app, const QString &outputDirectory) {
     };
     QJsonObject resources;
     for (const QString &name : {QStringLiteral("Main.qml"), QStringLiteral("DocumentFooter.qml"),
-            QStringLiteral("FooterButton.qml"), QStringLiteral("PreviewPane.qml"),
+            QStringLiteral("FooterButton.qml"), QStringLiteral("PreviewPane.qml"), QStringLiteral("LibraryPane.qml"),
             QStringLiteral("WorkspaceLayout.qml"), QStringLiteral("WorkspaceCommands.qml"), QStringLiteral("AboutDialog.qml"),
             QStringLiteral("DocumentFindBar.qml"), QStringLiteral("DocumentOutline.qml"),
             QStringLiteral("PaneZoomState.qml"), QStringLiteral("PaneZoomControls.qml"), QStringLiteral("WorkspaceHeader.qml"), QStringLiteral("LinkEditor.qml"), QStringLiteral("LinkSyntax.js"), QStringLiteral("ExportHub.qml"), QStringLiteral("SquareDialogButton.qml")}) {
@@ -397,19 +400,34 @@ int runDocumentViewCheck(QApplication &app, const QString &outputDirectory) {
             auto *label = button->findChild<QQuickItem *>("footerButtonLabel");
             entry.insert("truncated", !label || label->property("truncated").toBool());
             controls.insert(name, entry);
-            check(button->isVisible() == expectedBounds.contains(name), step + ": control visibility changed: " + name);
+            const bool shouldBeVisible = name == "sourceAppearanceButton" ? mode != 2 : name == "previewTemplateButton" ? mode != 0 : true;
+            check(button->isVisible() == shouldBeVisible, step + ": wrong pane control visibility: " + name);
             if (!button->isVisible()) continue;
             check(QRectF(QPointF(), window->size()).contains(rect), step + ": control is clipped: " + name);
-            if (viewNames.contains(name) || name == "footerStylesButton")
+            if (viewNames.contains(name))
                 check(label && !label->property("truncated").toBool(), step + ": label is truncated: " + name);
-            const QRectF baseline = expectedBounds.value(name);
-            check(qAbs(rect.x() - baseline.x()) < 0.5 && qAbs(rect.y() - baseline.y()) < 0.5
-                  && qAbs(rect.width() - baseline.width()) < 0.5 && qAbs(rect.height() - baseline.height()) < 0.5,
-                  step + ": control moved: " + name);
+            if (stationaryNames.contains(name)) {
+                const QRectF baseline = expectedBounds.value(name);
+                check(qAbs(rect.x() - baseline.x()) < 0.5 && qAbs(rect.y() - baseline.y()) < 0.5
+                      && qAbs(rect.width() - baseline.width()) < 0.5 && qAbs(rect.height() - baseline.height()) < 0.5,
+                      step + ": view control moved: " + name);
+            } else if (name == "sourceAppearanceButton" || name == "previewTemplateButton") {
+                auto *owner = name == "sourceAppearanceButton" ? window->findChild<QQuickItem *>("editorPane") : pane;
+                check(owner && qAbs(rect.left() - bounds(owner).left() - 12) < 0.5
+                      && rect.right() <= bounds(owner).right() - 11.5, step + ": control lost its pane anchor: " + name);
+            }
             if (!viewNames.contains(name)) continue;
             const bool checked = name == "visualEditToggle" ? visual
                 : name == "sourceModeButton" ? mode == 0 : name == "previewSplitButton" ? mode == 1 : mode == 2;
             check(button->property("checked").toBool() == checked, step + ": incorrect checked state: " + name);
+        }
+        for (int first = 0; first < controlNames.size(); ++first) {
+            auto *a = buttons.value(controlNames[first]); if (!a->isVisible()) continue;
+            for (int second = first + 1; second < controlNames.size(); ++second) {
+                auto *b = buttons.value(controlNames[second]); if (!b->isVisible()) continue;
+                const auto overlap = bounds(a).intersected(bounds(b));
+                check(overlap.width() <= 0.5 || overlap.height() <= 0.5, step + ": pane controls overlap: " + a->objectName() + "/" + b->objectName());
+            }
         }
         check(editor->property("text").toString() == draft, step + ": canonical draft changed");
         check(editor->property("cursorPosition").toInt() == cursor
@@ -1061,6 +1079,7 @@ int runDocumentViewCheck(QApplication &app, const QString &outputDirectory) {
     }
 
 #include "editoracceptancecheck.inc"
+#include "panechromeacceptancecheck.inc"
 
     if (auto *about = window->findChild<QObject *>("aboutDialog")) {
         check(QMetaObject::invokeMethod(about, "open"), "Cannot open bundled About dialog");

@@ -151,7 +151,7 @@ Rectangle {
                         folderMenu.popup(fileList, eventPoint.position.x, eventPoint.position.y)
                 }
             }
-            spacing: displaySettings.showExcerpts ? 4 : 0
+            spacing: 0
             delegate: ItemDelegate {
                 id: entry
                 objectName: "libraryEntry"
@@ -159,16 +159,17 @@ Rectangle {
                 readonly property bool documentCard: !modelData.directory && displaySettings.showExcerpts
                 readonly property var summary: documentCard ? root.library.documentSummary(modelData.url) : ({})
                 width: Math.max(0, fileList.width - (fileScrollBar.size < 1 ? 12 : 0))
-                height: documentCard ? cardContent.implicitHeight + topPadding + bottomPadding : 30
-                topPadding: documentCard ? 14 : 0
+                height: Math.max(30, rowContent.implicitHeight + topPadding + bottomPadding)
+                topPadding: documentCard ? 6 : 0
                 bottomPadding: topPadding
-                rightPadding: documentCard ? 12 : 8
+                rightPadding: 8
                 font.family: Qt.application.font.family
                 font.pixelSize: 13
                 focusPolicy: Qt.StrongFocus
-                leftPadding: (documentCard ? 12 : 8) + modelData.depth * 16
+                // The model carries real tree depth; flat browsing keeps sibling rows aligned.
+                leftPadding: 8 + modelData.depth * 18
                 highlighted: !modelData.directory && modelData.url.toString() === root.currentFile.toString()
-                Accessible.name: documentCard && summary.title ? summary.title : modelData.name
+                Accessible.name: modelData.name
                 Accessible.selected: highlighted
                 Accessible.description: modelData.directory ? "Folder" : modelData.name
                 onClicked: {
@@ -176,84 +177,83 @@ Rectangle {
                     else root.openRequested(modelData.url)
                 }
                 background: Rectangle {
-                    radius: entry.documentCard ? 8 : 6
+                    radius: 6
                     color: entry.down ? (backend.palette.controlPressed || backend.palette.selectedRow)
                         : entry.highlighted ? backend.palette.selectedRow
                         : entry.hovered ? backend.palette.hover : "transparent"
                     border.width: entry.activeFocus ? 2 : 0
                     border.color: backend.palette.focus
                 }
-                contentItem: ColumnLayout {
-                    id: cardContent
-                    spacing: entry.documentCard ? 4 : 0
-                    Label {
-                        objectName: "libraryEntryDate"
-                        visible: entry.documentCard && displaySettings.dateMode !== 0
-                        text: displaySettings.dateMode === 2 ? entry.modelData.createdLabel : entry.modelData.modifiedLabel
-                        Layout.fillWidth: true
-                        Layout.minimumWidth: 0
-                        Layout.bottomMargin: 1
-                        font.family: Qt.application.font.family
-                        font.pixelSize: 11
-                        color: backend.palette.muted
-                        elide: Text.ElideRight
+                contentItem: RowLayout {
+                    id: rowContent
+                    spacing: 8
+                    LineIcon {
+                        objectName: "libraryEntryIcon"
+                        name: entry.modelData.directory ? "folder" : "document"
+                        ink: entry.modelData.directory ? backend.palette.folder : backend.palette.muted
+                        Layout.preferredWidth: 16
+                        Layout.preferredHeight: 16
+                        Layout.alignment: entry.documentCard ? Qt.AlignTop : Qt.AlignVCenter
+                        Layout.topMargin: entry.documentCard ? 1 : 0
                     }
-                    RowLayout {
-                        spacing: 8
+                    ColumnLayout {
+                        spacing: entry.documentCard ? 2 : 0
                         Layout.fillWidth: true
                         Layout.minimumWidth: 0
-                        LineIcon {
-                            visible: !entry.documentCard
-                            name: entry.modelData.directory ? "folder" : "editor"
-                            ink: entry.modelData.directory ? backend.palette.folder : backend.palette.muted
-                            Layout.preferredWidth: 16
-                            Layout.preferredHeight: 16
+                        RowLayout {
+                            spacing: 8
+                            Layout.fillWidth: true
+                            Layout.minimumWidth: 0
+                            Label {
+                                objectName: "libraryEntryTitle"
+                                textFormat: Text.PlainText
+                                text: entry.modelData.name
+                                font.family: Qt.application.font.family
+                                font.pixelSize: 13
+                                font.weight: entry.documentCard ? Font.DemiBold : Font.Normal
+                                color: backend.palette.text
+                                elide: Text.ElideMiddle
+                                wrapMode: Text.NoWrap
+                                maximumLineCount: 1
+                                Layout.fillWidth: true
+                                Layout.minimumWidth: 0
+                            }
+                            Label {
+                                objectName: "libraryEntryDate"
+                                textFormat: Text.PlainText
+                                visible: !entry.modelData.directory && displaySettings.dateMode !== 0
+                                text: displaySettings.dateMode === 2 ? entry.modelData.created : entry.modelData.modified
+                                elide: Text.ElideRight
+                                Layout.minimumWidth: 0
+                                Layout.maximumWidth: Math.max(0, entry.availableWidth * 0.3)
+                                font.family: Qt.application.font.family
+                                font.pixelSize: 11
+                                color: backend.palette.muted
+                            }
+                            LineIcon {
+                                visible: entry.modelData.directory
+                                name: root.library.navigationMode === 0 && entry.modelData.expanded ? "down" : "right"
+                                ink: backend.palette.muted
+                                Layout.preferredWidth: 14
+                                Layout.preferredHeight: 14
+                            }
                         }
                         Label {
-                            objectName: "libraryEntryTitle"
-                            text: entry.documentCard && entry.summary.title ? entry.summary.title : entry.modelData.name
-                            font.family: Qt.application.font.family
-                            font.pixelSize: 13
-                            font.weight: entry.documentCard ? Font.DemiBold : Font.Normal
-                            color: backend.palette.text
+                            objectName: "libraryEntryExcerpt"
+                            textFormat: Text.PlainText
+                            visible: entry.documentCard
+                            text: entry.summary.excerpt || "Empty document"
                             elide: Text.ElideRight
-                            wrapMode: entry.documentCard ? Text.Wrap : Text.NoWrap
-                            maximumLineCount: entry.documentCard ? 2 : 1
+                            wrapMode: Text.Wrap
+                            maximumLineCount: 2
+                            lineHeightMode: Text.ProportionalHeight
+                            lineHeight: 1.2
+                            font.family: Qt.application.font.family
+                            font.pixelSize: 12
+                            color: backend.palette.muted
                             Layout.fillWidth: true
                             Layout.minimumWidth: 0
                         }
-                        Label {
-                            visible: !entry.documentCard && !entry.modelData.directory && displaySettings.dateMode !== 0
-                            text: displaySettings.dateMode === 2 ? entry.modelData.created : entry.modelData.modified
-                            elide: Text.ElideRight
-                            Layout.minimumWidth: 0
-                            Layout.maximumWidth: Math.max(0, entry.width * 0.35)
-                            font.family: Qt.application.font.family
-                            font.pixelSize: 11
-                            color: backend.palette.muted
-                        }
-                        LineIcon {
-                            visible: entry.modelData.directory
-                            name: root.library.navigationMode === 0 && entry.modelData.expanded ? "down" : "right"
-                            ink: backend.palette.muted
-                            Layout.preferredWidth: 14
-                            Layout.preferredHeight: 14
-                        }
-                    }
-                    Label {
-                        objectName: "libraryEntryExcerpt"
-                        visible: entry.documentCard
-                        text: entry.summary.excerpt || "Empty document"
-                        elide: Text.ElideRight
-                        wrapMode: Text.Wrap
-                        maximumLineCount: 2
-                        lineHeightMode: Text.ProportionalHeight
-                        lineHeight: 1.45
-                        font.family: Qt.application.font.family
-                        font.pixelSize: 13
-                        color: backend.palette.text
-                        Layout.fillWidth: true
-                        Layout.minimumWidth: 0
                     }
                 }
                 TapHandler {

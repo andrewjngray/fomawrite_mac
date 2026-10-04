@@ -213,14 +213,14 @@ void FomawriteTest::referenceWorkspaceCompositionMatchesConcept() {
         QVERIFY(date && label && excerpt);
         QVERIFY(date->isVisible() && label->isVisible() && excerpt->isVisible());
         QVERIFY(!date->property("text").toString().isEmpty());
-        QVERIFY(!label->property("text").toString().endsWith(".md"));
+        QVERIFY(label->property("text").toString().endsWith(".md"));
         QVERIFY(!excerpt->property("text").toString().isEmpty());
         const auto a = date->mapRectToItem(card, date->boundingRect());
         const auto b = label->mapRectToItem(card, label->boundingRect());
         const auto c = excerpt->mapRectToItem(card, excerpt->boundingRect());
-        QVERIFY(a.bottom() < b.top()); QVERIFY(b.bottom() < c.top());
+        QVERIFY(a.left() > b.right()); QVERIFY(qAbs(a.center().y() - b.center().y()) < 2); QVERIFY(b.bottom() < c.top());
         QVERIFY(c.bottom() < card->height());
-        if (label->property("text").toString() == names[1]) secondCard = card;
+        if (label->property("text").toString() == names[1] + ".md") secondCard = card;
     }
     for (const char *name : {"collapseOrganizerButton", "collapseFilesButton", "newDocumentButton", "documentSearchButton", "topChromeLibraryButton"}) {
         auto *button = window->findChild<QQuickItem *>(name); QVERIFY(button && button->isVisible());

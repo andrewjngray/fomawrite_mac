@@ -315,7 +315,7 @@ ApplicationWindow {
     }
     Connections {
         target: documentFooter
-        function onCompactChanged() { Qt.callLater(win.rescueHiddenWorkspaceFocus); }
+        function onLayoutModeChanged() { Qt.callLater(win.rescueHiddenWorkspaceFocus); }
     }
     Shortcut {
         sequence: "F6"; context: Qt.WindowShortcut; enabled: win.workspaceOwnsKeyboard
@@ -601,6 +601,8 @@ ApplicationWindow {
 
     WorkspaceHeader {
         id: topChrome
+        documentName: win.appBackend.fileName
+        documentModified: win.appBackend.modified
         zoomController: paneZoom
         anchors.top: parent.top
         width: parent.width
@@ -843,20 +845,6 @@ ApplicationWindow {
         CompactMenuItem { objectName: "sourceAppearanceSmaller"; text: "Smaller text"; enabled: paneZoom.sourceZoom > paneZoom.minimumZoom; onTriggered: paneZoom.adjustZoom("source", -10) }
         CompactMenuItem { objectName: "sourceAppearanceReset"; text: "Reset text size"; onTriggered: paneZoom.resetZoom("source") }
     }
-    CompactMenu {
-        id: footerStylesMenu
-        objectName: "footerStylesMenu"
-        width: 230
-        CompactMenuItem {
-            objectName: "footerWritingStylesEntry"; text: "Writing appearance…"
-            onTriggered: Qt.callLater(function() { win.openAnchoredMenu(sourceAppearanceMenu, documentFooter.stylesAnchor); })
-        }
-        CompactMenuItem {
-            objectName: "footerPreviewTemplatesEntry"; text: "Preview template…"
-            onTriggered: Qt.callLater(function() { win.openAnchoredMenu(previewTemplateMenu, documentFooter.stylesAnchor); })
-        }
-    }
-
     CompactMenu {
         id: previewTemplateMenu
         objectName: "previewTemplateMenu"
@@ -3343,9 +3331,8 @@ ApplicationWindow {
         layoutMode: workspaceLayout.effectiveLayoutMode
         visualEditing: workspaceLayout.effectiveLayoutMode !== 0 && workspaceLayout.visualEditEnabled
         canSplit: workspaceLayout.availableWidth >= 800
-        styleWidthBudget: Math.max(0, workspaceLayout.availableWidth
-            - (workspaceLayout.organizerVisible ? workspaceLayout.organizerWidth : 0)
-            - (workspaceLayout.filesVisible ? workspaceLayout.fileWidth : 0))
+        sourcePaneWidth: editorPane.visible ? editorPane.width : 0
+        previewPaneStart: previewPane.visible ? previewPane.x - x : width
         writingAppearance: win.activeWritingAppearance === "editorial" ? "Editorial" : win.activeWritingAppearance === "book" ? "Book" : "Manuscript"
         previewTemplate: backend.outputTemplateName
         statusText: backend.status
@@ -3356,7 +3343,6 @@ ApplicationWindow {
         onVisualEditRequested: win.toggleVisualEditing()
         onAppearanceMenuRequested: function(anchor) { win.openAnchoredMenu(sourceAppearanceMenu, anchor); }
         onTemplateMenuRequested: function(anchor) { win.openAnchoredMenu(previewTemplateMenu, anchor); }
-        onStylesMenuRequested: function(anchor) { win.openAnchoredMenu(footerStylesMenu, anchor); }
         onStatisticsRequested: workspaceCommands.run("statistics")
     }
 

@@ -41,3 +41,7 @@ Makefile
 /research/cycle-116/*
 !/research/cycle-116/README.md
 !/research/cycle-116/verified-builds.json
+
+/research/cycle-117/*
+!/research/cycle-117/README.md
+!/research/cycle-117/verified-builds.json

@@ -14,6 +14,11 @@ Item {
     required property var editorPane
     required property var previewPane
     required property var zoomController
+    // Explicit bindings can be supplied by a window; defaults retain the
+    // per-engine Backend identity used by existing component fixtures.
+    property string documentName: backend.fileName
+    property bool documentModified: backend.modified
+    readonly property bool fullPreview: !editorPane.visible && previewPane.visible
     property bool keyboardReveal: false
     readonly property bool revealRequested: chromeHover.hovered || keyboardReveal
     readonly property real titleContentOpacity: settings.titleBarMode === 1 || revealRequested ? 1 : 0
@@ -30,6 +35,71 @@ Item {
             if (writingClusterExpanded) sourceBoldButton.forceActiveFocus(Qt.TabFocusReason);
             else sourceFormatButton.forceActiveFocus(Qt.TabFocusReason);
         } else workspaceButton.forceActiveFocus(Qt.TabFocusReason);
+    }
+    // The filename and dirty marker are independent text runs: the filename
+    // can elide without hiding whether this particular document is unsaved.
+    component PreviewDocumentIdentity: Item {
+        id: identity
+        required property string identityPrefix
+        readonly property string displayName: root.documentName.length > 0 ? root.documentName : "Untitled.md"
+        readonly property string accessibleTitle: displayName + (root.documentModified ? " — Edited" : "")
+        objectName: identityPrefix + "Identity"
+        implicitWidth: identityRow.implicitWidth
+        implicitHeight: 20
+        clip: true
+        Accessible.role: Accessible.StaticText
+        Accessible.name: accessibleTitle
+        ToolTip.visible: identityHover.hovered
+        ToolTip.delay: 700
+        ToolTip.text: accessibleTitle
+        HoverHandler { id: identityHover }
+        RowLayout {
+            id: identityRow
+            anchors.left: parent.left
+            anchors.verticalCenter: parent.verticalCenter
+            width: Math.min(parent.width, implicitWidth)
+            height: parent.height
+            spacing: 6
+            LineIcon {
+                objectName: identity.identityPrefix + "Icon"
+                name: "document"
+                ink: backend.palette.muted
+                Layout.preferredWidth: 16
+                Layout.preferredHeight: 16
+                Layout.minimumWidth: 16
+                Layout.maximumWidth: 16
+                Accessible.ignored: true
+            }
+            Text {
+                objectName: identity.identityPrefix + "Name"
+                text: identity.displayName
+                textFormat: Text.PlainText
+                font.family: Qt.application.font.family
+                font.pixelSize: 13
+                font.weight: Font.Bold
+                color: backend.palette.text
+                Layout.fillWidth: true
+                Layout.minimumWidth: 0
+                elide: Text.ElideMiddle
+                maximumLineCount: 1
+                verticalAlignment: Text.AlignVCenter
+                Accessible.ignored: true
+            }
+            Text {
+                objectName: identity.identityPrefix + "Edited"
+                visible: root.documentModified
+                text: "— Edited"
+                textFormat: Text.PlainText
+                font.family: Qt.application.font.family
+                font.pixelSize: 13
+                font.weight: Font.Normal
+                color: backend.palette.muted
+                Layout.minimumWidth: implicitWidth
+                Layout.maximumWidth: implicitWidth
+                verticalAlignment: Text.AlignVCenter
+                Accessible.ignored: true
+            }
+        }
     }
     height: 52
     z: 20
@@ -130,7 +200,22 @@ Item {
                 }
                 ToolbarButton { objectName: "documentSearchButton"; iconName: "search"; hint: "Find in document"; onClicked: root.actionRequested("find", this) }
             }
-            Item { Layout.fillWidth: true; Layout.minimumWidth: 6 }
+            Label {
+                objectName: "fullPreviewHeaderModeLabel"
+                visible: root.fullPreview && root.toolbarContentVisible && root.writingControlsWidth >= 380
+                text: root.previewPane.visualEditEnabled ? "Visual Edit" : "Preview"
+                font.pixelSize: 13
+                color: backend.palette.muted
+                opacity: root.toolbarContentOpacity
+            }
+            PreviewDocumentIdentity {
+                identityPrefix: "fullPreviewDocument"
+                visible: root.fullPreview && root.toolbarContentVisible
+                opacity: root.titleContentOpacity
+                Layout.fillWidth: true
+                Layout.minimumWidth: 0
+            }
+            Item { visible: !root.fullPreview; Layout.fillWidth: true; Layout.minimumWidth: 6 }
             Row {
                 id: trailing
                 objectName: "topChromeToolbarTrailing"
@@ -139,19 +224,19 @@ Item {
                 ToolbarGroup {
                     objectName: "compactWritingControls"
                     property bool sourceFormattingControl: true
-                    visible: root.writingClusterExpanded
+                    visible: !root.fullPreview && root.writingClusterExpanded
                     ToolbarButton { id: sourceBoldButton; objectName: "compactBoldButton"; grouped: true; text: "B"; font.pixelSize: 16; font.weight: Font.Bold; hint: trailing.formattingAllowed ? "Bold selection" : "Choose Source to apply formatting"; enabled: trailing.formattingAllowed; onClicked: root.actionRequested("bold", this) }
                     ToolbarButton { objectName: "compactItalicButton"; grouped: true; text: "I"; font.family: "Times New Roman"; font.pixelSize: 18; font.italic: true; hint: "Italic selection"; enabled: trailing.formattingAllowed; onClicked: root.actionRequested("italic", this) }
                     ToolbarButton { objectName: "compactLinkButton"; grouped: true; iconName: "link"; hint: "Insert or edit link"; enabled: trailing.formattingAllowed; onClicked: root.actionRequested("link", this) }
                     ToolbarButton { objectName: "compactParagraphButton"; grouped: true; iconName: "paragraph"; hint: "Paragraph formatting"; enabled: trailing.formattingAllowed; onClicked: root.actionRequested("format", this) }
                 }
-                ToolbarButton { id: sourceFormatButton; property bool sourceFormattingControl: true; objectName: "compactFormatButton"; visible: !root.writingClusterExpanded; iconName: "paragraph"; hint: "Formatting"; enabled: trailing.formattingAllowed; onClicked: root.actionRequested("format", this) }
+                ToolbarButton { id: sourceFormatButton; property bool sourceFormattingControl: true; objectName: "compactFormatButton"; visible: !root.fullPreview && !root.writingClusterExpanded; iconName: "paragraph"; hint: "Formatting"; enabled: trailing.formattingAllowed; onClicked: root.actionRequested("format", this) }
                 PaneZoomControls {
                     zoomController: root.zoomController
                     pane: root.editorPane.visible ? "source" : "preview"
                 }
-                ToolbarButton { objectName: "workspaceAppearanceButton"; text: "Aa"; hint: "Writing appearance"; onClicked: root.actionRequested("appearance", this) }
-                ToolbarButton { objectName: "exportHubButton"; visible: root.writingControlsWidth >= 450; iconName: "export"; hint: "Export and share"; onClicked: root.actionRequested("export", this) }
+                ToolbarButton { objectName: "workspaceAppearanceButton"; visible: !root.fullPreview || root.writingControlsWidth >= 540; text: "Aa"; hint: "Writing appearance"; onClicked: root.actionRequested("appearance", this) }
+                ToolbarButton { objectName: "exportHubButton"; visible: root.writingControlsWidth >= (root.fullPreview ? 540 : 450); iconName: "export"; hint: "Export and share"; onClicked: root.actionRequested("export", this) }
             }
             ToolbarButton {
                 id: workspaceButton
@@ -163,6 +248,7 @@ Item {
         }
     }
     Rectangle {
+        id: splitPreviewHeader
         objectName: "previewHeader"
         visible: root.editorPane.visible && root.previewPane.visible
         x: root.previewPane.x; width: root.previewPane.width; height: root.height
@@ -172,14 +258,26 @@ Item {
             anchors.fill: parent; anchors.leftMargin: 12; anchors.rightMargin: 12
             visible: root.toolbarContentVisible; opacity: root.toolbarContentOpacity; enabled: opacity > 0
             spacing: 8
-            Label { text: root.previewPane.visualEditEnabled ? "Visual Edit" : "Preview"; color: backend.palette.muted; font.pixelSize: 13; Layout.fillWidth: true; Layout.minimumWidth: 0; elide: Text.ElideRight }
+            Label {
+                objectName: "previewHeaderModeLabel"
+                visible: splitPreviewHeader.width >= 500
+                text: root.previewPane.visualEditEnabled ? "Visual Edit" : "Preview"
+                color: backend.palette.muted
+                font.pixelSize: 13
+            }
+            PreviewDocumentIdentity {
+                identityPrefix: "previewDocument"
+                opacity: root.titleContentOpacity
+                Layout.fillWidth: true
+                Layout.minimumWidth: 0
+            }
             PaneZoomControls {
                 zoomController: root.zoomController
                 pane: "preview"
                 controlsActive: root.editorPane.visible && root.previewPane.visible
             }
-            ToolbarButton { iconName: "export"; hint: "Export and share"; onClicked: root.actionRequested("export", this) }
-            ToolbarButton { iconName: "close"; hint: "Hide preview"; onClicked: root.actionRequested("hidePreview", this) }
+            ToolbarButton { objectName: "previewHeaderExportButton"; visible: splitPreviewHeader.width >= 640; iconName: "export"; hint: "Export and share"; onClicked: root.actionRequested("export", this) }
+            ToolbarButton { objectName: "previewHeaderCloseButton"; iconName: "close"; hint: "Hide preview"; onClicked: root.actionRequested("hidePreview", this) }
         }
     }
     Rectangle { anchors.bottom: parent.bottom; width: parent.width; height: 1; color: backend.palette.border }

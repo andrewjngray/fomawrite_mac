@@ -39,6 +39,9 @@ class FomawriteTest : public QObject {
     Q_OBJECT
 
 private slots:
+    void paneAlignedFooterMenusFollowDividerWithoutEditing();
+    void previewHeaderTracksFileAndEditedState();
+    void compactLibraryRowsOpenActualFilesAndIndentChildren();
     void linkSyntaxPreservesSupportedFormsAndRejectsAmbiguity();
     void linkEditorAppliesAtomicRoundTripsAndNoOpSaves();
     void linkEditorRejectsChangedAndReloadedTargets();
@@ -5328,6 +5331,7 @@ private:
 #include "cycle114-links.inc"
 #include "cycle113-focus.inc"
 #include "cycle116-tables.inc"
+#include "cycle117-pane-chrome.inc"
 #include "cycle100-navigation.inc"
 #include "cycle99-integration.inc"
 #include "sourcevisualmapping-cycle99.inc"

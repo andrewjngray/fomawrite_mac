@@ -92,21 +92,25 @@ void FomawriteTest::bundledFooterRapidModesPreserveDraftAndViewport() {
         QTest::qWait(60);
         const qreal sourceY = scroll->property("contentY").toReal();
         const int cursor = editor->property("cursorPosition").toInt();
-        const auto bounds = cycle107ActionBounds(footer);
+        const auto bounds = cycle107ViewBounds(footer);
         const QRectF footerBounds = cycle103SceneBounds(footer);
-        QCOMPARE(bounds.size(), 6);
+        QCOMPARE(bounds.size(), 3);
         for (int burst = 0; burst < 4; ++burst) {
             const QList<QQuickItem *> choices{full, visual, split, full, source, visual, split, source};
             int overlappingClicks = 0;
             for (auto *choice : choices) {
                 if (window->property("changingDocumentView").toBool()) ++overlappingClicks;
                 QSignalSpy painted(quick, &QQuickWindow::frameSwapped);
-                QVERIFY(cycle108PaintedClick(quick, choice, bounds.value(choice->objectName()).center().toPoint()));
+                // Visual Edit follows its pane; click its last painted position.
+                // Only Source/Split/Full retain their baseline coordinates.
+                const auto target = choice == visual ? cycle103SceneBounds(choice) : bounds.value(choice->objectName());
+                QVERIFY(cycle108PaintedClick(quick, choice, target.center().toPoint()));
                 quick->update();
                 // Wait for one presented frame, not the 48–120ms viewport
                 // restoration. Check the geometry actually offered to users.
                 QVERIFY(QTest::qWaitFor([&] { return !painted.isEmpty(); }, 1000));
-                QVERIFY(cycle107SameBounds(cycle107ActionBounds(footer), bounds));
+                QVERIFY(cycle107SameBounds(cycle107ViewBounds(footer), bounds));
+                QVERIFY(cycle117PaneFooterAnchors(window.data()));
                 QVERIFY(cycle107ViewChecked(footer, layout));
             }
             QVERIFY2(overlappingClicks > 0, "Rapid clicks must overlap an unfinished viewport restoration.");
@@ -116,7 +120,7 @@ void FomawriteTest::bundledFooterRapidModesPreserveDraftAndViewport() {
             QVERIFY(!layout->property("visualEditEnabled").toBool());
             QVERIFY(cycle107ViewChecked(footer, layout));
             QVERIFY(cycle108NativeViewChecks(window.data(), 0));
-            QTRY_VERIFY(cycle107SameBounds(cycle107ActionBounds(footer), bounds));
+            QTRY_VERIFY(cycle107SameBounds(cycle107ViewBounds(footer), bounds));
             QCOMPARE(cycle103SceneBounds(footer), footerBounds);
             QCOMPARE(editor->property("text").toString(), draft);
             QCOMPARE(editor->property("cursorPosition").toInt(), cursor);
@@ -127,7 +131,7 @@ void FomawriteTest::bundledFooterRapidModesPreserveDraftAndViewport() {
             // No late visual refresh or timer may undo the final Source choice.
             QTest::qWait(320);
             QCOMPARE(layout->property("effectiveLayoutMode").toInt(), 0);
-            QVERIFY(cycle107SameBounds(cycle107ActionBounds(footer), bounds));
+            QVERIFY(cycle107SameBounds(cycle107ViewBounds(footer), bounds));
             QVERIFY(qAbs(scroll->property("contentY").toReal() - sourceY) <= 2);
             QCOMPARE(editor->property("text").toString(), draft);
         }
@@ -237,7 +241,7 @@ void FomawriteTest::bundledFooterRoutesFollowResponsivePresentation() {
     // next click or leave an old tooltip over the view controls.
     quick->resize(1440, 800);
     QTest::qWait(100);
-    const auto initial = cycle107ActionBounds(footer);
+    const auto initial = cycle107ViewBounds(footer);
     const QRectF footerBounds = cycle103SceneBounds(footer);
     for (const auto &[text, mode, editing] : {
              std::tuple{"Visual Edit", 2, true}, std::tuple{"Visual Edit", 2, true},
@@ -254,7 +258,7 @@ void FomawriteTest::bundledFooterRoutesFollowResponsivePresentation() {
         QTRY_VERIFY2(cycle108WorkspaceViewChecks(workspaceMenu, mode, editing),
                  qPrintable(QString("View menu checkmarks disagreed after selecting %1.").arg(QString::fromLatin1(text))));
         QVERIFY(cycle108NativeViewChecks(window.data(), mode));
-        QTRY_VERIFY(cycle107SameBounds(cycle107ActionBounds(footer), initial));
+        QTRY_VERIFY(cycle107SameBounds(cycle107ViewBounds(footer), initial));
         QTRY_COMPARE(cycle103SceneBounds(footer), footerBounds);
         QVERIFY(!workspaceButton->property("tooltipReady").toBool());
     }
@@ -272,5 +276,5 @@ void FomawriteTest::bundledFooterRoutesFollowResponsivePresentation() {
     QTRY_VERIFY(!window->property("changingDocumentView").toBool());
     QTRY_COMPARE(layout->property("effectiveLayoutMode").toInt(), 0);
     QCOMPARE(editor->property("text").toString(), draft);
-    QVERIFY(cycle107SameBounds(cycle107ActionBounds(footer), initial));
+    QVERIFY(cycle107SameBounds(cycle107ViewBounds(footer), initial));
 }

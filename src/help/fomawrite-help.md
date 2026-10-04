@@ -56,3 +56,11 @@ Within a supported table cell in Visual Edit, **Tab** moves to the next cell and
 - Unsupported or ambiguous operations are refused without changing the document.
 
 Open **Help → Keyboard Shortcuts** for the compact shortcut list.
+
+## Pane controls and file lists
+
+The lower appearance menu sits at the left of Source. The Preview template menu follows the left edge of Preview when you drag the divider. Visual Edit sits within the Preview band and becomes a compose icon when space is tight; its tooltip identifies the action. Source, Split and Full keep their place at the far right. Narrow style menus shorten in place and keep the full style name in their tooltip. Hidden-pane settings remain available from the View menu.
+
+Preview headers show the current filename with a document icon. **— Edited** means the document has unsaved changes; saving clears it. Long names shorten in the middle, and their tooltip shows the full name.
+
+With Show Text Excerpts enabled, the library shows the actual filename above up to two lines of muted excerpt text. Date Modified or Date Created appears beside the filename when enabled. Tree navigation indents real child folders and files; List navigation shows the current folder’s siblings.

@@ -520,7 +520,37 @@ QVariantMap FileLibrary::documentSummary(const QUrl &url) const {
     auto readable = [](QString value) {
         value.remove(QRegularExpression(QStringLiteral("(?m)^ {0,3}(?:`{3,}|~{3,})[^\\n]*(?:\\n|$)")));
         value.replace(QRegularExpression(QStringLiteral("!?\\[([^\\]]*)\\]\\([^\\n)]*\\)")), QStringLiteral("\\1"));
-        value.remove(QRegularExpression(QStringLiteral("(?m)^ {0,3}(?:#{1,6}[ \\t]+|>[ \\t]?|[-+*][ \\t]+|[0-9]+[.)][ \\t]+)")));
+        // Strip stacked display prefixes one line at a time: a quoted list can
+        // itself contain a heading or task. This never parses or changes the
+        // document; the caller has already limited the sample to 2048 bytes.
+        static const QRegularExpression blockPrefix(QStringLiteral(
+            "^ {0,3}(?:>[ \\t]?|([-+*]|[0-9]+[.)])[ \\t]+|#{1,6}[ \\t]+)"));
+        static const QRegularExpression taskMarker(QStringLiteral("^\\[[ xX]\\](?:[ \\t]+|$)"));
+        static const QRegularExpression rule(QStringLiteral(
+            "^[ \\t]*(?:(?:-[ \\t]*){3,}|(?:\\*[ \\t]*){3,}|(?:_[ \\t]*){3,}|={3,})[ \\t]*$"));
+        QStringList lines = value.split('\n');
+        for (QString &line : lines) {
+            bool afterList = false;
+            while (!line.isEmpty()) {
+                // Check before removing list markers so '* * *' does not
+                // collapse into a stray asterisk in the card's excerpt.
+                if (rule.match(line).hasMatch()) { line.clear(); break; }
+                const auto prefix = blockPrefix.match(line);
+                if (prefix.hasMatch()) {
+                    afterList = afterList || !prefix.captured(1).isEmpty();
+                    line.remove(0, prefix.capturedLength());
+                    continue;
+                }
+                const auto task = afterList ? taskMarker.match(line) : QRegularExpressionMatch();
+                if (task.hasMatch()) {
+                    line.remove(0, task.capturedLength());
+                    afterList = false;
+                    continue;
+                }
+                break;
+            }
+        }
+        value = lines.join(' ');
         value.remove(QRegularExpression(QStringLiteral("(?<!\\\\)(?:\\*\\*|__|`|\\*)")));
         return value.simplified();
     };

@@ -1,6 +1,13 @@
 # What’s New in Fomawrite
 
-Build 116 adds:
+Build 117 adds:
+
+- Source appearance and Preview template controls aligned with their own panes; Source/Split/Full stay at the right;
+- compact pane controls that follow divider resizing without overlapping;
+- a document icon, bold filename and Edited indicator in Preview headers;
+- compact file rows with actual filenames, dates beside them, grey excerpts and tree indentation.
+
+Build 116 added:
 
 - Source formatting controls that respect the focused field and cannot change an old selection while you use Find, filters or rendered writing;
 - one Insert/Edit link dialog with optional titles, safe Cancel and a warning when the document changes while a link is open;

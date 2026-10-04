@@ -1,7 +1,7 @@
 namespace {
 QMap<QString, QRectF> cycle107ViewBounds(QQuickItem *footer) {
     QMap<QString, QRectF> result;
-    for (const char *name : {"visualEditToggle", "sourceModeButton", "previewSplitButton", "previewFullButton"}) {
+    for (const char *name : {"sourceModeButton", "previewSplitButton", "previewFullButton"}) {
         auto *button = footer->findChild<QQuickItem *>(name);
         if (!button || !button->isVisible()) return {};
         result.insert(QString::fromLatin1(name), cycle103SceneBounds(button));
@@ -19,16 +19,31 @@ bool cycle107SameBounds(const QMap<QString, QRectF> &actual, const QMap<QString,
     }
     return true;
 }
-QMap<QString, QRectF> cycle107ActionBounds(QQuickItem *footer) {
-    auto result = cycle107ViewBounds(footer);
-    for (const char *name : {"footerStylesButton", "sourceAppearanceButton", "previewTemplateButton"}) {
-        auto *button = footer->findChild<QQuickItem *>(name);
-        if (button && button->isVisible()) result.insert(QString::fromLatin1(name), cycle103SceneBounds(button));
+// Only the view capsule is stationary across modes. Style choices belong to
+// their visible pane, and Visual Edit follows the Preview pane's free space.
+bool cycle117PaneFooterAnchors(QObject *window) {
+    auto *footer = window->findChild<QQuickItem *>("documentFooter");
+    auto *sourcePane = window->findChild<QQuickItem *>("editorPane");
+    auto *previewPane = window->findChild<QQuickItem *>("previewPane");
+    auto *appearance = footer ? footer->findChild<QQuickItem *>("sourceAppearanceButton") : nullptr;
+    auto *output = footer ? footer->findChild<QQuickItem *>("previewTemplateButton") : nullptr;
+    auto *visual = footer ? footer->findChild<QQuickItem *>("visualEditToggle") : nullptr;
+    auto *modes = footer ? footer->findChild<QQuickItem *>("documentViewControls") : nullptr;
+    if (!sourcePane || !previewPane || !appearance || !output || !visual || !modes) return false;
+    if (appearance->isVisible() != sourcePane->isVisible() || output->isVisible() != previewPane->isVisible()) return false;
+    for (const auto &[button, pane] : {std::pair{appearance, sourcePane}, std::pair{output, previewPane}}) {
+        if (!button->isVisible()) continue;
+        const auto control = cycle103SceneBounds(button), region = cycle103SceneBounds(pane);
+        if (qAbs(control.left() - region.left() - 12) > 0.5 || control.right() > region.right() - 11.5
+            || control.width() < 34 || control.height() < 32) return false;
     }
-    return result;
+    const auto visualBounds = cycle103SceneBounds(visual), modeBounds = cycle103SceneBounds(modes);
+    if (!visual->isVisible() || visualBounds.right() > modeBounds.left() - 5.5) return false;
+    if (output->isVisible() && visualBounds.left() < cycle103SceneBounds(output).right() + 5.5) return false;
+    return cycle106FooterControlsFit(window);
 }
 bool cycle107ViewLabelsReadable(QQuickItem *footer) {
-    for (const char *name : {"visualEditToggle", "sourceModeButton", "previewSplitButton", "previewFullButton", "footerStylesButton"}) {
+    for (const char *name : {"visualEditToggle", "sourceModeButton", "previewSplitButton", "previewFullButton"}) {
         auto *button = footer->findChild<QQuickItem *>(name);
         if (!button || !button->isVisible()) continue;
         auto *label = button->findChild<QQuickItem *>("footerButtonLabel");
@@ -64,10 +79,9 @@ void FomawriteTest::footerViewControlsStayStationaryAcrossModes() {
     auto *split = footer->findChild<QQuickItem *>("previewSplitButton");
     auto *full = footer->findChild<QQuickItem *>("previewFullButton");
     auto *visual = footer->findChild<QQuickItem *>("visualEditToggle");
-    auto *styles = footer->findChild<QQuickItem *>("footerStylesButton");
     auto *appearance = footer->findChild<QQuickItem *>("sourceAppearanceButton");
     auto *output = footer->findChild<QQuickItem *>("previewTemplateButton");
-    QVERIFY(source && split && full && visual && styles && appearance && output);
+    QVERIFY(source && split && full && visual && appearance && output);
     cycle106KeepNativeFocus(quick);
     Cycle106MouseInputIsolation mouseInput(quick);
     quick->show();
@@ -86,12 +100,8 @@ void FomawriteTest::footerViewControlsStayStationaryAcrossModes() {
             QTRY_COMPARE(layout->property("effectiveLayoutMode").toInt(), 0);
             QTRY_VERIFY(cycle106FooterControlsFit(window.data()));
             const auto initial = cycle107ViewBounds(footer);
-            QCOMPARE(initial.size(), 4);
-            const auto initialActions = cycle107ActionBounds(footer);
-            const bool initiallyCompact = styles->isVisible();
+            QCOMPARE(initial.size(), 3);
             const QRectF initialFooter = cycle103SceneBounds(footer);
-            const QRectF initialAppearance = cycle103SceneBounds(appearance);
-            const QRectF initialOutput = cycle103SceneBounds(output);
             auto *viewGroup = footer->findChild<QQuickItem *>("documentViewControls"); QVERIFY(viewGroup);
             QVERIFY(qAbs(cycle103SceneBounds(viewGroup).right() - (width - 12)) < 0.1);
             QVERIFY(qAbs(initial.value("previewFullButton").right() - (width - 13)) < 0.1);
@@ -112,20 +122,14 @@ void FomawriteTest::footerViewControlsStayStationaryAcrossModes() {
                     QVERIFY(cycle102Click(quick, steps[step].first));
                     QTRY_COMPARE(layout->property("effectiveLayoutMode").toInt(), steps[step].second);
                     QTRY_VERIFY(cycle107SameBounds(cycle107ViewBounds(footer), initial));
-                    QTRY_VERIFY(cycle107SameBounds(cycle107ActionBounds(footer), initialActions));
+                    QTRY_VERIFY(cycle117PaneFooterAnchors(window.data()));
                     QTRY_VERIFY(cycle107ViewChecked(footer, layout));
                     QTRY_VERIFY2(cycle107ViewLabelsReadable(footer), "Footer view labels must not be truncated.");
                     QTRY_VERIFY(cycle106FootersAlign(window.data()));
                     QTRY_VERIFY(cycle106FooterControlsFit(window.data()));
-                    // Style selection is independent of the visible writing mode.
-                    QCOMPARE(appearance->isVisible(), !initiallyCompact);
-                    QCOMPARE(output->isVisible(), !initiallyCompact);
-                    QCOMPARE(styles->isVisible(), initiallyCompact);
-                    if (width == 1440) {
-                        QTRY_COMPARE(cycle103SceneBounds(footer), initialFooter);
-                        QTRY_COMPARE(cycle103SceneBounds(output), initialOutput);
-                        QTRY_COMPARE(cycle103SceneBounds(appearance), initialAppearance);
-                    }
+                    QCOMPARE(appearance->isVisible(), steps[step].second != 2);
+                    QCOMPARE(output->isVisible(), steps[step].second != 0);
+                    if (width == 1440) QTRY_COMPARE(cycle103SceneBounds(footer), initialFooter);
                     if (!dark && pass == 0 && (step == 0 || step == 1 || step == 2 || step == 4))
                         QVERIFY(cycle102Capture(quick, QString("cycle107-view-%1-%2-%3").arg(width).arg(step).arg(steps[step].second)));
                 }
@@ -156,8 +160,7 @@ void FomawriteTest::footerViewControlsStayStationaryAcrossModes() {
             QTest::keyClick(quick, Qt::Key_F6, modifiers);
             QTRY_VERIFY(editor->hasActiveFocus());
         }
-        // Shrinking a focused style trigger must not leave focus on the hidden
-        // wide button after the compact Aa replacement appears.
+        // Compact styling keeps the same pane-owned trigger and keyboard focus.
         layout->setProperty("organizerVisible", true);
         layout->setProperty("filesVisible", true);
         quick->resize(1440, 700);
@@ -165,10 +168,9 @@ void FomawriteTest::footerViewControlsStayStationaryAcrossModes() {
         QVERIFY(QMetaObject::invokeMethod(appearance, "forceActiveFocus"));
         QTRY_VERIFY(appearance->hasActiveFocus());
         quick->resize(720, 700);
-        QTRY_VERIFY(styles->isVisible());
-        QTRY_VERIFY(!appearance->isVisible());
-        QTRY_VERIFY(!appearance->hasActiveFocus());
-        QTRY_VERIFY(editor->hasActiveFocus());
+        QTRY_VERIFY(appearance->isVisible());
+        QTRY_VERIFY(appearance->hasActiveFocus());
+        QTRY_VERIFY(cycle117PaneFooterAnchors(window.data()));
     }
 }
 
@@ -324,54 +326,47 @@ void FomawriteTest::footerCompactStylesRemainReachableAcrossModes() {
     auto *footer = window->findChild<QQuickItem *>("documentFooter");
     auto *editor = window->findChild<QQuickItem *>("sourceEditor");
     QVERIFY(quick && layout && settings && footer && editor);
-    auto *styles = footer->findChild<QQuickItem *>("footerStylesButton");
-    auto *stylesMenu = window->findChild<QObject *>("footerStylesMenu");
+    auto *appearance = footer->findChild<QQuickItem *>("sourceAppearanceButton");
+    auto *output = footer->findChild<QQuickItem *>("previewTemplateButton");
     auto *appearanceMenu = window->findChild<QObject *>("sourceAppearanceMenu");
     auto *templateMenu = window->findChild<QObject *>("previewTemplateMenu");
-    auto *appearanceEntry = window->findChild<QQuickItem *>("footerWritingStylesEntry");
-    auto *templateEntry = window->findChild<QQuickItem *>("footerPreviewTemplatesEntry");
-    QVERIFY(styles && stylesMenu && appearanceMenu && templateMenu && appearanceEntry && templateEntry);
-    cycle106KeepNativeFocus(quick);
-    Cycle106MouseInputIsolation mouseInput(quick);
+    QVERIFY(appearance && output && appearanceMenu && templateMenu);
+    cycle106KeepNativeFocus(quick); Cycle106MouseInputIsolation mouseInput(quick);
     quick->resize(720, 520); quick->show();
     QVERIFY(QMetaObject::invokeMethod(window.data(), "applyReferenceWorkspace"));
     const QString draft = QString::fromUtf8("# Compact styles\n\nThe café draft keeps its text — 你好.\n");
     editor->setProperty("text", draft);
     const auto cleanup = qScopeGuard([&] { backend.discardRecovery(); });
     QVERIFY(QTest::qWaitForWindowExposed(quick));
-    int compactChecks = 0;
+    int appearanceChecks = 0, templateChecks = 0;
     for (int width : {720, 960}) {
-        quick->resize(width, 520);
-        QTest::qWait(60);
-        QTRY_COMPARE(quick->size(), QSize(width, 520));
-        for (const char *name : {"sourceModeButton", "previewFullButton", "visualEditToggle"}) {
-            QVERIFY(cycle102Click(quick, footer->findChild<QQuickItem *>(name)));
-            QTRY_VERIFY(cycle106FooterControlsFit(window.data()));
-            if (!styles->isVisible()) continue;
-            ++compactChecks;
-            QVERIFY(cycle102Click(quick, styles));
-            QTRY_VERIFY(stylesMenu->property("opened").toBool());
-            QVERIFY(cycle106MenuFits(quick, stylesMenu, styles));
-            QVERIFY(cycle102Click(quick, appearanceEntry));
-            QTRY_VERIFY(appearanceMenu->property("opened").toBool());
-            QVERIFY(cycle106MenuFits(quick, appearanceMenu, styles));
-            const int outputBefore = backend.outputStyle();
-            QVERIFY(cycle102Click(quick, window->findChild<QQuickItem *>("sourceAppearanceBook")));
-            QTRY_COMPARE(settings->property("writingAppearance").toString(), QStringLiteral("book"));
-            QCOMPARE(backend.outputStyle(), outputBefore);
-            QVERIFY(cycle102Click(quick, styles));
-            QTRY_VERIFY(stylesMenu->property("opened").toBool());
-            QVERIFY(cycle102Click(quick, templateEntry));
-            QTRY_VERIFY(templateMenu->property("opened").toBool());
-            QVERIFY(cycle106MenuFits(quick, templateMenu, styles));
-            if (width == 720 && QString::fromLatin1(name) == "previewFullButton")
-                QVERIFY(cycle102Capture(quick, "cycle107-compact-template-menu"));
-            QVERIFY(cycle102Click(quick, window->findChild<QQuickItem *>("previewTemplate6")));
-            QTRY_COMPARE(backend.outputStyle(), 6);
-            QCOMPARE(settings->property("writingAppearance").toString(), QStringLiteral("book"));
+        quick->resize(width, 520); QTest::qWait(60);
+        for (const char *name : {"sourceModeButton", "previewFullButton", "visualEditToggle", "previewSplitButton"}) {
+            auto *mode = footer->findChild<QQuickItem *>(name); if (!mode->isEnabled()) continue;
+            QVERIFY(cycle102Click(quick, mode));
+            QTRY_VERIFY(cycle117PaneFooterAnchors(window.data()));
+            if (appearance->isVisible()) {
+                ++appearanceChecks;
+                QVERIFY(cycle102Click(quick, appearance)); QTRY_VERIFY(appearanceMenu->property("opened").toBool());
+                QVERIFY(cycle106MenuFits(quick, appearanceMenu, appearance));
+                const int outputBefore = backend.outputStyle();
+                QVERIFY(cycle102Click(quick, window->findChild<QQuickItem *>("sourceAppearanceBook")));
+                QTRY_COMPARE(settings->property("writingAppearance").toString(), QStringLiteral("book"));
+                QCOMPARE(backend.outputStyle(), outputBefore);
+            }
+            if (output->isVisible()) {
+                ++templateChecks;
+                QVERIFY(cycle102Click(quick, output)); QTRY_VERIFY(templateMenu->property("opened").toBool());
+                QVERIFY(cycle106MenuFits(quick, templateMenu, output));
+                if (width == 720) QVERIFY(cycle102Capture(quick, "cycle117-compact-template-menu"));
+                const auto before = settings->property("writingAppearance");
+                QVERIFY(cycle102Click(quick, window->findChild<QQuickItem *>("previewTemplate6")));
+                QTRY_COMPARE(backend.outputStyle(), 6);
+                QCOMPARE(settings->property("writingAppearance"), before);
+            }
             QCOMPARE(editor->property("text").toString(), draft);
             QVERIFY(cycle107ViewChecked(footer, layout));
         }
     }
-    QVERIFY2(compactChecks >= 3, "Compact style menus must be exercised in Source, Preview and Visual Edit.");
+    QVERIFY(appearanceChecks >= 2 && templateChecks >= 4);
 }
