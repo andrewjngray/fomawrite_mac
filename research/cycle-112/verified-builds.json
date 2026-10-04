@@ -1,0 +1,43 @@
+{
+  "version": "0.3.0-dev11",
+  "build": "112",
+  "verifiedAt": "2026-10-04T07:13:48.635358+00:00",
+  "sourceCommit": "6e0c88eef6a976981b69b5760d193068a4f59cbf",
+  "publicReleaseChanged": false,
+  "verification": "163 full-suite tests; 8 focused native checks; 124 footer states, 7 daily-writing workflows and 5 pane-zoom workflows per actual bundle; strict signatures and matching embedded UI",
+  "bundles": [
+    {
+      "copy": "Dev",
+      "passed": true,
+      "version": "0.3.0-dev11",
+      "build": "112",
+      "bundleIdentifier": "io.github.andrewjngray.fomawrite.dev",
+      "executableSha256": "b74412cbcb72622320c83418a3b4a0d4167be8c08ab99b19108762f59a9620d6",
+      "statesChecked": 124,
+      "dailyWritingChecks": 7,
+      "paneZoomChecks": 5
+    },
+    {
+      "copy": "demo",
+      "passed": true,
+      "version": "0.3.0-dev11",
+      "build": "112",
+      "bundleIdentifier": "io.github.andrewjngray.fomawrite",
+      "executableSha256": "fd4aea3dd4aa8c42768eb0a848643f3eb1632d97a62e9205396df15e4d5392ef",
+      "statesChecked": 124,
+      "dailyWritingChecks": 7,
+      "paneZoomChecks": 5
+    },
+    {
+      "copy": "Applications",
+      "passed": true,
+      "version": "0.3.0-dev11",
+      "build": "112",
+      "bundleIdentifier": "io.github.andrewjngray.fomawrite",
+      "executableSha256": "fd4aea3dd4aa8c42768eb0a848643f3eb1632d97a62e9205396df15e4d5392ef",
+      "statesChecked": 124,
+      "dailyWritingChecks": 7,
+      "paneZoomChecks": 5
+    }
+  ]
+}

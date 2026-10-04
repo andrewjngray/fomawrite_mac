@@ -22,3 +22,8 @@ Makefile
 /research/cycle-112/native/
 /research/cycle-112/demo/*.png
 /research/cycle-112/applications/*.png
+
+# Keep raw Cycle112 machine reports and screenshots local; publish the summary.
+/research/cycle-112/*
+!/research/cycle-112/README.md
+!/research/cycle-112/verified-builds.json
