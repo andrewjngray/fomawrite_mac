@@ -18,6 +18,8 @@ Removed screenshot-gated replacement and the retained screenshot overlay. Docume
 - Native coverage includes PDF A→B, an in-flight A/B/C switch, hidden/show, theme/Web/PDF changes, and a fresh PDF component. This is synthetic Cocoa automation, not physical mouse/keyboard acceptance or a full persisted multi-window application relaunch.
 - Bundle verification and deployment status are recorded in `verified-builds.json`. Raw synthetic captures/reports remain local under this directory; private writing/themes are not committed.
 
+A broad Dev run was initially blocked by Cocoa reporting its nonactivating QA window as unexposed. The diagnostic snapshot showed the correct document, completed Web load and no pending work. Each visual scenario now raises its QA window once before waiting; it does not force repainting or relax readiness assertions. The isolated `--preview-only` path runs before unrelated forced-frame geometry checks and passed all eight actual-pane observations. Earlier failed reports and Chromium graphics-context diagnostics remain in the ignored local evidence.
+
 ## Remaining acceptance
 
 The fresh-component startup check does not substitute for Andrew's persisted workspace relaunch. Physical input, arbitrary themes/documents, multi-display/VoiceOver and long-running use remain unverified. Replacing a busy app waits for normal closure and preserves unsaved-work prompts. Chromium can emit compositor diagnostics during the broad harness; the visible-content assertions and QML warning gate are recorded separately.

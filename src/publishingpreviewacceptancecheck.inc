@@ -98,6 +98,10 @@
                 };
                 const auto verifyActualSurface = [&](QQuickWindow *host, QQuickItem *surface, int index,
                                                       const QString &format, const QString &label) {
+                    // Cocoa marks this nonactivating QA window unexposed when
+                    // another app covers it. Raise before each observation so
+                    // the normal compositor can paint; never force a frame.
+                    host->raise();
                     int naturalFrames = 0;
                     QObject frameReceiver;
                     const QMetaObject::Connection frameObserver = QObject::connect(host, &QQuickWindow::frameSwapped, &frameReceiver,
