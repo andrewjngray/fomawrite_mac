@@ -1,6 +1,14 @@
 # Acceptance ledger — current follow-through and Cycle 59 history
 
-## Current review build — Cycle 123
+## Current verified review build — Cycle 124
+
+**0.3.0-dev20 / macOS 0.3.0 (124)** adds managed CSS publishing themes, Claude Like and shared semantic HTML/Chromium Web/PDF output, including the actual Export Hub preview. Native rendered printing uses browser-PDF page images at 300 dpi; saved PDF exports retain vector output. Publishing selection remains independent of left-pane writing appearance and Markdown history. [Current evidence and limits](../research/cycle-124/README.md), [optional review](../research/usability/cycle-124.md).
+
+**193 regressions pass, 0 failed, 0 skipped.** Dev, ordinary/demo and Applications each pass **154 native checks**, including three publishing-theme checks, with matching embedded UI/version, strict signatures and zero QML warnings. [Verified identities](../research/cycle-124/verified-builds.json). Native runs use synthetic Qt pointer/key events on Cocoa, not physical device input. The private sample comparison confirms two A4 pages, equal bundled/imported Claude first-page pixels with Georgia fallback and unchanged source; the document and raw outputs remain private.
+
+Bounded compatibility covers common document CSS, local CSS imports and embedded raster/font assets. Remote resources are blocked; Typora editor/UI selectors have no output elements, safe raw HTML stays visible as escaped text, and math is not typeset. Text-based PDF heading lookup refuses ambiguous destinations. Physical printer output, VoiceOver, display/IME, arbitrary CSS/Markdown grammar and complete competitor template parity remain acceptance work. Existing historical gaps below remain open.
+
+## Previous verified review build — Cycle 123
 
 **0.3.0-dev19 / macOS 0.3.0 (123)** adds Code appearance, hanging Manuscript headings and continuous fenced-code backgrounds. [Verification and limits](../research/cycle-123/README.md). 189 regressions pass; Dev, demo and Applications each pass 151 native checks with matching UI/version and strict signatures.
 
