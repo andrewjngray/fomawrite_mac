@@ -442,7 +442,7 @@ Rectangle {
     Label {
         objectName: "publishingLoadingNotice"
         anchors.centerIn: parent
-        visible: root.viewportRefreshPending && !root.outputUrl && root.errorText === ""
+        visible: root.viewportRefreshPending && String(root.outputUrl) === "" && root.errorText === ""
         text: "Loading preview…"
         color: root.renderer.palette.text
     }

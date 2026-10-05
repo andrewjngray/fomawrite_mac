@@ -105,31 +105,67 @@ bool Backend::importPublishingTheme(const QUrl &file) {
     setStatus(message.isEmpty() ? publishingThemeName() + " imported for Web and PDF." : message);
     return true;
 }
-void Backend::watchPublishingThemes() {
-    // Both directories and files are needed: macOS directory events cover added
-    // files, while file events cover in-place edits. Re-arm after atomic saves.
-    const auto files = m_publishingThemeWatcher.files();
-    const auto directories = m_publishingThemeWatcher.directories();
-    if (!files.isEmpty()) m_publishingThemeWatcher.removePaths(files);
-    if (!directories.isEmpty()) m_publishingThemeWatcher.removePaths(directories);
+QByteArray Backend::watchPublishingThemes() {
     const QString folder = PublishingThemes::directory();
-    if (!QDir().mkpath(folder)) {
+    QStringList paths;
+    if (QDir(folder).exists() || QDir().mkpath(folder)) {
+        const QString canonicalFolder = QDir(folder).canonicalPath();
+        paths.append(canonicalFolder);
+        QDirIterator entries(canonicalFolder, QDir::Files | QDir::Dirs | QDir::NoDotAndDotDot | QDir::NoSymLinks, QDirIterator::Subdirectories);
+        while (entries.hasNext() && paths.size() < 512) {
+            const QString path = entries.next();
+            if (QFileInfo(path).canonicalFilePath() == path) paths.append(path);
+        }
+    } else {
         const QString parent = QFileInfo(folder).absolutePath();
-        if (QDir(parent).exists()) m_publishingThemeWatcher.addPath(parent);
-        return;
+        if (QDir(parent).exists()) paths.append(parent);
     }
-    const QString canonicalFolder = QDir(folder).canonicalPath();
-    QStringList paths{canonicalFolder};
-    QDirIterator entries(canonicalFolder, QDir::Files | QDir::Dirs | QDir::NoDotAndDotDot | QDir::NoSymLinks, QDirIterator::Subdirectories);
-    while (entries.hasNext() && paths.size() < 512) {
-        const QString path = entries.next();
-        // Refuse to watch a symlinked resource tree.
-        if (QFileInfo(path).canonicalFilePath() == path) paths.append(path);
+    paths.sort();
+    const QStringList watched = m_publishingThemeWatcher.files() + m_publishingThemeWatcher.directories();
+    QStringList removed, added;
+    for (const QString &path : watched) if (!paths.contains(path)) removed.append(path);
+    for (const QString &path : paths) if (!watched.contains(path)) added.append(path);
+    // Re-registering the whole tree replays macOS filesystem notifications.
+    // Keep unchanged watches; atomic saves still re-add dropped file watches.
+    if (!removed.isEmpty()) m_publishingThemeWatcher.removePaths(removed);
+    if (!added.isEmpty()) m_publishingThemeWatcher.addPaths(added);
+
+    for (auto it = m_publishingThemeFileHashes.begin(); it != m_publishingThemeFileHashes.end();) {
+        if (!paths.contains(it.key())) it = m_publishingThemeFileHashes.erase(it);
+        else ++it;
     }
-    m_publishingThemeWatcher.addPaths(paths);
+    QCryptographicHash snapshot(QCryptographicHash::Sha256);
+    for (const QString &path : paths) {
+        const QFileInfo entry(path);
+        snapshot.addData(path.toUtf8());
+        snapshot.addData(QByteArray(1, '\0'));
+        // Directory timestamp/access notifications are not theme edits. Hash
+        // file contents, caching unchanged files so font trees are not re-read
+        // for each directory notification. File events invalidate this cache.
+        if (entry.isFile()) {
+            const QByteArray metadata = QByteArray::number(entry.size()) + ':'
+                + QByteArray::number(entry.lastModified().toMSecsSinceEpoch()) + ':'
+                + QByteArray::number(entry.birthTime().toMSecsSinceEpoch());
+            auto cached = m_publishingThemeFileHashes.constFind(path);
+            if (cached == m_publishingThemeFileHashes.cend() || cached->first != metadata) {
+                QCryptographicHash content(QCryptographicHash::Sha256);
+                QFile file(path);
+                // The CSS importer accepts at most 128 MiB per expanded file;
+                // unsupported oversized files need only discovery metadata.
+                const bool readable = entry.size() <= 128 * 1024 * 1024
+                    && file.open(QIODevice::ReadOnly) && content.addData(&file);
+                m_publishingThemeFileHashes.insert(path, {metadata, readable ? content.result() : metadata});
+            }
+            snapshot.addData(m_publishingThemeFileHashes.value(path).second);
+        }
+        snapshot.addData(QByteArray(1, '\0'));
+    }
+    return snapshot.result();
 }
-void Backend::refreshPublishingThemes() {
-    watchPublishingThemes();
+void Backend::refreshPublishingThemes(bool force) {
+    const QByteArray snapshot = watchPublishingThemes();
+    if (!force && snapshot == m_publishingThemeSnapshot) return;
+    m_publishingThemeSnapshot = snapshot;
     if (!m_publishingThemeId.isEmpty()) {
         QString error, advisory;
         PublishingThemes::css(m_publishingThemeId, &error, &advisory);
@@ -141,7 +177,7 @@ void Backend::refreshPublishingThemes() {
     emit publishingThemesChanged();
 }
 void Backend::reloadPublishingThemes() {
-    refreshPublishingThemes();
+    refreshPublishingThemes(true);
     setStatus(m_publishingThemeError.isEmpty() ? "Publishing themes reloaded." : m_publishingThemeError);
 }
 bool Backend::openPublishingThemesFolder() {

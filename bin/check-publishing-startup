@@ -1,0 +1,82 @@
+#!/usr/bin/env sh
+# Compile-only normal-startup regression with disposable persisted settings/state.
+set -eu
+ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
+. "$ROOT/bin/qt-env"
+CHECK_ROOT="${1:-$(mktemp -d /private/tmp/fomawrite-startup-check.XXXXXX)}"
+[ ! -e "$CHECK_ROOT/data" ] && [ ! -e "$CHECK_ROOT/settings" ] || {
+  echo 'Use a fresh output directory; cold startup must have no existing checkpoint or preferences.' >&2
+  exit 2
+}
+mkdir -p "$CHECK_ROOT"
+CHECK_ROOT="$(CDPATH= cd -- "$CHECK_ROOT" && pwd)"
+if [ -n "${FOMAWRITE_STARTUP_PREVIEW_THEMES:-}" ]; then
+  mkdir -p "$CHECK_ROOT/data"
+  cp -pR "$FOMAWRITE_STARTUP_PREVIEW_THEMES" "$CHECK_ROOT/data/publishing-themes"
+else
+  python3 - "$CHECK_ROOT" <<'THEMES'
+from pathlib import Path
+import sys
+folder = Path(sys.argv[1]) / 'data/publishing-themes'
+for pack in range(8):
+    assets = folder / ('theme-%s' % pack) / 'fonts'
+    assets.mkdir(parents=True)
+    (folder / ('theme-%s.css' % pack)).write_text('#write { color: #123456; }\n')
+    for font in range(12):
+        (assets / ('sample-%s.woff' % font)).write_bytes(b'synthetic unreferenced font fixture')
+THEMES
+fi
+if [ "${FOMAWRITE_STARTUP_PREVIEW_COPY_CACHE:-0}" = 1 ]; then
+  mkdir -p "$CHECK_ROOT/cache"
+  cp -pR "$HOME/Library/Caches/AndrewGray/fomawrite/qmlcache" "$CHECK_ROOT/cache/qmlcache"
+fi
+if [ -n "${FOMAWRITE_STARTUP_PREVIEW_BUILD:-}" ]; then
+  CHECK_BUILD="$FOMAWRITE_STARTUP_PREVIEW_BUILD"
+  mkdir -p "$CHECK_BUILD"
+else
+  CHECK_BUILD="$(mktemp -d /private/tmp/fomawrite-startup-build.XXXXXX)"
+  trap 'rm -rf "$CHECK_BUILD"' EXIT
+fi
+cd "$CHECK_BUILD"
+"$QMAKE" "$ROOT/fomawrite.pro" 'DEFINES+=FOMAWRITE_STARTUP_PREVIEW_CHECK' 'CONFIG-=app_bundle'
+make -j"$JOBS"
+if [ -n "${FOMAWRITE_STARTUP_PREVIEW_SOURCE:-}" ]; then
+  cp "$FOMAWRITE_STARTUP_PREVIEW_SOURCE" "$CHECK_ROOT/A.md"
+else
+  printf '# Startup document A\n\nOnly synthetic A belongs in this window.\n' > "$CHECK_ROOT/A.md"
+  if [ "${FOMAWRITE_STARTUP_PREVIEW_LONG:-0}" = 1 ]; then
+    i=0
+    while [ "$i" -lt 40 ]; do
+      printf '\nParagraph %s. This longer saved document tests ordinary startup with multiple PDF pages. Local Markdown remains canonical while persisted pane layout and geometry restore. Each paragraph contains enough text to wrap across the full page and keep PDF delegates active in the visible viewport.\n' "$i" >> "$CHECK_ROOT/A.md"
+      i=$((i + 1))
+    done
+  fi
+fi
+printf '# Startup document B\n\nOnly synthetic B belongs in this window.\n' > "$CHECK_ROOT/B.md"
+case "$(uname -s)" in Darwin) CHECK_BINARY="$CHECK_BUILD/Fomawrite" ;; *) CHECK_BINARY="$CHECK_BUILD/fomawrite" ;; esac
+CHECK_STATUS=0
+FOMAWRITE_STARTUP_PREVIEW_ROOT="$CHECK_ROOT" FOMAWRITE_STARTUP_PREVIEW_PHASE=cold "$CHECK_BINARY" "$CHECK_ROOT/A.md" "$CHECK_ROOT/B.md" > "$CHECK_ROOT/cold.log" 2>&1 || CHECK_STATUS=$?
+if [ "$CHECK_STATUS" -eq 0 ]; then
+  if [ "${FOMAWRITE_STARTUP_PREVIEW_REAL_GEOMETRY:-0}" = 1 ]; then
+    python3 - "$CHECK_ROOT" <<'GEOMETRY'
+import json, pathlib, sys
+root = pathlib.Path(sys.argv[1])
+checkpoints = list((root / 'data').glob('workspace-*.json'))
+assert len(checkpoints) == 1, checkpoints
+p = checkpoints[0]
+d = json.loads(p.read_text())
+assert len(d['windows']) == 2
+for i, w in enumerate(d['windows']):
+    w.update(x=227, y=70, width=2376 if i == 0 else 1938, height=1339 if i == 0 else 1304,
+             screen='Studio Display', state=0 if i == 0 else 1, active=i == 0)
+    w['paneState'] = dict(fileWidth=390.68, filesVisible=True, lastEditingLayoutMode=1,
+        layoutMode=1 if i == 0 else 2, organizerVisible=True, organizerWidth=208.0,
+        previewWidth=856.57, version=2, visualEditEnabled=False)
+p.write_text(json.dumps(d))
+(root / 'seeded-geometry.json').write_text(json.dumps(d, indent=2))
+GEOMETRY
+  fi
+  FOMAWRITE_STARTUP_PREVIEW_ROOT="$CHECK_ROOT" FOMAWRITE_STARTUP_PREVIEW_PHASE=restored "$CHECK_BINARY" > "$CHECK_ROOT/restored.log" 2>&1 || CHECK_STATUS=$?
+fi
+printf 'Ordinary startup preview reports: %s\n' "$CHECK_ROOT"
+exit "$CHECK_STATUS"

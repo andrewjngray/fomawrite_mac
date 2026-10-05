@@ -294,8 +294,10 @@ private:
     QString m_publishingThemeError;
     QFileSystemWatcher m_publishingThemeWatcher;
     QTimer m_publishingThemeRefreshTimer;
-    void watchPublishingThemes();
-    void refreshPublishingThemes();
+    QByteArray m_publishingThemeSnapshot;
+    QHash<QString, QPair<QByteArray, QByteArray>> m_publishingThemeFileHashes;
+    QByteArray watchPublishingThemes();
+    void refreshPublishingThemes(bool force = false);
     void invalidatePublishingDocument();
     quint64 m_publishingDocumentGeneration = 0;
     quint64 m_publishingSettingsGeneration = 0;

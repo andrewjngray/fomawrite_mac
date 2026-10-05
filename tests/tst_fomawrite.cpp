@@ -43,6 +43,8 @@ class FomawriteTest : public QObject {
 private slots:
     void publishingFolderThemesResolveNamesImportsAndAssets();
     void publishingFolderThemesRefreshAfterExternalChanges();
+    void publishingFolderThemesStayQuietAcrossWindows();
+    void publishingFolderThemesReloadAndAtomicResourcesSettle();
     void publishingWebCommandSelectsWebWithoutChangingEditor();
     void publishingSemanticHtmlPreservesStructureAndEscapesContent();
     void publishingImagesKeepIncompletePreviewsReadableAndExportsStrict();

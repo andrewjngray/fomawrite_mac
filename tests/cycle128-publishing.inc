@@ -198,6 +198,9 @@ void FomawriteTest::publishingComponentSwitchRejectsStalePdfResults() {
     QVERIFY(!fixture.preview()->property("holdingPreviousFrame").toBool());
     QVERIFY(fixture.preview()->property("displayedDocumentIdentity").toString().isEmpty());
     QTRY_VERIFY_WITH_TIMEOUT(fixture.blankDisplayed(), 1000);
+    auto *loading = fixture.preview()->findChild<QQuickItem *>("publishingLoadingNotice");
+    QVERIFY(loading);
+    QTRY_VERIFY(loading->isVisible());
     QVERIFY(fixture.complete(101, cycle128PdfResult(a)));
     QVERIFY(fixture.blankDisplayed());
     QTRY_COMPARE_WITH_TIMEOUT(fixture.preview()->property("pendingRequest").toInt(), 102, 3000);

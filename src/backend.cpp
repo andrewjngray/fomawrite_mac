@@ -600,11 +600,16 @@ Backend::Backend(QObject *parent, bool outputOnly) : QObject(parent), m_library(
     m_publishingThemeId = QSettings().value("output/publishingTheme").toString();
     m_publishingThemeRefreshTimer.setSingleShot(true);
     m_publishingThemeRefreshTimer.setInterval(200);
-    connect(&m_publishingThemeRefreshTimer, &QTimer::timeout, this, &Backend::refreshPublishingThemes);
+    connect(&m_publishingThemeRefreshTimer, &QTimer::timeout, this, [this] { refreshPublishingThemes(); });
     const auto queueThemeRefresh = [this]() { m_publishingThemeRefreshTimer.start(); };
-    connect(&m_publishingThemeWatcher, &QFileSystemWatcher::fileChanged, this, queueThemeRefresh);
+    connect(&m_publishingThemeWatcher, &QFileSystemWatcher::fileChanged, this, [this](const QString &path) {
+        // In-place edits can preserve size and coarse timestamps. Re-read only
+        // the file actually notified, while directory event replays stay cheap.
+        m_publishingThemeFileHashes.remove(path);
+        m_publishingThemeRefreshTimer.start();
+    });
     connect(&m_publishingThemeWatcher, &QFileSystemWatcher::directoryChanged, this, queueThemeRefresh);
-    watchPublishingThemes();
+    m_publishingThemeSnapshot = watchPublishingThemes();
     if (!m_publishingThemeId.isEmpty()) {
         QString error, advisory;
         PublishingThemes::css(m_publishingThemeId, &error, &advisory);

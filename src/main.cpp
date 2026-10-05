@@ -30,6 +30,14 @@
 #include "backend.h"
 #include "systemtheme.h"
 #include "documentviewcheck.h"
+#ifdef FOMAWRITE_STARTUP_PREVIEW_CHECK
+#include <QQuickItem>
+#include <QQuickWindow>
+#include <QElapsedTimer>
+#include <QJsonDocument>
+#include <QPdfDocument>
+#include <QTextDocument>
+#endif
 #ifdef FOMAWRITE_CONTEXT_SMOKE
 #include <QAccessible>
 #include <QKeyEvent>
@@ -136,7 +144,7 @@ int main(int argc, char *argv[]) {
     app.setOrganizationName(QStringLiteral("AndrewGray"));
     app.setOrganizationDomain(QStringLiteral("andrewjngray.github.io"));
     app.setApplicationDisplayName(QStringLiteral("Fomawrite"));
-    app.setApplicationVersion(QStringLiteral("0.3.0-dev24"));
+    app.setApplicationVersion(QStringLiteral("0.3.0-dev25"));
     const int documentCheck = app.arguments().indexOf(QStringLiteral("--check-document-views"));
     if (documentCheck >= 0) {
         const QString destination = app.arguments().value(documentCheck + 1);
@@ -146,6 +154,9 @@ int main(int argc, char *argv[]) {
         }
         return runDocumentViewCheck(app, destination);
     }
+#ifdef FOMAWRITE_STARTUP_PREVIEW_CHECK
+#include "../tests/startup-preview-setup.inc"
+#endif
 #ifdef FOMAWRITE_CONTEXT_SMOKE
     // A separately compiled integration test runs the real window manager with
     // disposable settings and documents, never the user's workspace.
@@ -157,7 +168,7 @@ int main(int argc, char *argv[]) {
 #include "../tests/cycle103-migration-seed.inc"
 #endif
 #ifdef Q_OS_MACOS
-#ifndef FOMAWRITE_CONTEXT_SMOKE
+#if !defined(FOMAWRITE_CONTEXT_SMOKE) && !defined(FOMAWRITE_STARTUP_PREVIEW_CHECK)
     migrateMacPreferences();
 #endif
 #endif
@@ -168,7 +179,7 @@ int main(int argc, char *argv[]) {
     const QString stateDirectory = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
     QDir().mkpath(stateDirectory);
     const QString workspacePath = QDir(stateDirectory).filePath("workspace-" + identity + ".json");
-#ifndef FOMAWRITE_CONTEXT_SMOKE
+#if !defined(FOMAWRITE_CONTEXT_SMOKE) && !defined(FOMAWRITE_STARTUP_PREVIEW_CHECK)
     migrateLegacyWorkspace(stateDirectory, workspacePath);
 #endif
     QStringList launchPaths;
@@ -305,6 +316,11 @@ int main(int argc, char *argv[]) {
         auto session = std::make_shared<Session>();
         session->backend = new Backend(&app);
         auto *backend = session->backend.data();
+#ifdef FOMAWRITE_STARTUP_PREVIEW_CHECK
+        QObject::connect(backend, &Backend::publishingThemesChanged, &app, [&, backend] {
+            ++startupThemeChanges[backend];
+        });
+#endif
         QObject::connect(backend, &Backend::themePresetChanged, &app, [&, backend] {
             for (const auto &other : sessions)
                 if (other->backend && other->backend != backend) other->backend->setThemePreset(backend->themePreset());
@@ -348,6 +364,11 @@ int main(int argc, char *argv[]) {
         session->engine = new QQmlApplicationEngine(&app);
         session->engine->rootContext()->setContextProperty(QStringLiteral("backend"), backend);
         session->engine->rootContext()->setContextProperty(QStringLiteral("referenceWorkspaceUpgrade"), referenceWorkspaceUpgrade);
+#ifdef FOMAWRITE_STARTUP_PREVIEW_CHECK
+        QObject::connect(session->engine, &QQmlEngine::warnings, &app, [&](const QList<QQmlError> &warnings) {
+            for (const auto &warning : warnings) startupQmlWarnings.append(warning.toString());
+        });
+#endif
         session->engine->load(QUrl(QStringLiteral("qrc:/Main.qml")));
         if (session->engine->rootObjects().isEmpty()) {
             session->engine->deleteLater(); backend->deleteLater(); return;
@@ -501,10 +522,29 @@ int main(int argc, char *argv[]) {
     });
 #endif
 
+#ifdef FOMAWRITE_STARTUP_PREVIEW_CHECK
+#include "../tests/startup-preview-check.inc"
+#endif
 #ifdef FOMAWRITE_CONTEXT_SMOKE
 #include "../tests/window-routing-smoke.inc"
 #endif
     const int result = app.exec();
+#ifdef FOMAWRITE_STARTUP_PREVIEW_CHECK
+    {
+        const QString reportPath = QDir(startupRoot).filePath(startupPhase + "-report.json");
+        QFile input(reportPath);
+        if (input.open(QIODevice::ReadOnly)) {
+            auto report = QJsonDocument::fromJson(input.readAll()).object();
+            const bool normalQuit = result == 0 && committingQuit && sessions.isEmpty();
+            report.insert("processExitCode", result);
+            report.insert("normalQuitCompleted", normalQuit);
+            if (!normalQuit) report.insert("passed", false);
+            input.close();
+            QSaveFile output(reportPath);
+            if (output.open(QIODevice::WriteOnly)) { output.write(QJsonDocument(report).toJson(QJsonDocument::Indented)); output.commit(); }
+        }
+    }
+#endif
     // QApplication outlives these captured locals. Disconnect callbacks before
     // its child windows/backends are destroyed during application teardown.
     for (const auto &session : sessions) {
@@ -513,11 +553,13 @@ int main(int argc, char *argv[]) {
     }
     app.openDocument = {};
     app.guardedQuit = {};
-#ifdef FOMAWRITE_CONTEXT_SMOKE
+#if defined(FOMAWRITE_CONTEXT_SMOKE) || defined(FOMAWRITE_STARTUP_PREVIEW_CHECK)
     for (const auto &session : sessions) {
         delete session->engine.data();
         delete session->backend.data();
     }
+#endif
+#ifdef FOMAWRITE_CONTEXT_SMOKE
     QDir(stateDirectory).removeRecursively();
 #endif
     return result;
