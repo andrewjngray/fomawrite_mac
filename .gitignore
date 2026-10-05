@@ -75,3 +75,7 @@ Makefile
 /research/cycle-123/*
 !/research/cycle-123/README.md
 !/research/cycle-123/verified-builds.json
+
+# Personal correspondence and raw desktop reference captures stay local.
+/examples/ken_email.md
+/screenshots/

@@ -2,6 +2,10 @@
 
 A place to write, read, and keep your thoughts in order.
 
+
+
+this is the version i wrote ... 
+
 ## Heading check
 
 #title

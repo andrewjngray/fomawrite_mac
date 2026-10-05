@@ -4,7 +4,7 @@ Explore your files on the left, write Markdown in the middle, and read the resul
 
 ## Make it yours
 
-Open **Aa** for writing options. Try *paragraph focus*, typewriter scrolling, or a serif preview. Use the layout selector to move between Editor, Split, and Preview.
+Open **Aa** for *[writing](https://youtu.be/66XR8e7pC9Y?si=x_7hjgcVY7pw-l-p)* options. Try *paragraph focus*, typewriter scrolling, or a serif preview. Use the layout selector to move between Editor, Split, and Preview.
 
 ## A small plan
 
