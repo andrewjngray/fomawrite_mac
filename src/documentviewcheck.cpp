@@ -24,6 +24,10 @@
 #include <QQmlEngine>
 #include <QWheelEvent>
 #include <QQuickItem>
+#include <QQuickTextDocument>
+#include <QTextDocument>
+#include <QTextBlock>
+#include <QTextLayout>
 #include <QQuickStyle>
 #include <QQuickWindow>
 #include <QSaveFile>
@@ -1123,6 +1127,60 @@ int runDocumentViewCheck(QApplication &app, const QString &outputDirectory) {
 #include "editoracceptancecheck.inc"
 #include "panechromeacceptancecheck.inc"
 #include "editinglayoutacceptancecheck.inc"
+
+    editingLayoutCheck("literal-source-markers-typography-and-view-cycles", [&] {
+        backend.setThemePreset("studio"); window->resize(1280, 820);
+        layout->setProperty("organizerVisible", false); layout->setProperty("filesVisible", false);
+        settings->setProperty("autoHideChrome", false);
+        settings->setProperty("writingAppearance", "manuscript");
+        settings->setProperty("sourceZoom", 100);
+        settings->setProperty("showMarkup", false); // Simulate the legacy persisted preference.
+        const QString sample = QString::fromUtf8(
+            "# A clearer place to write\n\n"
+            "**Purpose:** Keep every Markdown marker visible in Source, including *emphasis*, `inline code`, and [links](https://example.com).\n\n"
+            "## A little structure\n\n"
+            "- **Readable lists** keep their literal markers. A longer sentence wraps beneath its own words, making the shape of a paragraph clear while you write.\n"
+            "  - Nested items retain their original spaces and align their continuation lines with their own text. Café and 你好 remain untouched.\n"
+            "12. Numbered items follow the same rule, even when the marker has more than one digit. Nothing is inserted into the saved Markdown.\n"
+            "- [x] Task boxes remain literal and the text after the box sets the wrapping position for this longer task.\n\n"
+            "> A quotation keeps its visible arrow and wraps beneath its words. The extra breathing room makes the editor easier to read.\n\n"
+            "```text\n**This fenced code stays literal.**\n```\n");
+        if (!loadSample("Source readability", sample)) return;
+        action("sourceModeButton", 0, false); action("singleModeButton", 0, false);
+        auto *quickDocument = qvariant_cast<QQuickTextDocument *>(editor->property("textDocument"));
+        if (!check(quickDocument, "Source has no text document")) return;
+        auto *document = quickDocument->textDocument();
+        check(waitUntil([&] { return document->defaultFont().family() == "iA Writer Mono S"; }), "Source is not using bundled iA Writer Mono");
+        backend.refreshSourceTypography(); renderBarrier(window);
+        check(backend.hiddenRangesAt(sample.indexOf("Purpose")).isEmpty(), "Legacy setting still hides inline Markdown");
+        const int marker = sample.indexOf("**Purpose");
+        const auto block = document->findBlock(marker);
+        for (const auto &range : block.layout()->formats())
+            check(range.format.fontPointSize() != 1.0, "Source contains collapsed syntax glyphs");
+        const auto bullet = document->findBlock(sample.indexOf("- **Readable"));
+        check(bullet.blockFormat().leftMargin() > 0 && bullet.blockFormat().textIndent() == -bullet.blockFormat().leftMargin(), "Source list lacks a hanging indent");
+        check(bullet.blockFormat().lineHeight() == 155, "Source line spacing is not applied");
+        capture("source-readable-single");
+        for (int mode : {1, 0, 1}) {
+            action(mode ? "previewSplitButton" : "singleModeButton", mode, false);
+            action("visualEditToggle", mode, true);
+            action("sourceModeButton", mode, false);
+            check(document->toPlainText() == sample && !backend.modified(), "Source/Visual cycles altered literal Markdown or dirty state");
+            check(backend.hiddenRangesAt(marker).isEmpty(), "Returning to Source hid Markdown markers");
+        }
+        capture("source-readable-split");
+        backend.save(); QFile saved(backend.fileUrl().toLocalFile());
+        check(saved.open(QIODevice::ReadOnly) && saved.readAll() == sample.toUtf8(), "Source typography changed saved bytes");
+        editor->forceActiveFocus(); editor->setProperty("cursorPosition", sample.indexOf("- **Readable"));
+        key(window, Qt::Key_unknown, "> ");
+        QString edited = sample; edited.insert(sample.indexOf("- **Readable"), "> ");
+        check(waitUntil([&] { return document->toPlainText() == edited; }), "Source prefix typing failed");
+        settle();
+        QMetaObject::invokeMethod(window, "undoEditing");
+        check(document->toPlainText() == sample, "App Undo stopped at presentation instead of reversing typing");
+        QMetaObject::invokeMethod(window, "redoEditing");
+        check(document->toPlainText() == edited, "App Redo did not restore exact prefix typing");
+    });
 
     editingLayoutCheck("publishing-web-pdf-renderers-preserve-source", [&] {
         window->resize(1280, 720);

@@ -102,8 +102,8 @@ void MarkdownHighlighter::setReviewSpans(const QList<Span> &spans) {
 }
 
 void MarkdownHighlighter::rebuildFormats() {
-    const QColor marker = m_darkMode ? QColor(QStringLiteral("#4f525a"))
-                                     : QColor(QStringLiteral("#aeb1b5"));
+    const QColor marker = m_darkMode ? QColor(QStringLiteral("#A4ABB7"))
+                                     : QColor(QStringLiteral("#68707B"));
     const QColor background = !m_customBackground.isEmpty() ? QColor(m_customBackground)
         : (m_darkMode ? QColor(QStringLiteral("#101010")) : QColor(QStringLiteral("#ffffff")));
     const QColor text = !m_customForeground.isEmpty() ? QColor(m_customForeground)
@@ -111,8 +111,8 @@ void MarkdownHighlighter::rebuildFormats() {
     const QColor link = !m_customAccent.isEmpty() ? QColor(m_customAccent)
         : (m_darkMode ? QColor(QStringLiteral("#5584aa")) : QColor(QStringLiteral("#2077b2")));
     const QColor quote = marker;
-    const QColor codeBackground = m_darkMode ? QColor(QStringLiteral("#1c1a1a"))
-                                             : QColor(QStringLiteral("#f8f8f8"));
+    const QColor codeBackground = m_darkMode ? QColor(QStringLiteral("#252A32"))
+                                             : QColor(QStringLiteral("#EAECF0"));
 
     m_markerFormat = QTextCharFormat();
     m_markerFormat.setForeground(marker);

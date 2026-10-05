@@ -78,7 +78,6 @@ QtObject {
         { id: "sans", title: "Sans", toggle: true },
         { id: "serif", title: "Serif", toggle: true },
         { id: "mono", title: "Mono", toggle: true },
-        { id: "markup", title: "Show Markdown Syntax", toggle: true },
         { id: "outline", title: "Document Outline" },
         { id: "statistics", title: "Document Statistics" },
         { id: "titleBarFade", title: "Fade In/Out", toggle: true },
@@ -179,7 +178,6 @@ QtObject {
         case "sans": return backend.outputStyle === 0;
         case "serif": return backend.outputStyle === 1;
         case "mono": return backend.outputStyle === 2;
-        case "markup": return settings.showMarkup;
         case "writingManuscript": return settings.writingAppearance === "manuscript";
         case "writingEditorial": return settings.writingAppearance === "editorial";
         case "writingBook": return settings.writingAppearance === "book";
@@ -246,7 +244,6 @@ QtObject {
         case "sans": backend.setOutputStyle(0); break;
         case "serif": backend.setOutputStyle(1); break;
         case "mono": backend.setOutputStyle(2); break;
-        case "markup": settings.showMarkup = !settings.showMarkup; break;
         case "outline": outlineRequested(); break;
         case "statistics": statisticsRequested(); break;
         case "fullscreen": window.toggleFullScreen(); break;

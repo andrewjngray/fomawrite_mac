@@ -13,6 +13,7 @@
 #include <QTextBlock>
 #include <QTextLayout>
 #include <QTextDocument>
+#include <QAbstractTextDocumentLayout>
 #include <QQuickTextDocument>
 #include <QQuickWindow>
 #include <QImage>
@@ -41,6 +42,8 @@ class FomawriteTest : public QObject {
 
 private slots:
     void publishingWebCommandSelectsWebWithoutChangingEditor();
+    void sourceHangingIndentPreservesLiteralMarkdown();
+    void sourceHangingIndentKeepsUndoRedoAndSelection();
     void documentChromeHidesForUserInputAndRevealsEdgesWithoutReflow();
     void documentChromeKeepsMenusKeyboardAndNativeToggleAccessible();
     void paneAlignedFooterMenusFollowDividerWithoutEditing();
@@ -3419,7 +3422,7 @@ private slots:
         auto *editor = window->findChild<QObject *>("sourceEditor");
         QVERIFY(commands && settings && editor);
         auto run = [&](const char *id) { return QMetaObject::invokeMethod(commands, "run", Q_ARG(QVariant, QString::fromLatin1(id))); };
-        for (const auto *id : {"editor", "split", "preview", "split", "paragraph", "typewriter", "serif", "mono", "sans", "markup", "reloadPreview"})
+        for (const auto *id : {"editor", "split", "preview", "split", "paragraph", "typewriter", "serif", "mono", "sans", "reloadPreview"})
             QVERIFY(run(id));
         auto *preview = window->findChild<QObject *>("previewPane");
         QVERIFY(preview);
@@ -5482,6 +5485,7 @@ private:
 #include "cycle117-pane-chrome.inc"
 #include "cycle118-editing-layout.inc"
 #include "cycle119-document-chrome.inc"
+#include "cycle122-source-typography.inc"
 #include "cycle100-navigation.inc"
 #include "cycle99-integration.inc"
 #include "sourcevisualmapping-cycle99.inc"

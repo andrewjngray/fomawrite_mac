@@ -120,6 +120,9 @@ public:
     Q_INVOKABLE void setShowMarkup(bool show);
     Q_INVOKABLE QUrl resolveDocumentLink(const QString &link) const;
     Q_INVOKABLE void attachDocument(QObject *textDocument);
+    Q_INVOKABLE bool refreshSourceTypography();
+    Q_INVOKABLE int undoSource(int position);
+    Q_INVOKABLE int redoSource(int position);
     Q_INVOKABLE void openDialog();
     Q_INVOKABLE bool open(const QUrl &url);
     Q_INVOKABLE void rememberCursor(int position);
@@ -300,7 +303,7 @@ private:
     void loadOmarchyTheme();
     void watchOmarchyTheme();
 
-    bool m_showMarkup = false;
+    bool m_showMarkup = true;
     FileLibrary m_library;
     QUrl m_fileUrl;
     bool m_modified = false;
@@ -313,9 +316,9 @@ private:
     bool m_loading = false;
     bool m_closeAfterSave = false;
     bool m_formattingTypography = false;
-    int m_formattedBlockCount = 0;
-    int m_lastChangePos = 0;
-    int m_lastChangeAdded = 0;
+    QMap<int, int> m_typographyUndoRanges;
+    int m_observedUndoSteps = 0;
+    bool m_sourceHistoryTraversal = false;
     QTimer m_wordCountTimer;
     QTimer m_recoveryTimer;
     QFileSystemWatcher m_fileWatcher;

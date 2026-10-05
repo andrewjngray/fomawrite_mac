@@ -158,9 +158,9 @@ void FomawriteTest::footerModesAndTemplatesPreserveDraftAndUndo() {
     QVERIFY(QMetaObject::invokeMethod(custom, "close"));
     QTRY_VERIFY(!custom->property("visible").toBool());
     QCOMPARE(editor->property("text").toString(), draft);
-    QVERIFY(QMetaObject::invokeMethod(editor, "undo"));
+    QVERIFY(QMetaObject::invokeMethod(window.data(), "undoEditing"));
     QCOMPARE(editor->property("text").toString(), QString::fromUtf8(source));
-    QVERIFY(QMetaObject::invokeMethod(editor, "redo"));
+    QVERIFY(QMetaObject::invokeMethod(window.data(), "redoEditing"));
     QCOMPARE(editor->property("text").toString(), draft);
     QCOMPARE(cycle103Read(path), source);
 }
@@ -243,9 +243,9 @@ void FomawriteTest::footerAppearanceAndStatisticsWorkByClick() {
     QVERIFY(QMetaObject::invokeMethod(dialog, "close"));
     QTRY_VERIFY(!dialog->property("visible").toBool());
     QCOMPARE(editor->property("text").toString(), draft);
-    QVERIFY(QMetaObject::invokeMethod(editor, "undo"));
+    QVERIFY(QMetaObject::invokeMethod(window.data(), "undoEditing"));
     QCOMPARE(editor->property("text").toString(), source);
-    QVERIFY(QMetaObject::invokeMethod(editor, "redo"));
+    QVERIFY(QMetaObject::invokeMethod(window.data(), "redoEditing"));
     QCOMPARE(editor->property("text").toString(), draft);
 }
 

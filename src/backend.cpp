@@ -8,6 +8,7 @@
 #include <QScopeGuard>
 #include <QCryptographicHash>
 #include <QTextFragment>
+#include <QTextLayout>
 #include <QTextTable>
 #include <QJsonArray>
 #include <QPdfWriter>
@@ -57,12 +58,107 @@
 #include "markdownhighlighter.h"
 #include "visualtexthighlighter.h"
 
-// Qt proportional height includes font leading; 130% gives the reference
-// manuscript a roughly 1.55em baseline interval (17px Menlo ≈ 26px).
-constexpr qreal sourceLineHeightPercent = 130;
+// Extra baseline space keeps literal Markdown readable in Source.
+constexpr qreal sourceLineHeightPercent = 155;
 const QString lastSaveDirectorySetting = QStringLiteral("file/lastSaveDirectory");
 
 namespace {
+
+// Source is literal Markdown. Only the soft wraps move; the first line keeps
+// its original leading spaces and markers. Container prefixes also let us keep
+// quoted fences and nested-list code literal.
+QList<QPair<QTextBlock, qreal>> sourceHangingOffsets(QTextDocument *document) {
+    static const QRegularExpression quote(QStringLiteral("^[ \\t]*(?:>[ \\t]?)+[ \\t]*"));
+    static const QRegularExpression list(QStringLiteral("^(?:[-+*]|[0-9]{1,9}[.)])[ \\t]+"));
+    static const QRegularExpression task(QStringLiteral("^\\[[ xX]\\][ \\t]+"));
+    static const QRegularExpression fence(QStringLiteral("^(`{3,}|~{3,})(.*)$"));
+    static const QRegularExpression rule(QStringLiteral("^(?:\\*[ \\t]*){3,}$|^(?:-[ \\t]*){3,}$|^(?:_[ \\t]*){3,}$"));
+    QList<QPair<QTextBlock, qreal>> result;
+    QChar fenceMarker;
+    int fenceLength = 0;
+    QList<int> listContentIndents;
+    bool inMath = false;
+    bool inFrontMatter = document->firstBlock().text() == QStringLiteral("---");
+    for (QTextBlock block = document->begin(); block.isValid(); block = block.next()) {
+        const QString text = block.text();
+        int leading = 0;
+        int columns = 0;
+        while (leading < text.size() && (text.at(leading) == ' ' || text.at(leading) == '\t')) {
+            columns += text.at(leading) == '\t' ? 4 - columns % 4 : 1;
+            ++leading;
+        }
+        const auto quoteMatch = quote.match(text);
+        int prefix = quoteMatch.hasMatch() ? int(quoteMatch.capturedLength()) : leading;
+        QString body = text.mid(prefix);
+        const auto listMatch = list.match(body);
+        // A child may start within three columns of its parent's content.
+        // Four more columns denote literal code, even if it starts with '-'
+        // or '>'. Keep each level so ordinary 2/4-space siblings still work.
+        if (!text.trimmed().isEmpty() && fenceLength == 0 && !inMath && !inFrontMatter) {
+            while (!listContentIndents.isEmpty() && columns < listContentIndents.last())
+                listContentIndents.removeLast();
+        }
+        const int parentContentIndent = listContentIndents.isEmpty() ? 0 : listContentIndents.last();
+        const bool indentedCode = columns >= parentContentIndent + 4;
+        const bool listItem = listMatch.hasMatch() && !indentedCode;
+        int contentIndent = columns;
+        if (listItem) {
+            for (const QChar character : listMatch.captured())
+                contentIndent += character == '\t' ? 4 - contentIndent % 4 : 1;
+            prefix += listMatch.capturedLength();
+            body = text.mid(prefix);
+            const auto taskMatch = task.match(body);
+            if (taskMatch.hasMatch()) prefix += taskMatch.capturedLength();
+            body = text.mid(prefix);
+        }
+        const QString trimmed = body.trimmed();
+        bool literal = indentedCode;
+        if (inFrontMatter) {
+            literal = true;
+            if (block.blockNumber() > 0 && (text == QStringLiteral("---") || text == QStringLiteral("...")))
+                inFrontMatter = false;
+        } else if (fenceLength > 0) {
+            literal = true;
+            const auto match = fence.match(trimmed);
+            if (match.hasMatch() && match.captured(1).front() == fenceMarker
+                    && match.capturedLength(1) >= fenceLength && match.captured(2).trimmed().isEmpty())
+                fenceLength = 0;
+        } else if (trimmed == QStringLiteral("$$")) {
+            literal = true;
+            inMath = !inMath;
+        } else if (inMath) {
+            literal = true;
+        } else {
+            const auto match = fence.match(trimmed);
+            if (match.hasMatch()) {
+                literal = true;
+                fenceMarker = match.captured(1).front();
+                fenceLength = match.capturedLength(1);
+            }
+        }
+        if (literal && columns == 0 && !quoteMatch.hasMatch())
+            listContentIndents.clear();
+        else if (!literal && listItem)
+            listContentIndents.append(contentIndent);
+        else if (!literal && !text.trimmed().isEmpty() && columns == 0 && !quoteMatch.hasMatch())
+            listContentIndents.clear();
+        qreal offset = 0;
+        if (!literal && (listItem || quoteMatch.hasMatch()) && !trimmed.isEmpty()
+                && !rule.match(text.trimmed()).hasMatch() && !trimmed.startsWith('|')) {
+            QTextLayout prefixLayout(text.left(prefix), document->defaultFont());
+            prefixLayout.setTextOption(document->defaultTextOption());
+            prefixLayout.beginLayout();
+            QTextLine line = prefixLayout.createLine();
+            if (line.isValid()) {
+                line.setLineWidth(1000000);
+                offset = line.cursorToX(prefix);
+            }
+            prefixLayout.endLayout();
+        }
+        result.append({block, offset});
+    }
+    return result;
+}
 
 struct OutputPaper {
     const char *id;
@@ -1592,18 +1688,18 @@ void Backend::attachDocument(QObject *textDocument) {
     m_highlighter->setShowMarkup(m_showMarkup);
     m_highlighter->setColors(palette().value("editor").toString(), m_themeForeground, m_themeAccent);
 
-    connect(m_document, &QTextDocument::contentsChange, this,
-            [this](int position, int, int charsAdded) {
-                if (m_formattingTypography || m_loading)
-                    return;
-                m_lastChangePos = position;
-                m_lastChangeAdded = charsAdded;
-            });
     // Includes format-only authorship edits and their Undo/Redo paths. The QML
     // consumer debounces this signal before recomputing the displayed metrics.
     connect(m_document, &QTextDocument::contentsChanged,
             this, &Backend::documentStatisticsChanged);
 
+    connect(m_document, &QTextDocument::undoCommandAdded, this, [this] {
+        if (m_loading || m_formattingTypography || m_sourceHistoryTraversal) return;
+        // New text or intentional formatting can start a branch after Undo.
+        auto it = m_typographyUndoRanges.upperBound(m_observedUndoSteps);
+        while (it != m_typographyUndoRanges.end()) it = m_typographyUndoRanges.erase(it);
+        m_observedUndoSteps = m_document->availableUndoSteps();
+    });
     applyDocumentTypography();
     restoreRecovery();
 }
@@ -2126,12 +2222,7 @@ bool Backend::editorTextChanged() {
         return false;
     m_lastDocumentText = text;
 
-    if (m_document) {
-        const int blockCount = m_document->blockCount();
-        if (blockCount > m_formattedBlockCount)
-            reapplyTypographyToChange();
-        m_formattedBlockCount = blockCount;
-    }
+    if (m_document) reapplyTypographyToChange();
 
     scheduleWordCount();
     emit documentStatisticsChanged();
@@ -2584,64 +2675,104 @@ void Backend::scheduleWordCount() {
 }
 
 void Backend::applyDocumentTypography() {
-    if (!m_document)
-        return;
-
-    QTextBlockFormat blockFormat;
-    blockFormat.setLineHeight(sourceLineHeightPercent, QTextBlockFormat::ProportionalHeight);
-
-    // A full pass is only used for freshly loaded/attached documents, so it is
-    // safe to drop undo history here (re-enabling clears the stack anyway).
+    if (!m_document) return;
+    m_typographyUndoRanges.clear();
+    m_observedUndoSteps = 0;
+    // Freshly loaded/attached documents have no edit history to preserve.
     const bool undoEnabled = m_document->isUndoRedoEnabled();
     m_document->setUndoRedoEnabled(false);
+    refreshSourceTypography();
+    m_document->setUndoRedoEnabled(undoEnabled);
+}
 
+bool Backend::refreshSourceTypography() {
+    if (!m_document || m_formattingTypography || m_sourceHistoryTraversal || m_document->isRedoAvailable())
+        return false;
+
+    QList<QPair<QTextBlock, qreal>> changed;
+    for (const auto &item : sourceHangingOffsets(m_document)) {
+        const QTextBlockFormat format = item.first.blockFormat();
+        if (format.lineHeightType() != QTextBlockFormat::ProportionalHeight
+                || !qFuzzyCompare(format.lineHeight(), sourceLineHeightPercent)
+                || qAbs(format.leftMargin() - item.second) > 0.01
+                || qAbs(format.textIndent() + item.second) > 0.01)
+            changed.append(item);
+    }
+    // Identical merges also create undo commands, so leave them alone.
+    if (changed.isEmpty()) return true;
+
+    const int beforeSteps = m_document->availableUndoSteps();
+    const bool wasModified = m_document->isModified();
+    const bool emptyHistory = m_document->isUndoRedoEnabled() && !m_document->isUndoAvailable();
+    if (emptyHistory) m_document->setUndoRedoEnabled(false);
     m_formattingTypography = true;
     QTextCursor cursor(m_document);
-    cursor.select(QTextCursor::Document);
-    cursor.mergeBlockFormat(blockFormat);
+    // Text edits own their presentation. Font-only refreshes join the latest
+    // edit too, so Undo continues to undo writing, never typography alone.
+    if (m_document->isUndoAvailable()) cursor.joinPreviousEditBlock();
+    else cursor.beginEditBlock();
+    for (const auto &item : changed) {
+        QTextBlockFormat format;
+        format.setLineHeight(sourceLineHeightPercent, QTextBlockFormat::ProportionalHeight);
+        format.setLeftMargin(item.second);
+        format.setTextIndent(-item.second);
+        cursor.setPosition(item.first.position());
+        cursor.mergeBlockFormat(format);
+    }
+    cursor.endEditBlock();
+    if (emptyHistory) m_document->setUndoRedoEnabled(true);
+    m_document->setModified(wasModified);
     m_formattingTypography = false;
+    const int afterSteps = m_document->availableUndoSteps();
+    if (afterSteps > beforeSteps)
+        m_typographyUndoRanges.insert(afterSteps, m_typographyUndoRanges.value(beforeSteps, beforeSteps));
+    m_observedUndoSteps = afterSteps;
+    return true;
+}
 
-    m_document->setUndoRedoEnabled(undoEnabled);
+int Backend::undoSource(int position) {
+    if (!m_document) return position;
+    m_sourceHistoryTraversal = true;
+    const auto guard = qScopeGuard([&] { m_sourceHistoryTraversal = false; });
+    QTextCursor cursor(m_document);
+    cursor.setPosition(qBound(0, position, m_document->characterCount() - 1));
+    while (m_document->isUndoAvailable()) {
+        const int before = m_document->availableUndoSteps();
+        const int formatBase = m_typographyUndoRanges.value(before, -1);
+        m_document->undo(&cursor);
+        // Qt joins explicit edit blocks, but single keystrokes can leave a
+        // standalone paragraph-format command. Only our recorded formatting
+        // is transparent; authorship and other intentional format edits stay.
+        if (formatBase < 0 || m_document->availableUndoSteps() != formatBase) break;
+    }
+    m_observedUndoSteps = m_document->availableUndoSteps();
+    return cursor.position();
+}
 
-    m_formattedBlockCount = m_document->blockCount();
+int Backend::redoSource(int position) {
+    if (!m_document) return position;
+    m_sourceHistoryTraversal = true;
+    const auto guard = qScopeGuard([&] { m_sourceHistoryTraversal = false; });
+    QTextCursor cursor(m_document);
+    cursor.setPosition(qBound(0, position, m_document->characterCount() - 1));
+    if (m_document->isRedoAvailable()) m_document->redo(&cursor);
+    while (m_document->isRedoAvailable()) {
+        const int steps = m_document->availableUndoSteps();
+        bool presentationNext = false;
+        for (auto it = m_typographyUndoRanges.cbegin(); it != m_typographyUndoRanges.cend(); ++it)
+            if (it.key() > steps && it.value() == steps) { presentationNext = true; break; }
+        if (!presentationNext) break;
+        m_document->redo(&cursor);
+    }
+    m_observedUndoSteps = m_document->availableUndoSteps();
+    return cursor.position();
 }
 
 void Backend::reapplyTypographyToChange() {
-    if (!m_document)
-        return;
-
-    QTextBlockFormat blockFormat;
-    blockFormat.setLineHeight(sourceLineHeightPercent, QTextBlockFormat::ProportionalHeight);
-
-    // Format only the block(s) touched by the last edit instead of the whole
-    // document, and fold the change into the preceding edit command so a single
-    // undo reverts both the text and its formatting.
-    const int maxPos = m_document->characterCount() - 1;
-    const int start = qBound(0, m_lastChangePos, maxPos);
-    const int end = qBound(start, m_lastChangePos + m_lastChangeAdded, maxPos);
-
-    QList<QTextBlock> unformatted;
-    for (QTextBlock block = m_document->findBlock(start);
-         block.isValid() && block.position() <= end; block = block.next()) {
-        const auto format = block.blockFormat();
-        if (format.lineHeightType() != QTextBlockFormat::ProportionalHeight
-                || !qFuzzyCompare(format.lineHeight(), qreal(sourceLineHeightPercent)))
-            unformatted.append(block);
-    }
-    // New blocks normally inherit typography, and Redo restores it with the
-    // original edit. Even merging an identical format creates an undo command
-    // and discards the remaining redo history, so leave those blocks alone.
-    if (unformatted.isEmpty()) return;
-
-    m_formattingTypography = true;
-    QTextCursor cursor(m_document);
-    cursor.joinPreviousEditBlock();
-    for (const QTextBlock &block : unformatted) {
-        cursor.setPosition(block.position());
-        cursor.mergeBlockFormat(blockFormat);
-    }
-    cursor.endEditBlock();
-    m_formattingTypography = false;
+    // Undo/Redo restores the presentation saved with each text edit. A font
+    // change while Redo is pending waits for the next edit or reload instead
+    // of losing that Redo history.
+    refreshSourceTypography();
 }
 
 QString Backend::previewMarkdown(const QString &source) const { return expandedMarkdown(source, documentBaseUrl()); }

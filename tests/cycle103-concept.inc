@@ -113,7 +113,7 @@ void FomawriteTest::referenceWorkspacePresetPreservesDraftAndOutput() {
         QCOMPARE(layout->property("layoutMode").toInt(), 0);
         QVERIFY(!layout->property("visualEditEnabled").toBool());
         QCOMPARE(settings->property("writingAppearance").toString(), QStringLiteral("manuscript"));
-        QVERIFY(!settings->property("showMarkup").toBool());
+        QVERIFY(settings->property("showMarkup").toBool());
         QCOMPARE(backend.themePreset(), QStringLiteral("studio"));
         QVERIFY(library->property("showExcerpts").toBool());
         QCOMPARE(library->property("dateMode").toInt(), 1);

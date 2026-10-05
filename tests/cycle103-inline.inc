@@ -44,7 +44,7 @@ void FomawriteTest::sourceTripleEmphasisKeepsFormattingAndLiteralCode() {
                 for (int offset = 0; offset < 3; ++offset) {
                     const auto marker = formatAt(markerStart + offset);
                     if (showMarkers) {
-                        QCOMPARE(marker.foreground().color(), QColor("#aeb1b5"));
+                        QCOMPARE(marker.foreground().color(), QColor("#68707B"));
                         QVERIFY(marker.fontPointSize() != 1.0);
                     } else {
                         QCOMPARE(marker.fontPointSize(), qreal(1.0));
@@ -70,7 +70,7 @@ void FomawriteTest::sourceTripleEmphasisKeepsFormattingAndLiteralCode() {
                 QVERIFY(format.fontWeight() != QFont::Bold);
                 QVERIFY(!format.fontItalic());
                 QVERIFY(format.fontPointSize() != 1.0);
-                QCOMPARE(format.background().color(), QColor("#f8f8f8"));
+                QCOMPARE(format.background().color(), QColor("#EAECF0"));
             }
         }
         QCOMPARE(document.toPlainText(), source);

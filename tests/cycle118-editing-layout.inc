@@ -66,8 +66,8 @@ void FomawriteTest::editingAndLayoutChoicesAreIndependent() {
     QVERIFY(!sourceChoice->property("checked").toBool() && !visualChoice->property("checked").toBool());
     QVERIFY(QMetaObject::invokeMethod(f.window.data(), "selectWritingMode", Q_ARG(QVariant, "visual"))); QTRY_COMPARE(f.layout->property("effectiveLayoutMode").toInt(), 1);
     QVERIFY(f.layout->property("visualEditEnabled").toBool());
-    QVERIFY(QMetaObject::invokeMethod(f.editor, "undo")); QCOMPARE(f.editor->property("text").toString(), saved);
-    QVERIFY(QMetaObject::invokeMethod(f.editor, "redo")); QCOMPARE(f.editor->property("text").toString(), draft);
+    QVERIFY(QMetaObject::invokeMethod(f.window.data(), "undoEditing")); QCOMPARE(f.editor->property("text").toString(), saved);
+    QVERIFY(QMetaObject::invokeMethod(f.window.data(), "redoEditing")); QCOMPARE(f.editor->property("text").toString(), draft);
 }
 
 void FomawriteTest::visualSplitEditsCanonicalSourceAndKeepsPreviewReadOnly() {
@@ -107,7 +107,7 @@ void FomawriteTest::visualSplitEditsCanonicalSourceAndKeepsPreviewReadOnly() {
     }
     QVERIFY(cycle102Click(f.quick, sourceChoice)); QTRY_VERIFY(f.editor->isVisible());
     QCOMPARE(f.layout->property("effectiveLayoutMode").toInt(), 1);
-    QVERIFY(QMetaObject::invokeMethod(f.editor, "undo")); QTRY_COMPARE(f.editor->property("text").toString(), saved);
-    QVERIFY(QMetaObject::invokeMethod(f.editor, "redo")); QTRY_COMPARE(f.editor->property("text").toString(), edited);
+    QVERIFY(QMetaObject::invokeMethod(f.window.data(), "undoEditing")); QTRY_COMPARE(f.editor->property("text").toString(), saved);
+    QVERIFY(QMetaObject::invokeMethod(f.window.data(), "redoEditing")); QTRY_COMPARE(f.editor->property("text").toString(), edited);
     QCOMPARE(cycle103Read(path), saved.toUtf8());
 }

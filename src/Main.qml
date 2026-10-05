@@ -37,8 +37,8 @@ ApplicationWindow {
     readonly property string activeWritingAppearance: ["editorial", "book"].indexOf(workspaceSettings.writingAppearance) >= 0
         ? workspaceSettings.writingAppearance : "manuscript"
     readonly property string editorFontFamily: activeWritingAppearance === "editorial" ? Qt.application.font.family
-        : activeWritingAppearance === "book" ? "Georgia" : isMac ? "Menlo" : "iA Writer Mono S"
-    readonly property int writingBasePixelSize: activeWritingAppearance === "manuscript" ? 17 : activeWritingAppearance === "book" ? 20 : 19
+        : activeWritingAppearance === "book" ? "Georgia" : "iA Writer Mono S"
+    readonly property int writingBasePixelSize: activeWritingAppearance === "manuscript" ? 18 : activeWritingAppearance === "book" ? 20 : 19
     readonly property int editorFontPixelSize: scaledSize(writingBasePixelSize * paneZoom.sourceZoom / 100)
     readonly property int editorWidth: Math.min(
         scaledSize(680),
@@ -65,6 +65,14 @@ ApplicationWindow {
         topChrome.pointerReveal = false;
         documentFooter.pointerReveal = false;
         documentChromeHidden = true;
+    }
+    function undoEditing() {
+        if (editTarget === editor) editor.cursorPosition = backend.undoSource(editor.cursorPosition);
+        else editTarget.undo();
+    }
+    function redoEditing() {
+        if (editTarget === editor) editor.cursorPosition = backend.redoSource(editor.cursorPosition);
+        else editTarget.redo();
     }
     function performDocumentEdit(action) {
         var before = editor.text;
@@ -412,6 +420,7 @@ ApplicationWindow {
     readonly property bool adoptReferenceWorkspace: typeof referenceWorkspaceUpgrade !== "undefined" && referenceWorkspaceUpgrade
     function restoreWorkspacePaneState(state) {
         workspaceLayout.restoreState(state);
+        workspaceSettings.showMarkup = true;
         if (adoptReferenceWorkspace) applyReferenceWorkspace();
     }
     function openAnchoredMenu(menu, anchor) {
@@ -516,7 +525,7 @@ ApplicationWindow {
         workspaceSettings.toolbarMode = 0;
         workspaceSettings.titleBarMode = 1;
         workspaceSettings.typewriter = false;
-        workspaceSettings.showMarkup = false;
+        workspaceSettings.showMarkup = true;
         workspaceLayout.restoreState({ version: 1, organizerVisible: true, filesVisible: true,
             layoutMode: 0, visualEditEnabled: false, organizerWidth: 184, fileWidth: 232,
             previewWidth: workspaceLayout.previewWidth });
@@ -543,7 +552,7 @@ ApplicationWindow {
         property int zoomRevision: 0
         property string writingAppearance: "editorial"
         property int appearanceRevision: 0
-        property bool showMarkup: true
+        property bool showMarkup: true // Legacy preference; Source now always shows syntax.
         property string reviewWords: ""
         onReviewWordsChanged: if (styleCheckCustom) customReviewRefreshTimer.restart()
         property bool styleCheckCustom: false
@@ -585,7 +594,7 @@ ApplicationWindow {
         property bool toolbarAI: true
         property bool toolbarReference: true
         property bool automaticVersions: false
-        onShowMarkupChanged: backend.setShowMarkup(showMarkup)
+        onShowMarkupChanged: backend.setShowMarkup(true)
     }
 
     PaneZoomState {
@@ -871,7 +880,6 @@ ApplicationWindow {
             CompactMenuItem { text: "Book"; checkable: true; checked: win.activeWritingAppearance === "book"; onTriggered: workspaceCommands.run("writingBook") }
         }
         MenuSeparator {}
-        CompactMenuItem { text: "Show Markdown syntax"; checkable: true; checked: workspaceSettings.showMarkup; onTriggered: workspaceCommands.run("markup") }
         CompactMenuItem { text: "Paragraph focus"; checkable: true; checked: workspaceSettings.paragraphFocus; onTriggered: workspaceCommands.run("paragraph") }
         CompactMenuItem { text: "Typewriter scrolling (Source)"; checkable: true; checked: workspaceSettings.typewriter; onTriggered: workspaceCommands.run("typewriter") }
         MenuSeparator {}
@@ -1479,13 +1487,13 @@ ApplicationWindow {
     Shortcut {
         sequence: "Ctrl+Z"
         context: Qt.WindowShortcut
-        onActivated: win.performDocumentEdit(function() { win.editTarget.undo(); })
+        onActivated: win.performDocumentEdit(function() { win.undoEditing(); })
     }
 
     Shortcut {
         sequences: ["Ctrl+Shift+Z", "Ctrl+Y"]
         context: Qt.WindowShortcut
-        onActivated: win.performDocumentEdit(function() { win.editTarget.redo(); })
+        onActivated: win.performDocumentEdit(function() { win.redoEditing(); })
     }
 
     Shortcut {
@@ -1581,8 +1589,8 @@ ApplicationWindow {
         }
         Platform.Menu {
             title: "Edit"
-            Platform.MenuItem { objectName: "editUndo"; text: "Undo"; enabled: win.editTarget.canUndo; onTriggered: win.performDocumentEdit(function() { win.editTarget.undo(); }) }
-            Platform.MenuItem { objectName: "editRedo"; text: "Redo"; enabled: win.editTarget.canRedo; onTriggered: win.performDocumentEdit(function() { win.editTarget.redo(); }) }
+            Platform.MenuItem { objectName: "editUndo"; text: "Undo"; enabled: win.editTarget.canUndo; onTriggered: win.performDocumentEdit(function() { win.undoEditing(); }) }
+            Platform.MenuItem { objectName: "editRedo"; text: "Redo"; enabled: win.editTarget.canRedo; onTriggered: win.performDocumentEdit(function() { win.redoEditing(); }) }
             Platform.MenuSeparator {}
             Platform.MenuItem { text: "Cut"; enabled: win.sourceClipboardAllowed && !win.editTarget.readOnly && win.editTarget.selectedText.length > 0; onTriggered: { if (win.editTarget === editor) { backend.copySelection(editor.selectionStart, editor.selectionEnd, "markdown"); win.performDocumentEdit(function() { editor.remove(editor.selectionStart, editor.selectionEnd); }); } else win.editTarget.cut(); } }
             Platform.MenuItem { text: "Copy"; enabled: win.sourceClipboardAllowed && win.editTarget.selectedText.length > 0; onTriggered: { if (win.editTarget === editor) backend.copySelection(editor.selectionStart, editor.selectionEnd, "markdown"); else win.editTarget.copy(); } }
@@ -1770,7 +1778,6 @@ ApplicationWindow {
                 enabled: win.sourceEditorVisible && win.editTarget === editor && editor.selectionStart === editor.selectionEnd
                 onTriggered: win.showCompletions()
             }
-            NativeCommand { commandId: "markup" }
             Platform.MenuSeparator { objectName: "nativeBeforeTemplate" }
             Platform.Menu {
                 id: nativeTemplateMenu
@@ -2959,6 +2966,7 @@ ApplicationWindow {
                 font.family: win.editorFontFamily
                 font.pixelSize: win.editorFontPixelSize
                 font.weight: Font.Normal
+                onFontChanged: Qt.callLater(function() { backend.refreshSourceTypography(); })
                 // Native rendering hints glyphs to the pixel grid, which is
                 // crispest at whole scale factors but misplaces and unevenly
                 // rasterizes glyphs at fractional ones (and goes stale when
@@ -3244,7 +3252,7 @@ ApplicationWindow {
                 }
 
                 Component.onCompleted: {
-                    backend.setShowMarkup(workspaceSettings.showMarkup);
+                    backend.setShowMarkup(true);
                     backend.attachDocument(textDocument);
                     backend.setFocusPosition(cursorPosition, workspaceSettings.paragraphFocus, workspaceSettings.sentenceFocus);
                     if (workspaceSettings.styleCheckCustom || workspaceSettings.styleCheckFillers)
@@ -3277,8 +3285,8 @@ ApplicationWindow {
             visualTextSize: win.editorFontPixelSize
             visualTopInset: height < 600 ? 32 : 64
             onVisualEditorFocusedChanged: if (visualEditorFocused) Qt.callLater(win.updateWritingSurfaceFromFocus)
-            onEditorUndoRequested: win.performDocumentEdit(function() { editor.undo(); })
-            onEditorRedoRequested: win.performDocumentEdit(function() { editor.redo(); })
+            onEditorUndoRequested: win.performDocumentEdit(function() { editor.cursorPosition = backend.undoSource(editor.cursorPosition); })
+            onEditorRedoRequested: win.performDocumentEdit(function() { editor.cursorPosition = backend.redoSource(editor.cursorPosition); })
             onSourceEditRequested: win.selectWritingMode("source")
             onScrollFractionChanged: function(fraction) {
                 if (!visible || !workspaceSettings.synchronizedScroll || win.synchronizingScroll || win.changingDocumentView || workspaceLayout.effectiveLayoutMode !== 1) return;

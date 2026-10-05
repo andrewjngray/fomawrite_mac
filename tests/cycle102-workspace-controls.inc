@@ -175,9 +175,9 @@ void FomawriteTest::collapsedPaneButtonsRestoreEveryLayout() {
     QCOMPARE(editor->property("text").toString(), draft);
     QVERIFY(backend.modified());
     QVERIFY(editor->property("canUndo").toBool());
-    QVERIFY(QMetaObject::invokeMethod(editor, "undo"));
+    QVERIFY(QMetaObject::invokeMethod(window.data(), "undoEditing"));
     QCOMPARE(editor->property("text").toString(), source);
-    QVERIFY(QMetaObject::invokeMethod(editor, "redo"));
+    QVERIFY(QMetaObject::invokeMethod(window.data(), "redoEditing"));
     QCOMPARE(editor->property("text").toString(), draft);
 }
 
@@ -271,9 +271,9 @@ void FomawriteTest::previewTemplateFooterAndNativeMenuShareState() {
     QVERIFY(nativeHelvetica->property("checked").toBool());
     QCOMPARE(editor->property("text").toString(), draft);
     QVERIFY(backend.modified());
-    QVERIFY(QMetaObject::invokeMethod(editor, "undo"));
+    QVERIFY(QMetaObject::invokeMethod(window.data(), "undoEditing"));
     QCOMPARE(editor->property("text").toString(), source);
-    QVERIFY(QMetaObject::invokeMethod(editor, "redo"));
+    QVERIFY(QMetaObject::invokeMethod(window.data(), "redoEditing"));
     QCOMPARE(editor->property("text").toString(), draft);
 }
 
