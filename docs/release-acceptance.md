@@ -1,6 +1,10 @@
 # Acceptance ledger — current follow-through and Cycle 59 history
 
-## Current review build — Cycle 121
+## Current review build — Cycle 122
+
+**0.3.0-dev18 / macOS 0.3.0 (122)** makes Source consistently literal and more readable. [Verification and limits](../research/cycle-122/README.md). 185 regressions pass; Dev, demo and Applications each pass 150 native checks with matching UI/version and strict signatures.
+
+## Previous review build — Cycle 121
 
 **0.3.0-dev17 / macOS 0.3.0 (121)** exposes consistent Fade In/Out and Always Show choices. [Verification and limits](../research/cycle-121/README.md).
 

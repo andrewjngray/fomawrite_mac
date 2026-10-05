@@ -2,7 +2,9 @@
 
 **Product identity, Cycle 60:** Omawrite was renamed Fomawrite. Historical iA comparisons below retain their original cycle wording; this does not change their implemented/partial/unverified classification. See [migration notes](product-rename.md).
 
-**Current UI overlay — Cycle121:** View → Title Bar → Fade In/Out / Always Show now controls the persisted top/bottom document-bar behavior, with synchronized menu checkmarks and no legacy hover conflict. [Verification](../research/cycle-121/README.md).
+**Current UI overlay — Cycle122:** Source always shows Markdown markers, with bundled iA Writer Mono, clearer spacing/contrast and hanging list/quote wraps. Visual Edit remains the formatted choice. This does not establish parser parity. [Verification and limits](../research/cycle-122/README.md).
+
+**Previous UI overlay — Cycle121:** View → Title Bar → Fade In/Out / Always Show now controls the persisted top/bottom document-bar behavior, with synchronized menu checkmarks and no legacy hover conflict. [Verification](../research/cycle-121/README.md).
 
 **Previous UI overlay — Cycle120:** `0.3.0-dev16`, macOS `0.3.0 (120)`, retains Cycle119 pane ownership. Edge-revealed bars remain visible after pointer departure, until editing or scrolling. Copy/select-all and publishing clicks retain them. Studio pairs a soft grey editor with the existing warm publishing surround; actual export page colors stay intact. [Verification and limits](../research/cycle-120/README.md).
 

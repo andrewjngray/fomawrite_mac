@@ -1537,3 +1537,10 @@ Requested: expose Fade In/Out and Always Show in View → Title Bar, as in Andre
 [Verification and runnable copies](../research/cycle-121/README.md). [Optional review](../research/usability/cycle-121.md).
 
 Validation: **183 regressions pass**, including preference persistence after reopening. Dev, demo and Applications each pass **149 native executable checks** with matching embedded UI/version and strict signatures. Installed-copy verification is recorded in the handoff. Build **0.3.0-dev17 / macOS 0.3.0 (121)**.
+
+
+## Cycle 122 — literal, readable Source
+
+Requested: consistently visible Markdown in Source and clearer typography/list structure following Andrew’s iA Writer reference. Source now always shows syntax; Visual Edit is the formatted alternative. Manuscript uses bundled iA Writer Mono at an 18px base with 155% line spacing. Hanging indents align wrapped lists, tasks and quotes without changing Markdown. Literal code/fences/math and conservative nested-code handling retain their layout. Typography joins actual edits and defers font-refresh formatting while Redo is pending.
+
+[Verification and limits](../research/cycle-122/README.md), [optional review](../research/usability/cycle-122.md). Build 0.3.0-dev18 / macOS 0.3.0 (122). **185 regression tests pass, 0 failed/skipped**; all three refreshed app copies pass **150 native checks** each, matching UI/version and strict signatures with zero QML warnings. Source commit `a8f2c7902c011d670dae127a19bf28ef2d0124be`.
