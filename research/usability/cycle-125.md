@@ -1,6 +1,6 @@
 # Cycle 125 — optional theme-folder review
 
-Target build **0.3.0-dev21 / macOS 0.3.0 (125)**. Final regression and native verification are pending; see the [draft handoff](../cycle-125/README.md). Use a disposable Markdown sample with headings, a quote, a table and fenced code.
+Verified build **0.3.0-dev21 / macOS 0.3.0 (125)**. All 195 regressions and 157 native checks per app copy pass; see the [handoff](../cycle-125/README.md). Use a disposable Markdown sample with headings, a quote, a table and fenced code.
 
 - Open Themes Folder. Add a theme CSS file at the folder's top level, with any font/image/resource folders beside it. Confirm the theme appears automatically, including a name containing capitals or underscores. Nested archive CSS should stay outside the chooser.
 - Choose the theme from the publishing footer or View menu. Confirm one checked selection, comfortable scrolling with many entries, and matching Web/PDF styling in the workspace and Export and share.
