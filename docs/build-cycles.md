@@ -1600,3 +1600,14 @@ Remaining acceptance: Andrew should retry the document and repeated refresh work
 **Verification:** 202 regressions pass. Component tests first reproduced stale A→B output and a compositor-dependent replacement stall. Native tests now verify actual selected-document identity and marker pixels after natural frame presentation, including A/B/C, hidden/show and Web/PDF/theme transitions. Final candidate passes 163 native checks. [Bundle verification and deployment](../research/cycle-128/README.md).
 
 **Limits:** synthetic Cocoa tests, not physical input. Cold component coverage does not establish full persisted-workspace relaunch. No forced quit or unsaved-work discard. [Optional review](../research/usability/cycle-128.md).
+
+
+## Cycle 129 — stop theme notifications starving normal startup
+
+**Requested:** fix continuing blank previews across app copies and explain why prior verification missed the failure; prepare a candid developer handoff.
+
+**Changed:** reconcile watcher paths instead of removing/re-adding all paths; cache theme content snapshots and notify only actual changes; invalidate cache on file events to detect preserved-mtime/same-size edits; re-arm atomic replacements; retain forced Reload Themes. Pending empty-URL output shows loading status.
+
+**Verification:** old normal native startup with a populated copy of Andrew's themes fails: 67 theme signals/backend in 15 seconds and no output. Corrected cold/restored normal Main startup passes with QML caching enabled, guarded quit and no forced frames. Actual Dev saved workspace renders matching PDFs; OS capture inspected privately. Final full suite: **204 passed, 0 failed, 0 skipped**. Expanded final watcher fixture: four passes (two cases plus setup/cleanup). Added offscreen watcher tests also pass old code, so they are not the red/green evidence. Dev, packaged ordinary and installed build129 each pass four focused preview groups/eight pane paints, strict signatures and zero QML warnings; ordinary/installed executable hashes match. The full offscreen suite retains two Qt Material SplitView warnings. [Build identities](../research/cycle-129/verified-builds.json). [Current evidence](../research/cycle-129/README.md).
+
+**Limits:** Cycle128's document-identity/screenshot fixes remain valid, but its component checks missed this separate startup loop. Native startup harness is compile-only; it does not establish physical input or full packaged UI acceptance. Keep private documents/themes/raw reports outside Git. Review build **0.3.0-dev25 / macOS 0.3.0 (129)**. [Optional review](../research/usability/cycle-129.md).

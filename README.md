@@ -50,7 +50,9 @@ Semantic publishing uses [MD4C 0.5.3](src/vendor/md4c/LICENSE.md), copyright Mar
 
 ## Current workspace review build
 
-Cycle **128**, **0.3.0-dev24 / macOS 0.3.0 (128)**, repairs stale/blank publishing previews with document-scoped requests and compositor-independent replacement. **202 regressions pass**, including tests that reproduced the previous failure. Native checks now verify the actual displayed document. All three local app copies are synchronized and verified. [Verification, bundle status and remaining review](research/cycle-128/README.md).
+Cycle **129**, **0.3.0-dev25 / macOS 0.3.0 (129)**, repairs a separate theme-watcher loop that kept restarting publishing generation on normal macOS startup. The old implementation fails the new native cold/restored startup check with a populated copy of Andrew's themes; the corrected implementation passes. Cycle128's document-identity repair remains valid, but its checks missed this startup failure. **204 final regressions pass, with zero failures/skips.** Final verification and bundle status are recorded in the [Cycle129 handoff](research/cycle-129/README.md).
+
+Previous Cycle **128**, **0.3.0-dev24 / macOS 0.3.0 (128)**, repaired stale document identity and screenshot-gated replacement. Its 202 passing regressions and native component checks did not establish normal startup with the populated user theme folder. [Historical verification](research/cycle-128/README.md).
 
 Previous Cycle **127**, **0.3.0-dev23 / macOS 0.3.0 (127)**, attempted to keep publishing previews readable around unavailable images, reuses unchanged output and retains painted content while replacement pages load. **197 regressions pass; Dev and the installed copy each pass 159 native checks.** Andrew subsequently reported stale/blank PDFs; Cycle128 replaces its screenshot-dependent refresh. [Historical verification](research/cycle-127/README.md).
 

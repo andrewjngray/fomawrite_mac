@@ -104,3 +104,8 @@ Makefile
 /research/cycle-128/*
 !/research/cycle-128/README.md
 !/research/cycle-128/verified-builds.json
+
+# Cycle129 local startup reports may contain private themes, writing and captures.
+/research/cycle-129/*
+!/research/cycle-129/README.md
+!/research/cycle-129/verified-builds.json

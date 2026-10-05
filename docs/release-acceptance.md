@@ -1,6 +1,10 @@
 # Acceptance ledger — current follow-through and Cycle 59 history
 
-## Current review build — Cycle 128
+## Current review build — Cycle 129
+
+**0.3.0-dev25 / macOS 0.3.0 (129)** repairs a theme-watcher feedback loop on normal macOS startup with populated themes. Replacing all watcher paths generated repeated directory notifications; those repeatedly restarted the preview debounce before output could be generated. Differential path updates and cached content comparisons now notify only actual changes, while Reload Themes forces refresh. The old native startup fails with a copy of Andrew's themes; corrected cold and restored launches pass. The new offscreen watcher tests also pass old code and do not establish red/green coverage. **204 final regressions pass, with zero failures/skips.** The expanded final fixture passes four checks (two cases plus setup/cleanup); all three local app copies pass four focused groups/eight pane paints, strict signatures and zero QML warnings. [Evidence and limits](../research/cycle-129/README.md), [optional review](../research/usability/cycle-129.md). Physical/full UI acceptance remains open.
+
+## Previous review build — Cycle 128
 
 **0.3.0-dev24 / macOS 0.3.0 (128)** repairs the document-preview regression reported after Cycle127. Screenshot-gated replacement is removed; immutable document/request identity rejects stale results, old visible content clears on file change, and cached-PDF mode/retry transitions restore pages explicitly. **202 regressions pass**. Native verification checks displayed source/identity and eight actual-pane marker images after natural presentation; bundle deployment status and limits are in the [Cycle128 record](../research/cycle-128/README.md). Physical persisted-workspace relaunch remains Andrew's acceptance check. Cycle127's pass counts did not establish actual displayed-document correctness.
 

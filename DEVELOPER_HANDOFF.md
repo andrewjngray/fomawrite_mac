@@ -1,6 +1,6 @@
 # Fomawrite — developer handoff and independent review brief
 
-Prepared **6 October 2026 (Pacific/Auckland)** for Andrew Gray. This is a snapshot of the work through **Cycle 128**, with navigation for a developer reviewing the implementation, tests and improvement opportunities. It does not claim that all user acceptance or competitor parity is complete.
+Prepared **6 October 2026 (Pacific/Auckland)** for Andrew Gray. This is a snapshot of the work through **Cycle 129**, with navigation for a developer reviewing the implementation, tests and improvement opportunities. It does not claim that all user acceptance or competitor parity is complete.
 
 ## 1. Start here
 
@@ -8,10 +8,9 @@ Prepared **6 October 2026 (Pacific/Auckland)** for Andrew Gray. This is a snapsh
 - Git clone URL: `https://github.com/andrewjngray/fomawrite_mac.git`; current branch: **`master`**.
 - Upstream: [omacom/omawrite](https://github.com/omacom/omawrite), retained as remote `upstream`. This is an MIT-licensed fork, renamed Fomawrite.
 - Andrew's current checkout: **`/Users/andrewgray/repo/projects/fomawrite_mac`**. Historical tooling may still mention `omawrite_mac`; that is the obsolete checkout path.
-- Current review build: **`0.3.0-dev24`**, macOS version **`0.3.0 (128)`**.
-- Baseline immediately before this documentation handoff: **`0466c3c3cdaad3ae0b0a35bb87607a0c9cd8b50b`**, synchronized with `origin/master`. This handoff adds documentation after that baseline without changing the app version.
-- The verified app source commit is **`fe056ba105ec184c56baa684e0bc721926e1f98a`**; `0466c3c` records the subsequent verification and synchronization.
-- Authoritative build evidence: [Cycle 128 report](research/cycle-128/README.md) and [bundle/version/hash manifest](research/cycle-128/verified-builds.json).
+- Current review build: **`0.3.0-dev25`**, macOS version **`0.3.0 (129)`**.
+- Cycle129 source/test commit: **`cf0ed37982169f01773441b31d7d0759f5a98e81`**. The following documentation commit records its verified bundle identities. Historical Cycle128 baseline: `0466c3c3cdaad3ae0b0a35bb87607a0c9cd8b50b`.
+- Authoritative current evidence: [Cycle129 report](research/cycle-129/README.md). All three local app copies are synchronized and verified; see the [Cycle129 manifest](research/cycle-129/verified-builds.json).
 
 Read [AGENTS.md](AGENTS.md), [README](README.md), this handoff, and the [current acceptance ledger](docs/release-acceptance.md) before changing behavior. The [complete cycle log](docs/build-cycles.md) preserves the detailed history. Older plans contain historical checkpoints; use the current source and latest cycle evidence when they differ.
 
@@ -77,26 +76,20 @@ The repository contains many incremental cycles. This groups the work by capabil
 | 122–123 | Literal readable Source, Code appearance, hanging headings and block shading | [122](research/cycle-122/README.md), [123](research/cycle-123/README.md) |
 | 124–126 | Semantic CSS themes/shared browser output, theme-folder fixes and gallery link | [124](research/cycle-124/README.md), [125](research/cycle-125/README.md), [126](research/cycle-126/README.md) |
 | 127 | Missing-image handling, caching and attempted flicker reduction; subsequently reported stale/blank output | [127, historical](research/cycle-127/README.md) |
-| 128 | Document identity, compositor-independent replacement, recovery and actual-pane verification | [128, current](research/cycle-128/README.md) |
+| 128 | Document identity, compositor-independent replacement, recovery and actual-pane verification | [128, historical](research/cycle-128/README.md) |
+| 129 | Theme watcher feedback loop and normal cold/restored startup coverage | [129, current](research/cycle-129/README.md) |
 
 ## 4. Latest incident: what failed and what changed
 
-Andrew reported a blank PDF in the ordinary app, and a previous Ulysses document displayed under a Bain document title in Dev. Inspection found that the new PDF had been generated while the old PDF remained open in the preview.
+Andrew still saw blank publishing panes in all app copies after Cycle128. The earlier repair addressed real document-identity and screenshot-gated replacement defects, but the verification missed a separate startup failure with his populated themes folder. Reporting the preview incident as repaired on that evidence was too broad.
 
-The Cycle 127 anti-flicker change gated replacement on an asynchronous `grabToImage` screenshot callback and retained an old screenshot overlay. Replacement could stall when the compositor was not producing frames, and old visible content could outlive the selected document. Earlier tests checked generated artifacts and state without adequately proving what the user actually saw. Native polling also forced frames, masking the dependency.
+`watchPublishingThemes` removed and re-added every `QFileSystemWatcher` path on each refresh. On macOS with the populated theme folder, that replayed directory notifications about every 200 ms. Each theme notification restarted the publishing pane's 220 ms debounce, so generation never began. The old normal-startup reproduction recorded 67 theme signals per backend in 15 seconds and no output. Shared themes explain why ordinary and Dev copies could both fail despite different bundle identities/workspace paths.
 
-Cycle 128:
+Cycle129 updates watcher paths only when membership changes and compares cached content snapshots before announcing actual theme changes. File events invalidate cached content so same-size edits with preserved modification times are detected; atomic replacements re-arm their watches. Explicit Reload Themes still forces refresh. An empty preview URL now shows loading status when generation is pending.
 
-1. Removes screenshot-gated replacement and the retained screenshot overlay.
-2. Identifies requests/results using document lifetime, source digest and caller token; cancels obsolete requests and rejects late results.
-3. Clears visible output immediately when the selected document changes, and hides empty Web output.
-4. Restores PDF page delegates explicitly when reusing an already-loaded cached URL, including Web/PDF bouncing and retry.
-5. Adds a 30-second loading deadline with a visible failure and Reload Preview recovery.
-6. Tests actual Qt PDF sources/visible pages and native painted content, without forcing repaint while waiting for focused preview readiness.
+The new [normal-startup harness](bin/check-publishing-startup) uses the normal Main startup and persisted workspace path, enabled QML cache and guarded normal quit. It fails the old implementation with a copied user themes folder and passes the corrected implementation on cold and restored launches. It does not force frames. The added offscreen watcher tests **also pass the old implementation**: their passing count is not red/green evidence for this macOS failure. The earlier Cycle128 component tests remain evidence for their own defects.
 
-Key commits: [`25cb8b8`](https://github.com/andrewjngray/fomawrite_mac/commit/25cb8b8) introduced the earlier refresh approach; [`7b77eeb`](https://github.com/andrewjngray/fomawrite_mac/commit/7b77eeb) implements the repair; [`fe056ba`](https://github.com/andrewjngray/fomawrite_mac/commit/fe056ba) refines native visibility checks; [`0466c3c`](https://github.com/andrewjngray/fomawrite_mac/commit/0466c3c) records synchronized verification.
-
-These repairs passed the recorded checks. **Andrew's persisted-workspace, physical-input workflow still needs independent acceptance.** Pass counts alone previously missed this class of failure.
+A read-only check of Andrew's actual Dev saved workspace showed matching PDF output, with an OS screenshot visually inspected. Private document text, themes and captures are excluded from Git. Physical input, full UI acceptance and long-running use remain separate review work.
 
 ## 5. Architecture and source map
 
@@ -122,6 +115,7 @@ Canonical Markdown belongs to the C++ document backend. QML controls UI state an
 | macOS behavior and bundle metadata | [windowchrome_mac.mm](src/windowchrome_mac.mm), [systemtheme_mac.cpp](src/systemtheme_mac.cpp), [Info.plist](macos/Info.plist) |
 | Embedded QML/assets/fonts | [resources.qrc](src/resources.qrc), `fonts/`, `macos/` |
 | Tests | [tests.pro](tests/tests.pro), [tst_fomawrite.cpp](tests/tst_fomawrite.cpp), `tests/cycle*.inc` |
+| Normal startup/restoration | [check-publishing-startup](bin/check-publishing-startup), [startup-preview-check.inc](tests/startup-preview-check.inc), [startup-preview-setup.inc](tests/startup-preview-setup.inc) |
 | Actual-bundle verification | [check-document-views](bin/check-document-views), [documentviewcheck.cpp](src/documentviewcheck.cpp), [publishingpreviewacceptancecheck.inc](src/publishingpreviewacceptancecheck.inc) |
 
 **Naming trap:** `PreviewPane.qml` serves the left Visual Edit surface; `PublishingPreview.qml` is the right read-only output. Trace the current bindings rather than inferring ownership from the older filename.
@@ -141,9 +135,9 @@ Paths below are local to Andrew's machine. Relative repository links elsewhere i
 | `/Users/andrewgray/Library/Application Support/AndrewGray/fomawrite/` | Application data: workspace checkpoints, recovery files/locks, migration marker, basic output settings and managed themes |
 | `/Users/andrewgray/Library/Application Support/AndrewGray/fomawrite/publishing-themes/` | Managed CSS themes and their local resource folders |
 | `/Users/andrewgray/Library/Application Support/AndrewGray/fomawrite/output-user-styles.json` | Basic output settings; separate from CSS theme files |
-| `/Users/andrewgray/repo/projects/fomawrite_mac/research/cycle-128/` | Committed summary/manifest plus ignored local verification reports and captures |
+| `/Users/andrewgray/repo/projects/fomawrite_mac/research/cycle-129/` | Committed summary/manifest plus ignored local verification reports and captures |
 
-All three `dist`/installed copies were synchronized to build 128 and signature/resource-verified. Ordinary `dist` and `/Applications` executable hashes match. Dev differs because of packaging/identity; compare the manifest rather than expecting identical executable hashes across those two bundle types.
+All three local app copies are synchronized to build129 and pass strict signatures and focused preview checks. Ordinary and installed executable hashes match; Dev differs because of packaging/identity. See the [Cycle129 manifest](research/cycle-129/verified-builds.json). The previous installed copy is preserved at `/private/tmp/Fomawrite-before129-1791225132.app`.
 
 The Finder modification date of an outer `.app` folder is not a reliable build identifier. Use **About Fomawrite**, `Contents/Info.plist`, and the verification manifest. No new public release was created; the older Mac 0.2.0 RC1 download predates this work.
 
@@ -176,9 +170,10 @@ Build the app copies after normally closing any copy being replaced, preserving 
 
 Compilation alone does not refresh `dist` or `/Applications`. Packaging and Dev preparation are separate. Local bundles are **ad-hoc signed, not notarized**. Keep the stable Dev path/identity; see [development-app approvals](docs/development-app-approvals.md). Do not force-quit Andrew's normal editor or replace its live bundle.
 
-Run native checks in a logged-in macOS desktop session. The focused preview check avoids unrelated forced-frame geometry checks:
+Run native checks in a logged-in macOS desktop session. Run normal cold/restored startup with a fresh output directory, then the focused bundle checks:
 
 ```sh
+./bin/check-publishing-startup /tmp/fomawrite-review-startup
 ./bin/check-document-views /tmp/fomawrite-review-preview --preview-only --app "dist/Fomawrite Dev.app"
 ./bin/check-document-views /tmp/fomawrite-review-full --app "dist/Fomawrite Dev.app"
 ./bin/check-document-views /tmp/fomawrite-review-ordinary --preview-only --app "dist/Fomawrite.app"
@@ -190,33 +185,27 @@ Do not publish raw screenshots of private documents. Use synthetic A/B/C documen
 
 ## 8. Test evidence and what the numbers mean
 
-Recorded Cycle 128 results, rather than a new test run for this documentation change:
+[Cycle129](research/cycle-129/README.md) records the current candidate:
 
 | Layer | Result | Limits |
 | --- | --- | --- |
-| Build | `./bin/build` succeeds | Verified local toolchain |
-| Qt regression suite | **202 passed, 0 failed, 0 skipped** | QtTest totals include setup/cleanup; mixed backend and real-component coverage, offscreen |
-| Dev full native checks | **163 checks passed** | Synthetic Cocoa actions, not physical user input |
-| Ordinary packaged app | **4 focused preview groups / 8 actual-pane observations passed** | Not a rerun of all 163 native checks |
-| Installed app | **4 focused preview groups / 8 actual-pane observations passed** | Same limited scope |
-| Bundle validation | All three copies pass version/resource and strict signature checks | Local deployment, not public distribution certification |
+| Final Qt regression suite | **204 passed, 0 failed, 0 skipped** | Offscreen; totals include setup/cleanup; two Qt Material SplitView warnings |
+| Expanded final watcher fixture | **4 passed, 0 failed, 0 skipped** | Two cases plus setup/cleanup; added watcher tests also pass old code |
+| Old native normal startup | **FAIL** with copied populated user themes | 67 theme signals/backend in 15 seconds; no publishing output |
+| Corrected native normal startup | Cold **3327 ms**, restored **4260 ms**, both **PASS** | Compile-only harness; normal Main/cache/guarded quit; zero QML warnings |
+| Actual Dev saved workspace | Matching PDF output observed | Read-only private check; OS screenshot inspected, excluded from Git |
+| Dev, packaged ordinary and installed focused checks | Each **4 groups / 8 pane paints pass** | Zero QML warnings; strict signatures; focused preview scope, not full UI |
 
-The eight observations are included within native groups; do not add them to the 163 as separate tests.
+The [startup checker](bin/check-publishing-startup) defaults to a synthetic populated theme/resource fixture. `FOMAWRITE_STARTUP_PREVIEW_THEMES` optionally copies a theme folder into disposable state; `FOMAWRITE_STARTUP_PREVIEW_SOURCE` optionally copies a document. Treat those reports as private when personal input is used. Leave the output path fresh: the checker requires no existing disposable settings/checkpoint. A cold run saves a workspace by normal guarded quit; the restored run launches without document arguments. QML caching remains enabled, and readiness does not force frames.
 
-[tests/cycle128-publishing.inc](tests/cycle128-publishing.inc) adds five real-component regressions: cold PDF, replacement without capture frames, stale cross-document callbacks, rapid/mode/hidden changes, and timeout recovery. These use controlled rendering and actual Qt PDF components. Same-URL cache reuse is covered. Tests first failed against the previous implementation for cross-document invalidation and compositor-dependent replacement, establishing red/green evidence. Backend coverage in [cycle124-publishing.inc](tests/cycle124-publishing.inc) also checks request rebinding/cancellation and format-only document revisions.
-
-Native fixtures verify selected/displayed identity, the actual loaded PDF URL or Web DOM, and distinctive marker pixels. A passive `frameSwapped` observer precedes a settled capture; focused readiness polling does not call `grabWindow` or request frames. Older broad geometry checks still have their own forced-frame behavior, which is why the isolated path matters.
-
-Two earlier broad Dev runs encountered an unexposed Cocoa QA window despite correct loaded Web state. The runner now raises its QA window before each visual scenario; the final full run passed. Those failed reports and Chromium graphics diagnostics remain in ignored local evidence. They should not be mistaken for either unqualified successful acceptance or proof that every graphics scenario is resolved.
-
-Local final evidence folders: `research/cycle-128/dev-verified/`, `ordinary/`, and `applications/`; `dev-focused/` holds an earlier isolated pass. The committed [manifest](research/cycle-128/verified-builds.json) summarizes the verified final copies. [User acceptance checklist](research/usability/cycle-128.md).
+The default synthetic populated-theme fixture also passes cold (3320 ms) and restored (3135 ms) startup. Dev was closed normally and relaunched through `open` without diagnostic injection. The final full suite emits two Qt Material `SplitView.qml` null-parent TypeErrors in `savesAndOpensFromFooterMenu`; native startup and focused bundle checks report zero QML warnings. The old failure and corrected cold/restored pass establish the relevant red/green startup evidence. Component/offscreen pass counts alone do not. Final local reports are under `/private/tmp/fomawrite-cycle129-final-startup`; the old failure is under `/private/tmp/fomawrite-startup-theme-loop-red-128`. Commit only sanitized summaries/manifests, never private raw logs/screenshots. [Optional user review](research/usability/cycle-129.md).
 
 ## 9. Independent review priorities and remaining work
 
 Prioritize correctness and reproducible acceptance before further presentation features:
 
 1. **Document identity and asynchronous preview lifecycle.** Inspect cancellation, stale callbacks, source/settings tokens, cached URLs, hidden/show, rapid A→B→C selection and simultaneous export/pane jobs. Assert what is visible, not just what was generated. Review error/timeout/retry paths and whether optional Web geometry/JavaScript callbacks can leave pending state or block recovery.
-2. **Real application startup and persistence.** Reproduce the originally reported workflow, quit normally and relaunch a saved multi-window workspace. Check title, canonical editor text and publishing content agree throughout. A fresh component test is not a persisted application relaunch test.
+2. **Real application startup and persistence.** Reproduce the originally reported workflow, quit normally and relaunch a saved multi-window workspace. Check title, canonical editor text and publishing content agree throughout. Use the Cycle129 normal startup harness with populated themes; component tests alone missed this failure. Expand physical and sustained-workspace acceptance beyond its bounded cold/restored checks.
 3. **Data integrity.** Exercise Unicode, unsaved edits, Undo/Redo, source/visual switching, file changes, recovery and Save As. Appearance/highlighting refresh must not create unintended text edits or destroy Redo. Keep unsupported visual edits explicitly bounded.
 4. **Theme compatibility and resource handling.** Check imports, same-name themes, folder changes, selection persistence, local fonts/imports, missing assets and error feedback. Review resource containment, size limits, raw HTML handling and blocked remote assets. Compatibility with arbitrary Typora CSS is not established.
 5. **Rendering and sustained use.** Stress large documents, repeated edits, theme/zoom/divider changes, missing images, many windows and extended sessions. Measure Chromium/PDF job count, cache/temp-file lifetime, memory and responsiveness. Verify PDF page breaks/tables/code and physical printing separately.
