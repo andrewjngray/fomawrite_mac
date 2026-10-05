@@ -1,6 +1,10 @@
 # Acceptance ledger — current follow-through and Cycle 59 history
 
-## Current verified review build — Cycle 124
+## Current review build — Cycle 125
+
+**0.3.0-dev21 / macOS 0.3.0 (125)** repairs folder theme discovery, local resource resolution, automatic preview refresh, authoritative selection and theme-management menu actions. **195 regressions pass, 0 failed, 0 skipped**; **157 native checks per app copy pass**, with matching UI/version and strict signatures. Build identities are recorded in the [Cycle125 handoff](../research/cycle-125/README.md). All 13 existing top-level themes load in a read-only probe. Full Typora compatibility, physical printing and accessibility acceptance remain open.
+
+## Previous verified review build — Cycle 124
 
 **0.3.0-dev20 / macOS 0.3.0 (124)** adds managed CSS publishing themes, Claude Like and shared semantic HTML/Chromium Web/PDF output, including the actual Export Hub preview. Native rendered printing uses browser-PDF page images at 300 dpi; saved PDF exports retain vector output. Publishing selection remains independent of left-pane writing appearance and Markdown history. [Current evidence and limits](../research/cycle-124/README.md), [optional review](../research/usability/cycle-124.md).
 
