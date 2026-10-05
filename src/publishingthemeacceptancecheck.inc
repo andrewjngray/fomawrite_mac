@@ -63,11 +63,24 @@
             themeCheck("footer-theme-menu-and-semantic-web", [&] {
                 if (!check(web && pdfScroll && menu && choice, "Publishing theme menu or surfaces are missing")) return;
                 if (!check(click(window, buttons.value("previewTemplateButton")), "Cannot open footer publishing theme menu")) return;
-                if (!check(waitUntil([&] { return menu->property("opened").toBool() && choice->isVisible(); }),
-                           "Footer publishing theme menu did not expose Claude Like")) return;
+                if (!check(waitUntil([&] { return menu->property("opened").toBool(); }),
+                           "Footer output style menu did not open")) return;
+                auto *themes = window->findChild<QObject *>("previewCustomThemesMenu");
+                QQuickItem *entry = nullptr;
+                QMetaObject::invokeMethod(menu, "itemAt", Q_RETURN_ARG(QQuickItem *, entry), Q_ARG(int, 0));
+                if (!check(themes && entry && entry->property("text").toString() == "Custom Themes",
+                           "Footer output style menu has no Custom Themes entry")) return;
+                renderBarrier(window);
+                const QPointF point = bounds(entry).center();
+                QMouseEvent move(QEvent::MouseMove, point, point, window->mapToGlobal(point.toPoint()),
+                                 Qt::NoButton, Qt::NoButton, Qt::NoModifier);
+                QCoreApplication::sendEvent(window, &move);
+                if (!check(waitUntil([&] { return themes->property("opened").toBool() && choice->isVisible(); }),
+                           "Hovering Custom Themes did not expose Claude Like")) return;
                 check(choice->property("text").toString() == "Claude Like", "Footer theme label differs from Claude Like");
                 if (!check(click(window, choice), "Cannot choose Claude Like from the footer menu")) return;
-                if (!check(waitUntil([&] { return !menu->property("visible").toBool() && backend.publishingThemeId() == "claude-like"; }),
+                if (!check(waitUntil([&] { return !menu->property("visible").toBool() && !themes->property("visible").toBool()
+                        && backend.publishingThemeId() == "claude-like"; }),
                            "Footer selection did not activate Claude Like")) return;
                 if (!check(themeReady("web"), "Claude Like Web preview did not settle")) return;
                 sourceScroll->setProperty("contentY", 0);

@@ -77,13 +77,13 @@ WorkspaceFooter {
         objectName: "previewTemplateButton"
         visible: root.hasPreview && root.previewPaneStart >= 0 && root.templateRoom >= 34
         x: root.previewPaneStart + 12; anchors.verticalCenter: parent.verticalCenter
-        width: Math.min(200, root.templateRoom)
-        text: width >= 170 ? "Output · " + root.previewTemplate : width >= 140 ? root.previewTemplate : "Aa"
+        width: Math.min(160, root.templateRoom)
+        text: width >= 110 ? "Output Style" : "Aa"
         menuIndicator: width >= 60
         leftPadding: width < 70 ? 6 : 12
         rightPadding: leftPadding
         alignLeft: width >= 70
-        hint: "Choose publishing output style: " + root.previewTemplate
+        hint: "Choose output style: " + root.previewTemplate
         onClicked: root.templateMenuRequested(this)
     }
     Label {

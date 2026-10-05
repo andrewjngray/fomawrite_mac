@@ -21,29 +21,101 @@
                     : prefix + "PublishingTheme_" + backend.publishingThemeId();
                 return checkedCount == 1 && checkedName == expected;
             };
+            auto *customThemes = window->findChild<QObject *>("previewCustomThemesMenu");
+            const auto itemAt = [](QObject *owner, int index) {
+                QQuickItem *item = nullptr;
+                QMetaObject::invokeMethod(owner, "itemAt", Q_RETURN_ARG(QQuickItem *, item), Q_ARG(int, index));
+                return item;
+            };
+            const auto openCustomThemes = [&] {
+                if (!check(customThemes != nullptr, "Custom Themes submenu is missing")) return false;
+                auto *entry = itemAt(menu, 0);
+                if (!check(entry && entry->property("text").toString() == "Custom Themes", "Custom Themes is not the first root item")) return false;
+                if (!check(renderBarrier(window), "Cannot render Custom Themes hover target")) return false;
+                const QPointF point = bounds(entry).center();
+                QMouseEvent move(QEvent::MouseMove, point, point, window->mapToGlobal(point.toPoint()),
+                                 Qt::NoButton, Qt::NoButton, Qt::NoModifier);
+                QCoreApplication::sendEvent(window, &move);
+                return check(waitUntil([&] { return customThemes->property("opened").toBool(); }),
+                             "Hovering Custom Themes did not reveal the cascading submenu");
+            };
+            bool capturedCascade = false;
             const auto chooseItem = [&](const QString &name) {
                 if (!check(click(window, buttons.value("previewTemplateButton")), "Cannot open theme folder menu")) return false;
                 if (!check(waitUntil([&] { return menu->property("opened").toBool(); }), "Theme folder menu did not open for " + name)) return false;
                 auto *item = menuItem(name);
                 if (!check(item != nullptr, "Theme menu item missing: " + name)) return false;
-                // Selecting an index scrolls the capped ListView to a lower action.
-                for (int index = 0; index < menu->property("count").toInt(); ++index) {
-                    QQuickItem *at = nullptr;
-                    QMetaObject::invokeMethod(menu, "itemAt", Q_RETURN_ARG(QQuickItem *, at), Q_ARG(int, index));
-                    if (at == item) { menu->setProperty("currentIndex", index); break; }
+                QObject *owner = menu;
+                if (name.startsWith("previewPublishingTheme_")) {
+                    if (!openCustomThemes()) return false;
+                    owner = customThemes;
+                    if (!capturedCascade) {
+                        capture("folder-theme-cascading-menu");
+                        capturedCascade = true;
+                    }
+                }
+                // Selecting an index scrolls the owning capped ListView, including the CSS child.
+                for (int index = 0; index < owner->property("count").toInt(); ++index) {
+                    if (itemAt(owner, index) == item) { owner->setProperty("currentIndex", index); break; }
                 }
                 renderBarrier(window);
                 if (!check(click(window, item), "Cannot click theme menu item: " + name)) return false;
-                return check(waitUntil([&] { return !menu->property("visible").toBool(); }), "Theme action left its menu open");
+                return check(waitUntil([&] {
+                    return !menu->property("visible").toBool() && (!customThemes || !customThemes->property("visible").toBool());
+                }), "Theme action left a root or child menu open");
             };
             themeCheck("folder-drop-selection-and-rejected-choice-checkmarks", [&] {
                 if (!chooseFormat("web")) return;
+                if (!check(customThemes != nullptr, "Custom Themes submenu is missing")) return;
+                if (!check(click(window, buttons.value("previewTemplateButton"))
+                    && waitUntil([&] { return menu->property("opened").toBool(); }), "Cannot open compact output style baseline")) return;
+                const int rootCount = menu->property("count").toInt();
+                const QSizeF rootSize(menu->property("width").toReal(), menu->property("height").toReal());
+                const int childCount = customThemes->property("count").toInt();
+                QMetaObject::invokeMethod(menu, "close");
+                if (!check(waitUntil([&] { return !menu->property("visible").toBool(); }), "Baseline menu did not close")) return;
                 if (!check(writeTheme(firstId, "#write h1{color:rgb(12,34,56)!important}")
                         && writeTheme(secondId, "#write h1{color:rgb(65,43,21)!important}")
                         && writeTheme(badId, "#write{background:url(https://example.invalid/image.png)}"),
                         "Cannot create disposable folder themes")) return;
                 if (!check(waitUntil([&] { return menuItem("previewPublishingTheme_" + secondId) != nullptr; }, 5000),
                            "Copied CSS themes did not appear automatically")) return;
+                // A synthetic catalog grows only the child; the output style root stays compact.
+                for (int index = 0; index < 24; ++index) {
+                    if (!check(writeTheme(QString("cycle125-z%1").arg(index, 2, 10, QChar('0')),
+                        "#write h1{color:rgb(23,45,67)!important}"), "Cannot grow disposable CSS catalog")) return;
+                }
+                if (!check(waitUntil([&] { return customThemes->property("count").toInt() == childCount + 27; }, 5000),
+                           "CSS catalog growth did not remain entirely in its submenu")) return;
+                if (!check(click(window, buttons.value("previewTemplateButton"))
+                    && waitUntil([&] { return menu->property("opened").toBool(); }), "Cannot reopen grown CSS catalog")) return;
+                check(menu->property("count").toInt() == rootCount
+                    && qFuzzyCompare(menu->property("width").toReal(), rootSize.width())
+                    && qFuzzyCompare(menu->property("height").toReal(), rootSize.height()),
+                    "CSS catalog growth changed the compact root menu size or item count");
+                for (int style = 0; style < 8; ++style) {
+                    auto *basic = menuItem("previewTemplate" + QString::number(style));
+                    bool inRoot = false;
+                    for (int index = 0; index < rootCount; ++index) inRoot |= itemAt(menu, index) == basic;
+                    check(basic && inRoot, "Basic output style left the root menu");
+                }
+                if (!openCustomThemes()) return;
+                auto *rootContent = qvariant_cast<QQuickItem *>(menu->property("contentItem"));
+                auto *childContent = qvariant_cast<QQuickItem *>(customThemes->property("contentItem"));
+                if (!check(rootContent && childContent, "Cascading menu content is missing")) return;
+                renderBarrier(window);
+                const QRectF rootBounds = rootContent->mapRectToScene(rootContent->boundingRect());
+                const QRectF childBounds = childContent->mapRectToScene(childContent->boundingRect());
+                check(childBounds.left() >= rootBounds.right(), "Custom Themes did not cascade to the right");
+                check(QRectF(QPointF(), window->size()).contains(childBounds), "CSS submenu extends beyond the window");
+                capture("folder-theme-cascading-menu");
+                capturedCascade = true;
+                QMetaObject::invokeMethod(menu, "close");
+                if (!check(waitUntil([&] { return !menu->property("visible").toBool()
+                    && !customThemes->property("visible").toBool(); }), "Closing root left CSS submenu visible")) return;
+                if (!chooseItem("previewPublishingTheme_cycle125-z23")) return;
+                check(backend.publishingThemeId() == "cycle125-z23" && soleSelection("preview") && soleSelection("native"),
+                      "Scrolled CSS submenu did not select its lower item");
                 for (const QString &id : {firstId, secondId, secondId, firstId}) {
                     if (!chooseItem("previewPublishingTheme_" + id)) return;
                     if (!check(waitUntil([&] { return backend.publishingThemeId() == id && soleSelection("preview") && soleSelection("native"); }),
@@ -130,4 +202,6 @@
             });
             backend.setOutputStyle(0);
             for (const QString &id : {firstId, secondId, badId}) QFile::remove(folder + '/' + id + ".css");
+            for (int index = 0; index < 24; ++index)
+                QFile::remove(folder + '/' + QString("cycle125-z%1").arg(index, 2, 10, QChar('0')) + ".css");
             backend.reloadPublishingThemes();

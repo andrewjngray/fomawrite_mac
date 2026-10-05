@@ -139,7 +139,8 @@ void FomawriteTest::footerModesAndTemplatesPreserveDraftAndUndo() {
         QVERIFY(cycle102Click(quick, window->findChild<QQuickItem *>(QString("previewTemplate%1").arg(style))));
         QTRY_COMPARE(backend.outputStyle(), style);
         QTRY_VERIFY(!templateMenu->property("visible").toBool());
-        QVERIFY(templateButton->property("text").toString().contains(backend.outputTemplateName()));
+        QCOMPARE(templateButton->property("text").toString(), QStringLiteral("Output Style"));
+        QVERIFY(templateButton->property("hint").toString().contains(backend.outputTemplateName()));
         auto *selected = window->findChild<QQuickItem *>(QString("previewTemplate%1").arg(style));
         QVERIFY(selected->property("checked").toBool());
         QVERIFY(cycle102Click(quick, templateButton));

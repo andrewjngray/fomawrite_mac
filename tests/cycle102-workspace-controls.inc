@@ -243,6 +243,27 @@ void FomawriteTest::previewTemplateFooterAndNativeMenuShareState() {
         QVERIFY(QMetaObject::invokeMethod(items.at(index), "triggered"));
         QTRY_VERIFY(!items.at(index)->property("checked").toBool());
     }
+    auto *nativeOutput = window->findChild<QObject *>("nativeTemplateMenu");
+    auto *nativeThemes = window->findChild<QObject *>("nativeCustomThemesMenu");
+    auto *previewThemes = window->findChild<QObject *>("previewCustomThemesMenu");
+    QVERIFY(nativeOutput && nativeThemes && previewThemes);
+    QCOMPARE(nativeOutput->property("title").toString(), QStringLiteral("Output Style"));
+    QCOMPARE(nativeThemes->property("title").toString(), QStringLiteral("Custom Themes"));
+    QCOMPARE(previewThemes->property("title").toString(), QStringLiteral("Custom Themes"));
+    QQmlListReference outputItems(nativeOutput, "items");
+    QQmlListReference themeItems(nativeThemes, "items");
+    QVERIFY(outputItems.isValid() && themeItems.isValid());
+    QVERIFY(outputItems.count() > 0);
+    QCOMPARE(outputItems.at(0)->property("text").toString(), QStringLiteral("Custom Themes"));
+    QCOMPARE(themeItems.count(), backend.publishingThemes().size());
+    QCOMPARE(previewThemes->property("count").toInt(), backend.publishingThemes().size());
+    for (int style = 0; style < 8; ++style) {
+        const QString name = QString("nativeTemplate%1").arg(style);
+        bool inRoot = false;
+        for (qsizetype index = 0; index < outputItems.count(); ++index)
+            inRoot |= outputItems.at(index)->objectName() == name;
+        QVERIFY2(inRoot, qPrintable(name + " is missing from the Output Style root"));
+    }
     // A quick show/hide pair must cancel any deferred compact-navigation open.
     QCoreApplication::processEvents();
     auto *drawer = window->findChild<QObject *>("workspaceNavigationDrawer");
@@ -261,12 +282,14 @@ void FomawriteTest::previewTemplateFooterAndNativeMenuShareState() {
     QVERIFY(cycle102Click(quick, palatino));
     QTRY_COMPARE(backend.outputStyle(), 6);
     QTRY_VERIFY(!menu->property("visible").toBool());
-    QCOMPARE(button->property("text").toString(), QStringLiteral("Output · Palatino"));
+    QCOMPARE(button->property("text").toString(), QStringLiteral("Output Style"));
+    QVERIFY(button->property("hint").toString().contains("Palatino"));
     QVERIFY(nativePalatino->property("checked").toBool());
     QVERIFY(!nativeHelvetica->property("checked").toBool());
     QVERIFY(QMetaObject::invokeMethod(nativeHelvetica, "triggered"));
     QTRY_COMPARE(backend.outputStyle(), 5);
-    QCOMPARE(button->property("text").toString(), QStringLiteral("Output · Helvetica"));
+    QCOMPARE(button->property("text").toString(), QStringLiteral("Output Style"));
+    QVERIFY(button->property("hint").toString().contains("Helvetica"));
     QVERIFY(!nativePalatino->property("checked").toBool());
     QVERIFY(nativeHelvetica->property("checked").toBool());
     QCOMPARE(editor->property("text").toString(), draft);

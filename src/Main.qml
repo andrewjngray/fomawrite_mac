@@ -691,17 +691,19 @@ ApplicationWindow {
         function restoreSelectionCheck() { checked = Qt.binding(function() { return choice.backendSelected; }); }
         onTriggered: win.choosePublishingStyle(publishingId, basicStyle)
     }
+    function restorePublishingMenuChecks(menu, nativeMenu) {
+        if (!menu) return;
+        var count = nativeMenu ? menu.items.length : menu.count;
+        for (var i = 0; i < count; ++i) {
+            var item = nativeMenu ? menu.items[i] : menu.itemAt(i);
+            if (!item) continue;
+            if (item.restoreSelectionCheck) item.restoreSelectionCheck();
+            if (item.subMenu) restorePublishingMenuChecks(item.subMenu, nativeMenu);
+        }
+    }
     function restorePublishingChecks() {
-        for (var i = 0; i < previewTemplateMenu.count; ++i) {
-            var item = previewTemplateMenu.itemAt(i);
-            if (item && item.restoreSelectionCheck) item.restoreSelectionCheck();
-        }
-        if (nativePublishingMenu) {
-            for (var j = 0; j < nativePublishingMenu.items.length; ++j) {
-                var nativeItem = nativePublishingMenu.items[j];
-                if (nativeItem && nativeItem.restoreSelectionCheck) nativeItem.restoreSelectionCheck();
-            }
-        }
+        restorePublishingMenuChecks(previewTemplateMenu, false);
+        restorePublishingMenuChecks(nativePublishingMenu, true);
         for (var k = 0; k < writingOptions.count; ++k) {
             var writingItem = writingOptions.itemAt(k);
             if (writingItem && writingItem.restoreSelectionCheck) writingItem.restoreSelectionCheck();
@@ -981,7 +983,9 @@ ApplicationWindow {
     CompactMenu {
         id: previewTemplateMenu
         objectName: "previewTemplateMenu"
-        width: 290
+        width: 260
+        cascade: true
+        delegate: CompactMenuItem { iconName: "" }
         property real maximumPopupHeight: Math.max(0, win.contentItem.height - 32)
         height: Math.min(implicitHeight, maximumPopupHeight)
         onAboutToShow: win.restorePublishingChecks()
@@ -993,17 +997,34 @@ ApplicationWindow {
             boundsBehavior: Flickable.StopAtBounds
             ScrollBar.vertical: ScrollBar { policy: ScrollBar.AsNeeded }
         }
-        CompactMenuItem { text: "CSS Publishing Themes"; enabled: false }
-        Instantiator {
-            model: backend.publishingThemes
-            delegate: PublishingMenuItem {
-                required property var modelData
-                objectName: "previewPublishingTheme_" + modelData.id
-                text: modelData.id === "claude-like" ? "Claude Like" : modelData.name
-                publishingId: modelData.id
+        CompactMenu {
+            id: previewCustomThemesMenu
+            objectName: "previewCustomThemesMenu"
+            title: "Custom Themes"
+            cascade: true
+            width: 260
+            height: Math.min(implicitHeight, Math.max(0, win.contentItem.height - 24))
+            margins: 8
+            onAboutToShow: win.restorePublishingChecks()
+            contentItem: ListView {
+                implicitHeight: contentHeight
+                model: previewCustomThemesMenu.contentModel
+                currentIndex: previewCustomThemesMenu.currentIndex
+                clip: true
+                boundsBehavior: Flickable.StopAtBounds
+                ScrollBar.vertical: ScrollBar { policy: ScrollBar.AsNeeded }
             }
-            onObjectAdded: function(index, object) { previewTemplateMenu.insertItem(index + 1, object); }
-            onObjectRemoved: function(index, object) { previewTemplateMenu.removeItem(object); }
+            Instantiator {
+                model: backend.publishingThemes
+                delegate: PublishingMenuItem {
+                    required property var modelData
+                    objectName: "previewPublishingTheme_" + modelData.id
+                    text: modelData.id === "claude-like" ? "Claude Like" : modelData.name
+                    publishingId: modelData.id
+                }
+                onObjectAdded: function(index, object) { previewCustomThemesMenu.insertItem(index, object); }
+                onObjectRemoved: function(index, object) { previewCustomThemesMenu.removeItem(object); }
+            }
         }
         MenuSeparator {}
         CompactMenuItem { text: "Basic Font & Page Settings"; enabled: false }
@@ -1889,20 +1910,25 @@ ApplicationWindow {
                 id: nativeTemplateMenu
                 Component.onCompleted: win.nativePublishingMenu = nativeTemplateMenu
                 objectName: "nativeTemplateMenu"
-                title: "Publishing Theme"
+                title: "Output Style"
                 Binding { target: nativeTemplateMenu.menuItem; property: "objectName"; value: "nativeTemplateEntry" }
                 onAboutToShow: win.restorePublishingChecks()
-                Platform.MenuItem { text: "CSS Publishing Themes"; enabled: false }
-                Instantiator {
-                    model: backend.publishingThemes
-                    delegate: NativePublishingMenuItem {
-                        required property var modelData
-                        objectName: "nativePublishingTheme_" + modelData.id
-                        text: modelData.id === "claude-like" ? "Claude Like" : modelData.name
-                        publishingId: modelData.id
+                Platform.Menu {
+                    id: nativeCustomThemesMenu
+                    objectName: "nativeCustomThemesMenu"
+                    title: "Custom Themes"
+                    onAboutToShow: win.restorePublishingChecks()
+                    Instantiator {
+                        model: backend.publishingThemes
+                        delegate: NativePublishingMenuItem {
+                            required property var modelData
+                            objectName: "nativePublishingTheme_" + modelData.id
+                            text: modelData.id === "claude-like" ? "Claude Like" : modelData.name
+                            publishingId: modelData.id
+                        }
+                        onObjectAdded: function(index, object) { nativeCustomThemesMenu.insertItem(index, object); }
+                        onObjectRemoved: function(index, object) { nativeCustomThemesMenu.removeItem(object); }
                     }
-                    onObjectAdded: function(index, object) { nativeTemplateMenu.insertItem(index + 1, object); }
-                    onObjectRemoved: function(index, object) { nativeTemplateMenu.removeItem(object); }
                 }
                 Platform.MenuSeparator {}
                 Platform.MenuItem { text: "Basic Font & Page Settings"; enabled: false }
