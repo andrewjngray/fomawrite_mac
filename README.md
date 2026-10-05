@@ -36,6 +36,8 @@ The first launch of a renamed Mac bundle migrates prior preferences and copies m
 
 ## Project and status
 
+For an independent developer review, start with the [developer handoff](DEVELOPER_HANDOFF.md): implemented behavior, source/build/data locations, Git baseline, verification evidence and remaining review priorities.
+
 Source lives in `src/` (QML interface, C++ document I/O and formatting), `macos/` (bundle metadata), `bin/` (build and packaging), and `tests/` (Qt checks). The [roadmap](docs/roadmap.md), [cycle log](docs/build-cycles.md) and [acceptance ledger](docs/release-acceptance.md) track current work and explicit gaps. Cycle 60 is the Fomawrite identity migration; the prior menu work remains an implemented subset.
 
 The project repository is [andrewjngray/fomawrite_mac](https://github.com/andrewjngray/fomawrite_mac). `upstream` remains the original Omawrite repository. The earlier Mac 0.2.0 RC1 download uses the old name and predates the later menu cycles; do not present it as this Fomawrite build.
