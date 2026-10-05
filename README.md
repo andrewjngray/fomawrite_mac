@@ -46,7 +46,7 @@ The upstream Omawrite code is copyright David Heinemeier Hansson and remains und
 
 ## Current workspace review build
 
-Cycle **123** targets **0.3.0-dev19**, macOS **0.3.0 (123)**. Build verification and refreshed local copies are **PENDING**. The left pane owns **Source / Visual Edit** and writing appearance. The right pane is read-only publishing output with **Web / PDF** and its output style. **Single / Split** remains a separate group at the far right. Web renders the exported HTML; PDF displays the actual exported pages, including paper settings and page furniture.
+Cycle **123** is **0.3.0-dev19**, macOS **0.3.0 (123)**. All 189 regressions pass, and each of the three refreshed local app copies passes 151 native checks. The left pane owns **Source / Visual Edit** and writing appearance. The right pane is read-only publishing output with **Web / PDF** and its output style. **Single / Split** remains a separate group at the far right. Web renders the exported HTML; PDF displays the actual exported pages, including paper settings and page furniture.
 
 Document bars hide while typing or scrolling and return at the corresponding edge. Each revealed bar stays visible after the pointer leaves, until the next edit or scroll, without changing document geometry. Studio pairs a soft grey editing surface with the warm cream publishing surround. Keyboard access and open menus keep controls reachable. Choose **View → Title Bar → Fade In/Out** or **Always Show** for both document bars. The **Auto-Hide Document Bars** checkbox reflects the same preference. Verification status and local review paths are in the [Cycle123 handoff](research/cycle-123/README.md).
 

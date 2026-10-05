@@ -2,7 +2,7 @@
 
 ## Current review build — Cycle 123
 
-**0.3.0-dev19 / macOS 0.3.0 (123)** adds Code appearance, hanging Manuscript headings and continuous fenced-code backgrounds. [Verification and limits](../research/cycle-123/README.md). 189 regressions pass; final bundle verification is recorded in that handoff.
+**0.3.0-dev19 / macOS 0.3.0 (123)** adds Code appearance, hanging Manuscript headings and continuous fenced-code backgrounds. [Verification and limits](../research/cycle-123/README.md). 189 regressions pass; Dev, demo and Applications each pass 151 native checks with matching UI/version and strict signatures.
 
 ## Previous review build — Cycle 122
 

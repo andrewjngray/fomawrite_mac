@@ -1,6 +1,6 @@
 # Cycle 123 — optional review
 
-Build target: **0.3.0-dev19 / macOS 0.3.0 (123)**. Verification and refreshed app identities are **PENDING**; consult the [handoff](../cycle-123/README.md) before comparing local copies.
+Verified build: **0.3.0-dev19 / macOS 0.3.0 (123)**. Dev, demo and Applications are refreshed; consult the [handoff](../cycle-123/README.md) before comparing local copies.
 
 - In Source, choose **Aa → Manuscript**. Read a long `### Heading`: its markers should hang to the left, while its first word and wrapped lines align with the body paragraph below. Read lists and quotes beside that same column.
 - Add a fenced JavaScript block with an empty line. Its subtle background should remain continuous through the blank line and both fences. Inline backticks should colour only their short inline span.
