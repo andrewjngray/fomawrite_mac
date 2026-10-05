@@ -44,7 +44,9 @@
             const QString savedHash = fileHash(sourcePath);
             const auto themeReady = [&](const QString &format) {
                 return waitUntil([&] {
-                    return ready() && pane->property("publishingMode").toString() == format
+                    renderBarrier(window);
+                    return ready() && !pane->property("holdingPreviousFrame").toBool()
+                        && pane->property("publishingMode").toString() == format
                         && !pane->property("outputUrl").toUrl().isEmpty()
                         && QFileInfo(pane->property("outputUrl").toUrl().toLocalFile()).suffix() == (format == "pdf" ? "pdf" : "html")
                         && (format != "pdf" || pane->property("pdfPagesReady").toBool());
@@ -226,6 +228,63 @@
                 QMetaObject::invokeMethod(window, "undoEditing");
                 check(editor->property("text").toString() == themeSample && fileHash(sourcePath) == savedHash,
                       "The theme acceptance exercise changed the original synthetic UTF-8 file");
+            });
+            themeCheck("missing-images-keep-web-and-pdf-readable", [&] {
+                expectedMissingPreviewImage = backend.documentBaseUrl().resolved(QUrl("missing-cycle127.png")).toString();
+                const QString suffix = "\n\n![Unavailable sample](missing-cycle127.png)\n\nText after the unavailable image.\n";
+                check(QMetaObject::invokeMethod(editor, "insert", Q_ARG(int, themeSample.size()), Q_ARG(QString, suffix)),
+                      "Cannot append the missing-image fixture");
+                if (!chooseFormat("web")) return;
+                const auto dom = publishingDomResult(web, "document.querySelector('#write').textContent").toString();
+                check(dom.contains("Synthetic NPS review") && dom.contains("Text after the unavailable image.")
+                    && dom.contains("Unavailable sample") && !pane->property("warningText").toString().isEmpty(),
+                    "Missing image erased Web content or omitted its notice");
+                capture("missing-image-web");
+                if (!chooseFormat("pdf")) return;
+                QPdfDocument document;
+                check(document.load(pane->property("outputUrl").toUrl().toLocalFile()) == QPdfDocument::Error::None,
+                      "Missing image made PDF unreadable");
+                QString text;
+                for (int i = 0; i < document.pageCount(); ++i) text += document.getAllText(i).text();
+                check(text.contains("Synthetic NPS review") && text.contains("Text after the unavailable image.")
+                    && text.contains("Unavailable sample"), "Missing image erased the surrounding PDF text");
+                QMetaObject::invokeMethod(window, "undoEditing");
+                check(editor->property("text").toString() == themeSample && fileHash(sourcePath) == savedHash,
+                      "Missing-image preview changed the source or Undo");
+                check(themeReady("pdf"), "Preview did not settle after removing the unavailable image");
+                expectedMissingPreviewImage.clear();
+            });
+            themeCheck("unchanged-refresh-is-stable-and-edit-keeps-painted-preview", [&] {
+                for (const QString &format : {QString("web"), QString("pdf")}) {
+                    if (!chooseFormat(format)) return;
+                    const QUrl stable = pane->property("outputUrl").toUrl();
+                    for (int i = 0; i < 3; ++i) {
+                        QMetaObject::invokeMethod(pane, "reload");
+                        if (!check(themeReady(format), "Repeated refresh did not settle")) return;
+                        check(pane->property("outputUrl").toUrl() == stable, "Unchanged preview navigated to another output URL");
+                    }
+                    const QString suffix = "\n\nLatest painted preview revision.\n";
+                    check(QMetaObject::invokeMethod(editor, "insert", Q_ARG(int, themeSample.size()), Q_ARG(QString, suffix)),
+                          "Cannot edit preview stability fixture");
+                    bool heldFrame = false;
+                    const bool settled = waitUntil([&] {
+                        renderBarrier(window);
+                        if (!heldFrame && pane->property("holdingPreviousFrame").toBool()) {
+                            heldFrame = true;
+                            capture("refresh-held-" + format);
+                        }
+                        return pane->property("outputUrl").toUrl() != stable && ready()
+                            && !pane->property("holdingPreviousFrame").toBool();
+                    }, 30000);
+                    check(settled && heldFrame, "The previous painted preview was not retained through " + format + " replacement");
+                    const QUrl latest = pane->property("outputUrl").toUrl();
+                    settle(500);
+                    check(pane->property("outputUrl").toUrl() == latest && !pane->property("previewRefreshInFlight").toBool(),
+                          "Preview restarted rendering while idle");
+                    QMetaObject::invokeMethod(window, "undoEditing");
+                    if (!check(themeReady(format) && editor->property("text").toString() == themeSample,
+                               "Preview stability exercise changed source Undo")) return;
+                }
             });
             #include "publishingfolderacceptancecheck.inc"
             backend.setOutputStyle(0);

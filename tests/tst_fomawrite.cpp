@@ -45,9 +45,11 @@ private slots:
     void publishingFolderThemesRefreshAfterExternalChanges();
     void publishingWebCommandSelectsWebWithoutChangingEditor();
     void publishingSemanticHtmlPreservesStructureAndEscapesContent();
+    void publishingImagesKeepIncompletePreviewsReadableAndExportsStrict();
     void publishingThemeImportEmbedsLocalAssetsAndRejectsNetwork();
     void publishingSharedThemePdfPreservesPaperBreaksDraftAndUndo();
     void publishingAsyncPreviewKeepsLatestRequest();
+    void publishingPreviewCacheTracksAssetsAndConsumerLifetime();
     void manuscriptHeadingMarkersHangOutsideBodyColumn();
     void sourceCodeBackgroundAndAppearancePreserveSavedBytes();
     void codeIndentKeysAndQuotesKeepAtomicUndo();

@@ -180,7 +180,7 @@ QString Backend::publishingPrintCss() const {
 )CSS").arg(size.width()).arg(size.height()).arg(margins.top()).arg(margins.right()).arg(margins.bottom()).arg(margins.left()).arg(header, footer);
 }
 
-QString Backend::publishingHtml(QString *error) const {
+QString Backend::publishingHtml(QString *error, bool preview, QString *warning) const {
     QString body = PublishingHtml::body(previewMarkdown(currentDocumentText()), error);
     if (error && !error->isEmpty()) return {};
     QString css;
@@ -223,31 +223,7 @@ a { color: #245da8; } hr { border: 0; border-top: 1px solid #d0d7de; margin: 1.5
         "<meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'none'; style-src 'unsafe-inline'; img-src data:; font-src data:; base-uri 'self'; form-action 'none'\">"
         "<title>" + fileName().toHtmlEscaped() + "</title><style" + styleAttribute + ">" + foundations + '\n' + css + publishingPrintCss()
         + "</style></head><body>" + titlePage + "<article id=\"write\">" + body + "</article></body></html>";
-    const QRegularExpression images("<img\\b[^>]*\\bsrc=\"([^\"]+)\"", QRegularExpression::CaseInsensitiveOption);
-    auto matches = images.globalMatch(html);
-    QList<QPair<QPair<int,int>,QString>> substitutions;
-    qint64 total = 0;
-    while (matches.hasNext()) {
-        const auto match = matches.next();
-        QTextDocument unescape; unescape.setHtml(match.captured(1));
-        const QUrl asset = documentBaseUrl().resolved(QUrl(unescape.toPlainText()));
-        QFile image(asset.toLocalFile());
-        const auto format = QImageReader::imageFormat(asset.toLocalFile());
-        if (!asset.isLocalFile() || !QList<QByteArray>{"png","jpeg","gif","webp"}.contains(format) || !image.open(QIODevice::ReadOnly)
-            || image.size() > 5*1024*1024 || total+image.size() > 20*1024*1024) {
-            if (error) *error = "Publishing needs readable local PNG/JPEG/GIF/WebP images (5 MiB each, 20 MiB total).";
-            return {};
-        }
-        const auto data = image.read(5*1024*1024+1);
-        if (image.error()!=QFile::NoError || data.size()>5*1024*1024 || total+data.size()>20*1024*1024) {
-            if (error) *error="Could not read publishing image.";
-            return {};
-        }
-        total += data.size();
-        substitutions.append({{match.capturedStart(1),match.capturedLength(1)}, "data:image/"+QString::fromLatin1(format)+";base64,"+QString::fromLatin1(data.toBase64())});
-    }
-    for (auto it=substitutions.crbegin(); it!=substitutions.crend(); ++it) html.replace(it->first.first,it->first.second,it->second);
-    return html;
+    return PublishingHtml::embedImages(html, documentBaseUrl(), preview, error, warning);
 }
 QString Backend::outputHtml(QTextDocument &, QString *error) const { return publishingHtml(error); }
 QByteArray Backend::publishingPdfBytes(const QString &html, QString *error) const {
@@ -276,48 +252,101 @@ QVariantMap Backend::storePublishingOutput(quint64 generation, const QString &fo
 QVariantMap Backend::publishingPreview(const QString &format) {
     if (!m_document || (format!="html" && format!="pdf")) return {{"ok",false},{"error","Publishing preview is unavailable."}};
     QString error;
-    QString html=publishingHtml(&error);
+    QString warning;
+    QString html=publishingHtml(&error, true, &warning);
     if (!error.isEmpty()) return {{"ok",false},{"error",error}};
     const quint64 generation=++m_publishingGeneration;
     QByteArray bytes;
     if (format=="pdf") bytes=publishingPdfBytes(html,&error);
     else { html.replace("<head>","<head><base href=\""+documentBaseUrl().toString(QUrl::FullyEncoded).toHtmlEscaped()+"\">"); bytes=html.toUtf8(); }
     if (!error.isEmpty()) return {{"ok",false},{"error",error}};
-    return storePublishingOutput(generation,format,bytes,html);
+    auto result = storePublishingOutput(generation,format,bytes,html);
+    if (!warning.isEmpty()) result.insert("warning", warning);
+    return result;
 }
 QVariantMap Backend::requestPublishingPreview(const QString &format, QObject *consumer) {
-    if (!consumer || format!="pdf") {
-        if (consumer) { m_publishingRequests.remove(consumer); if (m_publishingRenderers.contains(consumer)) m_publishingRenderers[consumer]->cancel(); }
-        const auto result = publishingPreview(format);
-        if (consumer && result.value("ok").toBool()) m_publishingPinned[consumer] = result.value("url").toUrl().toLocalFile();
-        return result;
-    }
-    QString error;
-    const QString html=publishingHtml(&error);
-    if (!m_document || !error.isEmpty()) return {{"ok",false},{"error",error.isEmpty()?"Publishing preview is unavailable.":error}};
-    auto *renderer=m_publishingRenderers.value(consumer,nullptr);
-    if (!renderer) {
-        renderer=new PublishingPdf(this);
-        m_publishingRenderers.insert(consumer,renderer);
-        connect(consumer,&QObject::destroyed,this,[this,consumer] {
-            auto *renderer=m_publishingRenderers.take(consumer); m_publishingRequests.remove(consumer); m_publishingPinned.remove(consumer);
+    if (!consumer) return publishingPreview(format);
+    // Web-only consumers need the same lifetime cleanup as PDF consumers.
+    if (!m_publishingConsumers.contains(consumer)) {
+        m_publishingConsumers.insert(consumer);
+        connect(consumer, &QObject::destroyed, this, [this, consumer] {
+            disconnect(m_publishingConnections.take(consumer));
+            m_publishingRequests.remove(consumer);
+            m_publishingPendingKeys.remove(consumer);
+            m_publishingPreviewCache.remove(consumer);
+            m_publishingPinned.remove(consumer);
+            m_publishingConsumers.remove(consumer);
+            auto *renderer = m_publishingRenderers.take(consumer);
             if (renderer) { renderer->cancel(); renderer->deleteLater(); }
         });
     }
-    const quint64 generation=++m_publishingGeneration;
-    m_publishingRequests[consumer]=generation;
-    // Each view owns its renderer, so opening Export cannot cancel the workspace.
-    QMetaObject::Connection *connection=new QMetaObject::Connection;
-    *connection=connect(renderer,&PublishingPdf::finished,this,[this,consumer,generation,html,connection](quint64 id,const QByteArray &bytes,const QString &error) {
-        if (id!=generation) return;
-        disconnect(*connection); delete connection;
-        if (m_publishingRequests.value(consumer)!=generation) return;
-        const auto result = error.isEmpty() ? storePublishingOutput(generation,"pdf",bytes,html) : QVariantMap{{"ok",false},{"error",error}};
-        if (result.value("ok").toBool()) m_publishingPinned[consumer] = result.value("url").toUrl().toLocalFile();
+    const auto cancelPending = [this, consumer] {
+        // Disconnect before cancellation: cancel can emit finished synchronously.
+        disconnect(m_publishingConnections.take(consumer));
+        m_publishingRequests.remove(consumer);
+        m_publishingPendingKeys.remove(consumer);
+        if (auto *renderer = m_publishingRenderers.value(consumer, nullptr)) renderer->cancel();
+    };
+    if (!m_document || (format != "html" && format != "pdf")) {
+        cancelPending();
+        return {{"ok", false}, {"error", "Publishing preview is unavailable."}};
+    }
+    QString error, warning;
+    QString html = publishingHtml(&error, true, &warning);
+    if (!error.isEmpty()) {
+        cancelPending();
+        return {{"ok", false}, {"error", error}};
+    }
+    const QUrl baseUrl = documentBaseUrl();
+    // Embedded bytes capture local asset changes; print CSS captures page layout.
+    const QByteArray key = QCryptographicHash::hash(
+        (format + QChar::Null + baseUrl.toString(QUrl::FullyEncoded) + QChar::Null
+         + warning + QChar::Null + html).toUtf8(), QCryptographicHash::Sha256);
+    const auto cached = m_publishingPreviewCache.constFind(consumer);
+    if (cached != m_publishingPreviewCache.cend() && cached->key == key
+            && QFileInfo::exists(cached->result.value("url").toUrl().toLocalFile())) {
+        const auto result = cached->result;
+        cancelPending();
+        return result;
+    }
+    if (m_publishingPendingKeys.value(consumer) == key && m_publishingRequests.contains(consumer))
+        return {{"ok", true}, {"pending", true}, {"requestId", m_publishingRequests.value(consumer)}};
+    cancelPending();
+    const quint64 generation = ++m_publishingGeneration;
+    if (format == "html") {
+        html.replace("<head>", "<head><base href=\"" + baseUrl.toString(QUrl::FullyEncoded).toHtmlEscaped() + "\">");
+        auto result = storePublishingOutput(generation, format, html.toUtf8(), html);
+        if (!warning.isEmpty()) result.insert("warning", warning);
+        if (result.value("ok").toBool()) {
+            m_publishingPinned[consumer] = result.value("url").toUrl().toLocalFile();
+            m_publishingPreviewCache[consumer] = {key, result};
+        }
+        return result;
+    }
+    auto *renderer = m_publishingRenderers.value(consumer, nullptr);
+    if (!renderer) {
+        renderer = new PublishingPdf(this);
+        m_publishingRenderers.insert(consumer, renderer);
+    }
+    m_publishingRequests[consumer] = generation;
+    m_publishingPendingKeys[consumer] = key;
+    m_publishingConnections[consumer] = connect(renderer, &PublishingPdf::finished, this,
+        [this, consumer, generation, html, warning, key](quint64 id, const QByteArray &bytes, const QString &error) {
+        if (id != generation || m_publishingRequests.value(consumer) != generation) return;
+        disconnect(m_publishingConnections.take(consumer));
+        m_publishingRequests.remove(consumer);
+        m_publishingPendingKeys.remove(consumer);
+        auto result = error.isEmpty() ? storePublishingOutput(generation, "pdf", bytes, html)
+                                      : QVariantMap{{"ok", false}, {"error", error}};
+        if (!warning.isEmpty()) result.insert("warning", warning);
+        if (result.value("ok").toBool()) {
+            m_publishingPinned[consumer] = result.value("url").toUrl().toLocalFile();
+            m_publishingPreviewCache[consumer] = {key, result};
+        }
         emit publishingPreviewReady(generation, result);
     });
-    renderer->render(generation,html,documentBaseUrl(),effectiveOutputPageLayout());
-    return {{"ok",true},{"pending",true},{"requestId",generation}};
+    renderer->render(generation, html, baseUrl, effectiveOutputPageLayout());
+    return {{"ok", true}, {"pending", true}, {"requestId", generation}};
 }
 
 void Backend::paintPublishingOutput(QPagedPaintDevice &device) {

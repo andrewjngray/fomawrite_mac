@@ -127,7 +127,7 @@ void FomawriteTest::publishingAsyncPreviewKeepsLatestRequest() {
     QSignalSpy ready(&backend, &Backend::publishingPreviewReady);
     editor->setProperty("text", "# Superseded draft\n");
     const auto first = backend.requestPublishingPreview("pdf", &consumer); QVERIFY(first["ok"].toBool());
-    editor->setProperty("text", "# Latest draft\n");
+    editor->setProperty("text", "# Latest draft\n\n![Missing](fomawrite-async-missing-image.png)\n");
     const auto latest = backend.requestPublishingPreview("pdf", &consumer); QVERIFY(latest["ok"].toBool());
     const quint64 latestId = latest["requestId"].toULongLong(); QVERIFY(latestId > first["requestId"].toULongLong());
     QVariantMap result;
@@ -139,10 +139,151 @@ void FomawriteTest::publishingAsyncPreviewKeepsLatestRequest() {
     })(), 35000);
     QVERIFY2(result["ok"].toBool(), qPrintable(result["error"].toString()));
     QPdfDocument document; QCOMPARE(document.load(result["url"].toUrl().toLocalFile()), QPdfDocument::Error::None);
+    QVERIFY(!result["warning"].toString().isEmpty());
     QVERIFY(document.getAllText(0).text().contains("Latest draft"));
+    QVERIFY(document.getAllText(0).text().contains("Image unavailable: Missing"));
     QVERIFY(!document.getAllText(0).text().contains("Superseded draft"));
     for (const auto &arguments : ready) if (arguments[0].toULongLong() != latestId)
         QVERIFY(!arguments[1].toMap()["ok"].toBool());
-    QCOMPARE(editor->property("text").toString(), QString("# Latest draft\n"));
+    QCOMPARE(editor->property("text").toString(), QString("# Latest draft\n\n![Missing](fomawrite-async-missing-image.png)\n"));
+    backend.discardRecovery();
+}
+
+void FomawriteTest::publishingImagesKeepIncompletePreviewsReadableAndExportsStrict() {
+    Cycle103SettingsSnapshot settings;
+    QTemporaryDir directory; QVERIFY(directory.isValid());
+    QImage image(8, 8, QImage::Format_RGB32); image.fill(Qt::red);
+    QVERIFY(image.save(directory.filePath("local & valid.png")));
+    QFile corrupt(directory.filePath("corrupt.png")); QVERIFY(corrupt.open(QIODevice::WriteOnly));
+    corrupt.write(QByteArray::fromHex("89504e470d0a1a0a")); corrupt.close();
+    QFile oversized(directory.filePath("oversized.png")); QVERIFY(oversized.open(QIODevice::WriteOnly));
+    QVERIFY(oversized.resize(5 * 1024 * 1024 + 1)); oversized.close();
+    const QString source = "# Still readable\n\nBefore images.\n\n![Local](<local & valid.png>)\n\n"
+        "![Missing & <unsafe>](missing.png)\n\n![Remote](https://example.com/image.png)\n\n"
+        "![Corrupt](corrupt.png)\n\n![Oversized](oversized.png)\n\nAfter images.\n";
+    QString error, warning;
+    const auto baseUrl = QUrl::fromLocalFile(directory.path() + '/');
+    const auto rendered = PublishingHtml::body(source, &error); QVERIFY(error.isEmpty());
+    const auto embedded = PublishingHtml::embedImages(rendered, baseUrl, true, &error, &warning);
+    QVERIFY2(error.isEmpty(), qPrintable(error)); QVERIFY(!warning.isEmpty());
+    QVERIFY(embedded.contains("Before images.")); QVERIFY(embedded.contains("After images."));
+    QVERIFY(embedded.contains("data:image/png;base64,"));
+    QCOMPARE(embedded.count("class=\"fomawrite-image-placeholder\""), 4);
+    QVERIFY(embedded.contains("Missing &amp; &lt;unsafe&gt;")); QVERIFY(!embedded.contains("<unsafe>"));
+    QVERIFY(!embedded.contains("https://example.com/image.png"));
+    QVERIFY(PublishingHtml::embedImages(rendered, baseUrl, false, &error).isEmpty()); QVERIFY(!error.isEmpty());
+    const auto valid = PublishingHtml::embedImages(PublishingHtml::body("![Local](<local & valid.png>)"), baseUrl, false, &error, &warning);
+    QVERIFY(error.isEmpty()); QVERIFY(warning.isEmpty()); QVERIFY(valid.contains("data:image/png;base64,"));
+    // The total limit also leaves later text visible; repeated bounded PNG data
+    // triggers it without allocating or decoding an oversized bitmap.
+    QFile padded(directory.filePath("padded.png")); QVERIFY(padded.open(QIODevice::WriteOnly));
+    QFile local(directory.filePath("local & valid.png")); QVERIFY(local.open(QIODevice::ReadOnly));
+    padded.write(local.readAll()); QVERIFY(padded.resize(5 * 1024 * 1024)); padded.close();
+    const auto totalMarkup = PublishingHtml::body(QString("![Repeated](padded.png)\n\n").repeated(5) + "After total limit.");
+    const auto totalPreview = PublishingHtml::embedImages(totalMarkup, baseUrl, true, &error, &warning);
+    QVERIFY(error.isEmpty()); QVERIFY(!warning.isEmpty());
+    QCOMPARE(totalPreview.count("data:image/png;base64,"), 4);
+    QCOMPARE(totalPreview.count("fomawrite-image-placeholder"), 1);
+    QVERIFY(totalPreview.contains("After total limit."));
+    QVERIFY(PublishingHtml::embedImages(totalMarkup, baseUrl, false, &error).isEmpty()); QVERIFY(!error.isEmpty());
+
+    Backend backend;
+    QQmlEngine engine; engine.rootContext()->setContextProperty("backend", &backend);
+    QQmlComponent component(&engine);
+    component.setData("import QtQuick\nTextEdit { Component.onCompleted: backend.attachDocument(textDocument); onTextChanged: backend.editorTextChanged() }", QUrl());
+    QScopedPointer<QObject> editor(component.create()); QVERIFY2(editor, qPrintable(component.errorString()));
+    editor->setProperty("text", source);
+    backend.saveAs(QUrl::fromLocalFile(directory.filePath("source.md")));
+    const auto web = backend.publishingPreview("html"); QVERIFY(web["ok"].toBool()); QVERIFY(!web["warning"].toString().isEmpty());
+    QFile webFile(web["url"].toUrl().toLocalFile()); QVERIFY(webFile.open(QIODevice::ReadOnly));
+    const auto webHtml = webFile.readAll(); QVERIFY(webHtml.contains("Still readable")); QVERIFY(webHtml.contains("After images."));
+    const auto pdf = backend.publishingPreview("pdf"); QVERIFY2(pdf["ok"].toBool(), qPrintable(pdf["error"].toString()));
+    QVERIFY(!pdf["warning"].toString().isEmpty());
+    QPdfDocument pdfDocument; QCOMPARE(pdfDocument.load(pdf["url"].toUrl().toLocalFile()), QPdfDocument::Error::None);
+    QVERIFY(pdfDocument.getAllText(0).text().contains("After images."));
+    QVERIFY(!backend.exportDocument(QUrl::fromLocalFile(directory.filePath("strict.html")), "html"));
+    QVERIFY(!backend.exportDocument(QUrl::fromLocalFile(directory.filePath("strict.pdf")), "pdf"));
+    QCOMPARE(editor->property("text").toString(), source);
+    backend.discardRecovery();
+}
+
+void FomawriteTest::publishingPreviewCacheTracksAssetsAndConsumerLifetime() {
+    Cycle103SettingsSnapshot settings;
+    QTemporaryDir directory; QVERIFY(directory.isValid());
+    QImage image(8, 8, QImage::Format_RGB32); image.fill(Qt::red);
+    const auto imagePath = directory.filePath("asset.png"); QVERIFY(image.save(imagePath));
+    Backend backend;
+    QQmlEngine engine; engine.rootContext()->setContextProperty("backend", &backend);
+    QQmlComponent component(&engine);
+    component.setData("import QtQuick\nTextEdit { Component.onCompleted: backend.attachDocument(textDocument); onTextChanged: backend.editorTextChanged() }", QUrl());
+    QScopedPointer<QObject> editor(component.create()); QVERIFY2(editor, qPrintable(component.errorString()));
+    const QString source = "# Cached draft\n\n![Asset](asset.png)\n";
+    editor->setProperty("text", source); backend.saveAs(QUrl::fromLocalFile(directory.filePath("source.md")));
+    auto *webConsumer = new QObject;
+    const auto firstWeb = backend.requestPublishingPreview("html", webConsumer); QVERIFY(firstWeb["ok"].toBool());
+    const QUrl firstWebUrl = firstWeb["url"].toUrl();
+    for (int i = 0; i < 5; ++i)
+        QCOMPARE(backend.requestPublishingPreview("html", webConsumer)["url"].toUrl(), firstWebUrl);
+    image.fill(Qt::blue); QVERIFY(image.save(imagePath));
+    const auto changedAsset = backend.requestPublishingPreview("html", webConsumer); QVERIFY(changedAsset["ok"].toBool());
+    QVERIFY(changedAsset["url"].toUrl() != firstWebUrl);
+    QFile changedFile(changedAsset["url"].toUrl().toLocalFile()); QVERIFY(changedFile.open(QIODevice::ReadOnly));
+    QFile assetFile(imagePath); QVERIFY(assetFile.open(QIODevice::ReadOnly));
+    QVERIFY(changedFile.readAll().contains(assetFile.readAll().toBase64()));
+    editor->setProperty("text", source + "Changed document.");
+    const auto changedDocument = backend.requestPublishingPreview("html", webConsumer);
+    QVERIFY(changedDocument["url"].toUrl() != changedAsset["url"].toUrl());
+    QFile documentFile(changedDocument["url"].toUrl().toLocalFile()); QVERIFY(documentFile.open(QIODevice::ReadOnly));
+    QVERIFY(documentFile.readAll().contains("Changed document."));
+
+    QObject pdfConsumer;
+    QSignalSpy ready(&backend, &Backend::publishingPreviewReady);
+    const auto firstPdf = backend.requestPublishingPreview("pdf", &pdfConsumer); QVERIFY(firstPdf["pending"].toBool());
+    QCOMPARE(backend.requestPublishingPreview("pdf", &pdfConsumer)["requestId"], firstPdf["requestId"]);
+    QTRY_COMPARE_WITH_TIMEOUT(ready.size(), 1, 35000);
+    const auto pdfResult = ready.last()[1].toMap(); QVERIFY2(pdfResult["ok"].toBool(), qPrintable(pdfResult["error"].toString()));
+    const auto cachedPdf = backend.requestPublishingPreview("pdf", &pdfConsumer);
+    QVERIFY(!cachedPdf["pending"].toBool()); QCOMPARE(cachedPdf["url"], pdfResult["url"]);
+    image.fill(Qt::green); QVERIFY(image.save(imagePath));
+    const auto changedPdfAsset = backend.requestPublishingPreview("pdf", &pdfConsumer); QVERIFY(changedPdfAsset["pending"].toBool());
+    QTRY_COMPARE_WITH_TIMEOUT(ready.size(), 2, 35000);
+    const auto newPdfResult = ready.last()[1].toMap(); QVERIFY(newPdfResult["ok"].toBool());
+    QVERIFY(newPdfResult["url"] != pdfResult["url"]);
+    const QString cachedSource = editor->property("text").toString();
+    editor->setProperty("text", "# Superseded cache miss\n");
+    const auto superseded = backend.requestPublishingPreview("pdf", &pdfConsumer); QVERIFY(superseded["pending"].toBool());
+    editor->setProperty("text", cachedSource);
+    QCOMPARE(backend.requestPublishingPreview("pdf", &pdfConsumer)["url"], newPdfResult["url"]);
+    QTest::qWait(200);
+    QCOMPARE(ready.size(), 2); // Cache hit cancels the superseded request.
+    editor->setProperty("text", "# Cancelled by error\n");
+    QVERIFY(backend.requestPublishingPreview("pdf", &pdfConsumer)["pending"].toBool());
+    QVERIFY(!backend.requestPublishingPreview("invalid", &pdfConsumer)["ok"].toBool());
+    QTest::qWait(200); QCOMPARE(ready.size(), 2);
+    editor->setProperty("text", cachedSource);
+    QCOMPARE(backend.requestPublishingPreview("pdf", &pdfConsumer)["url"], newPdfResult["url"]);
+    QVERIFY(backend.setExportPaperSize(backend.exportPaperSize() == "letter" ? "a4" : "letter"));
+    QVERIFY(backend.requestPublishingPreview("pdf", &pdfConsumer)["pending"].toBool());
+    QVERIFY(!backend.requestPublishingPreview("invalid", &pdfConsumer)["ok"].toBool());
+
+    // A web-only consumer pins its file while alive and releases it on teardown.
+    const auto pinnedUrl = backend.requestPublishingPreview("html", webConsumer)["url"].toUrl();
+    for (int i = 0; i < 6; ++i) QVERIFY(backend.publishingPreview("html")["ok"].toBool());
+    QVERIFY(QFileInfo::exists(pinnedUrl.toLocalFile()));
+    delete webConsumer;
+    for (int i = 0; i < 6; ++i) QVERIFY(backend.publishingPreview("html")["ok"].toBool());
+    QVERIFY(!QFileInfo::exists(pinnedUrl.toLocalFile()));
+    QObject transientConsumer;
+    QFile css(directory.filePath("transient.css")); QVERIFY(css.open(QIODevice::WriteOnly));
+    css.write("#write { color: #112233; }"); css.close();
+    QVERIFY(backend.loadOutputCss(QUrl::fromLocalFile(css.fileName())));
+    const auto styled = backend.requestPublishingPreview("html", &transientConsumer); QVERIFY(styled["ok"].toBool());
+    QVERIFY(css.remove());
+    const auto failed = backend.requestPublishingPreview("html", &transientConsumer);
+    QVERIFY(!failed["ok"].toBool()); QVERIFY(!failed["error"].toString().isEmpty());
+    QVERIFY(css.open(QIODevice::WriteOnly)); css.write("#write { color: #445566; }"); css.close();
+    const auto recovered = backend.requestPublishingPreview("html", &transientConsumer);
+    QVERIFY(recovered["ok"].toBool()); QVERIFY(recovered["url"] != styled["url"]);
+    QCOMPARE(editor->property("text").toString(), cachedSource);
     backend.discardRecovery();
 }

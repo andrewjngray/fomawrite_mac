@@ -82,8 +82,11 @@ void FomawriteTest::publishingPreviewOwnsTemporaryFilesAndReportsErrors() {
         QCOMPARE(backend.status(), status);
         editor->setProperty("text", "![Missing](fomawrite-missing-publishing-image.png)");
         const QString changedStatus = backend.status();
-        const auto failed = backend.publishingPreview("html");
-        QVERIFY(!failed["ok"].toBool()); QVERIFY(!failed["error"].toString().isEmpty());
+        const auto incomplete = backend.publishingPreview("html");
+        QVERIFY(incomplete["ok"].toBool()); QVERIFY(!incomplete["warning"].toString().isEmpty());
+        lastPreview = incomplete["url"].toUrl().toLocalFile();
+        QFile incompleteFile(lastPreview); QVERIFY(incompleteFile.open(QIODevice::ReadOnly));
+        QVERIFY(incompleteFile.readAll().contains("Image unavailable: Missing"));
         QCOMPARE(backend.status(), changedStatus);
         backend.discardRecovery();
     }

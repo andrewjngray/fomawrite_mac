@@ -30,6 +30,12 @@ Rectangle {
     property bool previewRefreshInFlight: false
     readonly property bool viewportRefreshPending: refreshTimer.running || previewRefreshInFlight || webViewportRequests > 0
     property string errorText: ""
+    property string warningText: ""
+    property string displayedFormat: ""
+    property int appliedRevision: -1
+    property var retainedFrame: null
+    property int paintedFrames: 0
+    readonly property bool holdingPreviousFrame: retainedFrame !== null
     property url outputUrl
     property url webOutputUrl
     property bool pdfPagesReady: false
@@ -132,9 +138,14 @@ Rectangle {
         }
         return true;
     }
-    function navigateToAnchor(anchor) { pendingAnchor = anchor; reload(); }
+    function navigateToAnchor(anchor) {
+        if (!viewportRefreshPending && outputUrl && errorText === "") jumpToAnchor(anchor);
+        else { pendingAnchor = anchor; if (!viewportRefreshPending) reload(); }
+    }
     function finishRefresh() {
         previewRefreshInFlight = false;
+        displayedFormat = publishingMode;
+        paintedFrames = 0;
         scrollToFraction(retainedFraction);
         if (pendingAnchor !== "") { var anchor = pendingAnchor; pendingAnchor = ""; jumpToAnchor(anchor); }
     }
@@ -151,7 +162,37 @@ Rectangle {
     }
     function acceptOutput(result) {
         errorText = result.ok ? "" : result.error;
-        if (!result.ok) { previewRefreshInFlight = false; return; }
+        warningText = result.warning || "";
+        if (!result.ok) { previewRefreshInFlight = false; retainedFrame = null; return; }
+        // An unchanged refresh must not navigate Chromium or destroy PDF pages.
+        if (String(result.url) === String(outputUrl)
+                && (publishingMode === "web" ? String(web.url) === String(result.url)
+                    : String(pdf.source) === String(result.url))) {
+            appliedRevision = refreshRevision;
+            if (publishingMode === "web" && !web.loading) finishRefresh();
+            else if (publishingMode === "pdf" && pdf.status === PdfDocument.Ready) {
+                pdfPagesReady = true;
+                finishRefresh();
+            }
+            return;
+        }
+        // Keep the painted document visible while its replacement loads. A grab
+        // is asynchronous, so discard it if newer typing superseded this result.
+        if (displayedFormat === publishingMode && outputUrl && !holdingPreviousFrame) {
+            var revision = refreshRevision;
+            var surface = publishingMode === "pdf" ? previewScroll : web;
+            var captured = surface.grabToImage(function(frame) {
+                if (revision !== root.refreshRevision) return;
+                root.retainedFrame = frame;
+                root.applyOutput(result);
+            });
+            if (captured) return;
+        }
+        applyOutput(result);
+    }
+    function applyOutput(result) {
+        appliedRevision = refreshRevision;
+        paintedFrames = 0;
         pdfAnchors = result.anchors || ({});
         outputUrl = result.url;
         if (publishingMode === "web") webOutputUrl = result.url;
@@ -188,7 +229,7 @@ Rectangle {
     PdfDocument {
         id: pdf
         onStatusChanged: function(status) {
-            if (root.publishingMode !== "pdf" || String(source) !== String(root.outputUrl)) return;
+            if (root.appliedRevision !== root.refreshRevision || root.publishingMode !== "pdf" || String(source) !== String(root.outputUrl)) return;
             if (status === PdfDocument.Ready) {
                 root.pdfPagesReady = true;
                 var revision = root.refreshRevision, loadedUrl = String(source);
@@ -238,7 +279,9 @@ Rectangle {
                     width: points.width * pageScale
                     height: points.height * pageScale
                     color: "white"
+                    readonly property bool painted: !pageLoader.active || (pageLoader.item !== null && pageLoader.item.status === Image.Ready)
                     Loader {
+                        id: pageLoader
                         anchors.fill: parent
                         active: root.visible && paper.y + paper.height >= previewScroll.contentY - previewScroll.height
                             && paper.y <= previewScroll.contentY + 2 * previewScroll.height
@@ -312,7 +355,7 @@ Rectangle {
         onNewWindowRequested: function(request) { root.linkRequested(request.requestedUrl); }
         onContextMenuRequested: function(request) { request.accepted = true; }
         onLoadingChanged: function(info) {
-            if (root.publishingMode !== "web" || String(info.url) !== String(root.outputUrl)) return;
+            if (root.appliedRevision !== root.refreshRevision || root.publishingMode !== "web" || String(info.url) !== String(root.outputUrl)) return;
             if (info.status === WebEngineView.LoadSucceededStatus) root.webViewportCommand("", false, root.finishRefresh);
             else if (info.status === WebEngineView.LoadFailedStatus) { root.errorText = info.errorString; root.previewRefreshInFlight = false; }
         }
@@ -337,7 +380,47 @@ Rectangle {
             wheel.accepted = true;
         }
     }
+    Image {
+        anchors.fill: web
+        source: root.retainedFrame ? root.retainedFrame.url : ""
+        visible: root.holdingPreviousFrame
+        fillMode: Image.Stretch
+        z: 1
+        // This overlay does not accept input or change document geometry.
+    }
+    FrameAnimation {
+        running: root.holdingPreviousFrame && root.visible && !root.viewportRefreshPending
+        onTriggered: {
+            if (root.publishingMode === "pdf") {
+                if (!root.pdfPagesReady) return;
+                for (var i = 0; i < pages.count; ++i) {
+                    var page = pages.itemAt(i);
+                    if (page && !page.painted) { root.paintedFrames = 0; return; }
+                }
+            }
+            // Load completion precedes the compositor. Keep the old frame for
+            // three rendered frames, including async PDF image readiness.
+            if (++root.paintedFrames >= 3) root.retainedFrame = null;
+        }
+    }
     Label {
+        objectName: "publishingImageNotice"
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.bottom: parent.bottom
+        anchors.margins: 12
+        anchors.bottomMargin: root.bottomInset + 12
+        visible: root.warningText !== "" && root.errorText === ""
+        text: root.warningText
+        wrapMode: Text.WordWrap
+        color: root.renderer.palette.text
+        padding: 10
+        z: 2
+        background: Rectangle { color: root.renderer.palette.panel; radius: 6 }
+        Accessible.name: text
+    }
+    Label {
+        z: 2
         anchors.centerIn: parent
         width: Math.max(100, parent.width - 48)
         visible: root.errorText !== ""

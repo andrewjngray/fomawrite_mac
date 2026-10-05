@@ -252,7 +252,8 @@ int runDocumentViewCheck(QApplication &app, const QString &outputDirectory) {
     QJsonArray paneZoomReadings;
     QJsonArray paneZoomDividerEvents;
     QJsonArray screenshots;
-    QJsonArray qmlWarnings;
+    QJsonArray qmlWarnings, expectedImageWarnings;
+    QString expectedMissingPreviewImage;
     QJsonObject report{{"schema", 1}, {"startedAt", QDateTime::currentDateTimeUtc().toString(Qt::ISODate)},
                        {"applicationVersion", app.applicationVersion()},
                        {"executable", QFileInfo(app.applicationFilePath()).canonicalFilePath()},
@@ -279,6 +280,7 @@ int runDocumentViewCheck(QApplication &app, const QString &outputDirectory) {
         report.insert("paneZoomDividerEvents", paneZoomDividerEvents);
         report.insert("screenshots", screenshots);
         report.insert("qmlWarnings", qmlWarnings);
+        report.insert("expectedImageWarnings", expectedImageWarnings);
         report.insert("finishedAt", QDateTime::currentDateTimeUtc().toString(Qt::ISODate));
         QSaveFile file(output.filePath(QStringLiteral("report.json")));
         const QByteArray json = QJsonDocument(report).toJson(QJsonDocument::Indented);
@@ -339,7 +341,16 @@ int runDocumentViewCheck(QApplication &app, const QString &outputDirectory) {
     qputenv("QML_DISABLE_DISK_CACHE", "1");
     QQmlApplicationEngine engine;
     QObject::connect(&engine, &QQmlEngine::warnings, &engine, [&](const QList<QQmlError> &warnings) {
-        for (const auto &warning : warnings) qmlWarnings.append(warning.toString());
+        for (const auto &warning : warnings) {
+            const QString message = warning.toString();
+            // The incomplete-image fixture deliberately exercises a missing
+            // resource. Its left visual editor also reports that exact URL.
+            // Keep this expected diagnostic separate; all other warnings fail.
+            if (!expectedMissingPreviewImage.isEmpty() && message.startsWith("qrc:/PreviewPane.qml:")
+                    && message.endsWith("QML QQuickTextEdit: Cannot open: " + expectedMissingPreviewImage))
+                expectedImageWarnings.append(message);
+            else qmlWarnings.append(message);
+        }
     });
     engine.rootContext()->setContextProperty(QStringLiteral("backend"), &backend);
     engine.rootContext()->setContextProperty(QStringLiteral("referenceWorkspaceUpgrade"), false);

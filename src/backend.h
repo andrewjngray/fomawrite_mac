@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QObject>
+#include <QSet>
 #include <QPointer>
 #include <QByteArray>
 #include <QFileSystemWatcher>
@@ -283,7 +284,7 @@ private:
     QString outputHtml(QTextDocument &document, QString *error) const;
     QByteArray publishingPdfBytes(const QString &html, QString *error) const;
     QVariantMap storePublishingOutput(quint64 generation, const QString &format, const QByteArray &bytes, const QString &html = {});
-    QString publishingHtml(QString *error) const;
+    QString publishingHtml(QString *error, bool preview = false, QString *warning = nullptr) const;
     QString publishingPrintCss() const;
     QString m_publishingThemeId;
     QString m_publishingThemeError;
@@ -291,6 +292,11 @@ private:
     QTimer m_publishingThemeRefreshTimer;
     void watchPublishingThemes();
     void refreshPublishingThemes();
+    struct PublishingPreviewCache { QByteArray key; QVariantMap result; };
+    QHash<QObject *, PublishingPreviewCache> m_publishingPreviewCache;
+    QHash<QObject *, QByteArray> m_publishingPendingKeys;
+    QHash<QObject *, QMetaObject::Connection> m_publishingConnections;
+    QSet<QObject *> m_publishingConsumers;
     QHash<QObject *, PublishingPdf *> m_publishingRenderers;
     QHash<QObject *, quint64> m_publishingRequests;
     QHash<QObject *, QString> m_publishingPinned;

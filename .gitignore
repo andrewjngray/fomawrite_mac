@@ -94,3 +94,8 @@ Makefile
 /research/cycle-126/*
 !/research/cycle-126/README.md
 !/research/cycle-126/verified-builds.json
+
+# Cycle127 local preview-continuity and private-document evidence.
+/research/cycle-127/*
+!/research/cycle-127/README.md
+!/research/cycle-127/verified-builds.json

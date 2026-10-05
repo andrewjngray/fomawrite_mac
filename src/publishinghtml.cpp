@@ -2,6 +2,9 @@
 #include "vendor/md4c/md4c.h"
 
 #include <QHash>
+#include <QBuffer>
+#include <QFile>
+#include <QImageReader>
 #include <QRegularExpression>
 #include <QSet>
 #include <QTextDocument>
@@ -261,4 +264,73 @@ QString PublishingHtml::body(const QString &expandedMarkdown, QString *error) {
         return {};
     }
     return renderer.html;
+}
+
+QString PublishingHtml::embedImages(QString html, const QUrl &baseUrl, bool preview,
+                                    QString *error, QString *warning) {
+    if (error) error->clear();
+    if (warning) warning->clear();
+    // Only inspect renderer-produced image tags, never escaped raw HTML.
+    const QRegularExpression images(QStringLiteral("<img\\b[^>]*>"), QRegularExpression::CaseInsensitiveOption);
+    const QRegularExpression source(QStringLiteral("\\bsrc=\"([^\"]*)\""));
+    const QRegularExpression alt(QStringLiteral("\\balt=\"([^\"]*)\""));
+    auto matches = images.globalMatch(html);
+    struct Replacement { qsizetype start, length; QString value; };
+    QList<Replacement> replacements;
+    constexpr qint64 individualLimit = 5 * 1024 * 1024;
+    constexpr qint64 totalLimit = 20 * 1024 * 1024;
+    qint64 total = 0;
+    int unavailable = 0;
+    while (matches.hasNext()) {
+        const auto match = matches.next();
+        const auto src = source.match(match.captured());
+        if (!src.hasMatch()) continue;
+        const auto asset = baseUrl.resolved(QUrl(entity(src.captured(1))));
+        QByteArray data, format;
+        QString reason;
+        if (!asset.isLocalFile()) reason = QStringLiteral("remote images are unavailable");
+        else {
+            QFile file(asset.toLocalFile());
+            if (!file.open(QIODevice::ReadOnly)) reason = QStringLiteral("local image could not be read");
+            else if (file.size() > individualLimit) reason = QStringLiteral("image exceeds 5 MiB");
+            else if (total + file.size() > totalLimit) reason = QStringLiteral("images exceed 20 MiB in total");
+            else {
+                data = file.read(individualLimit + 1);
+                if (file.error() != QFile::NoError) reason = QStringLiteral("local image could not be read");
+                else if (data.size() > individualLimit) reason = QStringLiteral("image exceeds 5 MiB");
+                else if (total + data.size() > totalLimit) reason = QStringLiteral("images exceed 20 MiB in total");
+                else {
+                    QBuffer buffer(&data); buffer.open(QIODevice::ReadOnly);
+                    QImageReader reader(&buffer);
+                    format = reader.format();
+                    if (!QList<QByteArray>{"png", "jpeg", "gif", "webp"}.contains(format))
+                        reason = QStringLiteral("image must be PNG, JPEG, GIF or WebP");
+                    else if (reader.read().isNull()) reason = QStringLiteral("image is damaged or could not be decoded");
+                }
+            }
+        }
+        if (!reason.isEmpty()) {
+            if (!preview) {
+                if (error) *error = QStringLiteral("Publishing needs readable local PNG/JPEG/GIF/WebP images (5 MiB each, 20 MiB total). %1.").arg(reason);
+                return {};
+            }
+            ++unavailable;
+            const auto alternative = alt.match(match.captured());
+            const auto label = alternative.hasMatch() ? entity(alternative.captured(1)) : QString();
+            const auto description = label.isEmpty() ? QStringLiteral("Image unavailable") : QStringLiteral("Image unavailable: %1").arg(label);
+            replacements.append({match.capturedStart(), match.capturedLength(),
+                QStringLiteral("<span class=\"fomawrite-image-placeholder\" role=\"img\" title=\"%1\">[%2]</span>")
+                    .arg(reason.toHtmlEscaped(), description.toHtmlEscaped())});
+            continue;
+        }
+        total += data.size();
+        replacements.append({match.capturedStart() + src.capturedStart(1), src.capturedLength(1),
+            QStringLiteral("data:image/") + QString::fromLatin1(format) + QStringLiteral(";base64,") + QString::fromLatin1(data.toBase64())});
+    }
+    for (auto it = replacements.crbegin(); it != replacements.crend(); ++it)
+        html.replace(it->start, it->length, it->value);
+    if (warning && unavailable)
+        *warning = QStringLiteral("%1 image(s) unavailable in preview. Publishing requires readable local PNG/JPEG/GIF/WebP images (5 MiB each, 20 MiB total).")
+            .arg(unavailable);
+    return html;
 }
