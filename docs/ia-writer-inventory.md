@@ -2,7 +2,9 @@
 
 **Product identity, Cycle 60:** Omawrite was renamed Fomawrite. Historical iA comparisons below retain their original cycle wording; this does not change their implemented/partial/unverified classification. See [migration notes](product-rename.md).
 
-**Current publishing overlay — Cycle126:** Get More Themes… opens Typora’s gallery from the publishing menus and export dialog. It extends discovery, without claiming further theme compatibility. [Verification](../research/cycle-126/README.md).
+**Current publishing overlay — Cycle127:** build `0.3.0-dev23`, macOS `0.3.0 (127)`, keeps publishing preview readable around unavailable images, reuses unchanged successful output and retains painted content while replacement output loads. Export and print remain strict. 197 regressions and 159 native checks each on Dev and the installed copy pass. All three local copies are refreshed and signed; Andrew's physical blank-pane/flashing report still requires review. This improves bounded preview behavior without establishing broader renderer or reference-app parity. [Status and limits](../research/cycle-127/README.md).
+
+**Previous publishing overlay — Cycle126:** Get More Themes… opens Typora’s gallery from the publishing menus and export dialog. It extends discovery, without claiming further theme compatibility. [Verification](../research/cycle-126/README.md).
 
 **Previous publishing overlay — Cycle125:** CSS files in the themes folder load automatically with supported local resources. Folder changes refresh the chooser and selected output; accepted selection has one checkmark, errors remain visible, basic font/page settings are clearly separate, and long menus scroll above the footer. All 195 regressions pass. All three copies also pass 157 native checks. Build verification is recorded in the [Cycle125 handoff](../research/cycle-125/README.md). This does not establish complete Typora-theme or iA template compatibility.
 

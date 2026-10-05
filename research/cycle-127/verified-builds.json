@@ -1,0 +1,110 @@
+{
+  "version": "0.3.0-dev23",
+  "build": 127,
+  "verifiedAt": "2026-10-05T09:04:05.916744+00:00",
+  "sourceCommit": "25cb8b88ebcd33f64df4a11edfc533bd4b22b8cc",
+  "publicReleaseChanged": false,
+  "verification": {
+    "fullRegression": {
+      "passed": 197,
+      "failed": 0,
+      "skipped": 0
+    },
+    "nativeChecksPerTestedBundle": 159,
+    "nativeTestedBundles": [
+      "dev",
+      "applications"
+    ],
+    "nativeInput": "Synthetic Qt pointer/key events on Cocoa; file-dialog completion via accepted callbacks",
+    "unexpectedQmlWarningsPerTestedBundle": 0,
+    "expectedMissingImageDiagnostics": {
+      "dev": 6,
+      "applications": 6
+    },
+    "screenshotReview": "Inspected Web/PDF retained frames and readable missing-image Web output. Original physical user workflow awaits review."
+  },
+  "bundles": {
+    "dev": {
+      "passed": true,
+      "failures": [],
+      "app": "/Users/andrewgray/repo/projects/fomawrite_mac/dist/Fomawrite Dev.app",
+      "version": "0.3.0-dev23",
+      "build": "127",
+      "bundleIdentifier": "io.github.andrewjngray.fomawrite.dev",
+      "executableSha256": "055c4f85869019a5a4c69618c1491e0b45e6dea02e287db8b6bc8e59842921ca",
+      "resourceSha256": {
+        "AboutDialog.qml": "12017d5a492af70ffa10843ae236f26b56128d4af152876ff76a548ceef869f5",
+        "DocumentFindBar.qml": "7e3f64f90104ba403b222bce94ede7cce77e534394b669ad0b9f10210c77887b",
+        "DocumentFooter.qml": "f7e6dcdd2e7fe69a940104fb537f25b977474a41a6e6a02abf1867a9fd3a9103",
+        "DocumentOutline.qml": "6428a2f0cf1f14fe02d36799d706e52478ad2eb9e5baa200ad75992b76300f20",
+        "ExportHub.qml": "e7264e2586f0c3ffdf23004c66e1d85e54bfe66d34f491b692e16d4a92958e90",
+        "FooterButton.qml": "c7fa2c48acf137903db010239619d33aaa7a28475babdb7bf381640cb087ef5e",
+        "LibraryPane.qml": "f5df7aaeeee3cfd1efb05c6edf528cf66e625e0e9cd5ca1946c5607047452663",
+        "LinkEditor.qml": "869370567f601f7153d568461d68957df68082ee2a06354680d05fef3b9d6caa",
+        "LinkSyntax.js": "468ac5c0c63f3cdbbf90574bc4bd37984e3fac2e3c58655fb8f4ea2ee398dffd",
+        "Main.qml": "1dcb0559eac4a133e684214b7a016ec33b4d0333d45baf542ed580d56d24cca8",
+        "PaneZoomControls.qml": "86a0406cc274f3a0a24338daf77f9161aeac3bb07f6139ff2dd4163c77d6bd8a",
+        "PaneZoomState.qml": "cfdf6feb5c2e2a1748dd2f78d47b8f9609b0ca2d88d9f1b8d7e1aa981a33b48f",
+        "PreviewPane.qml": "84d7875da00a2cb53d69e5b088cc807935c102c8c684af733641618460109658",
+        "PublishingPreview.qml": "e1e88682970fbac9f60d4b14fdb64ae867bc52bc39369cd6031b0074a2302aaa",
+        "SquareDialogButton.qml": "bf4c23880c3a08833ca96341e1d9c2832ccce2e950b3d17d42a2e9ab36cfab90",
+        "WorkspaceCommands.qml": "efac6b5e59cfb71c0be0c005e8712d1bbdd2a8ce7bece25882fd7e4b8edcca84",
+        "WorkspaceHeader.qml": "a909707a8599a94ded5ad904149a3ace9a622a1e9d564bb40b33169258d3f3e8",
+        "WorkspaceLayout.qml": "c02563e54026f216854c90788065ef7424a7027da57519009e7c6dacd63e5791"
+      },
+      "statesChecked": 124,
+      "dailyWritingChecks": 7,
+      "paneZoomChecks": 5,
+      "editorAcceptanceChecks": 6,
+      "paneChromeChecks": 3,
+      "editingLayoutChecks": 6,
+      "publishingThemeChecks": 8,
+      "strictSignatureVerified": true
+    },
+    "applications": {
+      "passed": true,
+      "failures": [],
+      "app": "/Applications/Fomawrite.app",
+      "version": "0.3.0-dev23",
+      "build": "127",
+      "bundleIdentifier": "io.github.andrewjngray.fomawrite",
+      "executableSha256": "2d54323a313e8210fb3b4d004558268ded773097fbe74a58a31d063e6ff9fee4",
+      "resourceSha256": {
+        "AboutDialog.qml": "12017d5a492af70ffa10843ae236f26b56128d4af152876ff76a548ceef869f5",
+        "DocumentFindBar.qml": "7e3f64f90104ba403b222bce94ede7cce77e534394b669ad0b9f10210c77887b",
+        "DocumentFooter.qml": "f7e6dcdd2e7fe69a940104fb537f25b977474a41a6e6a02abf1867a9fd3a9103",
+        "DocumentOutline.qml": "6428a2f0cf1f14fe02d36799d706e52478ad2eb9e5baa200ad75992b76300f20",
+        "ExportHub.qml": "e7264e2586f0c3ffdf23004c66e1d85e54bfe66d34f491b692e16d4a92958e90",
+        "FooterButton.qml": "c7fa2c48acf137903db010239619d33aaa7a28475babdb7bf381640cb087ef5e",
+        "LibraryPane.qml": "f5df7aaeeee3cfd1efb05c6edf528cf66e625e0e9cd5ca1946c5607047452663",
+        "LinkEditor.qml": "869370567f601f7153d568461d68957df68082ee2a06354680d05fef3b9d6caa",
+        "LinkSyntax.js": "468ac5c0c63f3cdbbf90574bc4bd37984e3fac2e3c58655fb8f4ea2ee398dffd",
+        "Main.qml": "1dcb0559eac4a133e684214b7a016ec33b4d0333d45baf542ed580d56d24cca8",
+        "PaneZoomControls.qml": "86a0406cc274f3a0a24338daf77f9161aeac3bb07f6139ff2dd4163c77d6bd8a",
+        "PaneZoomState.qml": "cfdf6feb5c2e2a1748dd2f78d47b8f9609b0ca2d88d9f1b8d7e1aa981a33b48f",
+        "PreviewPane.qml": "84d7875da00a2cb53d69e5b088cc807935c102c8c684af733641618460109658",
+        "PublishingPreview.qml": "e1e88682970fbac9f60d4b14fdb64ae867bc52bc39369cd6031b0074a2302aaa",
+        "SquareDialogButton.qml": "bf4c23880c3a08833ca96341e1d9c2832ccce2e950b3d17d42a2e9ab36cfab90",
+        "WorkspaceCommands.qml": "efac6b5e59cfb71c0be0c005e8712d1bbdd2a8ce7bece25882fd7e4b8edcca84",
+        "WorkspaceHeader.qml": "a909707a8599a94ded5ad904149a3ace9a622a1e9d564bb40b33169258d3f3e8",
+        "WorkspaceLayout.qml": "c02563e54026f216854c90788065ef7424a7027da57519009e7c6dacd63e5791"
+      },
+      "statesChecked": 124,
+      "dailyWritingChecks": 7,
+      "paneZoomChecks": 5,
+      "editorAcceptanceChecks": 6,
+      "paneChromeChecks": 3,
+      "editingLayoutChecks": 6,
+      "publishingThemeChecks": 8,
+      "strictSignatureVerified": true
+    },
+    "demo": {
+      "app": "/Users/andrewgray/repo/projects/fomawrite_mac/dist/Fomawrite.app",
+      "build": "127",
+      "bundleIdentifier": "io.github.andrewjngray.fomawrite",
+      "executableSha256": "2d54323a313e8210fb3b4d004558268ded773097fbe74a58a31d063e6ff9fee4",
+      "strictSignatureVerified": true,
+      "verificationMethod": "Packaged executable matches the native-checked installed copy; no independent native run."
+    }
+  }
+}

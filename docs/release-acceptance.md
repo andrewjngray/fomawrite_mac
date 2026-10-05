@@ -1,6 +1,10 @@
 # Acceptance ledger — current follow-through and Cycle 59 history
 
-## Current review build — Cycle 126
+## Current review build — Cycle 127
+
+Review build **0.3.0-dev23 / macOS 0.3.0 (127)** addresses publishing-preview blanks and flashing. Unavailable images produce visible placeholders and warnings; successful unchanged output reuses its URL, stale PDF requests cancel and painted content remains during replacement loads. Source Markdown, saved files and Undo remain canonical; export and print require all images to be valid. 197 regressions pass; Dev and the installed copy each pass 159 native checks with zero unexpected QML warnings. Deliberate missing-image diagnostics are recorded separately. All three build127 copies have verified identities and strict signatures. Andrew's reported physical workflow is **not yet accepted as resolved**. [Evidence and remaining checks](../research/cycle-127/README.md), [optional review](../research/usability/cycle-127.md).
+
+## Previous review build — Cycle 126
 
 **0.3.0-dev22 / macOS 0.3.0 (126)** adds a direct Typora theme-gallery link. 195 regressions pass; Dev and the installed app each pass 157 native checks with zero QML warnings. [Verification and limits](../research/cycle-126/README.md). Existing theme and native acceptance limits remain unchanged.
 

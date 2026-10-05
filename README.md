@@ -48,6 +48,8 @@ Semantic publishing uses [MD4C 0.5.3](src/vendor/md4c/LICENSE.md), copyright Mar
 
 ## Current workspace review build
 
+Cycle **127**, **0.3.0-dev23 / macOS 0.3.0 (127)**, keeps publishing previews readable around unavailable images, reuses unchanged output and retains painted content while replacement pages load. **197 regressions pass; Dev and the installed copy each pass 159 native checks.** All three local bundles are refreshed. [Verification and remaining physical review](research/cycle-127/README.md).
+
 Cycle **126**, **0.3.0-dev22 / macOS 0.3.0 (126)**, adds **Get More Themes…** in the publishing menus and export dialog, opening [Typora’s theme gallery](https://theme.typora.io/). [Build verification](research/cycle-126/README.md).
 
 Cycle **125**, **0.3.0-dev21 / macOS 0.3.0 (125)**, repairs folder-based publishing themes. Copy top-level CSS files and their resource folders into **Open Themes Folder**; the menu and selected preview refresh automatically. Import Theme uses that same folder. Only the accepted selection stays checked; failures and font fallbacks are explained. CSS themes are separate from basic font/page settings, and long menus scroll above the footer. **195 regressions and 157 native checks per app copy pass**; installed-copy identities are recorded in the [Cycle125 handoff](research/cycle-125/README.md).
