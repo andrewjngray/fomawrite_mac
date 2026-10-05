@@ -1020,6 +1020,7 @@ ApplicationWindow {
         CompactMenuItem { objectName: "previewTemplateCustomEdit"; text: "Edit Basic Settings…"; onTriggered: win.openExportHub("pdf") }
         CompactMenuItem { objectName: "previewTemplateCustomLoad"; text: "Load Custom Settings…"; onTriggered: outputStyleDialog.open() }
         MenuSeparator {}
+        CompactMenuItem { objectName: "previewGetMoreThemes"; text: "Get More Themes…"; onTriggered: Qt.openUrlExternally("https://theme.typora.io/") }
         CompactMenuItem { objectName: "previewThemeImport"; text: "Import Theme…"; onTriggered: publishingThemeDialog.open() }
         CompactMenuItem { objectName: "previewThemesFolder"; text: "Open Themes Folder"; onTriggered: win.openPublishingThemesFolder() }
         CompactMenuItem { objectName: "previewThemesReload"; text: "Reload Themes"; onTriggered: win.reloadPublishingThemes() }
@@ -1918,6 +1919,7 @@ ApplicationWindow {
                 Platform.MenuItem { objectName: "nativeTemplateCustomEdit"; text: "Edit Basic Settings…"; onTriggered: win.openExportHub("pdf") }
                 Platform.MenuItem { objectName: "nativeTemplateCustomLoad"; text: "Load Custom Settings…"; onTriggered: outputStyleDialog.open() }
                 Platform.MenuSeparator {}
+                Platform.MenuItem { objectName: "nativeGetMoreThemes"; text: "Get More Themes…"; onTriggered: Qt.openUrlExternally("https://theme.typora.io/") }
                 Platform.MenuItem { objectName: "nativeThemeImport"; text: "Import Theme…"; onTriggered: publishingThemeDialog.open() }
                 Platform.MenuItem { objectName: "nativeThemesFolder"; text: "Open Themes Folder"; onTriggered: win.openPublishingThemesFolder() }
                 Platform.MenuItem { objectName: "nativeThemesReload"; text: "Reload Themes"; onTriggered: win.reloadPublishingThemes() }

@@ -224,6 +224,7 @@ Dialog {
                 }
                 Label { objectName: "exportThemeNotice"; visible: backend.publishingThemeError.length > 0; text: backend.publishingThemeError; Layout.fillWidth: true; wrapMode: Text.Wrap; color: hub.darkMode ? "#fca5a5" : "#b42318"; font.pixelSize: 12; Accessible.name: text }
                 Label { Layout.fillWidth: true; text: "CSS themes come from your Themes folder. Basic styles use the font and page settings in the next column."; wrapMode: Text.Wrap; color: backend.palette.muted; font.pixelSize: 11 }
+                SecondaryAction { objectName: "exportGetMoreThemesButton"; Layout.fillWidth: true; text: "Get More Themes…"; onClicked: Qt.openUrlExternally("https://theme.typora.io/"); Accessible.name: "Browse the Typora theme gallery" }
                 SecondaryAction { objectName: "exportImportThemeButton"; Layout.fillWidth: true; text: "Import Theme…"; onClicked: themePicker.open(); Accessible.name: "Import publishing CSS theme" }
                 ColumnLayout {
                     visible: true

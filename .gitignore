@@ -89,3 +89,8 @@ Makefile
 /research/cycle-125/*
 !/research/cycle-125/README.md
 !/research/cycle-125/verified-builds.json
+
+# Cycle126 local theme-gallery verification.
+/research/cycle-126/*
+!/research/cycle-126/README.md
+!/research/cycle-126/verified-builds.json
