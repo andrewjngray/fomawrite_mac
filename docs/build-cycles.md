@@ -1574,3 +1574,7 @@ User feedback exposed stale theme menus, multiple checkmarks after failed select
 Review build **0.3.0-dev21 / macOS 0.3.0 (125)**. All **195 regressions pass, 0 failed, 0 skipped**. A read-only probe loads all 13 existing top-level user themes without failures. Native checks include repeated valid/repeated/rejected choices, CSS application, live file edits, reload, basic settings and dialog callbacks; **157 checks pass per app copy**, with matching UI/version and strict signatures, as recorded in the [handoff](../research/cycle-125/README.md). Private themes and writing remain outside Git. [Optional user exercise](../research/usability/cycle-125.md).
 
 Compatibility remains bounded: top-level CSS plus resource folders, supported local fonts/images, no remote downloads or arbitrary Typora UI compatibility. Physical input, VoiceOver and printer output remain separate acceptance work.
+
+## Cycle 126 — Get More Themes
+
+Added **Get More Themes…** to the publishing footer menu, View → Publishing Theme and Export and share. It opens Andrew's exact requested address, https://theme.typora.io/, in the default browser. Downloaded CSS/resources still use the existing themes folder or Import Theme action. Build **0.3.0-dev22 / macOS 0.3.0 (126)**. Existing build, regression and native menu checks are recorded in the [handoff](../research/cycle-126/README.md); no new tests were added for this small link. [Optional browser exercise](../research/usability/cycle-126.md). No change to theme compatibility or outstanding physical/accessibility acceptance.

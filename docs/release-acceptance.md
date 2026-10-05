@@ -1,6 +1,10 @@
 # Acceptance ledger — current follow-through and Cycle 59 history
 
-## Current review build — Cycle 125
+## Current review build — Cycle 126
+
+**0.3.0-dev22 / macOS 0.3.0 (126)** adds a direct Typora theme-gallery link. 195 regressions pass; Dev and the installed app each pass 157 native checks with zero QML warnings. [Verification and limits](../research/cycle-126/README.md). Existing theme and native acceptance limits remain unchanged.
+
+## Previous review build — Cycle 125
 
 **0.3.0-dev21 / macOS 0.3.0 (125)** repairs folder theme discovery, local resource resolution, automatic preview refresh, authoritative selection and theme-management menu actions. **195 regressions pass, 0 failed, 0 skipped**; **157 native checks per app copy pass**, with matching UI/version and strict signatures. Build identities are recorded in the [Cycle125 handoff](../research/cycle-125/README.md). All 13 existing top-level themes load in a read-only probe. Full Typora compatibility, physical printing and accessibility acceptance remain open.
 
