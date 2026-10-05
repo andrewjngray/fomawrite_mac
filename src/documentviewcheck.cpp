@@ -32,6 +32,7 @@
 #include <QTextLayout>
 #include <QQuickStyle>
 #include <QQuickWindow>
+#include <QPdfDocument>
 #include <QSaveFile>
 #include <QSettings>
 #include <QStandardPaths>
@@ -246,6 +247,7 @@ int runDocumentViewCheck(QApplication &app, const QString &outputDirectory) {
     QJsonArray editorAcceptanceChecks;
     QJsonArray paneChromeChecks;
     QJsonArray editingLayoutChecks;
+    QJsonArray publishingThemeChecks;
     QJsonArray paneZoomReadings;
     QJsonArray paneZoomDividerEvents;
     QJsonArray screenshots;
@@ -271,6 +273,7 @@ int runDocumentViewCheck(QApplication &app, const QString &outputDirectory) {
         report.insert("editorAcceptanceChecks", editorAcceptanceChecks);
         report.insert("paneChromeChecks", paneChromeChecks);
         report.insert("editingLayoutChecks", editingLayoutChecks);
+        report.insert("publishingThemeChecks", publishingThemeChecks);
         report.insert("paneZoomReadings", paneZoomReadings);
         report.insert("paneZoomDividerEvents", paneZoomDividerEvents);
         report.insert("screenshots", screenshots);
@@ -283,7 +286,7 @@ int runDocumentViewCheck(QApplication &app, const QString &outputDirectory) {
             return 2;
         }
         qInfo().noquote() << "Document view check:" << (failures.isEmpty() ? "PASS" : "FAIL")
-                          << scenarios.size() << "footer states," << dailyWritingChecks.size() << "daily-writing checks," << paneZoomChecks.size() << "pane-zoom checks," << editorAcceptanceChecks.size() << "editor acceptance checks; report:" << file.fileName();
+                          << scenarios.size() << "footer states," << dailyWritingChecks.size() << "daily-writing checks," << paneZoomChecks.size() << "pane-zoom checks," << editorAcceptanceChecks.size() << "editor acceptance checks," << publishingThemeChecks.size() << "publishing theme checks; report:" << file.fileName();
         for (const QString &failure : failures) qWarning().noquote() << failure;
         return failures.isEmpty() ? 0 : 1;
     };
@@ -1324,6 +1327,7 @@ int runDocumentViewCheck(QApplication &app, const QString &outputDirectory) {
         check(editor->property("text").toString() == sample && backend.documentRevision() == revision && !backend.modified(),
             "Publishing format selection changed canonical source or dirty state");
     });
+#include "publishingthemeacceptancecheck.inc"
     editingLayoutCheck("document-chrome-input-hover-and-always-visible-setting", [&] {
         settings->setProperty("autoHideChrome", true);
         auto *header = child("topChrome");

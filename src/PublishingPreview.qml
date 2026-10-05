@@ -26,6 +26,7 @@ Rectangle {
     property int layoutMode: 1
     property string renderedMarkdown: markdown
     property string pendingAnchor: ""
+    property double pendingRequest: -1
     property bool previewRefreshInFlight: false
     readonly property bool viewportRefreshPending: refreshTimer.running || previewRefreshInFlight || webViewportRequests > 0
     property string errorText: ""
@@ -143,7 +144,12 @@ Rectangle {
         ++refreshRevision;
         webRestorationKey = "";
         previewRefreshInFlight = true;
-        var result = renderer.publishingPreview(publishingMode === "pdf" ? "pdf" : "html");
+        var result = renderer.requestPublishingPreview(publishingMode === "pdf" ? "pdf" : "html", root);
+        pendingRequest = result.pending ? result.requestId : -1;
+        if (result.pending) return;
+        acceptOutput(result);
+    }
+    function acceptOutput(result) {
         errorText = result.ok ? "" : result.error;
         if (!result.ok) { previewRefreshInFlight = false; return; }
         pdfAnchors = result.anchors || ({});
@@ -159,7 +165,7 @@ Rectangle {
             });
         }
     }
-    function reload() { refreshTimer.restart(); }
+    function reload() { ++refreshRevision; pendingRequest = -1; refreshTimer.restart(); }
     onMarkdownChanged: reload()
     onDocumentBaseUrlChanged: reload()
     onPublishingModeChanged: { webAnchor = null; reload(); }
@@ -172,12 +178,24 @@ Rectangle {
         function onOutputStyleChanged() { root.reload(); }
         function onOutputPageLayoutChanged() { root.reload(); }
         function onOutputCssChanged() { root.reload(); }
+        function onPublishingThemesChanged() { root.reload(); }
+        function onPublishingPreviewReady(requestId, result) {
+            if (requestId !== root.pendingRequest || root.publishingMode !== "pdf") return;
+            root.pendingRequest = -1;
+            root.acceptOutput(result);
+        }
     }
     PdfDocument {
         id: pdf
-        onStatusChanged: {
+        onStatusChanged: function(status) {
             if (root.publishingMode !== "pdf" || String(source) !== String(root.outputUrl)) return;
-            if (status === PdfDocument.Ready) { root.pdfPagesReady = true; Qt.callLater(root.finishRefresh); }
+            if (status === PdfDocument.Ready) {
+                root.pdfPagesReady = true;
+                var revision = root.refreshRevision, loadedUrl = String(source);
+                Qt.callLater(function() {
+                    if (revision === root.refreshRevision && loadedUrl === String(root.outputUrl)) root.finishRefresh();
+                });
+            }
             else if (status === PdfDocument.Error) { root.errorText = "Could not read the publishing PDF."; root.previewRefreshInFlight = false; }
         }
     }
@@ -220,7 +238,11 @@ Rectangle {
                     width: points.width * pageScale
                     height: points.height * pageScale
                     color: "white"
-                    PdfPageImage {
+                    Loader {
+                        anchors.fill: parent
+                        active: root.visible && paper.y + paper.height >= previewScroll.contentY - previewScroll.height
+                            && paper.y <= previewScroll.contentY + 2 * previewScroll.height
+                        sourceComponent: PdfPageImage {
                         id: pageImage
                         anchors.fill: parent
                         document: pdf
@@ -229,9 +251,11 @@ Rectangle {
                         sourceSize.height: Math.ceil(height * Screen.devicePixelRatio)
                         asynchronous: true
                         Accessible.name: "Publishing PDF page " + (paper.index + 1)
+                        }
                     }
                     Repeater {
-                        model: PdfLinkModel { document: pdf; page: paper.index }
+                        model: PdfLinkModel { document: root.visible && paper.y + paper.height >= previewScroll.contentY - previewScroll.height
+                            && paper.y <= previewScroll.contentY + 2 * previewScroll.height ? pdf : null; page: paper.index }
                         delegate: MouseArea {
                             required property rect rectangle
                             required property url url
@@ -270,6 +294,11 @@ Rectangle {
         settings.localContentCanAccessRemoteUrls: false
         settings.pluginsEnabled: false
         onNavigationRequested: function(request) {
+            if (request.navigationType !== WebEngineView.LinkClickedNavigation
+                    && String(request.url).split("#")[0] !== String(root.webOutputUrl).split("#")[0]) {
+                request.action = WebEngineView.IgnoreRequest;
+                return;
+            }
             if (request.navigationType === WebEngineView.LinkClickedNavigation) {
                 request.action = WebEngineView.IgnoreRequest;
                 root.viewportInteraction();

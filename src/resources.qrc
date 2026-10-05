@@ -1,5 +1,6 @@
 <RCC>
     <qresource prefix="/">
+        <file>themes/claude-like.css</file>
         <file>LibraryPane.qml</file>
         <file>LibraryContextMenu.qml</file>
         <file>WorkspaceCommands.qml</file>

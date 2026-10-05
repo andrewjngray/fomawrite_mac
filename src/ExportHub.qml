@@ -28,14 +28,25 @@ Dialog {
     }
     FileDialog {
         id: cssPicker
-        title: "Choose a local CSS file for HTML output"
+        title: "Choose additional local publishing CSS"
         nameFilters: ["CSS files (*.css)"]
         fileMode: FileDialog.OpenFile
         onAccepted: {
             if (hub.backend.loadOutputCss(selectedFile))
-                hub.cssFeedback = "CSS applied to HTML export only."
+                hub.cssFeedback = "CSS applied to Web and PDF publishing output."
             else
                 hub.cssFeedback = hub.backend.status
+        }
+    }
+    FileDialog {
+        id: themePicker
+        objectName: "exportThemePicker"
+        title: "Import Publishing Theme"
+        nameFilters: ["CSS themes (*.css)"]
+        fileMode: FileDialog.OpenFile
+        onAccepted: {
+            hub.backend.importPublishingTheme(selectedFile)
+            hub.cssFeedback = hub.backend.status
         }
     }
     component SecondaryAction: Button {
@@ -179,17 +190,41 @@ Dialog {
                     textRole: "label"; valueRole: "value"; currentIndex: hub.selectedFormat === "html" ? 1 : 0
                     onActivated: hub.selectedFormat = currentValue; Accessible.name: "Export format"
                 }
-                Label { text: "Selected style"; color: backend.palette.text; font.pixelSize: 14; font.weight: Font.DemiBold }
-                Label { Layout.fillWidth: true; text: backend.outputTemplateName + " · " + backend.outputFont + " · " + backend.outputPointSize + " pt"; wrapMode: Text.Wrap; color: backend.palette.muted; font.pixelSize: 13; Accessible.name: "Current output style: " + text }
+                Label { text: "Publishing theme"; color: backend.palette.text; font.pixelSize: 14; font.weight: Font.DemiBold }
+                Label { Layout.fillWidth: true; text: backend.publishingThemeName + (backend.publishingThemeId.length === 0 ? " · " + backend.outputFont + " · " + backend.outputPointSize + " pt" : ""); wrapMode: Text.Wrap; color: backend.palette.muted; font.pixelSize: 13; Accessible.name: "Current output style: " + text }
+                ComboBox {
+                    id: publishingThemeChoice
+                    objectName: "exportPublishingThemeChoice"
+                    Layout.fillWidth: true
+                    model: {
+                        var choices = [{ id: "", name: "Basic: " + backend.outputTemplateName }]
+                        var themes = backend.publishingThemes
+                        for (var i = 0; i < themes.length; ++i)
+                            choices.push({ id: themes[i].id, name: themes[i].id === "claude-like" ? "Claude Like" : themes[i].name })
+                        return choices
+                    }
+                    textRole: "name"; valueRole: "id"
+                    currentIndex: {
+                        for (var i = 0; i < model.length; ++i)
+                            if (model[i].id === backend.publishingThemeId) return i
+                        return 0
+                    }
+                    onActivated: {
+                        if (currentValue.length === 0) backend.setOutputStyle(backend.outputStyle)
+                        else backend.selectPublishingTheme(currentValue)
+                    }
+                    Accessible.name: "Publishing theme for Web and PDF"
+                }
+                SecondaryAction { objectName: "exportImportThemeButton"; Layout.fillWidth: true; text: "Import Theme…"; onClicked: themePicker.open(); Accessible.name: "Import publishing CSS theme" }
                 ColumnLayout {
-                    visible: hub.selectedFormat === "html"
+                    visible: true
                     Layout.fillWidth: true; spacing: 4
-                    Label { text: "Custom HTML CSS: " + hub.cssName; Layout.fillWidth: true; elide: Text.ElideMiddle; color: backend.palette.muted; font.pixelSize: 11; Accessible.name: text }
+                    Label { text: "Additional publishing CSS: " + hub.cssName; Layout.fillWidth: true; elide: Text.ElideMiddle; color: backend.palette.muted; font.pixelSize: 11; Accessible.name: text }
                     RowLayout {
                         Layout.fillWidth: true
-                        SecondaryAction { text: "Choose CSS…"; onClicked: cssPicker.open(); Accessible.name: "Choose local CSS for HTML export" }
+                        SecondaryAction { text: "Choose CSS…"; onClicked: cssPicker.open(); Accessible.name: "Choose additional local publishing CSS" }
                         SecondaryAction { text: "Clear"; enabled: hub.cssName !== "None"; onClicked: { backend.clearOutputCss(); hub.cssFeedback = "" }
-                            Accessible.name: "Clear HTML CSS" }
+                            Accessible.name: "Clear additional publishing CSS" }
                     }
                     Label { visible: hub.cssFeedback.length > 0; text: hub.cssFeedback; Layout.fillWidth: true; wrapMode: Text.Wrap; color: backend.palette.muted; font.pixelSize: 11 }
                 }
@@ -260,13 +295,13 @@ Dialog {
                             }
                         }
                         Rectangle { visible: hub.previewLayoutMode === 1; Layout.fillHeight: true; Layout.preferredWidth: 1; color: backend.palette.border }
-                        PreviewPane { objectName: "exportHubPreviewPane"; visualEditorObjectName: "exportHubVisualEditor"; allowVisualEdit: false; showFooter: false; Layout.fillWidth: true; Layout.fillHeight: true; renderer: hub.renderer; markdown: hub.markdown; documentBaseUrl: hub.documentBaseUrl; darkMode: hub.darkMode; typeface: backend.outputFont; textSize: backend.outputPointSize; layoutMode: hub.previewLayoutMode; onLayoutRequested: function(mode) { hub.previewLayoutMode = mode }; onLinkRequested: function(link) {} }
+                        PublishingPreview { objectName: "exportHubPreviewPane"; visualEditorObjectName: "exportHubVisualEditor"; allowVisualEdit: false; publishingMode: hub.selectedFormat === "pdf" ? "pdf" : "web"; showFooter: false; Layout.fillWidth: true; Layout.fillHeight: true; renderer: hub.renderer; markdown: hub.markdown; documentBaseUrl: hub.documentBaseUrl; darkMode: hub.darkMode; typeface: backend.outputFont; textSize: backend.outputPointSize; layoutMode: hub.previewLayoutMode; onLayoutRequested: function(mode) { hub.previewLayoutMode = mode }; onLinkRequested: function(link) {} }
                     }
                 }
                 RowLayout {
                     Layout.fillWidth: true; spacing: 8
-                    Label { Layout.fillWidth: true; text: backend.outputTemplateName + " · Continuous preview"; elide: Text.ElideRight; color: backend.palette.muted; font.pixelSize: 12 }
-                    SecondaryAction { objectName: "exportPaginatedPreviewButton"; text: "Paginated preview…"; onClicked: backend.printPreview(); Accessible.name: "Open paginated print preview"; ToolTip.text: "Shows exact PDF page breaks before saving"; ToolTip.visible: hovered }
+                    Label { Layout.fillWidth: true; text: backend.publishingThemeName + (hub.selectedFormat === "pdf" ? " · PDF pages" : " · Web preview"); elide: Text.ElideRight; color: backend.palette.muted; font.pixelSize: 12 }
+                    SecondaryAction { objectName: "exportPaginatedPreviewButton"; text: "PDF pages"; selected: hub.selectedFormat === "pdf"; onClicked: hub.selectedFormat = "pdf"; Accessible.name: "Show exported PDF pages"; ToolTip.text: "Shows exact PDF page breaks before saving"; ToolTip.visible: hovered }
                 }
                 }
             }

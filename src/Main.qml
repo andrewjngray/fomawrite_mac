@@ -891,9 +891,9 @@ ApplicationWindow {
         CompactMenuItem { text: "Smaller text"; enabled: paneZoom.activeZoom > paneZoom.minimumZoom; onTriggered: workspaceCommands.run("smaller") }
         CompactMenuItem { text: "Reset text size"; onTriggered: workspaceCommands.run("resetSize") }
         MenuSeparator {}
-        CompactMenuItem { text: "Template: Modern"; checkable: true; checked: backend.outputStyle === 0; onTriggered: workspaceCommands.run("sans") }
-        CompactMenuItem { text: "Template: Classic"; checkable: true; checked: backend.outputStyle === 1; onTriggered: workspaceCommands.run("serif") }
-        CompactMenuItem { text: "Template: Manuscript"; checkable: true; checked: backend.outputStyle === 2; onTriggered: workspaceCommands.run("mono") }
+        CompactMenuItem { text: "Publishing theme: Modern"; checkable: true; checked: backend.publishingThemeId.length === 0 && backend.outputStyle === 0; onTriggered: workspaceCommands.run("sans") }
+        CompactMenuItem { text: "Publishing theme: Classic"; checkable: true; checked: backend.publishingThemeId.length === 0 && backend.outputStyle === 1; onTriggered: workspaceCommands.run("serif") }
+        CompactMenuItem { text: "Publishing theme: Manuscript"; checkable: true; checked: backend.publishingThemeId.length === 0 && backend.outputStyle === 2; onTriggered: workspaceCommands.run("mono") }
     }
 
     CompactMenu {
@@ -912,18 +912,36 @@ ApplicationWindow {
     CompactMenu {
         id: previewTemplateMenu
         objectName: "previewTemplateMenu"
-        width: 246
-        CompactMenuItem { objectName: "previewTemplate0"; text: "Modern (Sans)"; checkable: true; autoExclusive: true; checked: backend.outputStyle === 0; onTriggered: backend.setOutputStyle(0) }
-        CompactMenuItem { objectName: "previewTemplate1"; text: "Classic (Serif)"; checkable: true; autoExclusive: true; checked: backend.outputStyle === 1; onTriggered: backend.setOutputStyle(1) }
-        CompactMenuItem { objectName: "previewTemplate2"; text: "Manuscript (Mono)"; checkable: true; autoExclusive: true; checked: backend.outputStyle === 2; onTriggered: backend.setOutputStyle(2) }
+        width: 270
+        Instantiator {
+            model: backend.publishingThemes
+            delegate: CompactMenuItem {
+                required property var modelData
+                objectName: "previewPublishingTheme_" + modelData.id
+                text: modelData.id === "claude-like" ? "Claude Like" : modelData.name
+                checkable: true
+                checked: backend.publishingThemeId === modelData.id
+                onTriggered: backend.selectPublishingTheme(modelData.id)
+            }
+            onObjectAdded: function(index, object) { previewTemplateMenu.insertItem(index, object); }
+            onObjectRemoved: function(index, object) { previewTemplateMenu.removeItem(object); }
+        }
         MenuSeparator {}
-        CompactMenuItem { objectName: "previewTemplate4"; text: "GitHub"; checkable: true; autoExclusive: true; checked: backend.outputStyle === 4; onTriggered: backend.setOutputStyle(4) }
-        CompactMenuItem { objectName: "previewTemplate5"; text: "Helvetica"; checkable: true; autoExclusive: true; checked: backend.outputStyle === 5; onTriggered: backend.setOutputStyle(5) }
-        CompactMenuItem { objectName: "previewTemplate6"; text: "Palatino"; checkable: true; autoExclusive: true; checked: backend.outputStyle === 6; onTriggered: backend.setOutputStyle(6) }
-        CompactMenuItem { objectName: "previewTemplate7"; text: "MLA Draft"; checkable: true; autoExclusive: true; checked: backend.outputStyle === 7; onTriggered: backend.setOutputStyle(7) }
+        CompactMenuItem { objectName: "previewTemplate0"; text: "Modern (Sans)"; checkable: true; autoExclusive: true; checked: backend.publishingThemeId.length === 0 && backend.outputStyle === 0; onTriggered: backend.setOutputStyle(0) }
+        CompactMenuItem { objectName: "previewTemplate1"; text: "Classic (Serif)"; checkable: true; autoExclusive: true; checked: backend.publishingThemeId.length === 0 && backend.outputStyle === 1; onTriggered: backend.setOutputStyle(1) }
+        CompactMenuItem { objectName: "previewTemplate2"; text: "Manuscript (Mono)"; checkable: true; autoExclusive: true; checked: backend.publishingThemeId.length === 0 && backend.outputStyle === 2; onTriggered: backend.setOutputStyle(2) }
         MenuSeparator {}
-        CompactMenuItem { objectName: "previewTemplate3"; text: "Custom"; checkable: true; autoExclusive: true; checked: backend.outputStyle === 3; onTriggered: backend.setOutputStyle(3) }
-        CompactMenuItem { objectName: "previewTemplateCustomLoad"; text: "Load Custom Template…"; onTriggered: outputStyleDialog.open() }
+        CompactMenuItem { objectName: "previewTemplate4"; text: "GitHub"; checkable: true; autoExclusive: true; checked: backend.publishingThemeId.length === 0 && backend.outputStyle === 4; onTriggered: backend.setOutputStyle(4) }
+        CompactMenuItem { objectName: "previewTemplate5"; text: "Helvetica"; checkable: true; autoExclusive: true; checked: backend.publishingThemeId.length === 0 && backend.outputStyle === 5; onTriggered: backend.setOutputStyle(5) }
+        CompactMenuItem { objectName: "previewTemplate6"; text: "Palatino"; checkable: true; autoExclusive: true; checked: backend.publishingThemeId.length === 0 && backend.outputStyle === 6; onTriggered: backend.setOutputStyle(6) }
+        CompactMenuItem { objectName: "previewTemplate7"; text: "MLA Draft"; checkable: true; autoExclusive: true; checked: backend.publishingThemeId.length === 0 && backend.outputStyle === 7; onTriggered: backend.setOutputStyle(7) }
+        MenuSeparator {}
+        CompactMenuItem { objectName: "previewTemplate3"; text: "Custom"; checkable: true; autoExclusive: true; checked: backend.publishingThemeId.length === 0 && backend.outputStyle === 3; onTriggered: backend.setOutputStyle(3) }
+        CompactMenuItem { objectName: "previewTemplateCustomLoad"; text: "Load Basic Theme Settings…"; onTriggered: outputStyleDialog.open() }
+        MenuSeparator {}
+        CompactMenuItem { objectName: "previewThemeImport"; text: "Import Theme…"; onTriggered: publishingThemeDialog.open() }
+        CompactMenuItem { objectName: "previewThemesFolder"; text: "Open Themes Folder"; onTriggered: backend.openPublishingThemesFolder() }
+        CompactMenuItem { objectName: "previewThemesReload"; text: "Reload Themes"; onTriggered: backend.reloadPublishingThemes() }
     }
     CompactMenu {
         id: workspaceMenu
@@ -1788,19 +1806,37 @@ ApplicationWindow {
             Platform.Menu {
                 id: nativeTemplateMenu
                 objectName: "nativeTemplateMenu"
-                title: "Template"
+                title: "Publishing Theme"
                 Binding { target: nativeTemplateMenu.menuItem; property: "objectName"; value: "nativeTemplateEntry" }
-                Platform.MenuItem { text: "Modern (Sans)"; objectName: "nativeTemplate0"; checkable: true; checked: backend.outputStyle === 0; onTriggered: backend.setOutputStyle(0) }
-                Platform.MenuItem { text: "Classic (Serif)"; objectName: "nativeTemplate1"; checkable: true; checked: backend.outputStyle === 1; onTriggered: backend.setOutputStyle(1) }
-                Platform.MenuItem { text: "Manuscript (Mono)"; objectName: "nativeTemplate2"; checkable: true; checked: backend.outputStyle === 2; onTriggered: backend.setOutputStyle(2) }
+                Instantiator {
+                    model: backend.publishingThemes
+                    delegate: Platform.MenuItem {
+                        required property var modelData
+                        objectName: "nativePublishingTheme_" + modelData.id
+                        text: modelData.id === "claude-like" ? "Claude Like" : modelData.name
+                        checkable: true
+                        checked: backend.publishingThemeId === modelData.id
+                        onTriggered: backend.selectPublishingTheme(modelData.id)
+                    }
+                    onObjectAdded: function(index, object) { nativeTemplateMenu.insertItem(index, object); }
+                    onObjectRemoved: function(index, object) { nativeTemplateMenu.removeItem(object); }
+                }
                 Platform.MenuSeparator {}
-                Platform.MenuItem { text: "GitHub"; objectName: "nativeTemplate4"; checkable: true; checked: backend.outputStyle === 4; onTriggered: backend.setOutputStyle(4) }
-                Platform.MenuItem { text: "Helvetica"; objectName: "nativeTemplate5"; checkable: true; checked: backend.outputStyle === 5; onTriggered: backend.setOutputStyle(5) }
-                Platform.MenuItem { text: "Palatino"; objectName: "nativeTemplate6"; checkable: true; checked: backend.outputStyle === 6; onTriggered: backend.setOutputStyle(6) }
-                Platform.MenuItem { text: "MLA Draft"; objectName: "nativeTemplate7"; checkable: true; checked: backend.outputStyle === 7; onTriggered: backend.setOutputStyle(7) }
+                Platform.MenuItem { text: "Modern (Sans)"; objectName: "nativeTemplate0"; checkable: true; checked: backend.publishingThemeId.length === 0 && backend.outputStyle === 0; onTriggered: backend.setOutputStyle(0) }
+                Platform.MenuItem { text: "Classic (Serif)"; objectName: "nativeTemplate1"; checkable: true; checked: backend.publishingThemeId.length === 0 && backend.outputStyle === 1; onTriggered: backend.setOutputStyle(1) }
+                Platform.MenuItem { text: "Manuscript (Mono)"; objectName: "nativeTemplate2"; checkable: true; checked: backend.publishingThemeId.length === 0 && backend.outputStyle === 2; onTriggered: backend.setOutputStyle(2) }
                 Platform.MenuSeparator {}
-                Platform.MenuItem { text: "Custom"; objectName: "nativeTemplate3"; checkable: true; checked: backend.outputStyle === 3; onTriggered: backend.setOutputStyle(3) }
-                Platform.MenuItem { text: "Load Custom Template…"; onTriggered: outputStyleDialog.open() }
+                Platform.MenuItem { text: "GitHub"; objectName: "nativeTemplate4"; checkable: true; checked: backend.publishingThemeId.length === 0 && backend.outputStyle === 4; onTriggered: backend.setOutputStyle(4) }
+                Platform.MenuItem { text: "Helvetica"; objectName: "nativeTemplate5"; checkable: true; checked: backend.publishingThemeId.length === 0 && backend.outputStyle === 5; onTriggered: backend.setOutputStyle(5) }
+                Platform.MenuItem { text: "Palatino"; objectName: "nativeTemplate6"; checkable: true; checked: backend.publishingThemeId.length === 0 && backend.outputStyle === 6; onTriggered: backend.setOutputStyle(6) }
+                Platform.MenuItem { text: "MLA Draft"; objectName: "nativeTemplate7"; checkable: true; checked: backend.publishingThemeId.length === 0 && backend.outputStyle === 7; onTriggered: backend.setOutputStyle(7) }
+                Platform.MenuSeparator {}
+                Platform.MenuItem { text: "Custom"; objectName: "nativeTemplate3"; checkable: true; checked: backend.publishingThemeId.length === 0 && backend.outputStyle === 3; onTriggered: backend.setOutputStyle(3) }
+                Platform.MenuItem { text: "Load Basic Theme Settings…"; onTriggered: outputStyleDialog.open() }
+                Platform.MenuSeparator {}
+                Platform.MenuItem { objectName: "nativeThemeImport"; text: "Import Theme…"; onTriggered: publishingThemeDialog.open() }
+                Platform.MenuItem { objectName: "nativeThemesFolder"; text: "Open Themes Folder"; onTriggered: backend.openPublishingThemesFolder() }
+                Platform.MenuItem { objectName: "nativeThemesReload"; text: "Reload Themes"; onTriggered: backend.reloadPublishingThemes() }
             }
             Platform.MenuSeparator { objectName: "nativeAfterTemplate" }
             Platform.Menu {
@@ -2397,9 +2433,17 @@ ApplicationWindow {
         }
     }
     Dialogs.FileDialog {
+        id: publishingThemeDialog
+        objectName: "publishingThemeDialog"
+        title: "Import Publishing Theme"
+        fileMode: Dialogs.FileDialog.OpenFile
+        nameFilters: ["CSS themes (*.css)"]
+        onAccepted: backend.importPublishingTheme(selectedFile)
+    }
+    Dialogs.FileDialog {
         id: outputStyleDialog
         objectName: "outputStyleDialog"
-        title: "Load Custom Template"
+        title: "Load Basic Theme Settings"
         nameFilters: ["Custom template (*.json)"]
         onAccepted: backend.loadOutputStyle(selectedFile)
     }
@@ -3523,7 +3567,7 @@ ApplicationWindow {
         sourcePaneWidth: editorPane.visible ? editorPane.width : 0
         previewPaneStart: previewPane.visible ? previewPane.x - x : width
         writingAppearance: win.codeAppearance ? "Code" : win.activeWritingAppearance === "editorial" ? "Editorial" : win.activeWritingAppearance === "book" ? "Book" : "Manuscript"
-        previewTemplate: backend.outputTemplateName
+        previewTemplate: backend.publishingThemeName
         statusText: backend.status
         showStatus: !workspaceLayout.effectiveOrganizerVisible
         showStatistics: workspaceSettings.toolbarMode === 1

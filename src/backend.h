@@ -22,6 +22,7 @@ class QPagedPaintDevice;
 class QLockFile;
 class QTemporaryDir;
 class QIODevice;
+class PublishingPdf;
 
 class Backend : public QObject {
     Q_OBJECT
@@ -30,6 +31,9 @@ class Backend : public QObject {
     Q_PROPERTY(QString outputFont READ outputFont NOTIFY outputStyleChanged)
     Q_PROPERTY(int outputPointSize READ outputPointSize NOTIFY outputStyleChanged)
     Q_PROPERTY(QString outputTemplateName READ outputTemplateName NOTIFY outputStyleChanged)
+    Q_PROPERTY(QString publishingThemeId READ publishingThemeId NOTIFY publishingThemesChanged)
+    Q_PROPERTY(QString publishingThemeName READ publishingThemeName NOTIFY publishingThemesChanged)
+    Q_PROPERTY(QVariantList publishingThemes READ publishingThemes NOTIFY publishingThemesChanged)
     Q_PROPERTY(QObject *library READ library CONSTANT)
     Q_PROPERTY(QUrl documentBaseUrl READ documentBaseUrl NOTIFY fileUrlChanged)
     Q_PROPERTY(QUrl fileUrl READ fileUrl NOTIFY fileUrlChanged)
@@ -147,6 +151,14 @@ public:
     Q_INVOKABLE bool exportDocument(const QUrl &destination, const QString &format);
     // Private temporary publishing output; never saves or changes the source.
     Q_INVOKABLE QVariantMap publishingPreview(const QString &format);
+    Q_INVOKABLE QVariantMap requestPublishingPreview(const QString &format, QObject *consumer);
+    QString publishingThemeId() const { return m_publishingThemeId; }
+    QString publishingThemeName() const;
+    QVariantList publishingThemes() const;
+    Q_INVOKABLE bool selectPublishingTheme(const QString &id);
+    Q_INVOKABLE bool importPublishingTheme(const QUrl &file);
+    Q_INVOKABLE void reloadPublishingThemes();
+    Q_INVOKABLE void openPublishingThemesFolder();
     int outputStyle() const { return m_outputStyle; }
     QString outputFont() const;
     int outputPointSize() const;
@@ -160,7 +172,7 @@ public:
     // Maps contain id, name, and font. Custom is deliberately excluded because
     // it is loaded from a user file rather than bundled with Fomawrite.
     Q_INVOKABLE QVariantList builtInOutputStyles() const;
-    // Optional user-selected CSS affects portable HTML exports only.
+    // Optional additional CSS applies to Web and PDF publishing output.
     Q_INVOKABLE QString outputCssName() const;
     Q_INVOKABLE bool loadOutputCss(const QUrl &file);
     Q_INVOKABLE void clearOutputCss();
@@ -242,6 +254,8 @@ signals:
     void outputStyleChanged();
     void outputPageLayoutChanged();
     void outputCssChanged();
+    void publishingThemesChanged();
+    void publishingPreviewReady(quint64 requestId, const QVariantMap &result);
     void themePresetChanged();
     void darkModeChanged();
     void textScaleChanged();
@@ -265,11 +279,19 @@ private:
     bool saveAuthorship(const QUrl &url);
     void loadAuthorship(const QUrl &url);
     QString outputHtml(QTextDocument &document, QString *error) const;
-    void writeOutputPdf(QIODevice &device, QTextDocument &document) const;
+    QByteArray publishingPdfBytes(const QString &html, QString *error) const;
+    QVariantMap storePublishingOutput(quint64 generation, const QString &format, const QByteArray &bytes, const QString &html = {});
+    QString publishingHtml(QString *error) const;
+    QString publishingPrintCss() const;
+    QString m_publishingThemeId;
+    QHash<QObject *, PublishingPdf *> m_publishingRenderers;
+    QHash<QObject *, quint64> m_publishingRequests;
+    QHash<QObject *, QString> m_publishingPinned;
     std::unique_ptr<QTemporaryDir> m_publishingDirectory;
     QStringList m_publishingFiles;
     quint64 m_publishingGeneration = 0;
     void paintOutput(QPagedPaintDevice &device, QTextDocument &document) const;
+    void paintPublishingOutput(QPagedPaintDevice &device);
     void applyTemplate(QTextDocument &document, bool preview) const;
     void prepareOutput(QTextDocument &document, bool plain = false) const;
     QPageLayout effectiveOutputPageLayout() const;

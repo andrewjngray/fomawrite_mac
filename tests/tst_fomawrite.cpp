@@ -42,6 +42,10 @@ class FomawriteTest : public QObject {
 
 private slots:
     void publishingWebCommandSelectsWebWithoutChangingEditor();
+    void publishingSemanticHtmlPreservesStructureAndEscapesContent();
+    void publishingThemeImportEmbedsLocalAssetsAndRejectsNetwork();
+    void publishingSharedThemePdfPreservesPaperBreaksDraftAndUndo();
+    void publishingAsyncPreviewKeepsLatestRequest();
     void manuscriptHeadingMarkersHangOutsideBodyColumn();
     void sourceCodeBackgroundAndAppearancePreserveSavedBytes();
     void codeIndentKeysAndQuotesKeepAtomicUndo();
@@ -1618,19 +1622,45 @@ private slots:
         QQmlComponent component(&engine, QUrl::fromLocalFile(QFINDTESTDATA("../src/Main.qml")));
         QScopedPointer<QObject> window(component.create()); QVERIFY2(window, qPrintable(component.errorString()));
         auto *editor = window->findChild<QObject *>("sourceEditor");
-        auto *preview = window->findChild<QObject *>("renderedPreview");
+        window->setProperty("width", 1440);
+        auto *layout = window->findChild<QObject *>("workspaceLayout"); QVERIFY(layout);
+        layout->setProperty("layoutMode", 1);
+        auto *pane = window->findChild<QObject *>("previewPane"); QVERIFY(pane);
+        pane->setProperty("publishingMode", "web");
+        auto *preview = pane->findChild<QObject *>("renderedPreview");
         QVERIFY(editor); QVERIFY(preview);
+        QQmlComponent probeComponent(&engine);
+        probeComponent.setData(R"QML(import QtQml
+QtObject {
+ id: probe
+ property var target
+ property string result: ""
+ function inspect() {
+  result = "";
+  target.runJavaScript("(function(){var s=getComputedStyle(document.body);var h=document.querySelector('#write h1');var p=document.querySelector('#write > p');return {title:h?h.textContent:'',font:s.fontFamily,leading:parseFloat(s.lineHeight)/parseFloat(s.fontSize),indent:p?parseFloat(getComputedStyle(p).textIndent):0,tables:document.querySelectorAll('#write table').length,code:document.querySelector('#write pre code')?document.querySelector('#write pre code').textContent:''};})()", 1, function(value){probe.result=JSON.stringify(value);});
+ }
+})QML", QUrl());
+        QScopedPointer<QObject> probe(probeComponent.create()); QVERIFY2(probe, qPrintable(probeComponent.errorString()));
+        probe->setProperty("target", QVariant::fromValue(preview));
         const QString source = "# Template specimen\n\nA paragraph with **bold**, *italic* and [a link](https://example.com).\n\n## Second heading\n\n> A quotation.\n\n- First item\n- Second item\n\n```cpp\nconst int answer = 42;\n```\n\n| Name | Value |\n| --- | --- |\n| Sample | 42 |\n";
         editor->setProperty("text", source);
         backend.saveAs(QUrl::fromLocalFile(dir.filePath("Source.md")));
-        auto *quick = qvariant_cast<QQuickTextDocument *>(preview->property("textDocument")); QVERIFY(quick);
         const QString evidence = qEnvironmentVariable("FOMAWRITE_TEMPLATE_EVIDENCE");
         if (!evidence.isEmpty()) QVERIFY(QDir().mkpath(evidence));
         for (int style : {0, 1, 2, 4, 5, 6, 7, 0}) {
             backend.setOutputStyle(style);
-            QTRY_COMPARE(preview->property("font").value<QFont>().family(), backend.outputFont());
-            QTRY_VERIFY(quick->textDocument()->toPlainText().contains("Template specimen"));
-            QTRY_COMPARE(quick->textDocument()->begin().blockFormat().lineHeight(), qreal(style == 2 || style == 7 ? 200 : style == 4 ? 150 : 135));
+            const auto previousUrl = pane->property("outputUrl").toUrl();
+            QVERIFY(QMetaObject::invokeMethod(pane, "reload"));
+            QTRY_VERIFY(pane->property("outputUrl").toUrl() != previousUrl);
+            QTRY_VERIFY(!pane->property("viewportRefreshPending").toBool());
+            QVERIFY(QMetaObject::invokeMethod(probe.data(), "inspect"));
+            QTRY_VERIFY(!probe->property("result").toString().isEmpty());
+            const auto dom = QJsonDocument::fromJson(probe->property("result").toString().toUtf8()).object().toVariantMap();
+            QCOMPARE(dom["title"].toString(), QString("Template specimen"));
+            QVERIFY(dom["font"].toString().contains(backend.outputFont()));
+            QVERIFY(qAbs(dom["leading"].toDouble() - (style == 2 || style == 7 ? 2.0 : 1.5)) < .01);
+            QCOMPARE(dom["tables"].toInt(), 1); QVERIFY(dom["code"].toString().contains("answer = 42"));
+            if (style == 7) QVERIFY(dom["indent"].toDouble() > 0);
             QCOMPARE(editor->property("text").toString(), source);
             QVERIFY(!backend.modified());
             const QString htmlPath = dir.filePath(QString::number(style) + ".html");
@@ -1640,7 +1670,7 @@ private slots:
             QVERIFY(bytes.contains(backend.outputFont().toUtf8()));
             QVERIFY(bytes.contains("<table"));
             QVERIFY(bytes.contains("answer"));
-            if (style == 7) QVERIFY(bytes.contains("text-indent:36px"));
+            if (style == 7) QVERIFY(bytes.contains("text-indent: 3em"));
             if (!evidence.isEmpty()) {
                 QFile::remove(evidence + "/template-" + QString::number(style) + ".html");
                 QVERIFY(QFile::copy(htmlPath, evidence + "/template-" + QString::number(style) + ".html"));
@@ -2004,7 +2034,7 @@ private slots:
         QQmlComponent component(&engine, QUrl::fromLocalFile(QFINDTESTDATA("../src/Main.qml")));
         QScopedPointer<QObject> window(component.create()); QVERIFY2(window, qPrintable(component.errorString()));
         auto *editor = window->findChild<QObject *>("sourceEditor");
-        auto *preview = window->findChild<QObject *>("renderedPreview");
+        auto *preview = window->findChild<QObject *>("visualEditorRenderedPreview");
         editor->setProperty("text", "# Same\n\ntext\n\n# Same\n");
         auto *document = qvariant_cast<QQuickTextDocument *>(preview->property("textDocument"));
         QTRY_VERIFY(backend.previewAnchorPosition(document, "same-1") > 0);
@@ -4174,7 +4204,7 @@ private slots:
         QScopedPointer<QObject> window(component.create());
         QVERIFY(window);
         auto *editor = window->findChild<QObject *>("sourceEditor");
-        auto *preview = window->findChild<QObject *>("renderedPreview");
+        auto *preview = window->findChild<QObject *>("visualEditorRenderedPreview");
         auto *settings = window->findChild<QObject *>("workspaceSettings");
         auto *layout = window->findChild<QObject *>("workspaceLayout");
         auto *scroll = window->findChild<QObject *>("editorScroll");
@@ -4570,7 +4600,7 @@ private slots:
         QScopedPointer<QObject> window(component.create());
         QVERIFY(window);
         auto *editor = window->findChild<QObject *>("sourceEditor");
-        auto *preview = window->findChild<QObject *>("renderedPreview");
+        auto *preview = window->findChild<QObject *>("visualEditorRenderedPreview");
         const QString markdown = "#title\n\n# title\n\n## Second\n\n```md\n# Literal\n**Stars**\n```\n";
         editor->setProperty("text", markdown);
         auto *quick = qvariant_cast<QQuickTextDocument *>(preview->property("textDocument"));
@@ -5476,6 +5506,7 @@ private:
 #include "cycle103-inline.inc"
 #include "cycle104-controls.inc"
 #include "cycle119-publishing.inc"
+#include "cycle124-publishing.inc"
 #include "cycle106-footer.inc"
 #include "cycle107-footer-transitions.inc"
 #include "cycle108-bundled-footer.inc"

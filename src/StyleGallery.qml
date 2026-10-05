@@ -121,13 +121,14 @@ ScrollView {
         objectName: "styleGalleryColumn"
         width: gallery.availableWidth
         spacing: 10
-        Label { text: "Built-in styles"; color: backend.palette.muted; font.pixelSize: 12; font.weight: Font.DemiBold; Accessible.role: Accessible.Heading }
+        Label { text: "Basic themes use the font and page settings below. Select a CSS publishing theme in the theme chooser."; Layout.fillWidth: true; Layout.preferredWidth: 0; wrapMode: Text.Wrap; color: backend.palette.muted; font.pixelSize: 11 }
+        Label { text: "Basic themes"; color: backend.palette.muted; font.pixelSize: 12; font.weight: Font.DemiBold; Accessible.role: Accessible.Heading }
         Repeater {
             model: gallery.builtIns
             delegate: Button {
                 required property var modelData
                 Layout.fillWidth: true; Layout.preferredHeight: 58; checkable: true
-                checked: backend.outputStyle === modelData.id
+                checked: backend.publishingThemeId.length === 0 && backend.outputStyle === modelData.id
                 onClicked: gallery.selectBuiltIn(modelData)
                 Accessible.name: modelData.name + ", " + modelData.font
                 background: Rectangle {
@@ -146,13 +147,13 @@ ScrollView {
             }
         }
         Rectangle { Layout.fillWidth: true; Layout.preferredHeight: 1; color: backend.palette.border; Layout.topMargin: 4; Layout.bottomMargin: 2 }
-        Label { text: "Your styles"; color: backend.palette.muted; font.pixelSize: 12; font.weight: Font.DemiBold; Accessible.role: Accessible.Heading }
+        Label { text: "Saved basic styles"; color: backend.palette.muted; font.pixelSize: 12; font.weight: Font.DemiBold; Accessible.role: Accessible.Heading }
         Repeater {
             model: gallery.userStyles
             delegate: Button {
                 required property var modelData
                 Layout.fillWidth: true; Layout.preferredHeight: 58; checkable: true
-                checked: backend.outputStyle === 3 && backend.selectedUserOutputStyleId() === modelData.id
+                checked: backend.publishingThemeId.length === 0 && backend.outputStyle === 3 && backend.selectedUserOutputStyleId() === modelData.id
                 onClicked: gallery.selectUser(modelData)
                 Accessible.name: modelData.name + ", user style, " + modelData.fontFamily
                 background: Rectangle {
@@ -175,7 +176,7 @@ ScrollView {
             Layout.fillWidth: true; spacing: 6
             TextField { id: copyName; Layout.fillWidth: true; placeholderText: "Name this copy"; maximumLength: 80; Accessible.name: "Name for style copy"; onAccepted: gallery.createCopy() }
             Button {
-                Layout.fillWidth: true; text: "Duplicate current"; flat: true
+                Layout.fillWidth: true; text: "Duplicate basic theme"; enabled: backend.publishingThemeId.length === 0; flat: true
                 background: Rectangle { radius: 6; color: parent.down || parent.hovered ? backend.palette.hover : backend.palette.field; border.color: backend.palette.border }
                 onClicked: gallery.createCopy(); Accessible.name: "Duplicate current style"
             }
@@ -183,7 +184,7 @@ ScrollView {
         ColumnLayout {
             visible: gallery.editingId.length > 0; Layout.fillWidth: true; spacing: 7
             Rectangle { Layout.fillWidth: true; Layout.preferredHeight: 1; color: backend.palette.border; Layout.topMargin: 5 }
-            Label { text: "Edit selected style"; color: backend.palette.muted; font.pixelSize: 12; font.weight: Font.DemiBold; Accessible.role: Accessible.Heading }
+            Label { text: "Edit selected basic style"; color: backend.palette.muted; font.pixelSize: 12; font.weight: Font.DemiBold; Accessible.role: Accessible.Heading }
             Label { text: "Changes are limited to current output controls and never change Markdown."; wrapMode: Text.Wrap; Layout.fillWidth: true; color: backend.palette.muted; font.pixelSize: 11 }
             Label { text: "Name"; color: backend.palette.text; font.pixelSize: 11 }
             TextField { id: editorName; Layout.fillWidth: true; maximumLength: 80; Accessible.name: "Style name" }

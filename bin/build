@@ -12,6 +12,10 @@ if [ "$(uname -s)" = Darwin ]; then
 fi
 make -j"$JOBS"
 if [ "$(uname -s)" = Darwin ]; then
+  mkdir -p "$ROOT/build/Fomawrite.app/Contents/Resources/licenses"
+  cp "$ROOT/LICENSE" "$ROOT/build/Fomawrite.app/Contents/Resources/licenses/Upstream-Omawrite-MIT.txt"
+  cp "$ROOT/fonts/OFL.txt" "$ROOT/build/Fomawrite.app/Contents/Resources/licenses/Fonts-OFL.txt"
+  cp "$ROOT/src/vendor/md4c/LICENSE.md" "$ROOT/build/Fomawrite.app/Contents/Resources/licenses/MD4C-MIT.txt"
   echo "Built $ROOT/build/Fomawrite.app"
 else
   echo "Built $ROOT/build/fomawrite"

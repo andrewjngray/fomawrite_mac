@@ -51,3 +51,9 @@ HEADERS += src/workspace.h
 DISTFILES += src/editoracceptancecheck.inc src/panechromeacceptancecheck.inc src/editinglayoutacceptancecheck.inc
 
 QT += pdfquick webenginequick
+
+QT += webenginecore pdf
+HEADERS += src/publishingthemes.h src/publishinghtml.h src/publishingpdf.h
+SOURCES += src/publishingthemes.cpp src/publishinghtml.cpp src/publishingpdf.cpp src/vendor/md4c/md4c.c
+
+DISTFILES += src/backendpublishing.inc src/publishingthemeacceptancecheck.inc src/vendor/md4c/LICENSE.md

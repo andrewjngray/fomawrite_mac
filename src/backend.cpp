@@ -17,6 +17,12 @@
 #include <QPageSize>
 #include "markdownextensions.h"
 #include "outputcss.h"
+#include "publishingthemes.h"
+#include "publishinghtml.h"
+#include "publishingpdf.h"
+#include <QPdfDocument>
+#include <QPdfSelection>
+#include <QBuffer>
 #include <QTextBoundaryFinder>
 #include "backend.h"
 #include "sourcevisualmapping.h"
@@ -583,6 +589,7 @@ Backend::Backend(QObject *parent, bool outputOnly) : QObject(parent), m_library(
     const QString cssPath = QSettings().value(QStringLiteral("output/cssFile")).toString();
     if (!cssPath.isEmpty()) m_outputCssFile = QUrl::fromLocalFile(cssPath);
     loadUserOutputStyles();
+    m_publishingThemeId = QSettings().value("output/publishingTheme").toString();
     // New installations start with the composed writing palette; a stored
     // choice, including System, always takes precedence.
     const auto preset = QSettings().value("appearance/theme", "studio").toString();
@@ -2014,9 +2021,8 @@ void Backend::printDocument(bool plain) {
         dialog.windowHandle()->setTransientParent(m_parentWindow);
 
     if (dialog.exec() == QDialog::Accepted) {
-        QTextDocument rendered;
-        prepareOutput(rendered, plain);
-        paintOutput(printer, rendered);
+        if (plain) { QTextDocument rendered; prepareOutput(rendered, true); paintOutput(printer, rendered); }
+        else paintPublishingOutput(printer);
     }
 }
 
@@ -3016,7 +3022,7 @@ bool Backend::loadOutputCss(const QUrl &file) {
     m_outputCssFile = file;
     QSettings().setValue(QStringLiteral("output/cssFile"), file.toLocalFile());
     emit outputCssChanged();
-    setStatus(QStringLiteral("HTML export CSS selected."));
+    setStatus(QStringLiteral("Output CSS selected for Web and PDF."));
     return true;
 }
 
@@ -3025,7 +3031,7 @@ void Backend::clearOutputCss() {
     m_outputCssFile = QUrl{};
     QSettings().remove(QStringLiteral("output/cssFile"));
     emit outputCssChanged();
-    setStatus(QStringLiteral("HTML export CSS cleared."));
+    setStatus(QStringLiteral("Output CSS cleared."));
 }
 
 QVariantList Backend::builtInOutputStyles() const {
@@ -3257,6 +3263,8 @@ bool Backend::deleteUserOutputStyle(const QString &id) {
 
 void Backend::setOutputStyle(int style) {
     if (style < 0 || style > 7) return;
+    m_publishingThemeId.clear();
+    QSettings().remove("output/publishingTheme");
     if (style != 3 && !m_selectedUserOutputStyleId.isEmpty()) {
         m_selectedUserOutputStyleId.clear();
         QSettings().remove(QStringLiteral("output/userStyleId"));
@@ -3264,6 +3272,7 @@ void Backend::setOutputStyle(int style) {
     m_outputStyle = style;
     QSettings().setValue("output/style", style);
     emit outputStyleChanged();
+    emit publishingThemesChanged();
 }
 
 void Backend::applyTemplate(QTextDocument &document, bool preview) const {
@@ -3398,7 +3407,7 @@ void Backend::printPreview() {
     QPrintPreviewDialog dialog(&printer);
     dialog.setWindowTitle("Fomawrite — Paginated Preview");
     connect(&dialog,&QPrintPreviewDialog::paintRequested,this,[this](QPrinter *output) {
-        QTextDocument rendered; prepareOutput(rendered,false); paintOutput(*output,rendered);
+        paintPublishingOutput(*output);
     });
     dialog.resize(900,700); dialog.exec();
 }
@@ -3414,84 +3423,7 @@ void Backend::pageSetup() {
     }
 }
 
-QString Backend::outputHtml(QTextDocument &document, QString *outputError) const {
-        QString html = document.toHtml();
-        const QRegularExpression images("<img\\b[^>]*\\bsrc=\"([^\"]+)\"",QRegularExpression::CaseInsensitiveOption);
-        auto matches=images.globalMatch(html); QList<QPair<QPair<int,int>,QString>> substitutions; qint64 total=0;
-        while(matches.hasNext()) {
-            const auto match=matches.next(); const QUrl asset=documentBaseUrl().resolved(QUrl(match.captured(1).replace("&amp;","&")));
-            if(asset.scheme()=="data") continue;
-            QFile image(asset.toLocalFile()); const auto format=QImageReader::imageFormat(asset.toLocalFile());
-            if(!asset.isLocalFile() || !QList<QByteArray>{"png","jpeg","gif","webp"}.contains(format) || !image.open(QIODevice::ReadOnly)
-                || image.size()>5*1024*1024 || total+image.size()>20*1024*1024) { *outputError = ("Portable HTML needs readable local PNG/JPEG/GIF/WebP images (5 MiB each, 20 MiB total)."); return {}; }
-            const auto data=image.read(5*1024*1024+1); if(image.error()!=QFile::NoError || data.size()>5*1024*1024 || total+data.size()>20*1024*1024) { *outputError = ("Could not read export image."); return {}; } total+=data.size();
-            const QString uri="data:image/"+QString::fromLatin1(format)+";base64,"+QString::fromLatin1(data.toBase64());
-            substitutions.append({{match.capturedStart(1),match.capturedLength(1)},uri});
-        }
-        for(auto it=substitutions.crbegin();it!=substitutions.crend();++it) html.replace(it->first.first,it->first.second,it->second);
-        if (!m_outputCssFile.isEmpty()) {
-            QString error;
-            const auto css = OutputCss::load(m_outputCssFile, &error);
-            if (!css) { *outputError = (error); return {}; }
-            const auto styled = OutputCss::embed(html, *css);
-            if (!styled) { *outputError = (QStringLiteral("Could not apply HTML CSS.")); return {}; }
-            html = *styled;
-        }
-    return html;
-}
-
-void Backend::writeOutputPdf(QIODevice &device, QTextDocument &document) const {
-        QPdfWriter writer(&device);
-        if (m_pageLayout.isValid()) writer.setPageLayout(m_pageLayout);
-        else { writer.setPageSize(QPageSize(QPageSize::A4)); writer.setPageMargins(QMarginsF(18,18,18,18)); }
-        writer.setTitle(fileName());
-        paintOutput(writer, document);
-}
-
-QVariantMap Backend::publishingPreview(const QString &format) {
-    if (!m_document || (format != "html" && format != "pdf"))
-        return {{"ok", false}, {"error", "Publishing preview is unavailable."}};
-    if (!m_publishingDirectory)
-        m_publishingDirectory = std::make_unique<QTemporaryDir>(QDir::tempPath() + "/fomawrite-publishing-XXXXXX");
-    if (!m_publishingDirectory->isValid())
-        return {{"ok", false}, {"error", "Could not create private publishing preview."}};
-    QTextDocument rendered;
-    prepareOutput(rendered);
-    const QString path = m_publishingDirectory->filePath(QString::number(++m_publishingGeneration) + "." + format);
-    QFile output(path);
-    if (!output.open(QIODevice::WriteOnly))
-        return {{"ok", false}, {"error", output.errorString()}};
-    if (format == "html") {
-        QString error;
-        QString html = outputHtml(rendered, &error);
-        if (!error.isEmpty()) { output.close(); output.remove(); return {{"ok", false}, {"error", error}}; }
-        // Export bytes are unchanged; only the local preview needs a base for links.
-        html.replace("<head>", "<head><base href=\"" + documentBaseUrl().toString(QUrl::FullyEncoded).toHtmlEscaped() + "\">");
-        const QByteArray bytes = html.toUtf8();
-        if (output.write(bytes) != bytes.size()) {
-            const QString error = output.errorString(); output.close(); output.remove();
-            return {{"ok", false}, {"error", error}};
-        }
-    } else {
-        writeOutputPdf(output, rendered);
-    }
-    output.close();
-    if (output.error() != QFile::NoError) { output.remove(); return {{"ok", false}, {"error", output.errorString()}}; }
-    QVariantMap anchors;
-    if (format == "pdf") {
-        const int titlePages = (m_outputStyle == 3 && m_outputTitlePage) ? 1 : 0;
-        for (auto block = rendered.begin(); block.isValid(); block = block.next()) {
-            const int page = int(rendered.documentLayout()->blockBoundingRect(block).top() / rendered.pageSize().height()) + titlePages;
-            for (auto it = block.begin(); !it.atEnd(); ++it) {
-                for (const auto &name : it.fragment().charFormat().anchorNames()) anchors.insert(name, page);
-            }
-        }
-    }
-    m_publishingFiles.append(path);
-    // Keep recent loads alive while the renderer swaps resources, bound disk use.
-    while (m_publishingFiles.size() > 4) QFile::remove(m_publishingFiles.takeFirst());
-    return {{"ok", true}, {"url", QUrl::fromLocalFile(path)}, {"anchors", anchors}};
-}
+#include "backendpublishing.inc"
 
 bool Backend::exportDocument(const QUrl &destination, const QString &format) {
     if (!m_document || !destination.isLocalFile() || (format != "html" && format != "pdf")) return false;
@@ -3511,7 +3443,11 @@ bool Backend::exportDocument(const QUrl &destination, const QString &format) {
         const QByteArray bytes = html.toUtf8();
         if (output.write(bytes) != bytes.size()) { setStatus(output.errorString()); return false; }
     } else {
-        writeOutputPdf(output, rendered);
+        QString error;
+        const QString html = outputHtml(rendered, &error);
+        if (!error.isEmpty()) { setStatus(error); return false; }
+        const QByteArray bytes = publishingPdfBytes(html, &error);
+        if (bytes.isEmpty() || output.write(bytes) != bytes.size()) { setStatus(error.isEmpty() ? output.errorString() : error); return false; }
     }
     if (!output.commit()) { setStatus(output.errorString()); return false; }
     setStatus("Exported " + info.fileName()); return true;

@@ -40,3 +40,7 @@ HEADERS += ../src/workspace.h
 RESOURCES += ../src/resources.qrc
 
 QT += pdf pdfquick webenginequick
+
+QT += webenginecore pdf
+HEADERS += ../src/publishingthemes.h ../src/publishinghtml.h ../src/publishingpdf.h
+SOURCES += ../src/publishingthemes.cpp ../src/publishinghtml.cpp ../src/publishingpdf.cpp ../src/vendor/md4c/md4c.c

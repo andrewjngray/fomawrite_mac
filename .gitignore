@@ -79,3 +79,8 @@ Makefile
 # Personal correspondence and raw desktop reference captures stay local.
 /examples/ken_email.md
 /screenshots/
+
+# Cycle124 local UI and private document comparisons.
+/research/cycle-124/*
+!/research/cycle-124/README.md
+!/research/cycle-124/verified-builds.json
