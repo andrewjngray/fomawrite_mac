@@ -1,6 +1,6 @@
 # Fomawrite — developer handoff and independent review brief
 
-Prepared **6 October 2026 (Pacific/Auckland)** for Andrew Gray. This is a snapshot of the work through **Cycle 129**, with navigation for a developer reviewing the implementation, tests and improvement opportunities. It does not claim that all user acceptance or competitor parity is complete.
+Prepared **6 October 2026 (Pacific/Auckland)** for Andrew Gray. This is a snapshot of the work through **Cycle 130**, with navigation for a developer reviewing the implementation, tests and improvement opportunities. It does not claim that all user acceptance or competitor parity is complete.
 
 ## 1. Start here
 
@@ -8,9 +8,10 @@ Prepared **6 October 2026 (Pacific/Auckland)** for Andrew Gray. This is a snapsh
 - Git clone URL: `https://github.com/andrewjngray/fomawrite_mac.git`; current branch: **`master`**.
 - Upstream: [omacom/omawrite](https://github.com/omacom/omawrite), retained as remote `upstream`. This is an MIT-licensed fork, renamed Fomawrite.
 - Andrew's current checkout: **`/Users/andrewgray/repo/projects/fomawrite_mac`**. Historical tooling may still mention `omawrite_mac`; that is the obsolete checkout path.
-- Current review build: **`0.3.0-dev25`**, macOS version **`0.3.0 (129)`**.
-- Cycle129 source/test commit: **`cf0ed37982169f01773441b31d7d0759f5a98e81`**. The following documentation commit records its verified bundle identities. Historical Cycle128 baseline: `0466c3c3cdaad3ae0b0a35bb87607a0c9cd8b50b`.
-- Authoritative current evidence: [Cycle129 report](research/cycle-129/README.md). All three local app copies are synchronized and verified; see the [Cycle129 manifest](research/cycle-129/verified-builds.json).
+- Current review build: **`0.3.0-dev26`**, macOS version **`0.3.0 (130)`**.
+- Cycle130 source/test commit: **`644d9e0`**. Its following documentation commit records the menu guide and verified build identities.
+- Historical Cycle129 source/test commit: **`cf0ed37982169f01773441b31d7d0759f5a98e81`**. The following documentation commit records its verified bundle identities. Historical Cycle128 baseline: `0466c3c3cdaad3ae0b0a35bb87607a0c9cd8b50b`.
+- Authoritative current evidence: [Cycle130 report](research/cycle-130/README.md) and [manifest](research/cycle-130/verified-builds.json). The Output Style/Custom Themes menu is explained in [the user guide](docs/output-style-menu.md). The Cycle129 incident evidence remains below.
 
 Read [AGENTS.md](AGENTS.md), [README](README.md), this handoff, and the [current acceptance ledger](docs/release-acceptance.md) before changing behavior. The [complete cycle log](docs/build-cycles.md) preserves the detailed history. Older plans contain historical checkpoints; use the current source and latest cycle evidence when they differ.
 

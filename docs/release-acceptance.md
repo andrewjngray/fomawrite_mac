@@ -1,6 +1,10 @@
 # Acceptance ledger — current follow-through and Cycle 59 history
 
-## Current review build — Cycle 129
+## Current review build — Cycle 130
+
+**0.3.0-dev26 / macOS 0.3.0 (130)** groups CSS themes under **Custom Themes ›** above the basic presets and names the control **Output Style**. Existing selection, import and settings actions retain their behavior. [Menu instructions](output-style-menu.md), [verification and limits](../research/cycle-130/README.md). Native menu checks passed; a broad-run unexposed-window preview failure and successful focused rerun are recorded rather than hidden. Final counts and app identities are in the Cycle130 manifest.
+
+## Previous review build — Cycle 129
 
 **0.3.0-dev25 / macOS 0.3.0 (129)** repairs a theme-watcher feedback loop on normal macOS startup with populated themes. Replacing all watcher paths generated repeated directory notifications; those repeatedly restarted the preview debounce before output could be generated. Differential path updates and cached content comparisons now notify only actual changes, while Reload Themes forces refresh. The old native startup fails with a copy of Andrew's themes; corrected cold and restored launches pass. The new offscreen watcher tests also pass old code and do not establish red/green coverage. **204 final regressions pass, with zero failures/skips.** The expanded final fixture passes four checks (two cases plus setup/cleanup); all three local app copies pass four focused groups/eight pane paints, strict signatures and zero QML warnings. [Evidence and limits](../research/cycle-129/README.md), [optional review](../research/usability/cycle-129.md). Physical/full UI acceptance remains open.
 

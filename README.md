@@ -36,6 +36,8 @@ The first launch of a renamed Mac bundle migrates prior preferences and copies m
 
 ## Project and status
 
+Current review build: **0.3.0-dev26 / macOS 0.3.0 (130)**. The compact **Output Style → Custom Themes** menu is described in the [menu guide](docs/output-style-menu.md) and [Cycle130 verification](research/cycle-130/README.md).
+
 For an independent developer review, start with the [developer handoff](DEVELOPER_HANDOFF.md): implemented behavior, source/build/data locations, Git baseline, verification evidence and remaining review priorities.
 
 Source lives in `src/` (QML interface, C++ document I/O and formatting), `macos/` (bundle metadata), `bin/` (build and packaging), and `tests/` (Qt checks). The [roadmap](docs/roadmap.md), [cycle log](docs/build-cycles.md) and [acceptance ledger](docs/release-acceptance.md) track current work and explicit gaps. Cycle 60 is the Fomawrite identity migration; the prior menu work remains an implemented subset.

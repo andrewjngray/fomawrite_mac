@@ -109,3 +109,8 @@ Makefile
 /research/cycle-129/*
 !/research/cycle-129/README.md
 !/research/cycle-129/verified-builds.json
+
+# Cycle130 local menu and preview verification.
+/research/cycle-130/*
+!/research/cycle-130/README.md
+!/research/cycle-130/verified-builds.json

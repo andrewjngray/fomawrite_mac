@@ -1,0 +1,187 @@
+{
+  "version": "0.3.0-dev26",
+  "build": 130,
+  "verifiedAt": "2026-10-05T20:55:12.404502+00:00",
+  "sourceCommit": "644d9e06093ac3c1e4242adf6a0d650ca037aa1d",
+  "publicReleaseChanged": false,
+  "verification": {
+    "fullRegression": {
+      "passed": 204,
+      "failed": 0,
+      "skipped": 0
+    },
+    "nativePublishingMenuChecks": [
+      {
+        "name": "footer-theme-menu-and-semantic-web",
+        "newFailures": 0,
+        "passed": true
+      },
+      {
+        "name": "browser-pdf-theme-pagination-paper-and-margins",
+        "newFailures": 0,
+        "passed": true
+      },
+      {
+        "name": "web-pdf-editor-layout-source-and-undo-preservation",
+        "newFailures": 0,
+        "passed": true
+      },
+      {
+        "name": "missing-images-keep-web-and-pdf-readable",
+        "newFailures": 0,
+        "passed": true
+      },
+      {
+        "name": "unchanged-refresh-is-stable-and-edit-displays-current-output",
+        "newFailures": 0,
+        "passed": true
+      },
+      {
+        "name": "folder-drop-selection-and-rejected-choice-checkmarks",
+        "newFailures": 0,
+        "passed": true
+      },
+      {
+        "name": "folder-css-edits-reload-and-basic-settings-actions",
+        "newFailures": 0,
+        "passed": true
+      },
+      {
+        "name": "theme-import-and-basic-settings-dialog-actions",
+        "newFailures": 0,
+        "passed": true
+      }
+    ],
+    "broadNativeRun": {
+      "passed": false,
+      "failures": [
+        "Preview did not become naturally ready: preview-web-after-hidden-switch"
+      ],
+      "limitation": "The Web preview scenario timed out while the Cocoa test window was unexposed; all changed menu workflows passed. Subsequent focused preview runs passed in each bundle."
+    },
+    "nativePreviewScope": "Four groups/eight painted-pane observations in each app, matching UI resources and strict signatures.",
+    "menuGrowth": "27 added synthetic CSS themes enlarged only the scrollable submenu; parent item count and dimensions stayed fixed.",
+    "visualReview": "Inspected synthetic cascading-menu capture.",
+    "remainingAcceptance": "Physical mouse/keyboard, VoiceOver and multi-display behavior.",
+    "privateWritingCommitted": false
+  },
+  "bundles": {
+    "dev": {
+      "checkScope": "publishing-preview-only",
+      "signatureVerified": true,
+      "passed": true,
+      "failures": [],
+      "app": "/Users/andrewgray/repo/projects/fomawrite_mac/dist/Fomawrite Dev.app",
+      "version": "0.3.0-dev26",
+      "build": "130",
+      "bundleIdentifier": "io.github.andrewjngray.fomawrite.dev",
+      "executableSha256": "b1b91f61414731803c10307056d7e45d7ce7df6391a59a4ddfe97c55125a114b",
+      "resourceSha256": {
+        "AboutDialog.qml": "12017d5a492af70ffa10843ae236f26b56128d4af152876ff76a548ceef869f5",
+        "DocumentFindBar.qml": "7e3f64f90104ba403b222bce94ede7cce77e534394b669ad0b9f10210c77887b",
+        "DocumentFooter.qml": "e1b42d01d48d14f68f7345aa77a10fc7645ff61256e387a351d00ce471663939",
+        "DocumentOutline.qml": "6428a2f0cf1f14fe02d36799d706e52478ad2eb9e5baa200ad75992b76300f20",
+        "ExportHub.qml": "e7264e2586f0c3ffdf23004c66e1d85e54bfe66d34f491b692e16d4a92958e90",
+        "FooterButton.qml": "c7fa2c48acf137903db010239619d33aaa7a28475babdb7bf381640cb087ef5e",
+        "LibraryPane.qml": "f5df7aaeeee3cfd1efb05c6edf528cf66e625e0e9cd5ca1946c5607047452663",
+        "LinkEditor.qml": "869370567f601f7153d568461d68957df68082ee2a06354680d05fef3b9d6caa",
+        "LinkSyntax.js": "468ac5c0c63f3cdbbf90574bc4bd37984e3fac2e3c58655fb8f4ea2ee398dffd",
+        "Main.qml": "8435daa9b33e448ed275f1a5d3b31632bec2488b438eb24c03442b03bc1c29fc",
+        "PaneZoomControls.qml": "86a0406cc274f3a0a24338daf77f9161aeac3bb07f6139ff2dd4163c77d6bd8a",
+        "PaneZoomState.qml": "cfdf6feb5c2e2a1748dd2f78d47b8f9609b0ca2d88d9f1b8d7e1aa981a33b48f",
+        "PreviewPane.qml": "84d7875da00a2cb53d69e5b088cc807935c102c8c684af733641618460109658",
+        "PublishingPreview.qml": "ff08dc971ba0009e68f30d149f48fcc56fd4959fe3f963f244eb866e43e8ab23",
+        "SquareDialogButton.qml": "bf4c23880c3a08833ca96341e1d9c2832ccce2e950b3d17d42a2e9ab36cfab90",
+        "WorkspaceCommands.qml": "efac6b5e59cfb71c0be0c005e8712d1bbdd2a8ce7bece25882fd7e4b8edcca84",
+        "WorkspaceHeader.qml": "a909707a8599a94ded5ad904149a3ace9a622a1e9d564bb40b33169258d3f3e8",
+        "WorkspaceLayout.qml": "c02563e54026f216854c90788065ef7424a7027da57519009e7c6dacd63e5791"
+      },
+      "statesChecked": 0,
+      "dailyWritingChecks": 0,
+      "paneZoomChecks": 0,
+      "editorAcceptanceChecks": 0,
+      "paneChromeChecks": 0,
+      "editingLayoutChecks": 0,
+      "publishingThemeChecks": 4,
+      "previewPaintChecks": 8
+    },
+    "ordinary": {
+      "checkScope": "publishing-preview-only",
+      "signatureVerified": true,
+      "passed": true,
+      "failures": [],
+      "app": "/Users/andrewgray/repo/projects/fomawrite_mac/dist/Fomawrite.app",
+      "version": "0.3.0-dev26",
+      "build": "130",
+      "bundleIdentifier": "io.github.andrewjngray.fomawrite",
+      "executableSha256": "2e6476840ed175556960d80d6c8a7a48595dd20a450e3c9837062ae49f71ff99",
+      "resourceSha256": {
+        "AboutDialog.qml": "12017d5a492af70ffa10843ae236f26b56128d4af152876ff76a548ceef869f5",
+        "DocumentFindBar.qml": "7e3f64f90104ba403b222bce94ede7cce77e534394b669ad0b9f10210c77887b",
+        "DocumentFooter.qml": "e1b42d01d48d14f68f7345aa77a10fc7645ff61256e387a351d00ce471663939",
+        "DocumentOutline.qml": "6428a2f0cf1f14fe02d36799d706e52478ad2eb9e5baa200ad75992b76300f20",
+        "ExportHub.qml": "e7264e2586f0c3ffdf23004c66e1d85e54bfe66d34f491b692e16d4a92958e90",
+        "FooterButton.qml": "c7fa2c48acf137903db010239619d33aaa7a28475babdb7bf381640cb087ef5e",
+        "LibraryPane.qml": "f5df7aaeeee3cfd1efb05c6edf528cf66e625e0e9cd5ca1946c5607047452663",
+        "LinkEditor.qml": "869370567f601f7153d568461d68957df68082ee2a06354680d05fef3b9d6caa",
+        "LinkSyntax.js": "468ac5c0c63f3cdbbf90574bc4bd37984e3fac2e3c58655fb8f4ea2ee398dffd",
+        "Main.qml": "8435daa9b33e448ed275f1a5d3b31632bec2488b438eb24c03442b03bc1c29fc",
+        "PaneZoomControls.qml": "86a0406cc274f3a0a24338daf77f9161aeac3bb07f6139ff2dd4163c77d6bd8a",
+        "PaneZoomState.qml": "cfdf6feb5c2e2a1748dd2f78d47b8f9609b0ca2d88d9f1b8d7e1aa981a33b48f",
+        "PreviewPane.qml": "84d7875da00a2cb53d69e5b088cc807935c102c8c684af733641618460109658",
+        "PublishingPreview.qml": "ff08dc971ba0009e68f30d149f48fcc56fd4959fe3f963f244eb866e43e8ab23",
+        "SquareDialogButton.qml": "bf4c23880c3a08833ca96341e1d9c2832ccce2e950b3d17d42a2e9ab36cfab90",
+        "WorkspaceCommands.qml": "efac6b5e59cfb71c0be0c005e8712d1bbdd2a8ce7bece25882fd7e4b8edcca84",
+        "WorkspaceHeader.qml": "a909707a8599a94ded5ad904149a3ace9a622a1e9d564bb40b33169258d3f3e8",
+        "WorkspaceLayout.qml": "c02563e54026f216854c90788065ef7424a7027da57519009e7c6dacd63e5791"
+      },
+      "statesChecked": 0,
+      "dailyWritingChecks": 0,
+      "paneZoomChecks": 0,
+      "editorAcceptanceChecks": 0,
+      "paneChromeChecks": 0,
+      "editingLayoutChecks": 0,
+      "publishingThemeChecks": 4,
+      "previewPaintChecks": 8
+    },
+    "applications": {
+      "checkScope": "publishing-preview-only",
+      "signatureVerified": true,
+      "passed": true,
+      "failures": [],
+      "app": "/Applications/Fomawrite.app",
+      "version": "0.3.0-dev26",
+      "build": "130",
+      "bundleIdentifier": "io.github.andrewjngray.fomawrite",
+      "executableSha256": "2e6476840ed175556960d80d6c8a7a48595dd20a450e3c9837062ae49f71ff99",
+      "resourceSha256": {
+        "AboutDialog.qml": "12017d5a492af70ffa10843ae236f26b56128d4af152876ff76a548ceef869f5",
+        "DocumentFindBar.qml": "7e3f64f90104ba403b222bce94ede7cce77e534394b669ad0b9f10210c77887b",
+        "DocumentFooter.qml": "e1b42d01d48d14f68f7345aa77a10fc7645ff61256e387a351d00ce471663939",
+        "DocumentOutline.qml": "6428a2f0cf1f14fe02d36799d706e52478ad2eb9e5baa200ad75992b76300f20",
+        "ExportHub.qml": "e7264e2586f0c3ffdf23004c66e1d85e54bfe66d34f491b692e16d4a92958e90",
+        "FooterButton.qml": "c7fa2c48acf137903db010239619d33aaa7a28475babdb7bf381640cb087ef5e",
+        "LibraryPane.qml": "f5df7aaeeee3cfd1efb05c6edf528cf66e625e0e9cd5ca1946c5607047452663",
+        "LinkEditor.qml": "869370567f601f7153d568461d68957df68082ee2a06354680d05fef3b9d6caa",
+        "LinkSyntax.js": "468ac5c0c63f3cdbbf90574bc4bd37984e3fac2e3c58655fb8f4ea2ee398dffd",
+        "Main.qml": "8435daa9b33e448ed275f1a5d3b31632bec2488b438eb24c03442b03bc1c29fc",
+        "PaneZoomControls.qml": "86a0406cc274f3a0a24338daf77f9161aeac3bb07f6139ff2dd4163c77d6bd8a",
+        "PaneZoomState.qml": "cfdf6feb5c2e2a1748dd2f78d47b8f9609b0ca2d88d9f1b8d7e1aa981a33b48f",
+        "PreviewPane.qml": "84d7875da00a2cb53d69e5b088cc807935c102c8c684af733641618460109658",
+        "PublishingPreview.qml": "ff08dc971ba0009e68f30d149f48fcc56fd4959fe3f963f244eb866e43e8ab23",
+        "SquareDialogButton.qml": "bf4c23880c3a08833ca96341e1d9c2832ccce2e950b3d17d42a2e9ab36cfab90",
+        "WorkspaceCommands.qml": "efac6b5e59cfb71c0be0c005e8712d1bbdd2a8ce7bece25882fd7e4b8edcca84",
+        "WorkspaceHeader.qml": "a909707a8599a94ded5ad904149a3ace9a622a1e9d564bb40b33169258d3f3e8",
+        "WorkspaceLayout.qml": "c02563e54026f216854c90788065ef7424a7027da57519009e7c6dacd63e5791"
+      },
+      "statesChecked": 0,
+      "dailyWritingChecks": 0,
+      "paneZoomChecks": 0,
+      "editorAcceptanceChecks": 0,
+      "paneChromeChecks": 0,
+      "editingLayoutChecks": 0,
+      "publishingThemeChecks": 4,
+      "previewPaintChecks": 8
+    }
+  }
+}
