@@ -1,6 +1,10 @@
 # Acceptance ledger — current follow-through and Cycle 59 history
 
-## Current review build — Cycle 127
+## Current review build — Cycle 128
+
+**0.3.0-dev24 / macOS 0.3.0 (128)** repairs the document-preview regression reported after Cycle127. Screenshot-gated replacement is removed; immutable document/request identity rejects stale results, old visible content clears on file change, and cached-PDF mode/retry transitions restore pages explicitly. **202 regressions pass**. Native verification checks displayed source/identity and eight actual-pane marker images after natural presentation; bundle deployment status and limits are in the [Cycle128 record](../research/cycle-128/README.md). Physical persisted-workspace relaunch remains Andrew's acceptance check. Cycle127's pass counts did not establish actual displayed-document correctness.
+
+## Previous review build — Cycle 127
 
 Review build **0.3.0-dev23 / macOS 0.3.0 (127)** addresses publishing-preview blanks and flashing. Unavailable images produce visible placeholders and warnings; successful unchanged output reuses its URL, stale PDF requests cancel and painted content remains during replacement loads. Source Markdown, saved files and Undo remain canonical; export and print require all images to be valid. 197 regressions pass; Dev and the installed copy each pass 159 native checks with zero unexpected QML warnings. Deliberate missing-image diagnostics are recorded separately. All three build127 copies have verified identities and strict signatures. Andrew's reported physical workflow is **not yet accepted as resolved**. [Evidence and remaining checks](../research/cycle-127/README.md), [optional review](../research/usability/cycle-127.md).
 

@@ -146,6 +146,94 @@ void FomawriteTest::publishingAsyncPreviewKeepsLatestRequest() {
     for (const auto &arguments : ready) if (arguments[0].toULongLong() != latestId)
         QVERIFY(!arguments[1].toMap()["ok"].toBool());
     QCOMPARE(editor->property("text").toString(), QString("# Latest draft\n\n![Missing](fomawrite-async-missing-image.png)\n"));
+
+    // Same-folder documents may have identical source and rendered HTML, but
+    // switching their lifetime must retire the first document's pending PDF.
+    QTemporaryDir directory; QVERIFY(directory.isValid());
+    const QByteArray sharedSource("# Shared file preview\n\nIdentical contents.\n");
+    const QUrl firstUrl = QUrl::fromLocalFile(directory.filePath("first.md"));
+    const QUrl secondUrl = QUrl::fromLocalFile(directory.filePath("second.md"));
+    for (const QUrl &url : {firstUrl, secondUrl}) {
+        QFile file(url.toLocalFile()); QVERIFY(file.open(QIODevice::WriteOnly));
+        QCOMPARE(file.write(sharedSource), qint64(sharedSource.size()));
+    }
+    QVERIFY(backend.open(firstUrl));
+    const QString firstIdentity = backend.publishingDocumentIdentity();
+    const auto firstDocument = backend.requestPublishingPreview("pdf", &consumer, "first:1");
+    QVERIFY(firstDocument["pending"].toBool());
+    QCOMPARE(firstDocument["documentUrl"].toUrl(), firstUrl);
+    QCOMPARE(firstDocument["documentIdentity"].toString(), firstIdentity);
+    QVERIFY(backend.open(secondUrl));
+    QVERIFY(backend.publishingDocumentIdentity() != firstIdentity);
+    const auto secondDocument = backend.requestPublishingPreview("pdf", &consumer, "second:1");
+    QVERIFY(secondDocument["pending"].toBool());
+    QCOMPARE(secondDocument["sourceHash"], firstDocument["sourceHash"]);
+    const quint64 secondId = secondDocument["requestId"].toULongLong();
+    QVariantMap secondResult;
+    QTRY_VERIFY_WITH_TIMEOUT(([&] {
+        for (const auto &arguments : ready) if (arguments[0].toULongLong() == secondId) {
+            secondResult = arguments[1].toMap(); return true;
+        }
+        return false;
+    })(), 35000);
+    QVERIFY2(secondResult["ok"].toBool(), qPrintable(secondResult["error"].toString()));
+    QCOMPARE(secondResult["documentUrl"].toUrl(), secondUrl);
+    QCOMPARE(secondResult["documentIdentity"].toString(), backend.publishingDocumentIdentity());
+    QCOMPARE(secondResult["requestIdentity"].toString(), QString("second:1"));
+    for (const auto &arguments : ready)
+        QVERIFY(arguments[0].toULongLong() != firstDocument["requestId"].toULongLong());
+
+    // A cache hit echoes this caller's token while retaining the rendered file.
+    const auto cachedPdf = backend.requestPublishingPreview("pdf", &consumer, "second:2");
+    QVERIFY(!cachedPdf["pending"].toBool());
+    QCOMPARE(cachedPdf["url"], secondResult["url"]);
+    QCOMPARE(cachedPdf["requestIdentity"].toString(), QString("second:2"));
+    QObject webConsumer;
+    const auto firstWeb = backend.requestPublishingPreview("html", &webConsumer, "web:1");
+    QVERIFY(firstWeb["ok"].toBool());
+    const auto cachedWeb = backend.requestPublishingPreview("html", &webConsumer, "web:2");
+    QCOMPARE(cachedWeb["url"], firstWeb["url"]);
+    QCOMPARE(cachedWeb["requestIdentity"].toString(), QString("web:2"));
+    QCOMPARE(cachedWeb["documentUrl"].toUrl(), secondUrl);
+    QCOMPARE(cachedWeb["sourceHash"], secondResult["sourceHash"]);
+
+    // Explicit cancellation retires work and preserves the successful cache.
+    editor->setProperty("text", "# Cancelled identity request\n");
+    const auto cancelled = backend.requestPublishingPreview("pdf", &consumer, "cancelled:1");
+    QVERIFY(cancelled["pending"].toBool());
+    backend.cancelPublishingPreview(&consumer);
+    editor->setProperty("text", QString::fromUtf8(sharedSource));
+    const auto restored = backend.requestPublishingPreview("pdf", &consumer, "second:3");
+    QVERIFY(!restored["pending"].toBool());
+    QCOMPARE(restored["url"], secondResult["url"]);
+    QCOMPARE(restored["requestIdentity"].toString(), QString("second:3"));
+    QTest::qWait(200);
+    for (const auto &arguments : ready)
+        QVERIFY(arguments[0].toULongLong() != cancelled["requestId"].toULongLong());
+
+    // Source presentation formatting can advance QTextDocument's revision
+    // without changing canonical Markdown or requiring a replacement request.
+    editor->setProperty("text", "# Format-only preview\n");
+    const auto formatting = backend.requestPublishingPreview("pdf", &consumer, "formatting:1");
+    QVERIFY(formatting["pending"].toBool());
+    auto *quickDocument = qvariant_cast<QQuickTextDocument *>(editor->property("textDocument"));
+    QVERIFY(quickDocument && quickDocument->textDocument());
+    QTextCursor cursor(quickDocument->textDocument());
+    cursor.select(QTextCursor::Document);
+    QTextCharFormat charFormat; charFormat.setFontItalic(true);
+    cursor.mergeCharFormat(charFormat);
+    QVERIFY(backend.documentRevision() != formatting["sourceRevision"].toInt());
+    const quint64 formattingId = formatting["requestId"].toULongLong();
+    QVariantMap formattingResult;
+    QTRY_VERIFY_WITH_TIMEOUT(([&] {
+        for (const auto &arguments : ready) if (arguments[0].toULongLong() == formattingId) {
+            formattingResult = arguments[1].toMap(); return true;
+        }
+        return false;
+    })(), 35000);
+    QVERIFY2(formattingResult["ok"].toBool(), qPrintable(formattingResult["error"].toString()));
+    QCOMPARE(formattingResult["sourceHash"], formatting["sourceHash"]);
+    QCOMPARE(editor->property("text").toString(), QString("# Format-only preview\n"));
     backend.discardRecovery();
 }
 

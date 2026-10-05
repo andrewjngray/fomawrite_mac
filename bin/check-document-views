@@ -15,6 +15,8 @@ root = Path(__file__).resolve().parent.parent
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument('output', type=Path, help='Directory for synthetic screenshots and report')
 parser.add_argument('--app', type=Path, default=root / 'dist/Fomawrite Dev.app')
+parser.add_argument('--preview-only', action='store_true',
+                    help='Run the four focused preview checks before any forced geometry frames')
 args = parser.parse_args()
 app = args.app.resolve()
 executable = app / 'Contents/MacOS/Fomawrite'
@@ -23,8 +25,12 @@ if not executable.is_file():
     parser.error(f'Bundle executable not found: {executable}')
 output.mkdir(parents=True, exist_ok=True)
 started_ns = time.time_ns()
+check_environment = {**os.environ, 'QT_FORCE_STDERR_LOGGING': '1'}
+check_environment.pop('FOMAWRITE_PUBLISHING_CHECK_ONLY', None)
+if args.preview_only:
+    check_environment['FOMAWRITE_PUBLISHING_CHECK_ONLY'] = '1'
 result = subprocess.run([str(executable), '--check-document-views', str(output)],
-                        env={**os.environ, 'QT_FORCE_STDERR_LOGGING': '1'}, timeout=240)
+                        env=check_environment, timeout=240)
 if result.returncode:
     sys.exit(result.returncode)
 report_path = output / 'report.json'
@@ -35,23 +41,60 @@ failures = []
 if not report.get('passed'):
     failures.append('The bundle reported failed view checks')
 daily_checks = report.get('dailyWritingChecks', [])
-if len(daily_checks) < 7 or any(not check.get('passed') for check in daily_checks):
-    failures.append('The shipped app did not pass all daily-writing checks')
 zoom_checks = report.get('paneZoomChecks', [])
-if len(zoom_checks) < 5 or any(not check.get('passed') for check in zoom_checks):
-    failures.append('The shipped app did not pass all independent-pane zoom checks')
 acceptance_checks = report.get('editorAcceptanceChecks', [])
-if len(acceptance_checks) < 6 or any(not check.get('passed') for check in acceptance_checks):
-    failures.append('The shipped app did not pass all editor acceptance checks')
 chrome_checks = report.get('paneChromeChecks', [])
-if len(chrome_checks) < 3 or any(not check.get('passed') for check in chrome_checks):
-    failures.append('The shipped app did not pass all pane/footer/library checks')
 editing_checks = report.get('editingLayoutChecks', [])
-if len(editing_checks) < 2 or any(not check.get('passed') for check in editing_checks):
-    failures.append('The shipped app did not pass independent Editing/Layout checks')
 publishing_checks = report.get('publishingThemeChecks', [])
-if len(publishing_checks) < 8 or any(not check.get('passed') for check in publishing_checks):
-    failures.append('The shipped app did not pass publishing theme checks')
+focused_groups = {
+    'natural-cocoa-pdf-document-a-to-nps-document-b',
+    'natural-cocoa-rapid-a-b-c-selection',
+    'natural-cocoa-hidden-show-theme-and-web-pdf-modes',
+    'cold-pdf-preview-component-cached-output',
+}
+if args.preview_only:
+    if report.get('checkScope') != 'publishing-preview-only':
+        failures.append('The bundle did not run the requested focused preview scope')
+    if not focused_groups.issubset({check.get('name') for check in publishing_checks}) \
+            or any(not check.get('passed') for check in publishing_checks):
+        failures.append('The shipped app did not pass all four focused preview groups')
+else:
+    if len(daily_checks) < 7 or any(not check.get('passed') for check in daily_checks):
+        failures.append('The shipped app did not pass all daily-writing checks')
+    if len(zoom_checks) < 5 or any(not check.get('passed') for check in zoom_checks):
+        failures.append('The shipped app did not pass all independent-pane zoom checks')
+    if len(acceptance_checks) < 6 or any(not check.get('passed') for check in acceptance_checks):
+        failures.append('The shipped app did not pass all editor acceptance checks')
+    if len(chrome_checks) < 3 or any(not check.get('passed') for check in chrome_checks):
+        failures.append('The shipped app did not pass all pane/footer/library checks')
+    if len(editing_checks) < 2 or any(not check.get('passed') for check in editing_checks):
+        failures.append('The shipped app did not pass independent Editing/Layout checks')
+    if len(publishing_checks) < 12 or any(not check.get('passed') for check in publishing_checks):
+        failures.append('The shipped app did not pass publishing theme checks')
+preview_observations = report.get('publishingPreviewCorrectness', {}).get('observations', [])
+painted_previews = [entry for entry in preview_observations if 'actualPanePainted' in entry]
+if len(painted_previews) < 8 or any(not entry.get('actualPanePainted') or not entry.get('contentCorrect')
+        or entry.get('actualMarkerSamples', 0) <= 40
+        or entry.get('naturalFramesBeforeCapture', 0) < 1
+        or not entry.get('selectedDocumentIdentity')
+        or entry.get('selectedDocumentIdentity') != entry.get('displayedDocumentIdentity')
+        or not entry.get('outputUrl')
+        or (entry.get('format') == 'pdf' and (entry.get('actualPdfSource') != entry.get('outputUrl')
+            or entry.get('referenceMarkerSamples', 0) <= 40
+            or entry.get('overlappingMarkerSamples', 0) < entry.get('referenceMarkerSamples', 0) * 0.65))
+        for entry in painted_previews):
+    failures.append('The actual publishing pane did not pass document identity, marker and natural-paint checks')
+if args.preview_only:
+    expected_captures = {
+        'preview-pdf-document-a', 'preview-pdf-document-b', 'preview-pdf-rapid-final-c',
+        'preview-web-after-hidden-switch', 'preview-pdf-after-theme-mode-switch',
+        'preview-pdf-after-window-show', 'preview-web-after-pdf-return', 'preview-cold-pdf-component',
+    }
+    if not expected_captures.issubset({entry.get('scenario') for entry in painted_previews}):
+        failures.append('The focused preview report is missing a required settled capture')
+    if not any(entry.get('scenario') == 'rapid-selection-in-flight-request' and entry.get('observedPendingRequest')
+               for entry in preview_observations):
+        failures.append('Rapid selection did not supersede an observed in-flight PDF request')
 if report.get('platform') != 'cocoa':
     failures.append('Expected native Cocoa window verification')
 if Path(report.get('executable', '')).resolve() != executable.resolve():
@@ -78,18 +121,28 @@ with (root / 'macos/Info.plist').open('rb') as file:
 for field in ('CFBundleShortVersionString', 'CFBundleVersion'):
     if info.get(field) != expected_info.get(field):
         failures.append(f'{field} differs from checkout')
-verification = {'passed': not failures, 'failures': failures, 'app': str(app),
+signature_check = subprocess.run(['codesign', '--verify', '--deep', '--strict', str(app)],
+                                 capture_output=True, text=True)
+if signature_check.returncode:
+    failures.append('Bundle signature verification failed: ' + signature_check.stderr.strip())
+verification = {'checkScope': report.get('checkScope'), 'signatureVerified': signature_check.returncode == 0,
+                'passed': not failures, 'failures': failures, 'app': str(app),
                 'version': report.get('applicationVersion'),
                 'build': info.get('CFBundleVersion'), 'bundleIdentifier': info.get('CFBundleIdentifier'),
                 'executableSha256': report.get('executableSha256'),
                 'resourceSha256': report.get('resourceSha256'),
                 'statesChecked': len(report.get('scenarios', [])),
                 'dailyWritingChecks': len(daily_checks), 'paneZoomChecks': len(zoom_checks),
-                'editorAcceptanceChecks': len(acceptance_checks), 'paneChromeChecks': len(chrome_checks), 'editingLayoutChecks': len(editing_checks), 'publishingThemeChecks': len(publishing_checks)}
+                'editorAcceptanceChecks': len(acceptance_checks), 'paneChromeChecks': len(chrome_checks), 'editingLayoutChecks': len(editing_checks), 'publishingThemeChecks': len(publishing_checks), 'previewPaintChecks': len(painted_previews)}
 (output / 'bundle-verification.json').write_text(json.dumps(verification, indent=2) + '\n')
 if failures:
     print('\n'.join(failures), file=sys.stderr)
     sys.exit(1)
-print(f"Verified {app}: {expected_version}, build {info['CFBundleVersion']}; "
-      f"{verification['statesChecked']} footer states, {len(daily_checks)} daily-writing checks and {len(zoom_checks)} pane-zoom checks, {len(acceptance_checks)} editor acceptance checks; "
-      f"{len(chrome_checks)} pane/footer/library checks, {len(editing_checks)} independent Editing/Layout checks, {len(publishing_checks)} publishing theme checks; embedded UI matches checkout.")
+if args.preview_only:
+    print(f"Verified {app}: {expected_version}, build {info['CFBundleVersion']}; "
+          f"{len(publishing_checks)} focused preview groups and {len(painted_previews)} settled actual-pane captures; "
+          "embedded UI matches checkout and signature verifies.")
+else:
+    print(f"Verified {app}: {expected_version}, build {info['CFBundleVersion']}; "
+          f"{verification['statesChecked']} footer states, {len(daily_checks)} daily-writing checks and {len(zoom_checks)} pane-zoom checks, {len(acceptance_checks)} editor acceptance checks; "
+          f"{len(chrome_checks)} pane/footer/library checks, {len(editing_checks)} independent Editing/Layout checks, {len(publishing_checks)} publishing theme checks; embedded UI matches checkout.")

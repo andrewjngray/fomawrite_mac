@@ -532,6 +532,14 @@ QString Backend::normalizedLinkUrl(const QString &clipboardText) {
 
 Backend::Backend(QObject *parent, bool outputOnly) : QObject(parent), m_library(this) {
     if (!outputOnly) liveBackends.insert(this);
+    const auto invalidatePublishingSettings = [this] {
+        ++m_publishingSettingsGeneration;
+        for (QObject *consumer : m_publishingRequests.keys()) cancelPublishingPreview(consumer);
+    };
+    connect(this, &Backend::outputStyleChanged, this, invalidatePublishingSettings);
+    connect(this, &Backend::outputPageLayoutChanged, this, invalidatePublishingSettings);
+    connect(this, &Backend::outputCssChanged, this, invalidatePublishingSettings);
+    connect(this, &Backend::publishingThemesChanged, this, invalidatePublishingSettings);
     connect(&m_library, &FileLibrary::rootFolderChanged, this, &Backend::fileUrlChanged);
     const QString stateDirectory = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
     QDir().mkpath(stateDirectory);
@@ -1814,6 +1822,7 @@ void Backend::attachDocument(QObject *textDocument) {
         delete m_highlighter.data();
 
     m_document = quickDocument->textDocument();
+    invalidatePublishingDocument();
     m_lastDocumentText = m_document->toPlainText();
     m_highlighter = new MarkdownHighlighter(m_document);
     m_highlighter->setDarkMode(m_darkMode);
@@ -2432,6 +2441,7 @@ void Backend::loadDocumentText(const QString &text) {
         return;
     }
 
+    invalidatePublishingDocument();
     m_loading = true;
     m_requiresExplicitSave = false;
     m_codeIndentWidth = 0; m_codeIndentTabs = false;
@@ -2451,6 +2461,7 @@ void Backend::setFileUrl(const QUrl &url) {
         return;
 
     m_fileUrl = url;
+    invalidatePublishingDocument();
     if (m_highlighter) m_highlighter->setCodeLanguage(QFileInfo(url.toLocalFile()).suffix());
     emit fileUrlChanged();
     watchCurrentFile();

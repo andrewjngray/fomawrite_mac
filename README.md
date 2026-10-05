@@ -48,7 +48,9 @@ Semantic publishing uses [MD4C 0.5.3](src/vendor/md4c/LICENSE.md), copyright Mar
 
 ## Current workspace review build
 
-Cycle **127**, **0.3.0-dev23 / macOS 0.3.0 (127)**, keeps publishing previews readable around unavailable images, reuses unchanged output and retains painted content while replacement pages load. **197 regressions pass; Dev and the installed copy each pass 159 native checks.** All three local bundles are refreshed. [Verification and remaining physical review](research/cycle-127/README.md).
+Cycle **128**, **0.3.0-dev24 / macOS 0.3.0 (128)**, repairs stale/blank publishing previews with document-scoped requests and compositor-independent replacement. **202 regressions pass**, including tests that reproduced the previous failure. Native checks now verify the actual displayed document. [Verification, bundle status and remaining review](research/cycle-128/README.md).
+
+Previous Cycle **127**, **0.3.0-dev23 / macOS 0.3.0 (127)**, attempted to keep publishing previews readable around unavailable images, reuses unchanged output and retains painted content while replacement pages load. **197 regressions pass; Dev and the installed copy each pass 159 native checks.** Andrew subsequently reported stale/blank PDFs; Cycle128 replaces its screenshot-dependent refresh. [Historical verification](research/cycle-127/README.md).
 
 Cycle **126**, **0.3.0-dev22 / macOS 0.3.0 (126)**, adds **Get More Themes…** in the publishing menus and export dialog, opening [Typora’s theme gallery](https://theme.typora.io/). [Build verification](research/cycle-126/README.md).
 

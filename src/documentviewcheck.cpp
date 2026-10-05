@@ -260,6 +260,7 @@ int runDocumentViewCheck(QApplication &app, const QString &outputDirectory) {
                        {"executableSha256", fileHash(app.applicationFilePath())},
                        {"platform", QGuiApplication::platformName()},
                        {"qmlEntry", "qrc:/Main.qml"},
+                       {"checkScope", "full-document-views"},
                        {"input", "Synthetic Qt window mouse and key events; native input rejected"}};
     const auto check = [&](bool condition, const QString &message) {
         if (!condition) failures.append(message);
@@ -405,6 +406,26 @@ int runDocumentViewCheck(QApplication &app, const QString &outputDirectory) {
     backend.library()->setProperty("rootFolder", QUrl::fromLocalFile(temporary.path()));
     if (!check(backend.open(QUrl::fromLocalFile(samplePath)), "Cannot open disposable sample in real Backend")) return finish();
     check(waitUntil([&] { return editor->property("text").toString() == saved; }), "Loaded document did not reach source editor");
+    if (qEnvironmentVariable("FOMAWRITE_PUBLISHING_CHECK_ONLY") == QStringLiteral("1")) {
+        // Isolate the normal preview workflow from unrelated geometry checks,
+        // which synchronously grab/force frames on a Chromium-backed window.
+        // No renderBarrier() or capture has occurred before this early path.
+        report.insert("checkScope", "publishing-preview-only");
+        window->resize(1440, 900);
+        layout->setProperty("organizerVisible", false);
+        layout->setProperty("filesVisible", false);
+        check(backend.setExportPaperSize("a4") && backend.setExportOrientation("portrait"),
+              "Cannot select A4 portrait for focused preview checks");
+        const QString sourcePath = samplePath;
+        const auto themeCheck = [&](const QString &name, const std::function<void()> &exercise) {
+            const qsizetype before = failures.size();
+            exercise();
+            publishingThemeChecks.append(QJsonObject{{"name", name}, {"passed", failures.size() == before},
+                {"newFailures", int(failures.size() - before)}});
+        };
+        #include "publishingpreviewacceptancecheck.inc"
+        return finish();
+    }
     settle(180); // Finish documentLoaded's deferred cursor reset before selecting.
     check(QMetaObject::invokeMethod(editor, "insert", Q_ARG(int, saved.size()),
                                   Q_ARG(QString, QStringLiteral("Unsaved diagnostic addition.\n"))), "Cannot create draft fixture");

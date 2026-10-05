@@ -44,8 +44,9 @@
             const QString savedHash = fileHash(sourcePath);
             const auto themeReady = [&](const QString &format) {
                 return waitUntil([&] {
-                    renderBarrier(window);
                     return ready() && !pane->property("holdingPreviousFrame").toBool()
+                        && pane->property("documentIdentity").toString() == backend.publishingDocumentIdentity()
+                        && pane->property("displayedDocumentIdentity").toString() == backend.publishingDocumentIdentity()
                         && pane->property("publishingMode").toString() == format
                         && !pane->property("outputUrl").toUrl().isEmpty()
                         && QFileInfo(pane->property("outputUrl").toUrl().toLocalFile()).suffix() == (format == "pdf" ? "pdf" : "html")
@@ -98,29 +99,26 @@
                     "Claude Like Web output lost semantic quotes, table cells, pagebreak or script isolation");
                 check(editor->property("text").toString() == themeSample && !backend.modified() && fileHash(sourcePath) == savedHash,
                       "Selecting a publishing theme changed source or saved UTF-8 bytes");
-                // DOM readiness precedes Chromium's compositor update. Verify
-                // the actual Web texture has painted the new cream background
-                // before taking a screenshot, including under window occlusion.
+                // DOM completion precedes the compositor. Let the exposed Cocoa
+                // window paint normally, then capture once; a grab in a polling
+                // predicate would conceal the missing natural update being tested.
+                settle(350);
                 QJsonArray paintedColors;
-                const bool painted = waitUntil([&] {
-                    window->requestUpdate();
-                    const QImage frame = window->grabWindow();
-                    if (frame.isNull() || !web || !web->isVisible()) return false;
+                const QImage frame = window->grabWindow();
+                bool painted = !frame.isNull() && web && web->isVisible();
+                if (painted) {
                     const QRectF area = bounds(web);
                     const double sx = double(frame.width()) / window->width();
                     const double sy = double(frame.height()) / window->height();
-                    int matches = 0;
-                    paintedColors = QJsonArray();
                     for (double fraction : {0.25, 0.5, 0.75}) {
                         const QPoint sample(qBound(0, qRound((area.left() + area.width() * fraction) * sx), frame.width() - 1),
                                             qBound(0, qRound((area.top() + 5) * sy), frame.height() - 1));
                         const QColor color = frame.pixelColor(sample);
                         paintedColors.append(color.name());
-                        if (qAbs(color.red() - 250) <= 2 && qAbs(color.green() - 249) <= 2 && qAbs(color.blue() - 245) <= 2)
-                            ++matches;
+                        painted = painted && qAbs(color.red() - 250) <= 2 && qAbs(color.green() - 249) <= 2
+                            && qAbs(color.blue() - 245) <= 2;
                     }
-                    return matches == 3;
-                }, 10000);
+                }
                 report.insert("publishingThemeWebPaint", QJsonObject{{"passed", painted}, {"colors", paintedColors},
                     {"previewWidth", pane->width()}, {"sourceWidth", child("editorPane") ? child("editorPane")->width() : 0}});
                 if (check(painted, "The actual Web texture did not paint Claude Like before its screenshot")) capture("theme-web");
@@ -254,7 +252,7 @@
                 check(themeReady("pdf"), "Preview did not settle after removing the unavailable image");
                 expectedMissingPreviewImage.clear();
             });
-            themeCheck("unchanged-refresh-is-stable-and-edit-keeps-painted-preview", [&] {
+            themeCheck("unchanged-refresh-is-stable-and-edit-displays-current-output", [&] {
                 for (const QString &format : {QString("web"), QString("pdf")}) {
                     if (!chooseFormat(format)) return;
                     const QUrl stable = pane->property("outputUrl").toUrl();
@@ -263,20 +261,27 @@
                         if (!check(themeReady(format), "Repeated refresh did not settle")) return;
                         check(pane->property("outputUrl").toUrl() == stable, "Unchanged preview navigated to another output URL");
                     }
-                    const QString suffix = "\n\nLatest painted preview revision.\n";
+                    const QString suffix = "\n\nLatest displayed preview revision.\n";
                     check(QMetaObject::invokeMethod(editor, "insert", Q_ARG(int, themeSample.size()), Q_ARG(QString, suffix)),
                           "Cannot edit preview stability fixture");
-                    bool heldFrame = false;
                     const bool settled = waitUntil([&] {
-                        renderBarrier(window);
-                        if (!heldFrame && pane->property("holdingPreviousFrame").toBool()) {
-                            heldFrame = true;
-                            capture("refresh-held-" + format);
-                        }
                         return pane->property("outputUrl").toUrl() != stable && ready()
-                            && !pane->property("holdingPreviousFrame").toBool();
+                            && !pane->property("previewRefreshInFlight").toBool();
                     }, 30000);
-                    check(settled && heldFrame, "The previous painted preview was not retained through " + format + " replacement");
+                    if (!check(settled, "Latest " + format + " edit did not replace the output")) return;
+                    if (format == "pdf") {
+                        check(pane->property("actualPdfSource").toUrl() == pane->property("outputUrl").toUrl(),
+                              "Latest PDF output differs from the pane's PdfDocument source");
+                        QPdfDocument document;
+                        check(document.load(pane->property("actualPdfSource").toUrl().toLocalFile()) == QPdfDocument::Error::None
+                            && document.pageCount() > 0 && document.getAllText(document.pageCount() - 1).text().contains("Latest displayed preview revision."),
+                            "Latest PDF edit is missing from the displayed document");
+                    } else check(publishingDomResult(web, "document.querySelector('#write').textContent").toString()
+                        .contains("Latest displayed preview revision."), "Latest Web edit is missing from the actual DOM");
+                    check(pane->property("documentIdentity").toString() == backend.publishingDocumentIdentity()
+                        && pane->property("displayedDocumentIdentity").toString() == backend.publishingDocumentIdentity()
+                        && backend.fileUrl() == QUrl::fromLocalFile(sourcePath),
+                          "Edited preview belongs to another selected document");
                     const QUrl latest = pane->property("outputUrl").toUrl();
                     settle(500);
                     check(pane->property("outputUrl").toUrl() == latest && !pane->property("previewRefreshInFlight").toBool(),
@@ -287,6 +292,7 @@
                 }
             });
             #include "publishingfolderacceptancecheck.inc"
+            #include "publishingpreviewacceptancecheck.inc"
             backend.setOutputStyle(0);
             settings->setProperty("publishingFormat", "web");
             check(themeReady("web"), "Basic Web output did not settle after the synthetic theme checks");

@@ -99,3 +99,8 @@ Makefile
 /research/cycle-127/*
 !/research/cycle-127/README.md
 !/research/cycle-127/verified-builds.json
+
+# Cycle128 local preview identity and rendering evidence.
+/research/cycle-128/*
+!/research/cycle-128/README.md
+!/research/cycle-128/verified-builds.json

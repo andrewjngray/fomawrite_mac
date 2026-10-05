@@ -49,6 +49,11 @@ private slots:
     void publishingThemeImportEmbedsLocalAssetsAndRejectsNetwork();
     void publishingSharedThemePdfPreservesPaperBreaksDraftAndUndo();
     void publishingAsyncPreviewKeepsLatestRequest();
+    void publishingComponentColdPdfLoadsActualDocument();
+    void publishingComponentReplacementLoadsWithoutCaptureFrames();
+    void publishingComponentSwitchRejectsStalePdfResults();
+    void publishingComponentRapidSwitchModesAndHiddenRejectStaleResults();
+    void publishingComponentTimeoutClearsStalePagesAndRecovers();
     void publishingPreviewCacheTracksAssetsAndConsumerLifetime();
     void manuscriptHeadingMarkersHangOutsideBodyColumn();
     void sourceCodeBackgroundAndAppearancePreserveSavedBytes();
@@ -5511,6 +5516,7 @@ private:
 #include "cycle104-controls.inc"
 #include "cycle119-publishing.inc"
 #include "cycle124-publishing.inc"
+#include "cycle128-publishing.inc"
 #include "cycle125-theme-folder.inc"
 #include "cycle106-footer.inc"
 #include "cycle107-footer-transitions.inc"

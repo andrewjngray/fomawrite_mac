@@ -136,7 +136,7 @@ int main(int argc, char *argv[]) {
     app.setOrganizationName(QStringLiteral("AndrewGray"));
     app.setOrganizationDomain(QStringLiteral("andrewjngray.github.io"));
     app.setApplicationDisplayName(QStringLiteral("Fomawrite"));
-    app.setApplicationVersion(QStringLiteral("0.3.0-dev23"));
+    app.setApplicationVersion(QStringLiteral("0.3.0-dev24"));
     const int documentCheck = app.arguments().indexOf(QStringLiteral("--check-document-views"));
     if (documentCheck >= 0) {
         const QString destination = app.arguments().value(documentCheck + 1);

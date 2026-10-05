@@ -264,58 +264,84 @@ QVariantMap Backend::publishingPreview(const QString &format) {
     if (!warning.isEmpty()) result.insert("warning", warning);
     return result;
 }
-QVariantMap Backend::requestPublishingPreview(const QString &format, QObject *consumer) {
-    if (!consumer) return publishingPreview(format);
+void Backend::cancelPublishingPreview(QObject *consumer) {
+    // Disconnect first: cancellation can finish synchronously.
+    disconnect(m_publishingConnections.take(consumer));
+    m_publishingRequests.remove(consumer);
+    m_publishingPendingKeys.remove(consumer);
+    if (auto *renderer = m_publishingRenderers.value(consumer, nullptr)) renderer->cancel();
+}
+
+void Backend::invalidatePublishingDocument() {
+    ++m_publishingDocumentGeneration;
+    for (QObject *consumer : m_publishingRequests.keys()) cancelPublishingPreview(consumer);
+    emit publishingDocumentIdentityChanged();
+}
+
+QVariantMap Backend::requestPublishingPreview(const QString &format, QObject *consumer, const QString &requestIdentity) {
+    const QUrl documentUrl = m_fileUrl;
+    const QString documentIdentity = publishingDocumentIdentity();
+    const int sourceRevision = documentRevision();
+    const QByteArray sourceHash = QCryptographicHash::hash(currentDocumentText().toUtf8(), QCryptographicHash::Sha256);
+    const quint64 settingsGeneration = m_publishingSettingsGeneration;
+    QVariantMap identity{{"documentIdentity", documentIdentity}, {"documentUrl", documentUrl},
+                         {"sourceHash", QString::fromLatin1(sourceHash.toHex())}, {"sourceRevision", sourceRevision},
+                         {"requestIdentity", requestIdentity}, {"format", format}};
+    const auto identified = [&identity](QVariantMap result) {
+        for (auto it = identity.cbegin(); it != identity.cend(); ++it) result.insert(it.key(), it.value());
+        return result;
+    };
+    if (!consumer) return identified(publishingPreview(format));
     // Web-only consumers need the same lifetime cleanup as PDF consumers.
     if (!m_publishingConsumers.contains(consumer)) {
         m_publishingConsumers.insert(consumer);
         connect(consumer, &QObject::destroyed, this, [this, consumer] {
-            disconnect(m_publishingConnections.take(consumer));
-            m_publishingRequests.remove(consumer);
-            m_publishingPendingKeys.remove(consumer);
+            cancelPublishingPreview(consumer);
             m_publishingPreviewCache.remove(consumer);
             m_publishingPinned.remove(consumer);
             m_publishingConsumers.remove(consumer);
             auto *renderer = m_publishingRenderers.take(consumer);
-            if (renderer) { renderer->cancel(); renderer->deleteLater(); }
+            if (renderer) renderer->deleteLater();
         });
     }
-    const auto cancelPending = [this, consumer] {
-        // Disconnect before cancellation: cancel can emit finished synchronously.
-        disconnect(m_publishingConnections.take(consumer));
-        m_publishingRequests.remove(consumer);
-        m_publishingPendingKeys.remove(consumer);
-        if (auto *renderer = m_publishingRenderers.value(consumer, nullptr)) renderer->cancel();
-    };
     if (!m_document || (format != "html" && format != "pdf")) {
-        cancelPending();
-        return {{"ok", false}, {"error", "Publishing preview is unavailable."}};
+        cancelPublishingPreview(consumer);
+        return identified({{"ok", false}, {"error", "Publishing preview is unavailable."}});
     }
     QString error, warning;
     QString html = publishingHtml(&error, true, &warning);
     if (!error.isEmpty()) {
-        cancelPending();
-        return {{"ok", false}, {"error", error}};
+        cancelPublishingPreview(consumer);
+        return identified({{"ok", false}, {"error", error}});
     }
     const QUrl baseUrl = documentBaseUrl();
-    // Embedded bytes capture local asset changes; print CSS captures page layout.
+    // Bind cached output to the canonical source and document lifetime, even
+    // when two sources produce identical HTML. Embedded bytes track assets.
     const QByteArray key = QCryptographicHash::hash(
-        (format + QChar::Null + baseUrl.toString(QUrl::FullyEncoded) + QChar::Null
+        (format + QChar::Null + documentIdentity + QChar::Null
+         + documentUrl.toString(QUrl::FullyEncoded) + QChar::Null
+         + QString::fromLatin1(sourceHash.toHex()) + QChar::Null
+         + baseUrl.toString(QUrl::FullyEncoded) + QChar::Null
          + warning + QChar::Null + html).toUtf8(), QCryptographicHash::Sha256);
+    identity.insert("renderKey", QString::fromLatin1(key.toHex()));
     const auto cached = m_publishingPreviewCache.constFind(consumer);
     if (cached != m_publishingPreviewCache.cend() && cached->key == key
             && QFileInfo::exists(cached->result.value("url").toUrl().toLocalFile())) {
-        const auto result = cached->result;
-        cancelPending();
+        // The output can be reused; the caller's revision token belongs to this
+        // request, rather than the request that originally populated the cache.
+        const auto result = identified(cached->result);
+        cancelPublishingPreview(consumer);
         return result;
     }
-    if (m_publishingPendingKeys.value(consumer) == key && m_publishingRequests.contains(consumer))
-        return {{"ok", true}, {"pending", true}, {"requestId", m_publishingRequests.value(consumer)}};
-    cancelPending();
+    const QByteArray pendingKey = QCryptographicHash::hash(key + '\0' + requestIdentity.toUtf8(), QCryptographicHash::Sha256);
+    if (m_publishingPendingKeys.value(consumer) == pendingKey && m_publishingRequests.contains(consumer))
+        return identified({{"ok", true}, {"pending", true}, {"requestId", m_publishingRequests.value(consumer)}});
+    cancelPublishingPreview(consumer);
     const quint64 generation = ++m_publishingGeneration;
+    identity.insert("requestId", generation);
     if (format == "html") {
         html.replace("<head>", "<head><base href=\"" + baseUrl.toString(QUrl::FullyEncoded).toHtmlEscaped() + "\">");
-        auto result = storePublishingOutput(generation, format, html.toUtf8(), html);
+        auto result = identified(storePublishingOutput(generation, format, html.toUtf8(), html));
         if (!warning.isEmpty()) result.insert("warning", warning);
         if (result.value("ok").toBool()) {
             m_publishingPinned[consumer] = result.value("url").toUrl().toLocalFile();
@@ -329,15 +355,23 @@ QVariantMap Backend::requestPublishingPreview(const QString &format, QObject *co
         m_publishingRenderers.insert(consumer, renderer);
     }
     m_publishingRequests[consumer] = generation;
-    m_publishingPendingKeys[consumer] = key;
+    m_publishingPendingKeys[consumer] = pendingKey;
     m_publishingConnections[consumer] = connect(renderer, &PublishingPdf::finished, this,
-        [this, consumer, generation, html, warning, key](quint64 id, const QByteArray &bytes, const QString &error) {
+        [this, consumer, generation, html, warning, key, identity, documentIdentity, documentUrl,
+         sourceHash, settingsGeneration](quint64 id, const QByteArray &bytes, const QString &error) {
         if (id != generation || m_publishingRequests.value(consumer) != generation) return;
         disconnect(m_publishingConnections.take(consumer));
         m_publishingRequests.remove(consumer);
         m_publishingPendingKeys.remove(consumer);
+        // Reject changes that occurred while the consumer's debounce timer was
+        // waiting to submit a replacement request. Never publish stale output.
+        if (publishingDocumentIdentity() != documentIdentity || m_fileUrl != documentUrl
+                || m_publishingSettingsGeneration != settingsGeneration
+                || QCryptographicHash::hash(currentDocumentText().toUtf8(), QCryptographicHash::Sha256) != sourceHash)
+            return;
         auto result = error.isEmpty() ? storePublishingOutput(generation, "pdf", bytes, html)
                                       : QVariantMap{{"ok", false}, {"error", error}};
+        for (auto it = identity.cbegin(); it != identity.cend(); ++it) result.insert(it.key(), it.value());
         if (!warning.isEmpty()) result.insert("warning", warning);
         if (result.value("ok").toBool()) {
             m_publishingPinned[consumer] = result.value("url").toUrl().toLocalFile();
@@ -346,7 +380,7 @@ QVariantMap Backend::requestPublishingPreview(const QString &format, QObject *co
         emit publishingPreviewReady(generation, result);
     });
     renderer->render(generation, html, baseUrl, effectiveOutputPageLayout());
-    return {{"ok", true}, {"pending", true}, {"requestId", generation}};
+    return identified({{"ok", true}, {"pending", true}, {"requestId", generation}});
 }
 
 void Backend::paintPublishingOutput(QPagedPaintDevice &device) {

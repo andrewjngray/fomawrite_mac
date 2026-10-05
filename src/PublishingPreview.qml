@@ -11,6 +11,20 @@ Rectangle {
     required property var renderer
     property string markdown: ""
     property url documentBaseUrl
+    // A document lifetime is distinct from its asset directory and source text.
+    property string documentIdentity: renderer ? String(renderer.publishingDocumentIdentity || renderer.fileUrl || documentBaseUrl) : ""
+    property string displayedDocumentIdentity: ""
+    property string appliedDocumentIdentity: ""
+    property string requestToken: ""
+    readonly property url actualPdfSource: pdf.source
+    readonly property bool pdfVisiblePagesPainted: {
+        if (!pdfPagesReady || pages.count === 0) return false;
+        for (var i = 0; i < pages.count; ++i) {
+            var page = pages.itemAt(i);
+            if (page && !page.painted) return false;
+        }
+        return true;
+    }
     property string publishingMode: "web"
     property real zoom: 1
     // Compatible assignments from the document workspace; this surface is read-only.
@@ -33,9 +47,7 @@ Rectangle {
     property string warningText: ""
     property string displayedFormat: ""
     property int appliedRevision: -1
-    property var retainedFrame: null
-    property int paintedFrames: 0
-    readonly property bool holdingPreviousFrame: retainedFrame !== null
+    readonly property bool holdingPreviousFrame: false
     property url outputUrl
     property url webOutputUrl
     property bool pdfPagesReady: false
@@ -45,6 +57,7 @@ Rectangle {
     property bool updatingWebScroll: false
     property real webContentHeight: 0
     property int webViewportRequests: 0
+    property int webCommandEpoch: 0
     property string webRestorationKey: ""
     property bool webUserScrolling: false
     property int refreshRevision: 0
@@ -84,9 +97,11 @@ Rectangle {
     function webViewportCommand(command, notify, completion) {
         if (publishingMode !== "web" || !webOutputUrl || String(web.url) !== String(webOutputUrl)) return;
         var revision = refreshRevision;
+        var commandEpoch = webCommandEpoch;
         ++webViewportRequests;
         var metrics = "var a=document.body.querySelectorAll('p,h1,h2,h3,h4,h5,h6,pre,table,li,img'),anchor=null;for(var i=0;i<a.length;i++){var r=a[i].getBoundingClientRect();if(r.bottom>0){anchor={index:i,offset:r.top};break;}}return {y:window.scrollY,height:Math.max(document.documentElement.scrollHeight,document.body.scrollHeight),anchor:anchor};";
         web.runJavaScript("(function(){if(!document.body)return null;" + command + metrics + "})()", 1, function(state) {
+            if (commandEpoch !== root.webCommandEpoch) return;
             --root.webViewportRequests;
             if (revision !== root.refreshRevision || root.publishingMode !== "web" || !state) return;
             root.updatingWebScroll = true;
@@ -142,33 +157,71 @@ Rectangle {
         if (!viewportRefreshPending && outputUrl && errorText === "") jumpToAnchor(anchor);
         else { pendingAnchor = anchor; if (!viewportRefreshPending) reload(); }
     }
-    function finishRefresh() {
+    function clearOutput() {
+        appliedRevision = -1;
+        appliedDocumentIdentity = "";
+        displayedDocumentIdentity = "";
+        displayedFormat = "";
+        pdfPagesReady = false;
+        outputUrl = "";
+        webOutputUrl = "";
+        pdfAnchors = ({});
+        webAnchor = null;
+        retainedFraction = 0;
+        previewScroll.contentY = 0;
+        errorText = "";
+        warningText = "";
+        pendingAnchor = "";
+    }
+    function cancelRequest() {
+        pendingRequest = -1;
+        requestToken = "";
+        if (renderer && renderer.cancelPublishingPreview) renderer.cancelPublishingPreview(root);
+        refreshDeadline.stop();
         previewRefreshInFlight = false;
+        ++webCommandEpoch;
+        webViewportRequests = 0;
+    }
+    function failRefresh(message) {
+        cancelRequest();
+        clearOutput();
+        errorText = message;
+    }
+    function finishRefresh() {
+        if (appliedRevision !== refreshRevision || appliedDocumentIdentity !== documentIdentity) return;
+        previewRefreshInFlight = false;
+        refreshDeadline.stop();
         displayedFormat = publishingMode;
-        paintedFrames = 0;
+        displayedDocumentIdentity = appliedDocumentIdentity;
         scrollToFraction(retainedFraction);
         if (pendingAnchor !== "") { var anchor = pendingAnchor; pendingAnchor = ""; jumpToAnchor(anchor); }
     }
     function refresh() {
         if (!visible) return;
-        retainedFraction = viewportFraction();
+        retainedFraction = appliedDocumentIdentity === documentIdentity ? viewportFraction() : 0;
         ++refreshRevision;
         webRestorationKey = "";
+        requestToken = documentIdentity + ":" + refreshRevision;
         previewRefreshInFlight = true;
-        var result = renderer.requestPublishingPreview(publishingMode === "pdf" ? "pdf" : "html", root);
+        refreshDeadline.restart();
+        var result = renderer.requestPublishingPreview(publishingMode === "pdf" ? "pdf" : "html", root, requestToken);
         pendingRequest = result.pending ? result.requestId : -1;
         if (result.pending) return;
         acceptOutput(result);
     }
     function acceptOutput(result) {
-        errorText = result.ok ? "" : result.error;
+        if (result.requestIdentity !== undefined && result.requestIdentity !== requestToken) return;
+        if (result.documentIdentity !== undefined && String(result.documentIdentity) !== documentIdentity) return;
+        if (result.format !== undefined && result.format !== (publishingMode === "pdf" ? "pdf" : "html")) return;
+        if (!result.ok) { failRefresh(result.error || "Could not load the publishing preview."); return; }
+        errorText = "";
         warningText = result.warning || "";
-        if (!result.ok) { previewRefreshInFlight = false; retainedFrame = null; return; }
-        // An unchanged refresh must not navigate Chromium or destroy PDF pages.
+        // Cache hits still have to prove the actual displayed source is current.
         if (String(result.url) === String(outputUrl)
                 && (publishingMode === "web" ? String(web.url) === String(result.url)
                     : String(pdf.source) === String(result.url))) {
             appliedRevision = refreshRevision;
+            appliedDocumentIdentity = documentIdentity;
             if (publishingMode === "web" && !web.loading) finishRefresh();
             else if (publishingMode === "pdf" && pdf.status === PdfDocument.Ready) {
                 pdfPagesReady = true;
@@ -176,44 +229,48 @@ Rectangle {
             }
             return;
         }
-        // Keep the painted document visible while its replacement loads. A grab
-        // is asynchronous, so discard it if newer typing superseded this result.
-        if (displayedFormat === publishingMode && outputUrl && !holdingPreviousFrame) {
-            var revision = refreshRevision;
-            var surface = publishingMode === "pdf" ? previewScroll : web;
-            var captured = surface.grabToImage(function(frame) {
-                if (revision !== root.refreshRevision) return;
-                root.retainedFrame = frame;
-                root.applyOutput(result);
-            });
-            if (captured) return;
-        }
+        // Loading must never wait for a screenshot or compositor callback.
         applyOutput(result);
     }
     function applyOutput(result) {
         appliedRevision = refreshRevision;
-        paintedFrames = 0;
+        appliedDocumentIdentity = documentIdentity;
         pdfAnchors = result.anchors || ({});
         outputUrl = result.url;
         if (publishingMode === "web") webOutputUrl = result.url;
         else {
-            // Destroy previous image delegates before their document changes
-            // source; PdfPageImage caches its previous URL internally.
             pdfPagesReady = false;
-            var revision = refreshRevision;
+            // Destroy old page delegates before changing their document.
+            var revision = refreshRevision, identity = documentIdentity;
             Qt.callLater(function() {
-                if (revision === root.refreshRevision && root.publishingMode === "pdf") pdf.source = result.url;
+                if (revision !== root.refreshRevision || identity !== root.documentIdentity || root.publishingMode !== "pdf") return;
+                if (String(pdf.source) === String(result.url) && pdf.status === PdfDocument.Ready) {
+                    // Mode changes clear the view, but may reuse an already-loaded
+                    // PDF. Assigning the same source emits no status transition.
+                    root.pdfPagesReady = true;
+                    root.finishRefresh();
+                } else pdf.source = result.url;
             });
         }
     }
-    function reload() { ++refreshRevision; pendingRequest = -1; refreshTimer.restart(); }
+    function reload() {
+        ++refreshRevision;
+        cancelRequest();
+        if (appliedDocumentIdentity !== documentIdentity) clearOutput();
+        refreshTimer.restart();
+    }
+    onDocumentIdentityChanged: { clearOutput(); reload(); }
     onMarkdownChanged: reload()
     onDocumentBaseUrlChanged: reload()
-    onPublishingModeChanged: { webAnchor = null; reload(); }
-    onVisibleChanged: if (visible) reload()
+    onPublishingModeChanged: { clearOutput(); reload(); }
+    onVisibleChanged: {
+        if (visible) reload();
+        else { ++refreshRevision; refreshTimer.stop(); cancelRequest(); }
+    }
     Component.onCompleted: reload()
     Timer { id: userScrollExpiry; interval: 350; onTriggered: root.webUserScrolling = false }
     Timer { id: refreshTimer; interval: 220; onTriggered: root.refresh() }
+    Timer { id: refreshDeadline; objectName: "publishingRefreshDeadline"; interval: 30000; onTriggered: root.failRefresh("Preview loading timed out. Use Reload Preview to try again.") }
     Connections {
         target: root.renderer
         function onOutputStyleChanged() { root.reload(); }
@@ -228,6 +285,7 @@ Rectangle {
     }
     PdfDocument {
         id: pdf
+        objectName: "actualPdfDocument"
         onStatusChanged: function(status) {
             if (root.appliedRevision !== root.refreshRevision || root.publishingMode !== "pdf" || String(source) !== String(root.outputUrl)) return;
             if (status === PdfDocument.Ready) {
@@ -237,7 +295,7 @@ Rectangle {
                     if (revision === root.refreshRevision && loadedUrl === String(root.outputUrl)) root.finishRefresh();
                 });
             }
-            else if (status === PdfDocument.Error) { root.errorText = "Could not read the publishing PDF."; root.previewRefreshInFlight = false; }
+            else if (status === PdfDocument.Error) root.failRefresh("Could not read the publishing PDF.");
         }
     }
     Flickable {
@@ -287,6 +345,7 @@ Rectangle {
                             && paper.y <= previewScroll.contentY + 2 * previewScroll.height
                         sourceComponent: PdfPageImage {
                         id: pageImage
+                        objectName: "publishingPdfPage_" + paper.index
                         anchors.fill: parent
                         document: pdf
                         currentFrame: paper.index
@@ -328,7 +387,7 @@ Rectangle {
         readonly property bool readOnly: true
         anchors.fill: parent
         anchors.bottomMargin: root.bottomInset
-        visible: root.publishingMode === "web"
+        visible: root.publishingMode === "web" && String(root.webOutputUrl) !== ""
         url: root.webOutputUrl
         zoomFactor: root.zoom
         backgroundColor: "white"
@@ -357,7 +416,7 @@ Rectangle {
         onLoadingChanged: function(info) {
             if (root.appliedRevision !== root.refreshRevision || root.publishingMode !== "web" || String(info.url) !== String(root.outputUrl)) return;
             if (info.status === WebEngineView.LoadSucceededStatus) root.webViewportCommand("", false, root.finishRefresh);
-            else if (info.status === WebEngineView.LoadFailedStatus) { root.errorText = info.errorString; root.previewRefreshInFlight = false; }
+            else if (info.status === WebEngineView.LoadFailedStatus) root.failRefresh(info.errorString);
         }
         onScrollPositionChanged: if (!root.previewRefreshInFlight && root.publishingMode === "web") root.webViewportCommand("", true)
         onContentsSizeChanged: if (!root.previewRefreshInFlight && root.publishingMode === "web") root.webViewportCommand("", false)
@@ -380,28 +439,12 @@ Rectangle {
             wheel.accepted = true;
         }
     }
-    Image {
-        anchors.fill: web
-        source: root.retainedFrame ? root.retainedFrame.url : ""
-        visible: root.holdingPreviousFrame
-        fillMode: Image.Stretch
-        z: 1
-        // This overlay does not accept input or change document geometry.
-    }
-    FrameAnimation {
-        running: root.holdingPreviousFrame && root.visible && !root.viewportRefreshPending
-        onTriggered: {
-            if (root.publishingMode === "pdf") {
-                if (!root.pdfPagesReady) return;
-                for (var i = 0; i < pages.count; ++i) {
-                    var page = pages.itemAt(i);
-                    if (page && !page.painted) { root.paintedFrames = 0; return; }
-                }
-            }
-            // Load completion precedes the compositor. Keep the old frame for
-            // three rendered frames, including async PDF image readiness.
-            if (++root.paintedFrames >= 3) root.retainedFrame = null;
-        }
+    Label {
+        objectName: "publishingLoadingNotice"
+        anchors.centerIn: parent
+        visible: root.viewportRefreshPending && !root.outputUrl && root.errorText === ""
+        text: "Loading preview…"
+        color: root.renderer.palette.text
     }
     Label {
         objectName: "publishingImageNotice"

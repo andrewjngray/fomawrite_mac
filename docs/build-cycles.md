@@ -1589,3 +1589,14 @@ Implemented: Web and PDF preview replace unavailable images with escaped, visibl
 Review build **0.3.0-dev23 / macOS 0.3.0 (127)**. Build/package and all **197 regressions** pass. Dev and the installed copy each pass **159 native checks**, with zero unexpected QML warnings; deliberate missing-image resource diagnostics are retained separately. Inspected Web/PDF held-frame and missing-image screenshots. All three bundles have matching verified product identities and strict signatures; the packaged executable matches the installed copy. [Current handoff](../research/cycle-127/README.md), [optional physical exercise](../research/usability/cycle-127.md). The previous Cycle126 results remain historical evidence, not validation for this change.
 
 Remaining acceptance: Andrew should retry the document and repeated refresh workflow that exposed the blank pane and flashing. Synthetic native checks cannot establish the physical report resolved. Placeholder previews are intentionally incomplete; export/print still refuse unavailable images. Physical input, VoiceOver, multi-display and broader CSS/Markdown compatibility remain separate acceptance work. No public release is included.
+
+
+## Cycle 128 — preview document identity and natural loading
+
+**Requested:** repair ordinary-app blank PDFs and Dev showing the previous document; update tests to catch both.
+
+**Changed:** removed screenshot-gated loading/retained overlays; invalidate output on document changes; bind backend/UI results to document lifetime/source/caller tokens; restore already-loaded cached PDF pages; hide empty Web output; bounded loading error/retry.
+
+**Verification:** 202 regressions pass. Component tests first reproduced stale A→B output and a compositor-dependent replacement stall. Native tests now verify actual selected-document identity and marker pixels after natural frame presentation, including A/B/C, hidden/show and Web/PDF/theme transitions. Final candidate passes 163 native checks. [Bundle verification and deployment](../research/cycle-128/README.md).
+
+**Limits:** synthetic Cocoa tests, not physical input. Cold component coverage does not establish full persisted-workspace relaunch. No forced quit or unsaved-work discard. [Optional review](../research/usability/cycle-128.md).

@@ -39,6 +39,7 @@ class Backend : public QObject {
     Q_PROPERTY(QObject *library READ library CONSTANT)
     Q_PROPERTY(QUrl documentBaseUrl READ documentBaseUrl NOTIFY fileUrlChanged)
     Q_PROPERTY(QUrl fileUrl READ fileUrl NOTIFY fileUrlChanged)
+    Q_PROPERTY(QString publishingDocumentIdentity READ publishingDocumentIdentity NOTIFY publishingDocumentIdentityChanged)
     Q_PROPERTY(QString fileName READ fileName NOTIFY fileUrlChanged)
     Q_PROPERTY(bool modified READ modified NOTIFY modifiedChanged)
     Q_PROPERTY(QString status READ status NOTIFY statusChanged)
@@ -153,7 +154,9 @@ public:
     Q_INVOKABLE bool exportDocument(const QUrl &destination, const QString &format);
     // Private temporary publishing output; never saves or changes the source.
     Q_INVOKABLE QVariantMap publishingPreview(const QString &format);
-    Q_INVOKABLE QVariantMap requestPublishingPreview(const QString &format, QObject *consumer);
+    Q_INVOKABLE QVariantMap requestPublishingPreview(const QString &format, QObject *consumer, const QString &requestIdentity = QString());
+    Q_INVOKABLE void cancelPublishingPreview(QObject *consumer);
+    QString publishingDocumentIdentity() const { return QString::number(m_publishingDocumentGeneration); }
     QString publishingThemeId() const { return m_publishingThemeId; }
     QString publishingThemeName() const;
     QVariantList publishingThemes() const;
@@ -259,6 +262,7 @@ signals:
     void outputCssChanged();
     void publishingThemesChanged();
     void publishingPreviewReady(quint64 requestId, const QVariantMap &result);
+    void publishingDocumentIdentityChanged();
     void themePresetChanged();
     void darkModeChanged();
     void textScaleChanged();
@@ -292,6 +296,9 @@ private:
     QTimer m_publishingThemeRefreshTimer;
     void watchPublishingThemes();
     void refreshPublishingThemes();
+    void invalidatePublishingDocument();
+    quint64 m_publishingDocumentGeneration = 0;
+    quint64 m_publishingSettingsGeneration = 0;
     struct PublishingPreviewCache { QByteArray key; QVariantMap result; };
     QHash<QObject *, PublishingPreviewCache> m_publishingPreviewCache;
     QHash<QObject *, QByteArray> m_publishingPendingKeys;
