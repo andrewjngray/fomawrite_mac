@@ -34,6 +34,7 @@ class Backend : public QObject {
     Q_PROPERTY(QString publishingThemeId READ publishingThemeId NOTIFY publishingThemesChanged)
     Q_PROPERTY(QString publishingThemeName READ publishingThemeName NOTIFY publishingThemesChanged)
     Q_PROPERTY(QVariantList publishingThemes READ publishingThemes NOTIFY publishingThemesChanged)
+    Q_PROPERTY(QString publishingThemeError READ publishingThemeError NOTIFY publishingThemesChanged)
     Q_PROPERTY(QObject *library READ library CONSTANT)
     Q_PROPERTY(QUrl documentBaseUrl READ documentBaseUrl NOTIFY fileUrlChanged)
     Q_PROPERTY(QUrl fileUrl READ fileUrl NOTIFY fileUrlChanged)
@@ -155,10 +156,11 @@ public:
     QString publishingThemeId() const { return m_publishingThemeId; }
     QString publishingThemeName() const;
     QVariantList publishingThemes() const;
+    QString publishingThemeError() const { return m_publishingThemeError; }
     Q_INVOKABLE bool selectPublishingTheme(const QString &id);
     Q_INVOKABLE bool importPublishingTheme(const QUrl &file);
     Q_INVOKABLE void reloadPublishingThemes();
-    Q_INVOKABLE void openPublishingThemesFolder();
+    Q_INVOKABLE bool openPublishingThemesFolder();
     int outputStyle() const { return m_outputStyle; }
     QString outputFont() const;
     int outputPointSize() const;
@@ -284,6 +286,11 @@ private:
     QString publishingHtml(QString *error) const;
     QString publishingPrintCss() const;
     QString m_publishingThemeId;
+    QString m_publishingThemeError;
+    QFileSystemWatcher m_publishingThemeWatcher;
+    QTimer m_publishingThemeRefreshTimer;
+    void watchPublishingThemes();
+    void refreshPublishingThemes();
     QHash<QObject *, PublishingPdf *> m_publishingRenderers;
     QHash<QObject *, quint64> m_publishingRequests;
     QHash<QObject *, QString> m_publishingPinned;

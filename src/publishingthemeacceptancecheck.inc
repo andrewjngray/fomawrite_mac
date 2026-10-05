@@ -227,6 +227,7 @@
                 check(editor->property("text").toString() == themeSample && fileHash(sourcePath) == savedHash,
                       "The theme acceptance exercise changed the original synthetic UTF-8 file");
             });
+            #include "publishingfolderacceptancecheck.inc"
             backend.setOutputStyle(0);
             settings->setProperty("publishingFormat", "web");
             check(themeReady("web"), "Basic Web output did not settle after the synthetic theme checks");

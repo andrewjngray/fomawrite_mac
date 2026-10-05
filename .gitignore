@@ -84,3 +84,8 @@ Makefile
 /research/cycle-124/*
 !/research/cycle-124/README.md
 !/research/cycle-124/verified-builds.json
+
+# Cycle125 local native theme verification.
+/research/cycle-125/*
+!/research/cycle-125/README.md
+!/research/cycle-125/verified-builds.json

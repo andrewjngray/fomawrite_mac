@@ -50,7 +50,7 @@ editing_checks = report.get('editingLayoutChecks', [])
 if len(editing_checks) < 2 or any(not check.get('passed') for check in editing_checks):
     failures.append('The shipped app did not pass independent Editing/Layout checks')
 publishing_checks = report.get('publishingThemeChecks', [])
-if len(publishing_checks) < 3 or any(not check.get('passed') for check in publishing_checks):
+if len(publishing_checks) < 6 or any(not check.get('passed') for check in publishing_checks):
     failures.append('The shipped app did not pass publishing theme checks')
 if report.get('platform') != 'cocoa':
     failures.append('Expected native Cocoa window verification')

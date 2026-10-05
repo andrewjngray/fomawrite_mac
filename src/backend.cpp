@@ -590,6 +590,18 @@ Backend::Backend(QObject *parent, bool outputOnly) : QObject(parent), m_library(
     if (!cssPath.isEmpty()) m_outputCssFile = QUrl::fromLocalFile(cssPath);
     loadUserOutputStyles();
     m_publishingThemeId = QSettings().value("output/publishingTheme").toString();
+    m_publishingThemeRefreshTimer.setSingleShot(true);
+    m_publishingThemeRefreshTimer.setInterval(200);
+    connect(&m_publishingThemeRefreshTimer, &QTimer::timeout, this, &Backend::refreshPublishingThemes);
+    const auto queueThemeRefresh = [this]() { m_publishingThemeRefreshTimer.start(); };
+    connect(&m_publishingThemeWatcher, &QFileSystemWatcher::fileChanged, this, queueThemeRefresh);
+    connect(&m_publishingThemeWatcher, &QFileSystemWatcher::directoryChanged, this, queueThemeRefresh);
+    watchPublishingThemes();
+    if (!m_publishingThemeId.isEmpty()) {
+        QString error, advisory;
+        PublishingThemes::css(m_publishingThemeId, &error, &advisory);
+        m_publishingThemeError = error.isEmpty() ? advisory : error;
+    }
     // New installations start with the composed writing palette; a stored
     // choice, including System, always takes precedence.
     const auto preset = QSettings().value("appearance/theme", "studio").toString();
@@ -3264,6 +3276,7 @@ bool Backend::deleteUserOutputStyle(const QString &id) {
 void Backend::setOutputStyle(int style) {
     if (style < 0 || style > 7) return;
     m_publishingThemeId.clear();
+    m_publishingThemeError.clear();
     QSettings().remove("output/publishingTheme");
     if (style != 3 && !m_selectedUserOutputStyleId.isEmpty()) {
         m_selectedUserOutputStyleId.clear();

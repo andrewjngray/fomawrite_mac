@@ -41,6 +41,8 @@ class FomawriteTest : public QObject {
     Q_OBJECT
 
 private slots:
+    void publishingFolderThemesResolveNamesImportsAndAssets();
+    void publishingFolderThemesRefreshAfterExternalChanges();
     void publishingWebCommandSelectsWebWithoutChangingEditor();
     void publishingSemanticHtmlPreservesStructureAndEscapesContent();
     void publishingThemeImportEmbedsLocalAssetsAndRejectsNetwork();
@@ -5507,6 +5509,7 @@ private:
 #include "cycle104-controls.inc"
 #include "cycle119-publishing.inc"
 #include "cycle124-publishing.inc"
+#include "cycle125-theme-folder.inc"
 #include "cycle106-footer.inc"
 #include "cycle107-footer-transitions.inc"
 #include "cycle108-bundled-footer.inc"

@@ -1,6 +1,7 @@
 #include "documentviewcheck.h"
 
 #include "backend.h"
+#include "publishingthemes.h"
 #include "systemtheme.h"
 
 #include <QApplication>

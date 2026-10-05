@@ -199,22 +199,31 @@ Dialog {
                     model: {
                         var choices = [{ id: "", name: "Basic: " + backend.outputTemplateName }]
                         var themes = backend.publishingThemes
-                        for (var i = 0; i < themes.length; ++i)
+                        var selectedFound = backend.publishingThemeId.length === 0
+                        for (var i = 0; i < themes.length; ++i) {
                             choices.push({ id: themes[i].id, name: themes[i].id === "claude-like" ? "Claude Like" : themes[i].name })
+                            if (themes[i].id === backend.publishingThemeId) selectedFound = true
+                        }
+                        if (!selectedFound) choices.push({ id: backend.publishingThemeId, name: "Unavailable: " + backend.publishingThemeName })
                         return choices
                     }
                     textRole: "name"; valueRole: "id"
-                    currentIndex: {
+                    function acceptedThemeIndex() {
                         for (var i = 0; i < model.length; ++i)
                             if (model[i].id === backend.publishingThemeId) return i
                         return 0
                     }
+                    currentIndex: acceptedThemeIndex()
                     onActivated: {
+                        hub.cssFeedback = ""
                         if (currentValue.length === 0) backend.setOutputStyle(backend.outputStyle)
-                        else backend.selectPublishingTheme(currentValue)
+                        else if (!backend.selectPublishingTheme(currentValue)) hub.cssFeedback = backend.publishingThemeError || backend.status
+                        currentIndex = Qt.binding(function() { return publishingThemeChoice.acceptedThemeIndex() })
                     }
                     Accessible.name: "Publishing theme for Web and PDF"
                 }
+                Label { objectName: "exportThemeNotice"; visible: backend.publishingThemeError.length > 0; text: backend.publishingThemeError; Layout.fillWidth: true; wrapMode: Text.Wrap; color: hub.darkMode ? "#fca5a5" : "#b42318"; font.pixelSize: 12; Accessible.name: text }
+                Label { Layout.fillWidth: true; text: "CSS themes come from your Themes folder. Basic styles use the font and page settings in the next column."; wrapMode: Text.Wrap; color: backend.palette.muted; font.pixelSize: 11 }
                 SecondaryAction { objectName: "exportImportThemeButton"; Layout.fillWidth: true; text: "Import Theme…"; onClicked: themePicker.open(); Accessible.name: "Import publishing CSS theme" }
                 ColumnLayout {
                     visible: true

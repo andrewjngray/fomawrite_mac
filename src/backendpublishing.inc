@@ -76,29 +76,84 @@ QString Backend::publishingThemeName() const {
 }
 QVariantList Backend::publishingThemes() const { return PublishingThemes::catalog(); }
 bool Backend::selectPublishingTheme(const QString &id) {
-    QString error;
-    if (!PublishingThemes::css(id, &error)) { setStatus(error); return false; }
+    QString error, advisory;
+    if (!PublishingThemes::css(id, &error, &advisory)) {
+        m_publishingThemeError = error;
+        emit publishingThemesChanged();
+        setStatus(error);
+        return false;
+    }
     m_publishingThemeId = id;
+    m_publishingThemeError = advisory;
     QSettings().setValue("output/publishingTheme", id);
     emit publishingThemesChanged();
-    setStatus(publishingThemeName() + " publishing theme selected.");
+    setStatus(advisory.isEmpty() ? publishingThemeName() + " publishing theme selected." : advisory);
     return true;
 }
 bool Backend::importPublishingTheme(const QUrl &file) {
     QString id, message;
-    if (!PublishingThemes::importTheme(file, &id, &message)) { setStatus(message); return false; }
+    if (!PublishingThemes::importTheme(file, &id, &message)) {
+        m_publishingThemeError = message;
+        emit publishingThemesChanged();
+        setStatus(message);
+        return false;
+    }
+    watchPublishingThemes();
     if (!selectPublishingTheme(id)) return false;
+    if (!message.isEmpty()) m_publishingThemeError = message;
+    emit publishingThemesChanged();
     setStatus(message.isEmpty() ? publishingThemeName() + " imported for Web and PDF." : message);
     return true;
 }
-void Backend::reloadPublishingThemes() {
-    emit publishingThemesChanged();
-    setStatus("Publishing themes reloaded.");
+void Backend::watchPublishingThemes() {
+    // Both directories and files are needed: macOS directory events cover added
+    // files, while file events cover in-place edits. Re-arm after atomic saves.
+    const auto files = m_publishingThemeWatcher.files();
+    const auto directories = m_publishingThemeWatcher.directories();
+    if (!files.isEmpty()) m_publishingThemeWatcher.removePaths(files);
+    if (!directories.isEmpty()) m_publishingThemeWatcher.removePaths(directories);
+    const QString folder = PublishingThemes::directory();
+    if (!QDir().mkpath(folder)) {
+        const QString parent = QFileInfo(folder).absolutePath();
+        if (QDir(parent).exists()) m_publishingThemeWatcher.addPath(parent);
+        return;
+    }
+    const QString canonicalFolder = QDir(folder).canonicalPath();
+    QStringList paths{canonicalFolder};
+    QDirIterator entries(canonicalFolder, QDir::Files | QDir::Dirs | QDir::NoDotAndDotDot | QDir::NoSymLinks, QDirIterator::Subdirectories);
+    while (entries.hasNext() && paths.size() < 512) {
+        const QString path = entries.next();
+        // Refuse to watch a symlinked resource tree.
+        if (QFileInfo(path).canonicalFilePath() == path) paths.append(path);
+    }
+    m_publishingThemeWatcher.addPaths(paths);
 }
-void Backend::openPublishingThemesFolder() {
+void Backend::refreshPublishingThemes() {
+    watchPublishingThemes();
+    if (!m_publishingThemeId.isEmpty()) {
+        QString error, advisory;
+        PublishingThemes::css(m_publishingThemeId, &error, &advisory);
+        m_publishingThemeError = error.isEmpty() ? advisory : error;
+        if (!m_publishingThemeError.isEmpty()) setStatus(m_publishingThemeError);
+    }
+    // Preview consumers already listen to this signal, so selected CSS and
+    // imported resources are rendered again without changing document state.
+    emit publishingThemesChanged();
+}
+void Backend::reloadPublishingThemes() {
+    refreshPublishingThemes();
+    setStatus(m_publishingThemeError.isEmpty() ? "Publishing themes reloaded." : m_publishingThemeError);
+}
+bool Backend::openPublishingThemesFolder() {
     const QString path = PublishingThemes::directory();
-    if (!QDir().mkpath(path) || !QDesktopServices::openUrl(QUrl::fromLocalFile(path)))
-        setStatus("Could not open the publishing themes folder.");
+    if (!QDir().mkpath(path) || !QDesktopServices::openUrl(QUrl::fromLocalFile(path))) {
+        m_publishingThemeError = "Could not open the publishing themes folder.";
+        emit publishingThemesChanged();
+        setStatus(m_publishingThemeError);
+        return false;
+    }
+    watchPublishingThemes();
+    return true;
 }
 
 QString Backend::publishingPrintCss() const {
