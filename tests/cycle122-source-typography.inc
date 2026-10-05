@@ -28,12 +28,13 @@ void FomawriteTest::sourceHangingIndentPreservesLiteralMarkdown() {
     auto *document = quick->textDocument();
     QCOMPARE(document->toPlainText(), source);
     QVERIFY(!backend.modified()); QVERIFY(!document->isUndoAvailable());
-    qreal previousOffset = 0;
+    const qreal gutter = document->findBlock(source.indexOf("Ordinary text.")).blockFormat().leftMargin();
+    qreal previousOffset = gutter;
     for (int number = 0; number < 9; ++number) {
         const QTextBlock block = document->findBlockByNumber(number);
         const auto format = block.blockFormat();
         QVERIFY(format.leftMargin() > 0);
-        QCOMPARE(format.textIndent(), -format.leftMargin());
+        QCOMPARE(format.textIndent(), gutter - format.leftMargin());
         QCOMPARE(format.lineHeight(), qreal(155));
         if (number < 3) {
             QVERIFY(format.leftMargin() > previousOffset);
@@ -50,9 +51,9 @@ void FomawriteTest::sourceHangingIndentPreservesLiteralMarkdown() {
         if (block.text() == "- Parent with code" || block.text() == "  - Ordinary nested sibling"
                 || block.text() == "    - Ordinary grandchild") {
             QVERIFY(block.blockFormat().leftMargin() > 0);
-            QCOMPARE(block.blockFormat().textIndent(), -block.blockFormat().leftMargin());
+            QCOMPARE(block.blockFormat().textIndent(), gutter - block.blockFormat().leftMargin());
         } else {
-            QCOMPARE(block.blockFormat().leftMargin(), qreal(0));
+            QCOMPARE(block.blockFormat().leftMargin(), gutter);
             QCOMPARE(block.blockFormat().textIndent(), qreal(0));
         }
     }

@@ -70,7 +70,11 @@ void FomawriteTest::sourceTripleEmphasisKeepsFormattingAndLiteralCode() {
                 QVERIFY(format.fontWeight() != QFont::Bold);
                 QVERIFY(!format.fontItalic());
                 QVERIFY(format.fontPointSize() != 1.0);
-                QCOMPARE(format.background().color(), QColor("#EAECF0"));
+                if (literal.startsWith(QStringLiteral("***fenced"))
+                    || literal.startsWith(QStringLiteral("___fenced")))
+                    QCOMPARE(format.background().style(), Qt::NoBrush);
+                else
+                    QCOMPARE(format.background().color(), QColor("#EAECF0"));
             }
         }
         QCOMPARE(document.toPlainText(), source);

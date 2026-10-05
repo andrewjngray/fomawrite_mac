@@ -123,8 +123,8 @@ void FomawriteTest::paneZoomPresetsLinkAndPersistWithoutEditing() {
         QCOMPARE(editor->property("text").toString(), draft);
         QVERIFY(backend.exportDocument(QUrl::fromLocalFile(after), "html"));
         QCOMPARE(cycle103Read(after), cycle103Read(before));
-        QVERIFY(QMetaObject::invokeMethod(editor, "undo")); QCOMPARE(editor->property("text").toString(), QString::fromUtf8(saved));
-        QVERIFY(QMetaObject::invokeMethod(editor, "redo")); QCOMPARE(editor->property("text").toString(), draft);
+        QVERIFY(QMetaObject::invokeMethod(window.data(), "undoEditing")); QCOMPARE(editor->property("text").toString(), QString::fromUtf8(saved));
+        QVERIFY(QMetaObject::invokeMethod(window.data(), "redoEditing")); QCOMPARE(editor->property("text").toString(), draft);
         QCOMPARE(cycle103Read(path), saved);
     }
     QSettings().sync();

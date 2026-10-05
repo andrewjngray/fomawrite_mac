@@ -76,8 +76,8 @@
         backend.setThemePreset("dark"); settle(80); capture("pane-footer-narrow-dark");
         window->resize(1280, 720); action("previewOnly", 2, false); paneAnchorCheck(); capture("pane-footer-full-preview");
         sourceSingle(); paneAnchorCheck(); capture("pane-footer-source");
-        QMetaObject::invokeMethod(editor, "undo"); check(editor->property("text").toString() == text, "Pane tools added an Undo unit");
-        QMetaObject::invokeMethod(editor, "redo"); check(editor->property("text").toString() == draft, "Pane tools changed Redo");
+        QMetaObject::invokeMethod(window, "undoEditing"); check(editor->property("text").toString() == text, "Pane tools added an Undo unit");
+        QMetaObject::invokeMethod(window, "redoEditing"); check(editor->property("text").toString() == draft, "Pane tools changed Redo");
     });
     chromeCheck("preview-header-file-identity-and-edited-state", [&] {
         window->resize(1280, 720); backend.setThemePreset("studio");

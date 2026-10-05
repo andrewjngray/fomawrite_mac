@@ -16,6 +16,8 @@ public:
     void setFocusRange(int start, int end);
     void setColors(const QString &background, const QString &foreground, const QString &accent);
     void setSearch(const QString &query, int currentMatchStart);
+    void setCodeStyle(bool enabled);
+    void setCodeLanguage(const QString &language);
 
     struct Span {
         int start;
@@ -49,12 +51,16 @@ private:
     void highlightInline(const QString &text);
     void highlightReviewSpans(const QString &text);
     void highlightSearch(const QString &text);
+    void highlightCode(const QString &text, const QString &language, int lexicalState = 0,
+                       int *nextLexicalState = nullptr, int offset = 0);
 
     int m_focusBlock = -1;
     int m_focusStart = -1;
     int m_focusEnd = -1;
     bool m_showMarkup = false;
     bool m_darkMode = true;
+    bool m_codeStyle = false;
+    QString m_codeLanguage;
     QString m_customBackground;
     QString m_customForeground;
     QString m_customAccent;
@@ -73,4 +79,10 @@ private:
     int m_currentMatchStart = -1;
     QTextCharFormat m_searchFormat;
     QTextCharFormat m_currentSearchFormat;
+    QTextCharFormat m_codeKeywordFormat;
+    QTextCharFormat m_codeStringFormat;
+    QTextCharFormat m_codeNumberFormat;
+    QTextCharFormat m_codeCommentFormat;
+    QTextCharFormat m_codeTypeFormat;
+    QTextCharFormat m_codeFunctionFormat;
 };

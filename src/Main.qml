@@ -34,13 +34,16 @@ ApplicationWindow {
     // `omarchy display text size` drives) anchored so its 12px default leaves
     // the app at the sizes it was designed around.
     readonly property real textScale: backend.textScale
-    readonly property string activeWritingAppearance: ["editorial", "book"].indexOf(workspaceSettings.writingAppearance) >= 0
+    readonly property string activeWritingAppearance: ["editorial", "book", "code"].indexOf(workspaceSettings.writingAppearance) >= 0
         ? workspaceSettings.writingAppearance : "manuscript"
+    readonly property bool codeAppearance: activeWritingAppearance === "code"
+    onActiveWritingAppearanceChanged: Qt.callLater(function() { backend.setSourceAppearance(activeWritingAppearance); codeDecorationsTimer.restart(); editorFlick.contentX = 0; })
+    onDarkModeChanged: Qt.callLater(function() { backend.setSourceAppearance(activeWritingAppearance); })
     readonly property string editorFontFamily: activeWritingAppearance === "editorial" ? Qt.application.font.family
-        : activeWritingAppearance === "book" ? "Georgia" : "iA Writer Mono S"
-    readonly property int writingBasePixelSize: activeWritingAppearance === "manuscript" ? 18 : activeWritingAppearance === "book" ? 20 : 19
+        : activeWritingAppearance === "book" ? "Georgia" : codeAppearance ? "Menlo" : "iA Writer Mono S"
+    readonly property int writingBasePixelSize: codeAppearance ? 15 : activeWritingAppearance === "manuscript" ? 18 : activeWritingAppearance === "book" ? 20 : 19
     readonly property int editorFontPixelSize: scaledSize(writingBasePixelSize * paneZoom.sourceZoom / 100)
-    readonly property int editorWidth: Math.min(
+    readonly property int editorWidth: codeAppearance ? Math.max(180, editorPane.width - 112) : Math.min(
         scaledSize(680),
         Math.max(180, editorPane.width - 64))
     property int tabInset: 0
@@ -878,6 +881,7 @@ ApplicationWindow {
             CompactMenuItem { text: "Manuscript"; checkable: true; checked: win.activeWritingAppearance === "manuscript"; onTriggered: workspaceCommands.run("writingManuscript") }
             CompactMenuItem { text: "Editorial"; checkable: true; checked: win.activeWritingAppearance === "editorial"; onTriggered: workspaceCommands.run("writingEditorial") }
             CompactMenuItem { text: "Book"; checkable: true; checked: win.activeWritingAppearance === "book"; onTriggered: workspaceCommands.run("writingBook") }
+            CompactMenuItem { text: "Code"; checkable: true; checked: win.activeWritingAppearance === "code"; onTriggered: workspaceCommands.run("writingCode") }
         }
         MenuSeparator {}
         CompactMenuItem { text: "Paragraph focus"; checkable: true; checked: workspaceSettings.paragraphFocus; onTriggered: workspaceCommands.run("paragraph") }
@@ -899,6 +903,7 @@ ApplicationWindow {
         CompactMenuItem { objectName: "sourceAppearanceManuscript"; text: "Manuscript"; checkable: true; autoExclusive: true; checked: win.activeWritingAppearance === "manuscript"; onTriggered: workspaceCommands.run("writingManuscript") }
         CompactMenuItem { objectName: "sourceAppearanceEditorial"; text: "Editorial"; checkable: true; autoExclusive: true; checked: win.activeWritingAppearance === "editorial"; onTriggered: workspaceCommands.run("writingEditorial") }
         CompactMenuItem { objectName: "sourceAppearanceBook"; text: "Book"; checkable: true; autoExclusive: true; checked: win.activeWritingAppearance === "book"; onTriggered: workspaceCommands.run("writingBook") }
+        CompactMenuItem { objectName: "sourceAppearanceCode"; text: "Code"; checkable: true; autoExclusive: true; checked: win.activeWritingAppearance === "code"; onTriggered: workspaceCommands.run("writingCode") }
         MenuSeparator {}
         CompactMenuItem { objectName: "sourceAppearanceLarger"; text: "Larger text"; enabled: paneZoom.sourceZoom < paneZoom.maximumZoom; onTriggered: paneZoom.adjustZoom("source", 10) }
         CompactMenuItem { objectName: "sourceAppearanceSmaller"; text: "Smaller text"; enabled: paneZoom.sourceZoom > paneZoom.minimumZoom; onTriggered: paneZoom.adjustZoom("source", -10) }
@@ -1771,6 +1776,7 @@ ApplicationWindow {
                 NativeCommand { commandId: "writingManuscript"; text: "Manuscript (Mono)" }
                 NativeCommand { commandId: "writingEditorial"; text: "Editorial (Sans)" }
                 NativeCommand { commandId: "writingBook"; text: "Book (Serif)" }
+                NativeCommand { commandId: "writingCode"; text: "Code" }
             }
             Platform.MenuItem {
                 objectName: "native_showCompletions"
@@ -2611,7 +2617,7 @@ ApplicationWindow {
                 textFormat: TextEdit.MarkdownText
                 readOnly: true
                 selectByMouse: true
-                wrapMode: TextEdit.Wrap
+                wrapMode: win.codeAppearance ? TextEdit.NoWrap : TextEdit.Wrap
                 color: win.textColor
                 background: null
                 Accessible.name: helpDialog.title
@@ -2740,8 +2746,47 @@ ApplicationWindow {
 
         Flickable {
             id: editorFlick
+            property var codeLines: []
+            Timer {
+                id: codeDecorationsTimer
+                interval: 0
+                onTriggered: editorFlick.codeLines = backend.sourceLineDecorations(editorFlick.contentY - editor.y, editorFlick.contentY + editorFlick.height - editor.y)
+            }
+            TextMetrics { id: codeMetrics; font: editor.font; text: " " }
+            Repeater {
+                model: editorFlick.codeLines
+                delegate: Item {
+                    required property var modelData
+                    x: editor.x; y: editor.y + modelData.y
+                    width: Math.max(editor.width, editor.contentWidth); height: modelData.height
+                    Rectangle {
+                        objectName: "sourceCodeBlockBackground"
+                        visible: modelData.fenced
+                        x: modelData.margin - 6; y: 0
+                        width: parent.width - x + 6; height: parent.height + 0.5
+                        color: win.darkMode ? "#252A32" : "#EAECF0"
+                    }
+                    Text {
+                        visible: win.codeAppearance
+                        x: -win.scaledSize(56); width: win.scaledSize(44)
+                        text: modelData.number; horizontalAlignment: Text.AlignRight
+                        font: editor.font; color: win.mutedColor; opacity: 0.75
+                        Accessible.ignored: true
+                    }
+                    Repeater {
+                        model: win.codeAppearance ? Math.floor(parent.modelData.indent / 4) : 0
+                        Rectangle {
+                            required property int index
+                            x: index * codeMetrics.advanceWidth * 4
+                            width: 1; height: parent.height
+                            color: backend.palette.border; opacity: 0.6
+                        }
+                    }
+                }
+            }
             visible: !workspaceLayout.visualEditEnabled
             onContentYChanged: {
+                codeDecorationsTimer.restart();
                 if (!win.sourceEditorVisible || !workspaceSettings.synchronizedScroll || win.synchronizingScroll || win.changingDocumentView || workspaceLayout.effectiveLayoutMode !== 1) return;
                 win.synchronizingScroll = true;
                 previewPane.scrollToFraction(contentY / Math.max(1, contentHeight - height));
@@ -2754,7 +2799,8 @@ ApplicationWindow {
             anchors.bottomMargin: documentFooter.height
             anchors.topMargin: documentMeta.y + documentMeta.height
             clip: true
-            contentWidth: width
+            contentWidth: win.codeAppearance ? Math.max(width, editor.x + editor.contentWidth + 24) : width
+            ScrollBar.horizontal: ScrollBar { policy: win.codeAppearance ? ScrollBar.AsNeeded : ScrollBar.AlwaysOff }
             contentHeight: Math.max(height, editor.y + editor.implicitHeight + (workspaceSettings.typewriter ? height / 2 : 220))
             boundsBehavior: Flickable.StopAtBounds
             ScrollBar.vertical: ScrollBar {
@@ -2875,6 +2921,8 @@ ApplicationWindow {
                     win.writingActivity();
                     win.cancelDocumentViewportTransition();
                     scrollLinger.restart();
+                    if (win.codeAppearance && (wheel.pixelDelta.x || wheel.angleDelta.x))
+                        editorFlick.contentX = Math.max(0, Math.min(editorFlick.contentWidth - editorFlick.width, editorFlick.contentX - (wheel.pixelDelta.x || wheel.angleDelta.x)));
                     if (wheel.pixelDelta.y !== 0)
                         editorFlick.scrollTo(editorFlick.clampContentY(editorFlick.contentY - wheel.pixelDelta.y));
                     else
@@ -2930,6 +2978,11 @@ ApplicationWindow {
             // bottom edge scrolls the page along with the text.
             function ensureCursorVisible() {
                 if (win.changingDocumentView) return;
+                if (win.codeAppearance) {
+                    var caretX = editor.x + editor.cursorRectangle.x;
+                    if (caretX < contentX + 64) contentX = Math.max(0, caretX - 64);
+                    else if (caretX > contentX + width - 24) contentX = Math.min(contentWidth - width, caretX - width + 24);
+                }
                 if (workspaceSettings.typewriter && editor.selectionStart === editor.selectionEnd) {
                     scrollTo(clampContentY(editor.y + editor.cursorRectangle.y - height / 2 + editor.cursorRectangle.height / 2));
                     return;
@@ -2949,14 +3002,14 @@ ApplicationWindow {
                 id: editor
                 objectName: "sourceEditor"
             Accessible.name: "Markdown editor"
-                x: Math.round((editorFlick.width - width) / 2)
+                x: win.codeAppearance ? win.scaledSize(64) : Math.round((editorFlick.width - width) / 2)
                 y: workspaceSettings.typewriter ? editorFlick.height / 2
                     : win.scaledSize(38)
                 width: win.editorWidth
                 height: Math.max(editorFlick.height - y - 96, implicitHeight + 20)
                 text: ""
                 textFormat: TextEdit.PlainText
-                wrapMode: TextEdit.Wrap
+                wrapMode: win.codeAppearance ? TextEdit.NoWrap : TextEdit.Wrap
                 selectByMouse: true
                 persistentSelection: true
                 activeFocusOnPress: true
@@ -2966,7 +3019,8 @@ ApplicationWindow {
                 font.family: win.editorFontFamily
                 font.pixelSize: win.editorFontPixelSize
                 font.weight: Font.Normal
-                onFontChanged: Qt.callLater(function() { backend.refreshSourceTypography(); })
+                onFontChanged: Qt.callLater(function() { backend.setSourceAppearance(win.activeWritingAppearance); codeDecorationsTimer.restart(); })
+                onContentHeightChanged: codeDecorationsTimer.restart()
                 // Native rendering hints glyphs to the pixel grid, which is
                 // crispest at whole scale factors but misplaces and unevenly
                 // rasterizes glyphs at fractional ones (and goes stale when
@@ -3031,7 +3085,18 @@ ApplicationWindow {
                     }
                 }
 
+                function applyCodeEdit(action) {
+                    var collapsed = selectionStart === selectionEnd;
+                    var result;
+                    win.performDocumentEdit(function() { result = backend.editCode(action, editor.selectionStart, editor.selectionEnd); });
+                    if (result.start === undefined) return;
+                    if (collapsed || action === "newline") cursorPosition = result.end;
+                    else select(result.start, result.end);
+                    codeDecorationsTimer.restart();
+                }
+
                 function smartReturn(softBreak) {
+                    if (win.codeAppearance && !softBreak) { applyCodeEdit("newline"); return; }
                     if (softBreak) {
                         replaceSelectionWith("\n");
                         return;
@@ -3185,30 +3250,33 @@ ApplicationWindow {
                         && (event.modifiers & Qt.ShiftModifier)
                         && !(event.modifiers & (Qt.ControlModifier | Qt.AltModifier | Qt.MetaModifier));
                     if (pasteKey || shiftInsert) {
-                        if (!pasteClipboardUrlAsMarkdownLink())
+                        if (win.codeAppearance || !pasteClipboardUrlAsMarkdownLink())
                             pasteClipboardAsPlainText();
                         event.accepted = true;
                         return;
                     }
 
                     if (!(event.modifiers & (Qt.ControlModifier | Qt.AltModifier | Qt.MetaModifier))
-                        && event.text === "\"" && win.insertSmartQuote()) {
+                        && !win.codeAppearance && event.text === "\"" && win.insertSmartQuote()) {
                         event.accepted = true;
                         return;
                     }
                     if (!(event.modifiers & (Qt.ControlModifier | Qt.AltModifier | Qt.MetaModifier))
-                        && event.text === "-" && win.insertSmartDash()) {
+                        && !win.codeAppearance && event.text === "-" && win.insertSmartDash()) {
                         event.accepted = true;
                         return;
                     }
 
                     var returnKey = event.key === Qt.Key_Return || event.key === Qt.Key_Enter;
                     var commandModifier = event.modifiers & (Qt.ControlModifier | Qt.AltModifier | Qt.MetaModifier);
-                    if (returnKey && !commandModifier) {
+                    if (win.codeAppearance && !commandModifier && (event.key === Qt.Key_Tab || event.key === Qt.Key_Backtab)) {
+                        applyCodeEdit((event.key === Qt.Key_Backtab || (event.modifiers & Qt.ShiftModifier)) ? "outdent" : "indent");
+                        event.accepted = true;
+                    } else if (returnKey && !commandModifier) {
                         smartReturn(event.modifiers & Qt.ShiftModifier);
                         event.accepted = true;
                     } else if (!commandModifier && event.key === Qt.Key_Backspace
-                               && deleteParagraphBreakBehindCursor()) {
+                               && !win.codeAppearance && deleteParagraphBreakBehindCursor()) {
                         event.accepted = true;
                     } else if (!commandModifier && !(event.modifiers & Qt.ShiftModifier)
                                && event.key === Qt.Key_Right) {
@@ -3231,6 +3299,7 @@ ApplicationWindow {
                     if (win.searchUpdating) return;
                     var contentChanged = backend.editorTextChanged();
                     if (!contentChanged) return;
+                    codeDecorationsTimer.restart();
                     // Highlight/typography notifications must not cancel a view
                     // transaction; actual writing always takes precedence.
                     win.cancelDocumentViewportTransition();
@@ -3254,6 +3323,7 @@ ApplicationWindow {
                 Component.onCompleted: {
                     backend.setShowMarkup(true);
                     backend.attachDocument(textDocument);
+                    backend.setSourceAppearance(win.activeWritingAppearance);
                     backend.setFocusPosition(cursorPosition, workspaceSettings.paragraphFocus, workspaceSettings.sentenceFocus);
                     if (workspaceSettings.styleCheckCustom || workspaceSettings.styleCheckFillers)
                         customReviewRefreshTimer.restart();
@@ -3452,7 +3522,7 @@ ApplicationWindow {
         canSplit: workspaceLayout.availableWidth >= 800
         sourcePaneWidth: editorPane.visible ? editorPane.width : 0
         previewPaneStart: previewPane.visible ? previewPane.x - x : width
-        writingAppearance: win.activeWritingAppearance === "editorial" ? "Editorial" : win.activeWritingAppearance === "book" ? "Book" : "Manuscript"
+        writingAppearance: win.codeAppearance ? "Code" : win.activeWritingAppearance === "editorial" ? "Editorial" : win.activeWritingAppearance === "book" ? "Book" : "Manuscript"
         previewTemplate: backend.outputTemplateName
         statusText: backend.status
         showStatus: !workspaceLayout.effectiveOrganizerVisible

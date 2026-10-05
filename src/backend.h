@@ -121,6 +121,9 @@ public:
     Q_INVOKABLE QUrl resolveDocumentLink(const QString &link) const;
     Q_INVOKABLE void attachDocument(QObject *textDocument);
     Q_INVOKABLE bool refreshSourceTypography();
+    Q_INVOKABLE void setSourceAppearance(const QString &appearance);
+    Q_INVOKABLE QVariantList sourceLineDecorations(qreal top, qreal bottom) const;
+    Q_INVOKABLE QVariantMap editCode(const QString &action, int start, int end);
     Q_INVOKABLE int undoSource(int position);
     Q_INVOKABLE int redoSource(int position);
     Q_INVOKABLE void openDialog();
@@ -304,6 +307,9 @@ private:
     void watchOmarchyTheme();
 
     bool m_showMarkup = true;
+    QString m_sourceAppearance = "manuscript";
+    int m_codeIndentWidth = 0;
+    bool m_codeIndentTabs = false;
     FileLibrary m_library;
     QUrl m_fileUrl;
     bool m_modified = false;

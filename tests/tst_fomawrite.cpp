@@ -42,6 +42,10 @@ class FomawriteTest : public QObject {
 
 private slots:
     void publishingWebCommandSelectsWebWithoutChangingEditor();
+    void manuscriptHeadingMarkersHangOutsideBodyColumn();
+    void sourceCodeBackgroundAndAppearancePreserveSavedBytes();
+    void codeIndentKeysAndQuotesKeepAtomicUndo();
+    void syntaxColorsRespectLanguagesAndLiteralMarkdown();
     void sourceHangingIndentPreservesLiteralMarkdown();
     void sourceHangingIndentKeepsUndoRedoAndSelection();
     void documentChromeHidesForUserInputAndRevealsEdgesWithoutReflow();
@@ -5486,6 +5490,8 @@ private:
 #include "cycle118-editing-layout.inc"
 #include "cycle119-document-chrome.inc"
 #include "cycle122-source-typography.inc"
+#include "cycle123-source-appearance.inc"
+#include "cycle123-code-highlighting.inc"
 #include "cycle100-navigation.inc"
 #include "cycle99-integration.inc"
 #include "sourcevisualmapping-cycle99.inc"

@@ -11,6 +11,7 @@
 #include <QFile>
 #include <QFileInfo>
 #include <QFontDatabase>
+#include <QFontMetricsF>
 #include <QImage>
 #include <QJsonArray>
 #include <QJsonDocument>
@@ -26,6 +27,7 @@
 #include <QQuickItem>
 #include <QQuickTextDocument>
 #include <QTextDocument>
+#include <QAbstractTextDocumentLayout>
 #include <QTextBlock>
 #include <QTextLayout>
 #include <QQuickStyle>
@@ -579,9 +581,9 @@ int runDocumentViewCheck(QApplication &app, const QString &outputDirectory) {
     backend.setThemePreset("dark");
     settle(120);
     capture("dark-split");
-    QMetaObject::invokeMethod(editor, "undo");
+    QMetaObject::invokeMethod(window, "undoEditing");
     check(editor->property("text").toString() == saved, "Draft Undo no longer restores saved source");
-    QMetaObject::invokeMethod(editor, "redo");
+    QMetaObject::invokeMethod(window, "redoEditing");
     check(editor->property("text").toString() == draft, "Draft Redo no longer restores unsaved source");
     check(sample.open(QIODevice::ReadOnly), "Cannot re-read saved fixture");
     check(sample.readAll() == saved.toUtf8(), "Disposable saved document was changed by view clicks");
@@ -677,12 +679,12 @@ int runDocumentViewCheck(QApplication &app, const QString &outputDirectory) {
                 check(!previousMatch->isEnabled() && !nextMatch->isEnabled()
                       && !replaceCurrent->isEnabled() && !replaceAll->isEnabled()
                       && matchStatus->property("text").toString() == "No matches", "No-match status/navigation is inconsistent");
-                QMetaObject::invokeMethod(editor, "undo");
+                QMetaObject::invokeMethod(window, "undoEditing");
                 check(editor->property("text").toString() == afterCurrent, "Replace all was not one undo unit");
-                QMetaObject::invokeMethod(editor, "undo");
+                QMetaObject::invokeMethod(window, "undoEditing");
                 check(editor->property("text").toString() == findDraft, "Replace current Undo did not preserve the unsaved ending");
-                QMetaObject::invokeMethod(editor, "redo");
-                QMetaObject::invokeMethod(editor, "redo");
+                QMetaObject::invokeMethod(window, "redoEditing");
+                QMetaObject::invokeMethod(window, "redoEditing");
                 check(editor->property("text").toString() == afterAll, "Replacement Redo did not restore exact draft");
                 replaceField->forceActiveFocus();
                 key(window, Qt::Key_Escape);
@@ -806,9 +808,9 @@ int runDocumentViewCheck(QApplication &app, const QString &outputDirectory) {
             key(window, Qt::Key_Return);
             check(waitUntil([&] { return editor->property("text").toString() == entry.second; }), "Visual middle Return did not preserve exact list Markdown: " + QString::number(index));
             if (index == 3) capture("daily-list-after-return");
-            QMetaObject::invokeMethod(editor, "undo");
+            QMetaObject::invokeMethod(window, "undoEditing");
             check(editor->property("text").toString() == entry.first, "Visual split was not one exact undo step");
-            QMetaObject::invokeMethod(editor, "redo");
+            QMetaObject::invokeMethod(window, "redoEditing");
             check(editor->property("text").toString() == entry.second, "Visual list split Redo changed source bytes");
         }
     });
@@ -1003,9 +1005,9 @@ int runDocumentViewCheck(QApplication &app, const QString &outputDirectory) {
                 const QString afterOutput = temporary.filePath("zoom-after.html");
                 check(backend.exportDocument(QUrl::fromLocalFile(afterOutput), "html")
                     && fileHash(afterOutput) == initialOutputHash, "Screen zoom changed exported HTML bytes");
-                QMetaObject::invokeMethod(editor, "undo");
+                QMetaObject::invokeMethod(window, "undoEditing");
                 check(editor->property("text").toString() == zoomOriginal, "Zoom polluted Undo of the unsaved ending");
-                QMetaObject::invokeMethod(editor, "redo");
+                QMetaObject::invokeMethod(window, "redoEditing");
                 check(editor->property("text").toString() == zoomDraft, "Zoom destroyed Redo of the unsaved ending");
                 QFile file(temporary.filePath("Independent pane zoom.md"));
                 check(file.open(QIODevice::ReadOnly) && file.readAll() == zoomOriginal.toUtf8(), "Zoom saved a diagnostic draft without request");
@@ -1158,7 +1160,7 @@ int runDocumentViewCheck(QApplication &app, const QString &outputDirectory) {
         for (const auto &range : block.layout()->formats())
             check(range.format.fontPointSize() != 1.0, "Source contains collapsed syntax glyphs");
         const auto bullet = document->findBlock(sample.indexOf("- **Readable"));
-        check(bullet.blockFormat().leftMargin() > 0 && bullet.blockFormat().textIndent() == -bullet.blockFormat().leftMargin(), "Source list lacks a hanging indent");
+        check(bullet.blockFormat().textIndent() < 0 && qAbs(bullet.blockFormat().leftMargin() + bullet.blockFormat().textIndent() - document->firstBlock().blockFormat().leftMargin()) < 1, "Source list lacks a hanging indent");
         check(bullet.blockFormat().lineHeight() == 155, "Source line spacing is not applied");
         capture("source-readable-single");
         for (int mode : {1, 0, 1}) {
@@ -1180,6 +1182,106 @@ int runDocumentViewCheck(QApplication &app, const QString &outputDirectory) {
         check(document->toPlainText() == sample, "App Undo stopped at presentation instead of reversing typing");
         QMetaObject::invokeMethod(window, "redoEditing");
         check(document->toPlainText() == edited, "App Redo did not restore exact prefix typing");
+    });
+
+    editingLayoutCheck("cycle123-manuscript-headings-and-code-appearance", [&] {
+        backend.setThemePreset("studio"); window->resize(1440, 900);
+        layout->setProperty("organizerVisible", false); layout->setProperty("filesVisible", false);
+        settings->setProperty("autoHideChrome", false);
+        if (zoom) QMetaObject::invokeMethod(zoom, "setZoom", Q_ARG(QVariant, "source"), Q_ARG(QVariant, 100));
+        const QString heading = "A readable heading keeps its words on the body column while its Markdown markers hang beside them. ";
+        const QString sample = QString::fromUtf8("# Source appearance\n\n")
+            + "### " + heading.repeated(3) + "\n\n"
+              "The source stays ordinary Markdown. Café and 你好 stay exact through every appearance change.\n\n"
+              "- A longer list item keeps its continuation lines under its own words while the prefix remains visible.\n"
+              "    - A nested item retains its original spaces.\n\n"
+              "```javascript\nfunction greet(name) {\n    const message = \"Hello, \" + name;\n\n"
+              "    // The empty line shares the block background.\n    return message;\n}\n```\n\n"
+              "Inline `greet(name)` has a compact background within this ordinary paragraph.\n";
+        if (!loadSample("Cycle123 source appearance", sample)) return;
+        auto *quickDocument = qvariant_cast<QQuickTextDocument *>(editor->property("textDocument"));
+        if (!check(quickDocument && commands, "Cycle123 source document or appearance commands are missing")) return;
+        auto *document = quickDocument->textDocument();
+        const QString path = backend.fileUrl().toLocalFile();
+        const QString originalHash = fileHash(path);
+        const auto appearance = [&](const QString &command, const QString &expected) {
+            const bool wasModified = backend.modified();
+            check(QMetaObject::invokeMethod(commands, "run", Q_ARG(QVariant, command)),
+                  "Cannot dispatch Source appearance command: " + command);
+            check(waitUntil([&] { return window->property("activeWritingAppearance").toString() == expected; }),
+                  "Source appearance command did not select " + expected);
+            check(renderBarrier(window), "Cannot render Source appearance: " + expected);
+            check(document->toPlainText() == sample && backend.modified() == wasModified, "Source appearance changed Markdown or dirty state: " + expected);
+        };
+        appearance("writingManuscript", "manuscript");
+        action("singleModeButton", 0, false);
+        backend.refreshSourceTypography(); renderBarrier(window);
+        const auto headingBlock = document->findBlock(sample.indexOf("### "));
+        const auto bodyBlock = document->findBlock(sample.indexOf("The source stays"));
+        document->documentLayout()->documentSize();
+        if (check(headingBlock.layout()->lineCount() > 1 && bodyBlock.layout()->lineCount() > 0,
+                  "Cycle123 heading geometry did not produce wrapped text")) {
+            const qreal bodyX = bodyBlock.layout()->lineAt(0).cursorToX(0);
+            const auto first = headingBlock.layout()->lineAt(0);
+            const qreal headingX = first.cursorToX(4);
+            const qreal markerX = first.cursorToX(0);
+            const qreal wrapX = headingBlock.layout()->lineAt(1).x();
+            report.insert("cycle123HeadingGeometry", QJsonObject{{"bodyX", bodyX}, {"headingTextX", headingX},
+                {"markerX", markerX}, {"continuationX", wrapX}});
+            check(headingBlock.blockFormat().textIndent() < 0 && markerX < bodyX
+                && qAbs(headingX - bodyX) < 1 && qAbs(wrapX - bodyX) < 1,
+                  "Native Manuscript layout did not hang heading markers beside the aligned body column; see cycle123HeadingGeometry");
+        }
+        const auto fence = document->findBlock(sample.indexOf("```javascript"));
+        const auto close = document->findBlock(sample.indexOf("```\n\nInline"));
+        const QBrush background = fence.blockFormat().background();
+        check(background.style() != Qt::NoBrush, "Fenced code has no full-width block background");
+        for (auto block = fence; block.isValid() && block.blockNumber() <= close.blockNumber(); block = block.next())
+            check(block.blockFormat().background() == background && block.blockFormat().topMargin() == 0
+                && block.blockFormat().bottomMargin() == 0, "Fenced code background is interrupted, including its empty line");
+        check(close.next().blockFormat().background().style() == Qt::NoBrush, "Fenced background leaked into following prose");
+        capture("manuscript-hanging-headings-code-blocks");
+        sourceScroll->setProperty("contentY", document->documentLayout()->blockBoundingRect(fence).top() - 160);
+        renderBarrier(window);
+        capture("manuscript-continuous-code-background");
+        sourceScroll->setProperty("contentY", 0);
+        appearance("writingCode", "code");
+        const QFontMetricsF metrics(qvariant_cast<QFont>(editor->property("font")));
+        check(qAbs(metrics.horizontalAdvance('i') - metrics.horizontalAdvance('W')) < 0.1, "Code appearance is not monospace");
+        for (auto block = document->begin(); block.isValid(); block = block.next())
+            check(block.blockFormat().lineHeight() == 135 && block.blockFormat().leftMargin() == 0
+                && block.blockFormat().textIndent() == 0, "Code appearance retained prose indentation or line spacing");
+        action("previewSplitButton", 1, false);
+        capture("code-style-light");
+        backend.setThemePreset("dark"); action("singleModeButton", 0, false);
+        capture("code-style-dark");
+        backend.setThemePreset("studio");
+        for (const auto &choice : {qMakePair(QString("writingBook"), QString("book")),
+                qMakePair(QString("writingEditorial"), QString("editorial")),
+                qMakePair(QString("writingManuscript"), QString("manuscript"))})
+            appearance(choice.first, choice.second);
+        backend.save();
+        check(fileHash(path) == originalHash, "Appearance changes altered the sample's saved UTF-8 bytes");
+        appearance("writingCode", "code");
+        const int position = sample.indexOf("    const message");
+        editor->setProperty("cursorPosition", position); editor->forceActiveFocus();
+        key(window, Qt::Key_Tab, "\t");
+        QString indented = sample; indented.insert(position, "    ");
+        check(waitUntil([&] { return document->toPlainText() == indented; }), "Native Code Tab did not indent the line");
+        key(window, Qt::Key_Backtab, {}, Qt::ShiftModifier);
+        check(waitUntil([&] { return document->toPlainText() == sample; }), "Native Code Shift-Tab did not remove one indent");
+        QMetaObject::invokeMethod(window, "undoEditing");
+        check(document->toPlainText() == indented, "Native Code outdent was not a single Undo operation");
+        QMetaObject::invokeMethod(window, "undoEditing");
+        check(document->toPlainText() == sample, "Native Code Tab was not a single Undo operation");
+        const int newline = sample.indexOf('\n', sample.indexOf("function greet"));
+        editor->setProperty("cursorPosition", newline); editor->forceActiveFocus();
+        key(window, Qt::Key_Return, "\n");
+        QString entered = sample; entered.insert(newline, "\n    ");
+        check(waitUntil([&] { return document->toPlainText() == entered; }), "Native Code Return did not keep brace indentation");
+        QMetaObject::invokeMethod(window, "undoEditing");
+        check(document->toPlainText() == sample, "Native Code Return was not a single Undo operation");
+        appearance("writingManuscript", "manuscript");
     });
 
     editingLayoutCheck("publishing-web-pdf-renderers-preserve-source", [&] {

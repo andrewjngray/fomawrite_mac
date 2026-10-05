@@ -132,8 +132,8 @@ void FomawriteTest::headerQuickZoomPreservesMarkdownAndUndo() {
     QCOMPARE(backend.outputStyle(), 6); QCOMPARE(backend.outputPointSize(), pointSize); QCOMPARE(backend.outputFont(), font);
     QCOMPARE(editor->property("selectionStart").toInt(), 5); QCOMPARE(editor->property("selectionEnd").toInt(), 12);
     QVERIFY(backend.modified());
-    QVERIFY(QMetaObject::invokeMethod(editor, "undo")); QCOMPARE(editor->property("text").toString(), QString::fromUtf8(source));
-    QVERIFY(QMetaObject::invokeMethod(editor, "redo")); QCOMPARE(editor->property("text").toString(), draft);
+    QVERIFY(QMetaObject::invokeMethod(window.data(), "undoEditing")); QCOMPARE(editor->property("text").toString(), QString::fromUtf8(source));
+    QVERIFY(QMetaObject::invokeMethod(window.data(), "redoEditing")); QCOMPARE(editor->property("text").toString(), draft);
     QCOMPARE(cycle103Read(path), source);
 }
 

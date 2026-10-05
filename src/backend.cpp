@@ -9,6 +9,7 @@
 #include <QCryptographicHash>
 #include <QTextFragment>
 #include <QTextLayout>
+#include <QFontMetricsF>
 #include <QTextTable>
 #include <QJsonArray>
 #include <QPdfWriter>
@@ -67,13 +68,16 @@ namespace {
 // Source is literal Markdown. Only the soft wraps move; the first line keeps
 // its original leading spaces and markers. Container prefixes also let us keep
 // quoted fences and nested-list code literal.
-QList<QPair<QTextBlock, qreal>> sourceHangingOffsets(QTextDocument *document) {
+struct SourceBlockStyle { QTextBlock block; qreal margin; qreal indent; bool fenced; };
+
+QList<SourceBlockStyle> sourceHangingOffsets(QTextDocument *document, bool manuscript, bool codeStyle) {
     static const QRegularExpression quote(QStringLiteral("^[ \\t]*(?:>[ \\t]?)+[ \\t]*"));
     static const QRegularExpression list(QStringLiteral("^(?:[-+*]|[0-9]{1,9}[.)])[ \\t]+"));
     static const QRegularExpression task(QStringLiteral("^\\[[ xX]\\][ \\t]+"));
     static const QRegularExpression fence(QStringLiteral("^(`{3,}|~{3,})(.*)$"));
     static const QRegularExpression rule(QStringLiteral("^(?:\\*[ \\t]*){3,}$|^(?:-[ \\t]*){3,}$|^(?:_[ \\t]*){3,}$"));
-    QList<QPair<QTextBlock, qreal>> result;
+    QList<SourceBlockStyle> result;
+    const qreal gutter = manuscript ? QFontMetricsF(document->defaultFont()).horizontalAdvance(QStringLiteral("#######")) : 0;
     QChar fenceMarker;
     int fenceLength = 0;
     QList<int> listContentIndents;
@@ -113,6 +117,7 @@ QList<QPair<QTextBlock, qreal>> sourceHangingOffsets(QTextDocument *document) {
         }
         const QString trimmed = body.trimmed();
         bool literal = indentedCode;
+        bool fenced = fenceLength > 0;
         if (inFrontMatter) {
             literal = true;
             if (block.blockNumber() > 0 && (text == QStringLiteral("---") || text == QStringLiteral("...")))
@@ -132,6 +137,7 @@ QList<QPair<QTextBlock, qreal>> sourceHangingOffsets(QTextDocument *document) {
             const auto match = fence.match(trimmed);
             if (match.hasMatch()) {
                 literal = true;
+                fenced = true;
                 fenceMarker = match.captured(1).front();
                 fenceLength = match.capturedLength(1);
             }
@@ -155,7 +161,19 @@ QList<QPair<QTextBlock, qreal>> sourceHangingOffsets(QTextDocument *document) {
             }
             prefixLayout.endLayout();
         }
-        result.append({block, offset});
+        qreal indent = -offset;
+        if (manuscript && !literal && !quoteMatch.hasMatch()) {
+            static const QRegularExpression heading(QStringLiteral("^ {0,3}#{1,6}[ \t]+(?=\\S)"));
+            const auto match = heading.match(text);
+            if (match.hasMatch()) {
+                QTextLayout prefixLayout(match.captured(), document->defaultFont());
+                prefixLayout.beginLayout();
+                auto line = prefixLayout.createLine(); line.setLineWidth(1000000);
+                indent = -line.cursorToX(match.capturedLength());
+                prefixLayout.endLayout();
+            }
+        }
+        result.append({block, codeStyle ? 0 : gutter + offset, codeStyle ? 0 : indent, fenced});
     }
     return result;
 }
@@ -1655,6 +1673,101 @@ void Backend::setFocusPosition(int position, bool enabled, bool sentence) {
     } else m_highlighter->setFocusBlock(block.blockNumber());
 }
 
+void Backend::setSourceAppearance(const QString &appearance) {
+    const QString normalized = QStringList{"manuscript", "editorial", "book", "code"}.contains(appearance) ? appearance : "manuscript";
+    m_sourceAppearance = normalized;
+    if (m_highlighter) {
+        m_highlighter->setCodeStyle(normalized == "code");
+        m_highlighter->setCodeLanguage(QFileInfo(m_fileUrl.toLocalFile()).suffix());
+    }
+    if (m_document) {
+        auto option = m_document->defaultTextOption();
+        option.setTabStopDistance(QFontMetricsF(m_document->defaultFont()).horizontalAdvance(' ') * 4);
+        m_document->setDefaultTextOption(option);
+        refreshSourceTypography();
+    }
+}
+
+QVariantList Backend::sourceLineDecorations(qreal top, qreal bottom) const {
+    QVariantList result;
+    if (!m_document) return result;
+    auto *layout = m_document->documentLayout();
+    for (auto block = m_document->begin(); block.isValid(); block = block.next()) {
+        const QRectF rect = layout->blockBoundingRect(block);
+        if (rect.bottom() < top) continue;
+        if (rect.top() > bottom) break;
+        int columns = 0;
+        for (const QChar c : block.text()) {
+            if (c == ' ') ++columns;
+            else if (c == '\t') columns += 4 - columns % 4;
+            else break;
+        }
+        result.append(QVariantMap{{"number", block.blockNumber() + 1}, {"y", rect.top()},
+                                  {"height", block.next().isValid() ? layout->blockBoundingRect(block.next()).top() - rect.top() : rect.height()}, {"indent", columns},
+                                  {"margin", block.blockFormat().leftMargin()}, {"fenced", block.blockFormat().background().style() != Qt::NoBrush}});
+    }
+    return result;
+}
+
+QVariantMap Backend::editCode(const QString &action, int start, int end) {
+    if (!m_document || m_sourceAppearance != "code") return {};
+    const QString text = currentDocumentText();
+    const int first = qBound(0, qMin(start, end), int(text.size()));
+    const int last = qBound(first, qMax(start, end), int(text.size()));
+    int spaces = m_codeIndentWidth;
+    bool tabs = m_codeIndentTabs;
+    if (spaces == 0) {
+    spaces = 4;
+    const auto lines = text.split('\n');
+    int minimum = 99;
+    for (int i = 0; i < qMin(200, int(lines.size())); ++i) {
+        const auto &line = lines[i];
+        if (line.startsWith('\t')) { tabs = true; break; }
+        int count = 0; while (count < line.size() && line[count] == ' ') ++count;
+        if (count > 0 && count < line.size() && count <= 8) minimum = qMin(minimum, count);
+    }
+    if (minimum == 2 || minimum == 4 || minimum == 8) spaces = minimum;
+    m_codeIndentWidth = spaces; m_codeIndentTabs = tabs;
+    }
+    const QString unit = tabs ? QString("\t") : QString(spaces, ' ');
+    const int lineStart = first > 0 ? text.lastIndexOf('\n', first - 1) + 1 : 0;
+    if (action == "newline") {
+        const QString before = text.mid(lineStart, first - lineStart);
+        int count = 0; while (count < before.size() && before[count].isSpace()) ++count;
+        QString indentation = before.left(count);
+        const QString trimmed = before.trimmed();
+        if (trimmed.endsWith('{') || trimmed.endsWith('[') || trimmed.endsWith('(') || trimmed.endsWith(':')) indentation += unit;
+        return replaceText(first, last, "\n" + indentation);
+    }
+    if (action != "indent" && action != "outdent") return {};
+    if (first == last && action == "indent") {
+        const int padding = spaces - (first - lineStart) % spaces;
+        return replaceText(first, last, tabs ? unit : QString(padding, ' '));
+    }
+    // Exclude a following line when the selection ends exactly at its start.
+    int rangeEnd = last;
+    if (rangeEnd > first && text[rangeEnd - 1] == '\n') --rangeEnd;
+    const int endOfLine = text.indexOf('\n', rangeEnd);
+    rangeEnd = endOfLine < 0 ? text.size() : endOfLine;
+    const auto selected = text.mid(lineStart, rangeEnd - lineStart).split('\n');
+    QStringList changed; int firstDelta = 0;
+    for (int i = 0; i < selected.size(); ++i) {
+        const auto &line = selected[i];
+        int removed = 0;
+        if (action == "outdent") {
+            if (line.startsWith('\t')) removed = 1;
+            else while (removed < qMin(spaces, int(line.size())) && line[removed] == ' ') ++removed;
+            changed.append(line.mid(removed));
+        } else changed.append(unit + line);
+        if (i == 0) firstDelta = action == "outdent" ? -removed : unit.size();
+    }
+    const QString replacement = changed.join('\n');
+    if (replacement == text.mid(lineStart, rangeEnd - lineStart)) return {{"start", first}, {"end", last}};
+    const auto result = replaceText(lineStart, rangeEnd, replacement);
+    if (first == last) return {{"start", qMax(lineStart, first + firstDelta)}, {"end", qMax(lineStart, first + firstDelta)}};
+    return result;
+}
+
 void Backend::setShowMarkup(bool show) {
     m_showMarkup = show;
     if (m_highlighter) m_highlighter->setShowMarkup(show);
@@ -1686,6 +1799,8 @@ void Backend::attachDocument(QObject *textDocument) {
     m_highlighter = new MarkdownHighlighter(m_document);
     m_highlighter->setDarkMode(m_darkMode);
     m_highlighter->setShowMarkup(m_showMarkup);
+    m_highlighter->setCodeStyle(m_sourceAppearance == "code");
+    m_highlighter->setCodeLanguage(QFileInfo(m_fileUrl.toLocalFile()).suffix());
     m_highlighter->setColors(palette().value("editor").toString(), m_themeForeground, m_themeAccent);
 
     // Includes format-only authorship edits and their Undo/Redo paths. The QML
@@ -2301,6 +2416,7 @@ void Backend::loadDocumentText(const QString &text) {
 
     m_loading = true;
     m_requiresExplicitSave = false;
+    m_codeIndentWidth = 0; m_codeIndentTabs = false;
     m_document->setPlainText(text);
     applyAuthorshipData({});
     m_lastDocumentText = text;
@@ -2317,6 +2433,7 @@ void Backend::setFileUrl(const QUrl &url) {
         return;
 
     m_fileUrl = url;
+    if (m_highlighter) m_highlighter->setCodeLanguage(QFileInfo(url.toLocalFile()).suffix());
     emit fileUrlChanged();
     watchCurrentFile();
 }
@@ -2689,13 +2806,16 @@ bool Backend::refreshSourceTypography() {
     if (!m_document || m_formattingTypography || m_sourceHistoryTraversal || m_document->isRedoAvailable())
         return false;
 
-    QList<QPair<QTextBlock, qreal>> changed;
-    for (const auto &item : sourceHangingOffsets(m_document)) {
-        const QTextBlockFormat format = item.first.blockFormat();
+    QList<SourceBlockStyle> changed;
+    const qreal lineHeight = m_sourceAppearance == "code" ? 135 : sourceLineHeightPercent;
+    const QBrush codeBackground(QColor(m_darkMode ? "#252A32" : "#EAECF0"));
+    for (const auto &item : sourceHangingOffsets(m_document, m_sourceAppearance == "manuscript", m_sourceAppearance == "code")) {
+        const QTextBlockFormat format = item.block.blockFormat();
         if (format.lineHeightType() != QTextBlockFormat::ProportionalHeight
-                || !qFuzzyCompare(format.lineHeight(), sourceLineHeightPercent)
-                || qAbs(format.leftMargin() - item.second) > 0.01
-                || qAbs(format.textIndent() + item.second) > 0.01)
+                || !qFuzzyCompare(format.lineHeight(), lineHeight)
+                || qAbs(format.leftMargin() - item.margin) > 0.01
+                || qAbs(format.textIndent() - item.indent) > 0.01
+                || format.background() != (item.fenced ? codeBackground : QBrush(Qt::NoBrush)))
             changed.append(item);
     }
     // Identical merges also create undo commands, so leave them alone.
@@ -2713,10 +2833,11 @@ bool Backend::refreshSourceTypography() {
     else cursor.beginEditBlock();
     for (const auto &item : changed) {
         QTextBlockFormat format;
-        format.setLineHeight(sourceLineHeightPercent, QTextBlockFormat::ProportionalHeight);
-        format.setLeftMargin(item.second);
-        format.setTextIndent(-item.second);
-        cursor.setPosition(item.first.position());
+        format.setLineHeight(lineHeight, QTextBlockFormat::ProportionalHeight);
+        format.setLeftMargin(item.margin);
+        format.setTextIndent(item.indent);
+        format.setBackground(item.fenced ? codeBackground : QBrush(Qt::NoBrush));
+        cursor.setPosition(item.block.position());
         cursor.mergeBlockFormat(format);
     }
     cursor.endEditBlock();

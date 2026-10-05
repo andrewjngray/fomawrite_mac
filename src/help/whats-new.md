@@ -1,5 +1,7 @@
 # What’s New in Fomawrite
 
+Build 123 adds Code appearance: monospace text, line numbers, indentation guides, horizontal scrolling, syntax colours for common code languages, Tab/Shift-Tab indentation and automatic indentation on Return. Code typing keeps quotes, dashes and pasted URLs literal. Choose Code in the editor appearance menu or View → Writing Appearance. Manuscript now hangs heading markers beside the body column, and fenced code uses a continuous grey background. Inline code keeps its compact highlight. Source files remain unchanged by appearance choices.
+
 Build 122 makes Source consistently show every Markdown marker. Manuscript uses bundled iA Writer Mono with more line spacing; wrapped lists, tasks and quotations align beneath their text. Visual Edit retains its formatted view. These presentation changes leave the Markdown file intact.
 
 Build 121 connects View → Title Bar → Fade In/Out and Always Show to document-bar visibility. Fade In/Out keeps revealed bars visible until typing or scrolling; Always Show keeps both bars visible. The existing Auto-Hide Document Bars checkbox stays synchronized.

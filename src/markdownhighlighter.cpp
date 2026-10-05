@@ -8,6 +8,46 @@
 #include <algorithm>
 
 namespace {
+enum CodeLanguage { UnknownLanguage = 0, JavaScriptLanguage = 1, PythonLanguage = 2,
+                    JsonLanguage = 3, CppLanguage = 4, ShellLanguage = 5,
+                    CssLanguage = 6, HtmlLanguage = 7 };
+
+QString normalizedLanguage(QString language) {
+    language = language.trimmed().toLower();
+    if (language.startsWith(QLatin1Char('.'))) language.remove(0, 1);
+    const int space = language.indexOf(QRegularExpression(QStringLiteral("[\\s,{]")));
+    if (space >= 0) language.truncate(space);
+    if (language == QLatin1String("mjs") || language == QLatin1String("cjs")
+        || language == QLatin1String("js") || language == QLatin1String("javascript")
+        || language == QLatin1String("jsx") || language == QLatin1String("ts")
+        || language == QLatin1String("typescript") || language == QLatin1String("tsx"))
+        return QStringLiteral("js");
+    if (language == QLatin1String("py") || language == QLatin1String("python")) return QStringLiteral("py");
+    if (language == QLatin1String("json") || language == QLatin1String("jsonc")) return QStringLiteral("json");
+    if (language == QLatin1String("c") || language == QLatin1String("h")
+        || language == QLatin1String("cc") || language == QLatin1String("hh")
+        || language == QLatin1String("c++") || language == QLatin1String("cpp") || language == QLatin1String("hpp")
+        || language == QLatin1String("cxx") || language == QLatin1String("hxx")) return QStringLiteral("cpp");
+    if (language == QLatin1String("sh") || language == QLatin1String("bash")
+        || language == QLatin1String("zsh") || language == QLatin1String("shell")) return QStringLiteral("sh");
+    if (language == QLatin1String("css") || language == QLatin1String("scss")
+        || language == QLatin1String("less")) return QStringLiteral("css");
+    if (language == QLatin1String("html") || language == QLatin1String("htm")
+        || language == QLatin1String("xml") || language == QLatin1String("svg")) return QStringLiteral("html");
+    return {};
+}
+
+int codeLanguageId(const QString &language) {
+    if (language == QLatin1String("js")) return JavaScriptLanguage;
+    if (language == QLatin1String("py")) return PythonLanguage;
+    if (language == QLatin1String("json")) return JsonLanguage;
+    if (language == QLatin1String("cpp")) return CppLanguage;
+    if (language == QLatin1String("sh")) return ShellLanguage;
+    if (language == QLatin1String("css")) return CssLanguage;
+    if (language == QLatin1String("html")) return HtmlLanguage;
+    return UnknownLanguage;
+}
+
 bool escapedMarker(const QString &text, int start) {
     int backslashes = 0;
     while (start > 0 && text.at(--start) == QLatin1Char('\\')) ++backslashes;
@@ -80,6 +120,19 @@ void MarkdownHighlighter::setSearch(const QString &query, int currentMatchStart)
         return;
     m_searchQuery = query;
     m_currentMatchStart = currentMatchStart;
+    rehighlight();
+}
+
+void MarkdownHighlighter::setCodeStyle(bool enabled) {
+    if (m_codeStyle == enabled) return;
+    m_codeStyle = enabled;
+    rehighlight();
+}
+
+void MarkdownHighlighter::setCodeLanguage(const QString &language) {
+    const QString normalized = normalizedLanguage(language);
+    if (m_codeLanguage == normalized) return;
+    m_codeLanguage = normalized;
     rehighlight();
 }
 
@@ -169,6 +222,18 @@ void MarkdownHighlighter::rebuildFormats() {
     m_currentSearchFormat = QTextCharFormat();
     m_currentSearchFormat.setBackground(m_darkMode ? QColor(QStringLiteral("#b36b20"))
                                                    : QColor(QStringLiteral("#ffad42")));
+
+    const auto syntaxFormat = [](const QColor &color) {
+        QTextCharFormat format;
+        format.setForeground(color);
+        return format;
+    };
+    m_codeKeywordFormat = syntaxFormat(m_darkMode ? QColor(QStringLiteral("#C792EA")) : QColor(QStringLiteral("#7B2CBF")));
+    m_codeStringFormat = syntaxFormat(m_darkMode ? QColor(QStringLiteral("#C3E88D")) : QColor(QStringLiteral("#287A35")));
+    m_codeNumberFormat = syntaxFormat(m_darkMode ? QColor(QStringLiteral("#F78C6C")) : QColor(QStringLiteral("#B54708")));
+    m_codeCommentFormat = syntaxFormat(m_darkMode ? QColor(QStringLiteral("#7F9F7F")) : QColor(QStringLiteral("#64775B")));
+    m_codeTypeFormat = syntaxFormat(m_darkMode ? QColor(QStringLiteral("#FFCB6B")) : QColor(QStringLiteral("#8A5A00")));
+    m_codeFunctionFormat = syntaxFormat(m_darkMode ? QColor(QStringLiteral("#82AAFF")) : QColor(QStringLiteral("#2459A6")));
 }
 
 void MarkdownHighlighter::setShowMarkup(bool show) {
@@ -195,16 +260,59 @@ void MarkdownHighlighter::highlightBlock(const QString &text) {
     // Fenced source is literal: never style headings or hide emphasis markers in it.
     static const QRegularExpression fenceRe(QStringLiteral("^ {0,3}(`{3,}|~{3,})(.*)$"));
     const auto fence = fenceRe.match(text);
-    int state = previousBlockState() > 0 ? previousBlockState() : 0;
+    const bool rawCode = m_codeStyle && !m_codeLanguage.isEmpty();
+    int state = rawCode ? previousBlockState() : (previousBlockState() > 0 ? previousBlockState() : 0);
     bool literal = state > 0;
-    if (fence.hasMatch()) {
+    const bool encoded = m_codeStyle && state >= 3000;
+    int languageId = encoded ? (state / 10) % 10 : UnknownLanguage;
+    int lexicalState = rawCode ? state : (encoded ? state % 10 : 0);
+    if (!rawCode && fence.hasMatch()) {
         const QString marker = fence.captured(1);
         const int kind = marker.startsWith('`') ? 1 : 2;
-        if (!state) { state = marker.size() * 10 + kind; literal = true; }
-        else if (state % 10 == kind && marker.size() >= state / 10 && fence.captured(2).trimmed().isEmpty()) state = 0;
+        if (!state) {
+            if (m_codeStyle) {
+                languageId = codeLanguageId(normalizedLanguage(fence.captured(2)));
+                lexicalState = 0;
+                state = marker.size() * 1000 + kind * 100 + languageId * 10;
+            } else {
+                state = marker.size() * 10 + kind;
+            }
+            literal = true;
+        } else {
+            const bool encodedState = m_codeStyle && state >= 3000;
+            const int openLength = encodedState ? state / 1000 : state / 10;
+            const int openKind = encodedState ? (state / 100) % 10 : state % 10;
+            if (openKind == kind && marker.size() >= openLength
+                && fence.captured(2).trimmed().isEmpty()) {
+                state = 0;
+                literal = true;
+            }
+            if (encodedState) {
+                languageId = (previousBlockState() / 10) % 10;
+                lexicalState = previousBlockState() % 10;
+            }
+        }
+    }
+    if (rawCode) {
+        literal = true;
+        int nextLexicalState = lexicalState;
+        if (!text.isEmpty()) highlightCode(text, m_codeLanguage, lexicalState, &nextLexicalState);
+        state = nextLexicalState;
+    } else if (literal) {
+        // Fenced backgrounds are painted across the full block width by the editor.
+        if (m_codeStyle && state > 0 && !fence.hasMatch() && languageId != UnknownLanguage) {
+            int nextLexicalState = lexicalState;
+            highlightCode(text, languageId == JavaScriptLanguage ? QStringLiteral("js")
+                : languageId == PythonLanguage ? QStringLiteral("py")
+                : languageId == JsonLanguage ? QStringLiteral("json")
+                : languageId == CppLanguage ? QStringLiteral("cpp")
+                : languageId == ShellLanguage ? QStringLiteral("sh")
+                : languageId == CssLanguage ? QStringLiteral("css") : QStringLiteral("html"),
+                lexicalState, &nextLexicalState);
+            state = (state / 10) * 10 + nextLexicalState;
+        }
     }
     setCurrentBlockState(state);
-    if (literal) setFormat(0, text.size(), m_codeFormat);
     if (!literal && !text.isEmpty()) {
         highlightMarkers(text);
         if (text.contains(QLatin1Char('`')) || text.contains(QLatin1Char('*'))
@@ -224,6 +332,125 @@ void MarkdownHighlighter::highlightBlock(const QString &text) {
     }
     if (!literal) highlightReviewSpans(text);
     highlightSearch(text);
+}
+
+void MarkdownHighlighter::highlightCode(const QString &text, const QString &language,
+                                       int lexicalState, int *nextLexicalState, int offset) {
+    const int id = codeLanguageId(language);
+    if (nextLexicalState) *nextLexicalState = 0;
+    if (id == UnknownLanguage || text.isEmpty()) return;
+
+    int scanStart = 0;
+    if (lexicalState == 1 || lexicalState == 2) {
+        int close = -1;
+        if (lexicalState == 1) {
+            close = text.indexOf(QStringLiteral("*/"));
+            if (close >= 0) close += 2;
+        } else {
+            for (int i = 0; i < text.size(); ++i) {
+                if (text.at(i) != QLatin1Char('`')) continue;
+                int slashes = 0;
+                for (int j = i - 1; j >= 0 && text.at(j) == QLatin1Char('\\'); --j) ++slashes;
+                if (slashes % 2 == 0) { close = i + 1; break; }
+            }
+        }
+        if (close < 0) {
+            setFormat(offset, text.size(), lexicalState == 1 ? m_codeCommentFormat : m_codeStringFormat);
+            if (nextLexicalState) *nextLexicalState = lexicalState;
+            return;
+        }
+        setFormat(offset, close, lexicalState == 1 ? m_codeCommentFormat : m_codeStringFormat);
+        scanStart = close;
+    }
+
+    const bool hashComments = id == PythonLanguage || id == ShellLanguage;
+    const QRegularExpression tokenRe(QStringLiteral("//[^\\n]*|/\\*.*?(?:\\*/|$)|")
+        + (hashComments ? QStringLiteral("#[^\\n]*|") : QString())
+        + QStringLiteral(
+            "(?:u8|u|U|L)?(?:\"(?:\\\\.|[^\"\\\\])*\"|'(?:\\\\.|[^'\\\\])*'|`(?:\\\\.|[^`\\\\])*`|`[^`]*$)|"
+            "(?:0[xX][\\da-fA-F]+|\\d+(?:\\.\\d+)?(?:[eE][+-]?\\d+)?[fFuUlL]*)|"
+            "[\\p{L}_$][\\p{L}\\p{N}_$]*"));
+    static const QRegularExpression htmlNameRe(QStringLiteral(
+        "</?([A-Za-z][\\w:-]*)|([A-Za-z_:][\\w:.-]*)(?=\\s*=)"));
+
+    QStringList keywords;
+    QStringList types;
+    switch (id) {
+    case JavaScriptLanguage:
+        keywords = {"async","await","break","case","catch","class","const","continue","debugger","default","delete","do","else","export","extends","false","finally","for","from","function","if","import","in","instanceof","let","new","null","of","return","static","super","switch","this","throw","true","try","typeof","undefined","var","void","while","yield","interface","type","implements","enum","readonly","public","private","protected"};
+        types = {"Array","BigInt","Boolean","Date","Error","Function","Map","Number","Object","Promise","RegExp","Set","String","Symbol","WeakMap","WeakSet"};
+        break;
+    case PythonLanguage:
+        keywords = {"and","as","assert","async","await","break","class","continue","def","del","elif","else","except","False","finally","for","from","global","if","import","in","is","lambda","None","nonlocal","not","or","pass","raise","return","True","try","while","with","yield"};
+        types = {"bool","bytes","dict","float","int","list","object","set","str","tuple","type"};
+        break;
+    case JsonLanguage:
+        keywords = {"false","null","true"};
+        break;
+    case CppLanguage:
+        keywords = {"alignas","auto","bool","break","case","catch","char","class","const","constexpr","continue","default","delete","do","double","else","enum","explicit","extern","false","float","for","friend","if","inline","int","long","namespace","new","noexcept","nullptr","operator","private","protected","public","return","short","signed","sizeof","static","struct","switch","template","this","throw","true","try","typedef","typename","union","unsigned","using","virtual","void","volatile","while","include","define","ifdef","ifndef","endif"};
+        types = {"char","double","float","int","long","short","size_t","string","uint8_t","uint32_t","uint64_t","void"};
+        break;
+    case ShellLanguage:
+        keywords = {"case","do","done","elif","else","esac","fi","for","function","if","in","select","then","time","until","while","export","local","readonly","return","set","shift","source","unset"};
+        break;
+    case CssLanguage:
+        keywords = {"important","inherit","initial","none","unset"};
+        break;
+    case HtmlLanguage:
+        break;
+    }
+
+    auto matches = tokenRe.globalMatch(text.mid(scanStart));
+    while (matches.hasNext()) {
+        const auto match = matches.next();
+        const QString token = match.captured();
+        const int start = offset + scanStart + match.capturedStart();
+        const int length = match.capturedLength();
+        QTextCharFormat format;
+        bool apply = true;
+        if (token.startsWith(QStringLiteral("//")) || token.startsWith(QStringLiteral("/*"))
+            || (hashComments && token.startsWith(QLatin1Char('#')))) {
+            format = m_codeCommentFormat;
+            if (token.startsWith(QStringLiteral("/*")) && !token.endsWith(QStringLiteral("*/"))
+                && nextLexicalState) *nextLexicalState = 1;
+        } else if (token.startsWith(QLatin1Char('\"')) || token.startsWith(QLatin1Char('\''))
+                   || token.startsWith(QLatin1Char('`')) || token.startsWith(QStringLiteral("u8\""))
+                   || token.startsWith(QStringLiteral("L\"")) || token.startsWith(QStringLiteral("u\""))
+                   || token.startsWith(QStringLiteral("U\""))) {
+            format = m_codeStringFormat;
+            if (token.startsWith(QLatin1Char('`')) && !token.endsWith(QLatin1Char('`'))
+                && nextLexicalState) *nextLexicalState = 2;
+        } else if (token.at(0).isDigit()) {
+            format = m_codeNumberFormat;
+        } else if (id == HtmlLanguage) {
+            apply = false;
+        } else if (keywords.contains(token)) {
+            format = m_codeKeywordFormat;
+        } else if (types.contains(token) || (id == CppLanguage && token.size() > 1 && token.at(0).isUpper())) {
+            format = m_codeTypeFormat;
+        } else if (id == JsonLanguage) {
+            const int next = text.indexOf(QRegularExpression(QStringLiteral("\\S")),
+                                          scanStart + match.capturedEnd());
+            if (next >= 0 && text.at(next) == QLatin1Char(':')) format = m_codeTypeFormat;
+            else apply = false;
+        } else {
+            int next = scanStart + match.capturedEnd();
+            while (next < text.size() && text.at(next).isSpace()) ++next;
+            if (next < text.size() && text.at(next) == QLatin1Char('(')) format = m_codeFunctionFormat;
+            else apply = false;
+        }
+        if (apply) setFormat(start, length, format);
+        if (nextLexicalState && *nextLexicalState != 0) break;
+    }
+    if (id == HtmlLanguage) {
+        auto names = htmlNameRe.globalMatch(text);
+        while (names.hasNext()) {
+            const auto match = names.next();
+            setFormat(offset + match.capturedStart(), match.capturedLength(),
+                      match.capturedStart(1) >= 0 ? m_codeTypeFormat : m_codeFunctionFormat);
+        }
+    }
 }
 
 void MarkdownHighlighter::highlightReviewSpans(const QString &text) {

@@ -1544,3 +1544,14 @@ Validation: **183 regressions pass**, including preference persistence after reo
 Requested: consistently visible Markdown in Source and clearer typography/list structure following Andrew’s iA Writer reference. Source now always shows syntax; Visual Edit is the formatted alternative. Manuscript uses bundled iA Writer Mono at an 18px base with 155% line spacing. Hanging indents align wrapped lists, tasks and quotes without changing Markdown. Literal code/fences/math and conservative nested-code handling retain their layout. Typography joins actual edits and defers font-refresh formatting while Redo is pending.
 
 [Verification and limits](../research/cycle-122/README.md), [optional review](../research/usability/cycle-122.md). Build 0.3.0-dev18 / macOS 0.3.0 (122). **185 regression tests pass, 0 failed/skipped**; all three refreshed app copies pass **150 native checks** each, matching UI/version and strict signatures with zero QML warnings. Source commit `a8f2c7902c011d670dae127a19bf28ef2d0124be`.
+
+
+## Cycle 123 — Code appearance and aligned Manuscript headings
+
+Requested scope: add a fourth Code writing appearance with familiar syntax colours and indentation, hang Manuscript heading markers beside aligned body text, and make fenced backgrounds continuous.
+
+Implemented: Code in the Source Aa, compact/native Writing Appearance menus and command palette; Menlo 15px/135%, line numbers, four-column guides and horizontal scrolling without wrapping. Tab/Shift-Tab and Return preserve/infer indentation, adding a level after `{`, `[`, `(` or `:`; Code retains straight quotes/dashes and plain pasted URLs. Lightweight file/fence lexers cover JS/TS, Python, JSON, C/C++, shell, CSS and HTML. Manuscript uses a seven-character block gutter and negative heading indent so words and wraps align with the body. Fenced backgrounds cover empty lines and closing markers in every appearance; inline code remains compact. Pending-Redo typography refresh remains deferred to preserve history.
+
+Verification: **PENDING**. Expected gate: **189 regression cases**, **151 actual-executable checks per bundle**; results, screenshot review, bundle refresh/resource identities and strict signatures are not yet confirmed. Build target **0.3.0-dev19 / macOS 0.3.0 (123)**. [Cycle123 scope and verification](../research/cycle-123/README.md), [optional exercise](../research/usability/cycle-123.md).
+
+References: official VS Code editing conventions and Qt syntax-highlighter documentation; no external code or new dependency copied. This adds a lightweight code appearance, with no language server, autocomplete, linting or debugging. Physical input/IME, VoiceOver, multi-display and historical parser/export/native-activation gaps remain open. Runnable targets after verification are the stable Dev, ordinary/demo and Applications bundles; their refresh is PENDING.

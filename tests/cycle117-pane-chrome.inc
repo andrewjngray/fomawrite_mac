@@ -111,8 +111,8 @@ void FomawriteTest::paneAlignedFooterMenusFollowDividerWithoutEditing() {
     QVERIFY(!f.preview->property("visualEditEnabled").toBool());
     QVERIFY(f.mode(0));
     QCOMPARE(f.editor->property("text").toString(), draft);
-    QVERIFY(QMetaObject::invokeMethod(f.editor, "undo")); QCOMPARE(f.editor->property("text").toString(), saved);
-    QVERIFY(QMetaObject::invokeMethod(f.editor, "redo")); QCOMPARE(f.editor->property("text").toString(), draft);
+    QVERIFY(QMetaObject::invokeMethod(f.window.data(), "undoEditing")); QCOMPARE(f.editor->property("text").toString(), saved);
+    QVERIFY(QMetaObject::invokeMethod(f.window.data(), "redoEditing")); QCOMPARE(f.editor->property("text").toString(), draft);
     QCOMPARE(cycle103Read(path), saved.toUtf8());
 }
 

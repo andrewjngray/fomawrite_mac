@@ -2,7 +2,7 @@
 
 **Product identity, Cycle 60:** Omawrite was renamed Fomawrite. Historical iA comparisons below retain their original cycle wording; this does not change their implemented/partial/unverified classification. See [migration notes](product-rename.md).
 
-**Current UI overlay — Cycle122:** Source always shows Markdown markers, with bundled iA Writer Mono, clearer spacing/contrast and hanging list/quote wraps. Visual Edit remains the formatted choice. This does not establish parser parity. [Verification and limits](../research/cycle-122/README.md).
+**Current UI overlay — Cycle123:** Source offers Manuscript, Editorial, Book and Code. Manuscript headings hang their literal markers beside the body column. Fenced-code shading is continuous, including empty lines; inline code keeps compact shading. Code adds Menlo, line numbers, four-column guides, syntax colours for supported languages, horizontal scrolling, Tab/Shift-Tab and basic auto-indent. This is a lightweight code appearance, not IDE or iA feature parity. [Verification and limits](../research/cycle-123/README.md).
 
 **Previous UI overlay — Cycle121:** View → Title Bar → Fade In/Out / Always Show now controls the persisted top/bottom document-bar behavior, with synchronized menu checkmarks and no legacy hover conflict. [Verification](../research/cycle-121/README.md).
 

@@ -1,6 +1,10 @@
 # Acceptance ledger — current follow-through and Cycle 59 history
 
-## Current review build — Cycle 122
+## Current review build — Cycle 123
+
+**0.3.0-dev19 / macOS 0.3.0 (123)** adds Code appearance, hanging Manuscript headings and continuous fenced-code backgrounds. [Verification and limits](../research/cycle-123/README.md). 189 regressions pass; final bundle verification is recorded in that handoff.
+
+## Previous review build — Cycle 122
 
 **0.3.0-dev18 / macOS 0.3.0 (122)** makes Source consistently literal and more readable. [Verification and limits](../research/cycle-122/README.md). 185 regressions pass; Dev, demo and Applications each pass 150 native checks with matching UI/version and strict signatures.
 
