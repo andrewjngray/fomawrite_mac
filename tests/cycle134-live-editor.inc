@@ -60,6 +60,33 @@ void FomawriteTest::liveChangesApplyToDocumentByteExactly() {
     backend.discardRecovery();
 }
 
+void FomawriteTest::liveImagesResolveThroughTheHost() {
+    Cycle103SettingsSnapshot settings;
+    QTemporaryDir directory; QVERIFY(directory.isValid());
+    QImage image(6, 4, QImage::Format_RGB32); image.fill(Qt::green);
+    QVERIFY(image.save(directory.filePath("pic.png")));
+    QFile doc(directory.filePath("doc.md")); QVERIFY(doc.open(QIODevice::WriteOnly)); doc.write("![Pic](pic.png)\n"); doc.close();
+    Backend backend;
+    QQmlEngine engine; engine.rootContext()->setContextProperty("backend", &backend);
+    QQmlComponent component(&engine);
+    component.setData("import QtQuick\nTextEdit { Component.onCompleted: backend.attachDocument(textDocument); onTextChanged: backend.editorTextChanged() }", QUrl());
+    QScopedPointer<QObject> editor(component.create()); QVERIFY2(editor, qPrintable(component.errorString()));
+    QVERIFY(backend.open(QUrl::fromLocalFile(directory.filePath("doc.md"))));
+    auto *bridge = backend.editorBridge();
+    QSignalSpy replies(bridge, &EditorBridge::imageReply);
+    QVERIFY(QMetaObject::invokeMethod(bridge, "requestImage", Q_ARG(int, 1), Q_ARG(QString, "pic.png")));
+    QCOMPARE(replies.count(), 1);
+    QCOMPARE(replies.at(0).at(0).toInt(), 1);
+    QVERIFY(replies.at(0).at(1).toString().startsWith("data:image/png;base64,"));
+    QVERIFY(replies.at(0).at(2).toString().isEmpty());
+    QVERIFY(QMetaObject::invokeMethod(bridge, "requestImage", Q_ARG(int, 2), Q_ARG(QString, "missing.png")));
+    QCOMPARE(replies.at(1).at(1).toString(), QString());
+    QVERIFY(!replies.at(1).at(2).toString().isEmpty());
+    QVERIFY(QMetaObject::invokeMethod(bridge, "requestImage", Q_ARG(int, 3), Q_ARG(QString, "https://example.com/x.png")));
+    QVERIFY(replies.at(2).at(2).toString().contains("remote"));
+    backend.discardRecovery();
+}
+
 void FomawriteTest::liveBridgeReplaysStateToLatePage() {
     EditorBridge bridge;
     QSignalSpy document(&bridge, &EditorBridge::setDocument), mode(&bridge, &EditorBridge::setMode),

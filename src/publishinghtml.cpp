@@ -268,6 +268,42 @@ QString PublishingHtml::body(const QString &expandedMarkdown, QString *error) {
     return renderer.html;
 }
 
+QString PublishingHtml::imageDataUrl(const QString &path, ImageCache *cache, QString *reason) {
+    constexpr qint64 individualLimit = 5 * 1024 * 1024;
+    const QFileInfo info(path);
+    const qint64 statSize = info.exists() ? info.size() : -1;
+    const qint64 modified = info.exists() ? info.lastModified().toMSecsSinceEpoch() : -1;
+    ImageEntry entry;
+    const bool reusable = cache && modified >= 0 && cache->contains(path)
+        && cache->value(path).size == statSize && cache->value(path).modified == modified;
+    if (reusable) entry = cache->value(path);
+    else {
+        entry.size = statSize; entry.modified = modified;
+        QByteArray data, format;
+        QFile file(path);
+        if (!file.open(QIODevice::ReadOnly)) entry.reason = QStringLiteral("local image could not be read");
+        else if (file.size() > individualLimit) entry.reason = QStringLiteral("image exceeds 5 MiB");
+        else {
+            data = file.read(individualLimit + 1);
+            if (file.error() != QFile::NoError) entry.reason = QStringLiteral("local image could not be read");
+            else if (data.size() > individualLimit) entry.reason = QStringLiteral("image exceeds 5 MiB");
+            else {
+                QBuffer buffer(&data); buffer.open(QIODevice::ReadOnly);
+                QImageReader reader(&buffer);
+                format = reader.format();
+                if (!QList<QByteArray>{"png", "jpeg", "gif", "webp"}.contains(format))
+                    entry.reason = QStringLiteral("image must be PNG, JPEG, GIF or WebP");
+                else if (reader.read().isNull()) entry.reason = QStringLiteral("image is damaged or could not be decoded");
+                else entry.dataUrl = QStringLiteral("data:image/") + QString::fromLatin1(format)
+                    + QStringLiteral(";base64,") + QString::fromLatin1(data.toBase64());
+            }
+        }
+        if (cache) { if (cache->size() >= 64) cache->clear(); cache->insert(path, entry); }
+    }
+    if (reason) *reason = entry.reason;
+    return entry.reason.isEmpty() ? entry.dataUrl : QString();
+}
+
 QString PublishingHtml::embedImages(QString html, const QUrl &baseUrl, bool preview,
                                     QString *error, QString *warning,
                                     ImageCache *cache, QByteArray *assetSignature) {

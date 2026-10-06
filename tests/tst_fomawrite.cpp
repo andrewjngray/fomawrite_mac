@@ -70,6 +70,7 @@ private slots:
     void persistenceRoundTripsBytesExactly();
     void liveChangesApplyToDocumentByteExactly();
     void liveBridgeReplaysStateToLatePage();
+    void liveImagesResolveThroughTheHost();
     void liveEditorPageMirrorsUserEditsByteExactly();
     void liveEditorRoundTripsPersistenceFixturesThroughThePage();
     void liveEditorLoadsLargeDocumentQuickly();

@@ -602,6 +602,7 @@ Backend::Backend(QObject *parent, bool outputOnly) : QObject(parent), m_library(
     // mirrored here so saving, recovery, publishing and the other panes agree.
     m_editorBridge = std::make_unique<EditorBridge>();
     connect(m_editorBridge.get(), &EditorBridge::changesReceived, this, &Backend::applyLiveChanges);
+    connect(m_editorBridge.get(), &EditorBridge::imageRequested, this, &Backend::resolveLiveImage);
     connect(m_editorBridge.get(), &EditorBridge::messageLogged, this, [](const QString &message) { qWarning("Live editor: %s", qPrintable(message)); });
     // New installations start with the composed writing palette; a stored
     // choice, including System, always takes precedence.
@@ -3615,6 +3616,15 @@ void Backend::syncLiveEditor() {
     m_editorBridge->applyAppearance(QString::fromUtf8(QJsonDocument(QJsonObject{{"dark", m_darkMode}}).toJson(QJsonDocument::Compact)));
     m_editorBridge->loadDocument(currentDocumentText());
     m_editorBridge->selectMode(QStringLiteral("live"));
+}
+
+void Backend::resolveLiveImage(int token, const QString &src) {
+    // Same resolution, limits and cache as the publishing preview.
+    const QUrl asset = documentBaseUrl().resolved(QUrl(src));
+    if (!asset.isLocalFile()) { m_editorBridge->replyImage(token, QString(), QStringLiteral("remote images are unavailable")); return; }
+    QString reason;
+    const QString dataUrl = PublishingHtml::imageDataUrl(asset.toLocalFile(), &m_publisher->imageCache(), &reason);
+    m_editorBridge->replyImage(token, dataUrl, reason);
 }
 
 bool Backend::applyLiveChanges(const QString &changesJson, int revision) {

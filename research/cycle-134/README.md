@@ -32,7 +32,21 @@ This spike answers, with numbers, whether that architecture holds inside Fomawri
 
 ## Measurements
 
-MEASUREMENTS_PLACEHOLDER
+Offscreen Qt 6.11.2, Apple Silicon, release build; a real `WebEngineView` driven over the bridge exactly as the app drives it.
+
+| Measurement | Result |
+| --- | --- |
+| User edits in the page (3 changes in one transaction, incl. ZWJ emoji and combining marks) mirrored into the `QTextDocument` | **byte-identical**, both directions (`requestText` returns the same text) |
+| Undo in the page | mirrored back; document returns to the original bytes |
+| Source → Live → Source switches | one text, unchanged |
+| Cycle 131 persistence fixtures (CRLF, BOM, NBSP, graphemes) edited in the page, saved by C++ | **bytes and conventions preserved** (CRLF stays CRLF, BOM stays) |
+| Small document: inject → mirrored in C++ | 53 ms round trip (two channel hops + 10 ms test polling) |
+| Page `setDocument` (small / 1 MiB) | 3.4 ms / 7.6 ms |
+| 1 MiB document pushed over the channel and loaded | 54 ms wall |
+| One keystroke on the 1 MiB document mirrored | 79 ms (two hops + polling; a real keystroke is one hop) |
+| Live decoration rebuild (`decorate`) | 0.0–0.4 ms |
+
+For comparison, Cycle 133's measurements of the existing Visual Edit pane: one keystroke on a 1 MiB document ≈ 58 ms after the O(n) fix (≈ 1.5 s before). The bridge is not the bottleneck.
 
 ## Verification
 

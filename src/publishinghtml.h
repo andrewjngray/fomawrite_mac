@@ -22,6 +22,9 @@ using ImageCache = QHash<QString, ImageEntry>;
 QString embedImages(QString html, const QUrl &baseUrl, bool preview,
                     QString *error = nullptr, QString *warning = nullptr,
                     ImageCache *cache = nullptr, QByteArray *assetSignature = nullptr);
+// One local image as a bounded data: URL (same limits and cache as embedImages).
+// Returns an empty string and sets `reason` when the image is unavailable.
+QString imageDataUrl(const QString &path, ImageCache *cache, QString *reason);
 }
 
 #endif

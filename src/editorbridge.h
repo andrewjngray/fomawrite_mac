@@ -42,6 +42,10 @@ public slots:
     void metric(const QString &name, double ms);
     void log(const QString &message);
     void textReply(int token, const QString &text);
+    // The page cannot read local files; it asks the host for a data: URL.
+    void requestImage(int token, const QString &src);
+    // Called by the host with the answer (emits imageReply to the page).
+    void replyImage(int token, const QString &dataUrl, const QString &error);
 
 signals:
     // Connected to by the page.
@@ -55,7 +59,9 @@ signals:
     void simulateUserChanges(const QString &changesJson);
     void undo();
     void redo();
+    void imageReply(int token, const QString &dataUrl, const QString &error);
     // For the app.
+    void imageRequested(int token, const QString &src);
     void readyChanged();
     void revisionChanged();
     void changesReceived(const QString &changesJson, int revision);

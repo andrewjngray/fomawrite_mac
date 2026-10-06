@@ -308,6 +308,7 @@ private:
     std::unique_ptr<Publisher> m_publisher;
     // Mirrors the Live editor's change lists into the canonical document.
     bool applyLiveChanges(const QString &changesJson, int revision);
+    void resolveLiveImage(int token, const QString &src);
     std::unique_ptr<EditorBridge> m_editorBridge;
     void paintOutput(QPagedPaintDevice &device, QTextDocument &document) const;
     void paintPublishingOutput(QPagedPaintDevice &device);

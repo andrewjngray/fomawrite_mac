@@ -62,3 +62,5 @@ void EditorBridge::cursorChanged(int anchor, int head) { emit cursorMoved(anchor
 void EditorBridge::metric(const QString &name, double ms) { emit metricRecorded(name, ms); }
 void EditorBridge::log(const QString &message) { emit messageLogged(message); }
 void EditorBridge::textReply(int token, const QString &text) { emit textReceived(token, text); }
+void EditorBridge::requestImage(int token, const QString &src) { emit imageRequested(token, src); }
+void EditorBridge::replyImage(int token, const QString &dataUrl, const QString &error) { emit imageReply(token, dataUrl, error); }
