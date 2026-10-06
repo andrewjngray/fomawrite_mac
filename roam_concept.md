@@ -17,6 +17,19 @@ In an AI-centric world there are too many artifacts. Markdown files, chats, agen
 
 The split suggests itself: **write and publish in Fomawrite; distil and keep in Roam.** The harness is whatever makes the handoff between them a single gesture.
 
+## How the graph is actually used (read 7 October 2026, graph `AJG_claude`)
+
+- **Size and shape.** About 3,480 pages, of which about 1,920 are daily notes. The daily note is the working surface: Roam's recent-activity view shows the daily-notes view open for most of the session time, and the recently edited pages are almost all daily notes.
+- **Daily notes are meeting-shaped.** A typical day (23 September 2026) is a list of meetings, each a block like `[[Soprano]] Pre Board Meeting Potentia Catch up` with the points under it, attendees as `[[Person]]` links, and sometimes an AI-assistant summary block. Many days are empty: capture happens when there is something worth keeping, not every day.
+- **The tag vocabulary is small and stable.** The most referenced pages are task states and meeting scaffolding: `DONE` (354 references), `ProjectTodos` (336), `TODO` (329), `meeting` (328), `tags` (296), then `notes`, `Attendees`, `Subject`, `boardmeeting`, `Put todays date here`, `Who is attending here`. Those last two are template placeholders, so there is a meeting template in use (`roam/templates` and `Templates_page` are starred).
+- **People and companies are pages.** `Renato`, `Tim Reed`, `Nitro`, `Linkly`, `SuperChoice`, `Soprano`, `Jinjer`, `EHG`, `Micromine`, `Potentia` and named people are the hubs; a page per person or deal, linked from daily notes, with backlinks doing the filing.
+- **Tasks live in Roam, GTD-style.** The starred `Vault` page is a GTD index: `ProjectTodos`, `WorkTodos`, `PersonalTodos`, `scheduled`, `waitingfor`, `somedaymaybe`, `DONE`. `Live List` holds the very-real-time tasks with a weekly sprint tally. `GSD` holds a few open intentions, including "create a daily journalling templates page".
+- **Quick Capture** is a starred catch-all page for fragments and quotations (an Adam Phillips line sits there now). `poem`, `quote`, `videos - inspiration` and `prayers` show the graph also holds the distilled, personal material the concept is about.
+- **Framework.** The help-notes page records the intent: P.A.R.A. without Resources, tag pages used purely as storage with linked references, projects versus areas. The `Areas` page itself is empty, so the framework is partly aspirational.
+- **Not used.** No long-form writing in Roam; nothing that looks like a document draft. That supports the split in the next section.
+
+What this means for Fomawrite: the natural unit to send to Roam is a block, not a document; the natural target is today's daily note or a person/deal page; the vocabulary to respect is `[[Page]]` links, `#tags`, `{{[[TODO]]}}`, and the meeting template. A "Send to Roam" that lands a selected paragraph on today's note with an optional `[[page]]` and a back-link to the file would fit the existing habit exactly.
+
 ## Possible shapes of the harness, cheapest first
 
 1. **Send to Roam.** Select a paragraph or a block in Fomawrite, choose *Send to Roam*, and it lands as a block on today's daily note (or a chosen page) with a link back to the file and position. Roam's API supports creating blocks and pages; this session already has a Roam connector that can append to the daily note and create blocks, so the mechanics exist. One-way, no sync, no conflict.
