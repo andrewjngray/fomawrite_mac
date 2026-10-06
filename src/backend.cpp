@@ -3657,6 +3657,14 @@ void Backend::forwardLiveChange(int position, int charsRemoved, int charsAdded) 
     if (m_loading) { m_liveMirrorValid = false; return; }
     if (!m_liveMirrorValid || m_applyingLiveChanges || !m_editorBridge->isReady()) return;
     const QString now = currentDocumentText();
+    // QTextDocument reports replacing an empty document as removing its final
+    // block character, and any other disagreement with the mirror would make
+    // the page refuse the change; reload the whole text instead of guessing.
+    if (position < 0 || position + charsRemoved > m_liveMirror.size() || position + charsAdded > now.size()) {
+        m_liveMirror = now;
+        m_editorBridge->loadDocument(now);
+        return;
+    }
     const QString inserted = now.mid(position, charsAdded);
     // Format-only changes (authorship marks, highlighting) report equal spans
     // with identical text; the page's text is unaffected.

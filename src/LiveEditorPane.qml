@@ -56,6 +56,13 @@ Rectangle {
         if (visible) { backend.syncLiveEditor(root.cursorOnEnter); root.cursorOnEnter = -1; }
     }
 
+    // Edit-menu clipboard actions while the page has focus (Chromium owns the clipboard there).
+    function triggerWebAction(name) {
+        var action = { "Cut": WebEngineView.Cut, "Copy": WebEngineView.Copy, "Paste": WebEngineView.Paste, "SelectAll": WebEngineView.SelectAll }[name];
+        if (action === undefined) return;
+        web.triggerWebAction(action);
+        web.forceActiveFocus();
+    }
     function focusLive() {
         web.forceActiveFocus();
         if (root.bridge) root.bridge.focus();

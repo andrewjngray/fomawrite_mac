@@ -401,6 +401,25 @@ void FomawriteTest::liveEditorInsertsLinksThroughThePagePanel() {
     page.backend.discardRecovery();
 }
 
+// QTextDocument reports replacing an empty document as removing one character
+// (its final block). Forwarding that literally made the page refuse the change
+// and keep stale text until the next full sync. Red on the old code.
+void FomawriteTest::liveEditorRecoversFromOutOfRangeHostChanges() {
+    Cycle103SettingsSnapshot settings;
+    Cycle134Page page; QVERIFY2(page.create(), qPrintable(page.error));
+    QTRY_VERIFY_WITH_TIMEOUT(page.bridge()->isReady(), 15000);
+    page.backend.syncLiveEditor(0);
+    QTRY_COMPARE_WITH_TIMEOUT(page.pageText(), QString(), 10000);
+    QSignalSpy logged(page.bridge(), &EditorBridge::messageLogged);
+    page.editor->setProperty("text", QStringLiteral("hello"));
+    QTRY_COMPARE_WITH_TIMEOUT(page.pageText(), QStringLiteral("hello"), 10000);
+    for (const auto &args : logged) QVERIFY2(!args.at(0).toString().contains("applyChanges failed"), qPrintable(args.at(0).toString()));
+    // Offsets still agree afterwards: a page edit lands at the right place.
+    QVERIFY(QMetaObject::invokeMethod(page.bridge(), "documentChanged", Q_ARG(QString, QStringLiteral("[{\"from\":5,\"to\":5,\"insert\":\" there\"}]")), Q_ARG(int, 1)));
+    QTRY_COMPARE_WITH_TIMEOUT(page.canonical(), QStringLiteral("hello there"), 5000);
+    page.backend.discardRecovery();
+}
+
 void FomawriteTest::liveEditorRunsHostCommands() {
     Cycle103SettingsSnapshot settings;
     Cycle134Page page; QVERIFY2(page.create(), qPrintable(page.error));
@@ -641,6 +660,15 @@ void FomawriteTest::liveModeInMainWindowLoadsPageAndNavigatesOutline() {
     })(), 15000);
     auto *liveToggle = window->findChild<QQuickItem *>("liveEditToggle"); QVERIFY(liveToggle);
     QTRY_VERIFY(liveToggle->property("checked").toBool());
+    // Edit > Select All while the page has focus acts on the page.
+    auto *pane = window->findChild<QObject *>("liveEditorPane"); QVERIFY(pane);
+    QVERIFY(QMetaObject::invokeMethod(pane, "focusLive"));
+    QTRY_VERIFY_WITH_TIMEOUT(pane->property("hasLiveFocus").toBool(), 5000);
+    QTest::qWait(200);
+    QTRY_VERIFY_WITH_TIMEOUT(([&] {
+        QMetaObject::invokeMethod(window.data(), "liveWebAction", Q_ARG(QVariant, QStringLiteral("SelectAll"))); QTest::qWait(150);
+        return bridge->lastSelectionStart() == 0 && bridge->lastSelectionEnd() == text.size();
+    })(), 8000);
     auto *outline = window->findChild<QObject *>("documentOutline"); QVERIFY(outline);
     const int two = text.indexOf("## Two");
     QVERIFY(QMetaObject::invokeMethod(outline, "jumpRequested", Q_ARG(int, two)));

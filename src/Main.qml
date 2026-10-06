@@ -1197,6 +1197,10 @@ ApplicationWindow {
         if (sourceFormattingAllowed()) editor.wrapSelection(before, after)
     }
 
+    function liveWebAction(name) {
+        if (workspaceLayout.liveEditEnabled && liveEditorLoader.item) liveEditorLoader.item.triggerWebAction(name);
+    }
+
     function tryInsertLink() {
         // The Source link editor dialog works on the Source text; the Live page has its own link panel.
         if (liveFormattingAllowed()) { backend.editorBridge.runCommand("link"); return; }

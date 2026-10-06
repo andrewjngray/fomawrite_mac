@@ -87,12 +87,12 @@ Platform.MenuBar {
         Platform.MenuItem { objectName: "editUndo"; text: "Undo"; enabled: win.canFormatLive || win.editTarget.canUndo; onTriggered: win.performDocumentEdit(function() { win.undoEditing(); }) }
         Platform.MenuItem { objectName: "editRedo"; text: "Redo"; enabled: win.canFormatLive || win.editTarget.canRedo; onTriggered: win.performDocumentEdit(function() { win.redoEditing(); }) }
         Platform.MenuSeparator {}
-        Platform.MenuItem { text: "Cut"; enabled: win.sourceClipboardAllowed && !win.editTarget.readOnly && win.editTarget.selectedText.length > 0; onTriggered: { if (win.editTarget === editor) { backend.copySelection(editor.selectionStart, editor.selectionEnd, "markdown"); win.performDocumentEdit(function() { editor.remove(editor.selectionStart, editor.selectionEnd); }); } else win.editTarget.cut(); } }
-        Platform.MenuItem { text: "Copy"; enabled: win.sourceClipboardAllowed && win.editTarget.selectedText.length > 0; onTriggered: { if (win.editTarget === editor) backend.copySelection(editor.selectionStart, editor.selectionEnd, "markdown"); else win.editTarget.copy(); } }
+        Platform.MenuItem { text: "Cut"; enabled: win.canFormatLive || (win.sourceClipboardAllowed && !win.editTarget.readOnly && win.editTarget.selectedText.length > 0); onTriggered: { if (win.canFormatLive) win.liveWebAction("Cut"); else if (win.editTarget === editor) { backend.copySelection(editor.selectionStart, editor.selectionEnd, "markdown"); win.performDocumentEdit(function() { editor.remove(editor.selectionStart, editor.selectionEnd); }); } else win.editTarget.cut(); } }
+        Platform.MenuItem { text: "Copy"; enabled: win.canFormatLive || (win.sourceClipboardAllowed && win.editTarget.selectedText.length > 0); onTriggered: { if (win.canFormatLive) win.liveWebAction("Copy"); else if (win.editTarget === editor) backend.copySelection(editor.selectionStart, editor.selectionEnd, "markdown"); else win.editTarget.copy(); } }
         Platform.MenuItem { objectName: "editCopyFormatted"; text: "Copy Formatted"; enabled: win.sourceClipboardAllowed && win.editTarget === editor && editor.selectedText.length > 0; onTriggered: backend.copySelection(editor.selectionStart, editor.selectionEnd, "formatted") }
         Platform.MenuItem { objectName: "editCopyHtml"; text: "Copy HTML"; enabled: win.sourceClipboardAllowed && win.editTarget === editor && editor.selectedText.length > 0; onTriggered: backend.copySelection(editor.selectionStart, editor.selectionEnd, "html") }
         Platform.MenuItem { objectName: "editCopyMarkdown"; text: "Copy Markdown"; enabled: win.sourceClipboardAllowed && win.editTarget === editor && editor.selectedText.length > 0; onTriggered: backend.copySelection(editor.selectionStart, editor.selectionEnd, "markdown") }
-        Platform.MenuItem { text: "Paste"; enabled: win.sourceClipboardAllowed && !win.editTarget.readOnly && win.editTarget.canPaste; onTriggered: { if (win.editTarget === editor) editor.pasteClipboardAsPlainText(); else win.editTarget.paste(); } }
+        Platform.MenuItem { text: "Paste"; enabled: win.canFormatLive || (win.sourceClipboardAllowed && !win.editTarget.readOnly && win.editTarget.canPaste); onTriggered: { if (win.canFormatLive) win.liveWebAction("Paste"); else if (win.editTarget === editor) editor.pasteClipboardAsPlainText(); else win.editTarget.paste(); } }
         Platform.Menu {
             title: "Paste As"
             Platform.MenuItem { objectName: "editPastePlain"; text: "Plain Text"; enabled: win.sourceClipboardAllowed && win.editTarget === editor && editor.canPaste; onTriggered: { editor.forceActiveFocus(); editor.replaceAtomic(editor.selectionStart, editor.selectionEnd, backend.clipboardText()); } }
@@ -100,7 +100,7 @@ Platform.MenuBar {
         }
         Platform.MenuSeparator {}
         Platform.MenuItem { objectName: "editDelete"; text: "Delete"; enabled: win.sourceClipboardAllowed && !win.editTarget.readOnly && win.editTarget.selectedText.length > 0; onTriggered: win.performDocumentEdit(function() { win.editTarget.remove(win.editTarget.selectionStart, win.editTarget.selectionEnd); }) }
-        Platform.MenuItem { text: "Select All"; enabled: win.sourceClipboardAllowed && win.editTarget.length > 0; onTriggered: win.editTarget.selectAll() }
+        Platform.MenuItem { text: "Select All"; enabled: win.canFormatLive || (win.sourceClipboardAllowed && win.editTarget.length > 0); onTriggered: { if (win.canFormatLive) win.liveWebAction("SelectAll"); else win.editTarget.selectAll(); } }
         Platform.MenuSeparator {}
         Platform.Menu {
             title: "Find"
