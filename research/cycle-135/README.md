@@ -28,6 +28,6 @@ Kept: `setEditingMode(visual)` in `Main.qml` as a thin alias of the new `setSour
 
 ## Limits
 
-- No native acceptance rerun (`bin/check-document-views`, `bin/check-publishing-startup`); their Live steps are untested natively.
+- `bin/check-document-views` (rerun 7 Oct against `dist/Fomawrite.app`): passed everything except three theme-folder fixture checks (`folder-drop-selection-and-rejected-choice-checkmarks`, `folder-css-edits-reload-and-basic-settings-actions`, `theme-import-and-basic-settings-dialog-actions`, all reporting that the disposable themes folder could not be created). The Live steps passed. The harness had been failing at its resource check since Cycle 133 (`PreviewPane.qml`), fixed this cycle.
 - The Live editor has still not been driven by physical input; this build is the first installed one that has it.
 - Open from the review: remaining `Backend` extractions, static library/test split, acceptance code in the product.

@@ -1,8 +1,8 @@
 {
   "version": "0.3.0-dev31",
   "build": 135,
-  "verifiedAt": "2026-10-06T15:57:49.807596+00:00",
-  "sourceCommit": "08915350c75160f5481810b17b2012f7f8848d17",
+  "verifiedAt": "2026-10-06T17:07:02.984185+00:00",
+  "sourceCommit": "see git log: resource-list fix commit",
   "publicReleaseChanged": false,
   "verification": {
     "fullRegression": {
@@ -15,20 +15,24 @@
       "passed": 176,
       "failed": 0
     },
-    "nativeChecks": "not rerun this cycle (bin/check-document-views, bin/check-publishing-startup)"
+    "nativeChecks": {
+      "check-document-views": "run against dist/Fomawrite.app after the resource-list fix: 124 footer states and all daily-writing, pane-zoom, editor, editing-layout and pane-chrome checks passed; 3 of 12 publishing-theme checks failed in the theme-folder fixture family (disposable themes folder could not be created) \u2014 not Live related, open",
+      "check-publishing-startup": "see research/cycle-135/README.md"
+    }
   },
   "bundles": {
     "dist/Fomawrite.app": {
       "build": 135,
-      "executableSha256": "ee0d20e19faa219021c2cdcd5ef1c35676f79c7da6afb5c02489cf6253dd906b"
+      "executableSha256": "f295c736994871936b5329d6d40830ff8eb877d9ee21285ca2a50b30d47e3b15"
     },
     "dist/Fomawrite Dev.app": {
       "build": 135,
-      "executableSha256": "2e1b2890ff07fd1cc2a7b7593e04bd199a539996f8f18f3af0d5f6f4f95bf4ec"
+      "executableSha256": "2e1b2890ff07fd1cc2a7b7593e04bd199a539996f8f18f3af0d5f6f4f95bf4ec",
+      "note": "still the first build-135 binary: it was running when the resource-list fix was repackaged; rerun ./bin/prepare-dev-app with it closed"
     },
     "/Applications/Fomawrite.app": {
       "build": 135,
-      "executableSha256": "ee0d20e19faa219021c2cdcd5ef1c35676f79c7da6afb5c02489cf6253dd906b"
+      "executableSha256": "f295c736994871936b5329d6d40830ff8eb877d9ee21285ca2a50b30d47e3b15"
     }
   },
   "removed": [

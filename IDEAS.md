@@ -22,6 +22,8 @@ Source mode uses the native Qt text editor and its spell check; the Live page is
 ### Grammarly in the editor
 Yes [ ]  No [ ]  Maybe [x]
 
+Requirement from Andrew: it must be switchable on and off. The Grammarly overlay (the small moving icon) is distracting when writing and creating; the purity of the editor and the clean panes are a feature, not a bug. Andrew will supply screenshots of how it behaves on his other devices.
+
 Andrew has a Grammarly account and finds its grammar checking good when it appears over text fields in Chrome. Three routes, in order of likelihood:
 1. **Grammarly Desktop for Mac** overlays its suggestions on text fields of other apps. Whether it attaches to the Live page (a Chromium `contenteditable` inside Qt WebEngine) and to the Source editor (a Qt Quick `TextEdit`) is untested. Cheapest first step: install Grammarly Desktop, open build 135, try both surfaces, record what happens.
 2. **Grammarly's browser-side SDK.** Grammarly offered a JavaScript Text Editor SDK for web apps; its current availability and terms need checking before planning on it. If it still exists it would fit the Live page directly.
