@@ -26,6 +26,7 @@
         <file>OrganizerPane.qml</file>
         <file>DocumentOutline.qml</file>
         <file>VisualEditPane.qml</file>
+        <file>LiveEditorPane.qml</file>
         <file>NativeMenuBar.qml</file>
         <file>PublishingPreview.qml</file>
         <file>ExportHub.qml</file>

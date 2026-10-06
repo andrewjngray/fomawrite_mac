@@ -598,6 +598,11 @@ Backend::Backend(QObject *parent, bool outputOnly) : QObject(parent), m_library(
     connect(this, &Backend::outputStyleChanged, m_publisher.get(), &Publisher::invalidateSettings);
     connect(this, &Backend::outputPageLayoutChanged, m_publisher.get(), &Publisher::invalidateSettings);
     connect(this, &Backend::outputCssChanged, m_publisher.get(), &Publisher::invalidateSettings);
+    // The Live editor (src/editor) is canonical while active; its changes are
+    // mirrored here so saving, recovery, publishing and the other panes agree.
+    m_editorBridge = std::make_unique<EditorBridge>();
+    connect(m_editorBridge.get(), &EditorBridge::changesReceived, this, &Backend::applyLiveChanges);
+    connect(m_editorBridge.get(), &EditorBridge::messageLogged, this, [](const QString &message) { qWarning("Live editor: %s", qPrintable(message)); });
     // New installations start with the composed writing palette; a stored
     // choice, including System, always takes precedence.
     const auto preset = QSettings().value("appearance/theme", "studio").toString();
@@ -3604,6 +3609,45 @@ QVariantMap Backend::requestPublishingPreview(const QString &format, QObject *co
 }
 void Backend::cancelPublishingPreview(QObject *consumer) { m_publisher->cancelPreview(consumer); }
 void Backend::invalidatePublishingDocument() { m_publisher->invalidateDocument(); }
+
+void Backend::syncLiveEditor() {
+    m_editorBridge->applyTheme(m_publisher->currentCss());
+    m_editorBridge->applyAppearance(QString::fromUtf8(QJsonDocument(QJsonObject{{"dark", m_darkMode}}).toJson(QJsonDocument::Compact)));
+    m_editorBridge->loadDocument(currentDocumentText());
+    m_editorBridge->selectMode(QStringLiteral("live"));
+}
+
+bool Backend::applyLiveChanges(const QString &changesJson, int revision) {
+    Q_UNUSED(revision);
+    if (!m_document) return false;
+    const auto json = QJsonDocument::fromJson(changesJson.toUtf8());
+    if (!json.isArray()) { m_editorBridge->log(QStringLiteral("Rejected change list: not a JSON array.")); return false; }
+    const QJsonArray changes = json.array();
+    const int length = currentDocumentText().size();
+    int previousFrom = length;
+    // Offsets are UTF-16 units in the pre-change document, ascending; applying
+    // in reverse keeps every earlier offset valid. Validate everything first so
+    // a malformed list changes nothing.
+    for (int i = changes.size() - 1; i >= 0; --i) {
+        const auto change = changes[i].toObject();
+        const int from = change.value("from").toInt(-1), to = change.value("to").toInt(-1);
+        if (!change.contains("insert") || from < 0 || to < from || to > length || to > previousFrom) {
+            m_editorBridge->log(QStringLiteral("Rejected change list: entry %1 is out of range (from %2, to %3, length %4).").arg(i).arg(from).arg(to).arg(length));
+            return false;
+        }
+        previousFrom = from;
+    }
+    QTextCursor cursor(m_document);
+    cursor.beginEditBlock();
+    for (int i = changes.size() - 1; i >= 0; --i) {
+        const auto change = changes[i].toObject();
+        cursor.setPosition(change.value("from").toInt());
+        cursor.setPosition(change.value("to").toInt(), QTextCursor::KeepAnchor);
+        cursor.insertText(change.value("insert").toString());
+    }
+    cursor.endEditBlock();
+    return true;
+}
 
 void Backend::paintPublishingOutput(QPagedPaintDevice &device) {
     const QPageLayout previous = m_pageLayout;

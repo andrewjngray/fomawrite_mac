@@ -10,6 +10,7 @@ QtObject {
     property int layoutMode: 1 // 0 Single editor, 1 Editor + Preview, 2 Preview only
     property int lastEditingLayoutMode: 1 // Restore this arrangement when leaving Preview only.
     property bool visualEditEnabled: false
+    property bool liveEditEnabled: false // The CodeMirror Live editor replaces the Source/Visual surface.
     property real organizerWidth: 208
     property real fileWidth: 288
     property real previewWidth: 420
@@ -109,7 +110,7 @@ QtObject {
 
     function saveState() {
         return { version: 2, organizerVisible: organizerVisible, filesVisible: filesVisible,
-            layoutMode: desiredMode(), visualEditEnabled: visualEditEnabled,
+            layoutMode: desiredMode(), visualEditEnabled: visualEditEnabled, liveEditEnabled: liveEditEnabled,
             lastEditingLayoutMode: lastEditingLayoutMode === 1 ? 1 : 0,
             organizerWidth: boundedWidth(organizerWidth, 184, 288, 208),
             fileWidth: boundedWidth(fileWidth, 232, 420, 288),
@@ -134,6 +135,7 @@ QtObject {
         filesVisible = typeof state.filesVisible === "boolean" ? state.filesVisible : true
         layoutMode = restoredMode
         visualEditEnabled = restoredVisual
+        liveEditEnabled = typeof state.liveEditEnabled === "boolean" ? state.liveEditEnabled : false
         lastEditingLayoutMode = restoredMode !== 2 ? restoredMode
                 : state.version === 2 && state.lastEditingLayoutMode === 1 ? 1 : 0
         organizerWidth = boundedWidth(state.organizerWidth, 184, 288, 208)

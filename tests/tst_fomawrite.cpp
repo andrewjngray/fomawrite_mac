@@ -68,6 +68,8 @@ private slots:
     void manuscriptHeadingMarkersHangOutsideBodyColumn();
     void sourceCodeBackgroundAndAppearancePreserveSavedBytes();
     void persistenceRoundTripsBytesExactly();
+    void liveChangesApplyToDocumentByteExactly();
+    void liveBridgeReplaysStateToLatePage();
     void persistenceRefusesLossyDecodeAndSaveAsWritesUtf8();
     void crlfDocumentsKeepAutosaveRenameAndMove();
     void manualSaveRespectsDiskBaseline();
@@ -5566,6 +5568,7 @@ private:
 #include "cycle132-publishing.inc"
 #include "perf-profile.inc"
 #include "mapper-fuzz.inc"
+#include "cycle134-live-editor.inc"
 
 int main(int argc, char **argv) {
     QtWebEngineQuick::initialize();

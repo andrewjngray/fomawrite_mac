@@ -132,6 +132,10 @@ bool Publisher::importTheme(const QUrl &file) {
     emit statusMessage(message.isEmpty() ? themeName() + " imported for Web and PDF." : message);
     return true;
 }
+QString Publisher::currentCss() const {
+    if (m_themeId.isEmpty()) return m_source.basicStyleCss();
+    return selectedCss(nullptr).value_or(QString());
+}
 void Publisher::clearTheme() {
     m_themeId.clear();
     m_themeError.clear();

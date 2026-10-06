@@ -69,6 +69,9 @@ public:
     // Basic presets replace any selected theme without announcing a theme change;
     // the caller's style signal re-renders the preview.
     void clearTheme();
+    // The stylesheet published output uses right now: the selected theme's
+    // sanitized CSS, or the basic style's inline CSS when no theme is selected.
+    QString currentCss() const;
 
     QString documentIdentity() const { return QString::number(m_documentGeneration); }
     // Document text, URL or lifetime changed: retire every pending render.

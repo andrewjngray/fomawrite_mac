@@ -16,6 +16,7 @@
 #include <optional>
 #include "filelibrary.h"
 #include "publisher.h"
+#include "editorbridge.h"
 
 class MarkdownHighlighter;
 class VisualTextHighlighter;
@@ -39,6 +40,7 @@ class Backend : public QObject, public PublishingSource {
     Q_PROPERTY(QString publishingThemeError READ publishingThemeError NOTIFY publishingThemesChanged)
     Q_PROPERTY(QObject *library READ library CONSTANT)
     Q_PROPERTY(QObject *publisher READ publisher CONSTANT)
+    Q_PROPERTY(QObject *editorBridge READ editorBridge CONSTANT)
     Q_PROPERTY(QUrl documentBaseUrl READ documentBaseUrl NOTIFY fileUrlChanged)
     Q_PROPERTY(QUrl fileUrl READ fileUrl NOTIFY fileUrlChanged)
     Q_PROPERTY(QString publishingDocumentIdentity READ publishingDocumentIdentity NOTIFY publishingDocumentIdentityChanged)
@@ -63,6 +65,9 @@ public:
     QString applicationPath() const;
     QObject *library() { return &m_library; }
     QObject *publisher() { return m_publisher.get(); }
+    EditorBridge *editorBridge() { return m_editorBridge.get(); }
+    // Push the current document, theme and appearance to the Live editor page.
+    Q_INVOKABLE void syncLiveEditor();
     QUrl documentBaseUrl() const override;
 
     void setParentWindow(QWindow *window);
@@ -301,6 +306,9 @@ private:
     QPageLayout outputPageLayout() const override;
     void invalidatePublishingDocument();
     std::unique_ptr<Publisher> m_publisher;
+    // Mirrors the Live editor's change lists into the canonical document.
+    bool applyLiveChanges(const QString &changesJson, int revision);
+    std::unique_ptr<EditorBridge> m_editorBridge;
     void paintOutput(QPagedPaintDevice &device, QTextDocument &document) const;
     void paintPublishingOutput(QPagedPaintDevice &device);
     void applyTemplate(QTextDocument &document, bool preview) const;

@@ -324,6 +324,7 @@ Platform.MenuBar {
             title: "Editing"
             NativeCommand { commandId: "sourceEditing" }
             NativeCommand { commandId: "visualEditing" }
+            NativeCommand { commandId: "liveEditing" }
         }
         Platform.Menu {
             title: "Layout"

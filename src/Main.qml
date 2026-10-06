@@ -284,7 +284,7 @@ ApplicationWindow {
     // explicit formatting controls. An unrelated field never borrows a stale
     // Source selection merely because the editor remains visible.
     property bool sourceFormattingOwned: false
-    readonly property bool sourceEditorVisible: editorPane.visible && !workspaceLayout.visualEditEnabled
+    readonly property bool sourceEditorVisible: editorPane.visible && !workspaceLayout.visualEditEnabled && !workspaceLayout.liveEditEnabled
     onSourceEditorVisibleChanged: if (!sourceEditorVisible && completionPopup) completionPopup.close()
     readonly property bool canFormatSource: sourceEditorVisible && sourceFormattingOwned
         && !editor.readOnly && !editor.inputMethodComposing
@@ -335,6 +335,7 @@ ApplicationWindow {
         else { win.revealDocumentChrome(); topChrome.focusWorkspaceControl(); }
     }
     function focusWritingSurface() {
+        if (editorPane.visible && workspaceLayout.liveEditEnabled) { liveEditorPane.focusLive(); return; }
         focusWorkspaceRegion(editorPane.visible ? "source" : "preview");
     }
     readonly property bool workspaceOwnsKeyboard: !navigationDrawer.visible && (!activeFocusItem
@@ -483,8 +484,21 @@ ApplicationWindow {
         documentViewportTransition.focusTarget = mode === 2 ? "preview"
             : workspaceLayout.visualEditEnabled ? "visual" : "source";
     }
+    function setLiveEditing(enabled) {
+        if (!enabled) { workspaceLayout.liveEditEnabled = false; return; }
+        if (searchOpen) closeSearch(false);
+        workspaceLayout.visualEditEnabled = false;
+        workspaceLayout.liveEditEnabled = true;
+        if (workspaceLayout.layoutMode === 2)
+            workspaceLayout.layoutMode = workspaceLayout.lastEditingLayoutMode;
+        lastWritingSurface = "live";
+        sourceFormattingOwned = false;
+        backend.syncLiveEditor();
+        liveEditorPane.focusLive();
+    }
     function setEditingMode(visual) {
         if (visual && searchOpen) closeSearch(false);
+        workspaceLayout.liveEditEnabled = false;
         if (workspaceLayout.visualEditEnabled === visual && workspaceLayout.effectiveLayoutMode !== 2) {
             focusWritingSurface();
             return;
@@ -509,6 +523,7 @@ ApplicationWindow {
     }
     function selectWritingMode(mode) {
         if (mode === "preview") setDocumentView(2);
+        else if (mode === "live") setLiveEditing(true);
         else setEditingMode(mode === "visual");
     }
     function applyStudioWorkspace() {
@@ -2445,7 +2460,7 @@ ApplicationWindow {
                     }
                 }
             }
-            visible: !workspaceLayout.visualEditEnabled
+            visible: !workspaceLayout.visualEditEnabled && !workspaceLayout.liveEditEnabled
             onContentYChanged: {
                 codeDecorationsTimer.restart();
                 if (!win.sourceEditorVisible || !workspaceSettings.synchronizedScroll || win.synchronizingScroll || win.changingDocumentView || workspaceLayout.effectiveLayoutMode !== 1) return;
@@ -3025,6 +3040,16 @@ ApplicationWindow {
                 previewPane.scrollToFraction(fraction);
                 win.synchronizingScroll = false;
             }
+        }
+
+        LiveEditorPane {
+            id: liveEditorPane
+            anchors.fill: parent
+            anchors.topMargin: documentMeta.y + documentMeta.height
+            bottomInset: documentFooter.height
+            visible: workspaceLayout.liveEditEnabled
+            bridge: backend.editorBridge
+            onWritingActivity: win.writingActivity()
         }
 
         DocumentFindBar {
