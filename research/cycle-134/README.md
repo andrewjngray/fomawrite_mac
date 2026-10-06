@@ -50,8 +50,21 @@ For comparison, Cycle 133's measurements of the existing Visual Edit pane: one k
 
 ## Verification
 
-VERIFICATION_PLACEHOLDER
+- Full offscreen regression suite at the end of the night: **FINAL_COUNT_PLACEHOLDER** (`./bin/test`, Qt 6.11.2, Apple Silicon).
+- Live editor tests in [`tests/cycle134-live-editor.inc`](../../tests/cycle134-live-editor.inc): change lists apply byte-exactly and malformed ones are refused whole; the bridge replays state to a late page; images resolve through the host (valid, missing, remote); a real `WebEngineView` mirrors page edits byte-exactly, mirrors undo, keeps one text across mode switches, round-trips the Cycle 131 persistence fixtures through the page and a C++ save, loads a 1 MiB document in ~55 ms, follows **host-side** edits (a `QTextCursor` change reaches the page; a format-only change does not) and keeps offsets agreeing afterwards; a capture test renders Live (basic, Claude Like light/dark), Source (Manuscript, Editorial, Code) and a math/table document and saves PNGs under `research/cycle-134/captures/` — the frames are checked to be non-uniform, then reviewed by eye.
+- Editor page tests (`cd src/editor && npm test`, node:test, DOM-free): change serialisation round-trips (incl. ZWJ emoji, combining marks, CJK), live decorations hide/reveal correctly, mode switches preserve text/revision, appearance JSON maps to classes/compartments, focus paragraph ranges, typewriter decisions, block builders (image/task/rule/fence/table/quote), table parsing (ragged rows, escaped pipes, alignments), math parsing (`$5 and $10` stays text, `\$` escapes, unclosed `$`), render caches. **JS_COUNT_PLACEHOLDER** tests.
+- Test isolation fixes found along the way: the two recovery-baseline tests now wait for the draft's recovery write to land instead of assuming a fixed delay; every test process uses its own app-data directory (`FomawriteTests-<pid>`, removed in `cleanupTestCase`) so suites running concurrently (worktrees, CI) no longer see each other's recovery snapshots — the cause of two "flaky" failures tonight.
+- Screenshots reviewed: Live mode under the Claude Like theme renders headings, inline marks, real checkboxes, the quote bar, the host-resolved image, a table **grid**, a rule and a labelled, highlighted Python fence; Source/Manuscript shows iA-Writer-style hanging `#`/`-`/`>` markers in the bundled mono face; Code shows line numbers, indent guides and horizontal scroll.
 
 ## Limits and what comes next
 
-LIMITS_PLACEHOLDER
+**Measured answers to the spike's questions:** the bridge is not a bottleneck (one keystroke on 1 MiB mirrors in ~75 ms including two hops and test polling; a real keystroke is one hop), the document stays byte-identical in both directions, existing Typora-style themes style the editor via `#write`, and the Chromium page costs nothing until Live is first used (it is then kept, hidden, so mode switches do not reload it).
+
+**Not done tonight / known limits**
+- **Mermaid diagrams** (would add ~2.5 MB) and **footnotes/TOC/front-matter** rendering: not started.
+- **Bundle size**: `dist/editor.js` is 1.8 MB because every CodeMirror language grammar is bundled for fence highlighting; a curated language list would halve it. KaTeX adds 275 KB + 20 fonts.
+- **Keyboard shortcuts and app commands while Live is focused**: the page handles its own editing keys (CodeMirror keymap incl. search, history); the app's Format commands apply to the Source editor and are refused while focus is outside it — with the host→page mirror they would now reach the page, but no Live-aware Format menu wiring exists yet.
+- **Cursor carry-over** between Source and Live is not implemented (each mode starts at its own caret); scroll position is synced with the publishing pane in both directions.
+- **Authorship marks** are format-only `QTextDocument` edits and are deliberately not pushed to the page; they are invisible in Live mode.
+- The **old Visual Edit pane and bounded mapper remain** untouched; the decision to retire them is Andrew's.
+- Offscreen only: no bundle refreshed, no native harness rerun (installed app in use). The footer "Live" button and the CI runner fixes were in flight when this record was written — see STATUS.

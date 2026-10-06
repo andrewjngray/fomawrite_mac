@@ -309,6 +309,12 @@ private:
     // Mirrors the Live editor's change lists into the canonical document.
     bool applyLiveChanges(const QString &changesJson, int revision);
     void resolveLiveImage(int token, const QString &src);
+    // The other direction: document edits made on the C++ side (format commands,
+    // version restore, replace) reach the page while Live is active.
+    void forwardLiveChange(int position, int charsRemoved, int charsAdded);
+    bool m_applyingLiveChanges = false;
+    QString m_liveMirror;
+    bool m_liveMirrorValid = false;
     std::unique_ptr<EditorBridge> m_editorBridge;
     void paintOutput(QPagedPaintDevice &device, QTextDocument &document) const;
     void paintPublishingOutput(QPagedPaintDevice &device);

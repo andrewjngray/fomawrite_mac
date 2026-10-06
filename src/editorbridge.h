@@ -33,6 +33,10 @@ public:
     Q_INVOKABLE void injectUserChanges(const QString &changesJson);
     Q_INVOKABLE void requestUndo();
     Q_INVOKABLE void requestRedo();
+    // Ask the page to scroll to a 0..1 fraction (pane sync); not echoed back.
+    Q_INVOKABLE void scrollTo(double fraction);
+    // Host-side document changes the page must apply (not reported back).
+    Q_INVOKABLE void pushChanges(const QString &changesJson);
 
 public slots:
     // Page → app (over QWebChannel).
@@ -46,6 +50,8 @@ public slots:
     void requestImage(int token, const QString &src);
     // Called by the host with the answer (emits imageReply to the page).
     void replyImage(int token, const QString &dataUrl, const QString &error);
+    // The page reports its vertical position as a 0..1 fraction (debounced).
+    void scrolled(double fraction);
 
 signals:
     // Connected to by the page.
@@ -60,7 +66,9 @@ signals:
     void undo();
     void redo();
     void imageReply(int token, const QString &dataUrl, const QString &error);
+    void scrollToFraction(double fraction);
     // For the app.
+    void scrollFractionChanged(double fraction);
     void imageRequested(int token, const QString &src);
     void readyChanged();
     void revisionChanged();

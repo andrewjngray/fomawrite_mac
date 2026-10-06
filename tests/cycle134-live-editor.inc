@@ -198,6 +198,38 @@ void FomawriteTest::liveEditorPageMirrorsUserEditsByteExactly() {
     page.backend.discardRecovery();
 }
 
+void FomawriteTest::liveEditorFollowsHostEdits() {
+    Cycle103SettingsSnapshot settings;
+    Cycle134Page page; QVERIFY2(page.create(), qPrintable(page.error));
+    QTRY_VERIFY_WITH_TIMEOUT(page.bridge()->isReady(), 15000);
+    const QString original = QString::fromUtf8("# Host\n\nalpha beta gamma\n");
+    page.editor->setProperty("text", original);
+    page.backend.syncLiveEditor();
+    QTRY_COMPARE_WITH_TIMEOUT(page.pageText(), original, 10000);
+    QSignalSpy pushed(page.bridge(), &EditorBridge::applyChanges);
+    // A change made on the C++ side, as a Format command or Replace would make it.
+    auto *quick = qvariant_cast<QQuickTextDocument *>(page.editor->property("textDocument"));
+    QTextCursor cursor(quick->textDocument());
+    cursor.setPosition(8); cursor.setPosition(13, QTextCursor::KeepAnchor); cursor.insertText("**alpha**");
+    const QString expected = QString::fromUtf8("# Host\n\n**alpha** beta gamma\n");
+    QCOMPARE(page.canonical(), expected);
+    QTRY_COMPARE_WITH_TIMEOUT(pushed.count(), 1, 5000);
+    QTRY_COMPARE_WITH_TIMEOUT(page.pageText(), expected, 10000);
+    // A format-only change (authorship label) must not be pushed as text.
+    QTextCursor label(quick->textDocument()); label.setPosition(10); label.setPosition(15, QTextCursor::KeepAnchor);
+    QTextCharFormat format; format.setFontItalic(true); label.mergeCharFormat(format);
+    QTest::qWait(300);
+    QCOMPARE(pushed.count(), 1);
+    QCOMPARE(page.pageText(), expected);
+    // And a page edit after a host edit still mirrors (offsets agree).
+    QSignalSpy changes(page.bridge(), &EditorBridge::changesReceived);
+    page.bridge()->injectUserChanges(QStringLiteral("[{\"from\":0,\"to\":0,\"insert\":\"> \"}]"));
+    QTRY_VERIFY_WITH_TIMEOUT(changes.count() >= 1, 10000);
+    QCOMPARE(page.canonical(), "> " + expected);
+    QCOMPARE(page.pageText(), "> " + expected);
+    page.backend.discardRecovery();
+}
+
 void FomawriteTest::liveEditorRoundTripsPersistenceFixturesThroughThePage() {
     Cycle103SettingsSnapshot settings;
     QTemporaryDir directory; QVERIFY(directory.isValid());
@@ -327,5 +359,21 @@ void FomawriteTest::liveEditorCapturesEachPresentation() {
         QVERIFY2(cycle134SaveFrame(page.window, QDir(captures).filePath(shot.file), &why), qPrintable(why));
         qInfo("capture %s", qPrintable(QDir(captures).filePath(shot.file)));
     }
+    // A short document so math and a table are visible in one frame.
+    const QString mathSample = QString::fromUtf8(
+        "## Math and tables\n\n"
+        "Inline $E = mc^2$ and $\\alpha + \\beta = \\gamma$ stay in the line of prose.\n\n"
+        "$$\n\\int_0^1 x^2\\,dx = \\frac{1}{3}\n$$\n\n"
+        "| Symbol | Meaning | Value |\n|:--|:--:|--:|\n| $\\pi$ | ratio | 3.14159 |\n| $e$ | Euler | 2.71828 |\n\n"
+        "A $5 coffee and a $10 lunch are prices, not math.\n");
+    QFile mathDoc(directory.filePath("math.md")); QVERIFY(mathDoc.open(QIODevice::WriteOnly)); mathDoc.write(mathSample.toUtf8()); mathDoc.close();
+    QVERIFY(page.backend.open(QUrl::fromLocalFile(directory.filePath("math.md"))));
+    QVERIFY(page.backend.selectPublishingTheme("claude-like"));
+    page.backend.syncLiveEditor();
+    page.bridge()->applyAppearance(QStringLiteral("{\"appearance\":\"manuscript\",\"dark\":false,\"fontSize\":17}"));
+    page.bridge()->selectMode("live");
+    QTRY_COMPARE_WITH_TIMEOUT(page.pageText(), page.canonical(), 10000);
+    QVERIFY2(cycle134SaveFrame(page.window, QDir(captures).filePath("live-math.png"), &why), qPrintable(why));
+    qInfo("capture %s", qPrintable(QDir(captures).filePath("live-math.png")));
     page.backend.discardRecovery();
 }

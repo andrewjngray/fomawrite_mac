@@ -41,6 +41,14 @@ void EditorBridge::injectUserChanges(const QString &changesJson) {
 
 void EditorBridge::requestUndo() { if (m_ready) emit undo(); }
 void EditorBridge::requestRedo() { if (m_ready) emit redo(); }
+void EditorBridge::scrollTo(double fraction) { if (m_ready) emit scrollToFraction(fraction); }
+void EditorBridge::pushChanges(const QString &changesJson) {
+    if (!m_ready || !m_hasDocument) return;
+    ++m_revision;
+    emit revisionChanged();
+    emit applyChanges(changesJson, m_revision);
+}
+void EditorBridge::scrolled(double fraction) { emit scrollFractionChanged(fraction); }
 
 void EditorBridge::ready() {
     m_ready = true;

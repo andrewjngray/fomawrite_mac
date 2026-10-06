@@ -110,6 +110,28 @@ async function main() {
   onSignal(bridge.requestText, guard("requestText", (token: number) => bridge.textReply(token, session.getText())));
   onSignal(bridge.simulateUserChanges, guard("simulateUserChanges", (json: string) => session.simulateUserChanges(json)));
   onSignal(bridge.undo, guard("undo", () => void session.undo()));
+  // Scroll sync with the host's other panes: report the editor's vertical
+  // position as a fraction, and follow the host's requests without echoing them.
+  let applyingHostScroll = 0;
+  let scrollTimer: ReturnType<typeof setTimeout> | undefined;
+  const scrollFraction = () => {
+    const el = view.scrollDOM;
+    const range = el.scrollHeight - el.clientHeight;
+    return range > 0 ? Math.max(0, Math.min(1, el.scrollTop / range)) : 0;
+  };
+  view.scrollDOM.addEventListener("scroll", () => {
+    if (applyingHostScroll > 0) return;
+    if (scrollTimer) clearTimeout(scrollTimer);
+    scrollTimer = setTimeout(() => bridge.scrolled(scrollFraction()), 60);
+  }, { passive: true });
+  onSignal(bridge.scrollToFraction, guard("scrollToFraction", (fraction: number) => {
+    const el = view.scrollDOM;
+    const range = el.scrollHeight - el.clientHeight;
+    if (range <= 0) return;
+    applyingHostScroll++;
+    el.scrollTop = Math.max(0, Math.min(1, fraction)) * range;
+    setTimeout(() => { applyingHostScroll = Math.max(0, applyingHostScroll - 1); }, 120);
+  }));
   onSignal(bridge.redo, guard("redo", () => void session.redo()));
 
   window.fomawriteEditor = {

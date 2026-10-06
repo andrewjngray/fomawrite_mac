@@ -20,6 +20,9 @@ Rectangle {
     property bool focusMode: false
     property bool dark: false
     signal writingActivity()
+    signal scrollFractionChanged(real fraction)
+
+    function scrollToFraction(fraction) { if (root.bridge) root.bridge.scrollTo(fraction); }
 
     function pushAppearance() {
         if (!root.bridge) return;
@@ -84,5 +87,9 @@ Rectangle {
     Connections {
         target: backend
         function onDocumentLoaded() { if (root.visible) backend.syncLiveEditor(); }
+    }
+    Connections {
+        target: root.bridge
+        function onScrollFractionChanged(fraction) { root.scrollFractionChanged(fraction); }
     }
 }

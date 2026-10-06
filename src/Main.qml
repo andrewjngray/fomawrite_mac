@@ -3048,8 +3048,12 @@ ApplicationWindow {
             id: liveEditorLoader
             anchors.fill: parent
             anchors.topMargin: documentMeta.y + documentMeta.height
-            active: workspaceLayout.liveEditEnabled
-            visible: active
+            // Created on first use and then kept (hidden) so switching modes does
+            // not reload the editor page; documents that never use Live pay nothing.
+            property bool used: false
+            onActiveChanged: if (active) used = true
+            active: workspaceLayout.liveEditEnabled || used
+            visible: workspaceLayout.liveEditEnabled
             sourceComponent: LiveEditorPane {
                 bottomInset: documentFooter.height
                 bridge: backend.editorBridge
@@ -3060,6 +3064,12 @@ ApplicationWindow {
                 focusMode: workspaceSettings.paragraphFocus || workspaceSettings.sentenceFocus
                 dark: win.darkMode
                 onWritingActivity: win.writingActivity()
+                onScrollFractionChanged: function(fraction) {
+                    if (!workspaceSettings.synchronizedScroll || win.synchronizingScroll || win.changingDocumentView || workspaceLayout.effectiveLayoutMode !== 1) return;
+                    win.synchronizingScroll = true;
+                    previewPane.scrollToFraction(fraction);
+                    win.synchronizingScroll = false;
+                }
             }
         }
 
@@ -3105,7 +3115,8 @@ ApplicationWindow {
             onScrollFractionChanged: function(fraction) {
                 if (!workspaceSettings.synchronizedScroll || win.synchronizingScroll || win.changingDocumentView || workspaceLayout.effectiveLayoutMode !== 1) return;
                 win.synchronizingScroll = true;
-                if (workspaceLayout.visualEditEnabled) visualEditorPane.scrollToFraction(fraction);
+                if (workspaceLayout.liveEditEnabled) { if (liveEditorLoader.item) liveEditorLoader.item.scrollToFraction(fraction); }
+                else if (workspaceLayout.visualEditEnabled) visualEditorPane.scrollToFraction(fraction);
                 else editorFlick.contentY = Math.max(0, editorFlick.contentHeight - editorFlick.height) * fraction;
                 win.synchronizingScroll = false;
             }

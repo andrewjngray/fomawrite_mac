@@ -1829,6 +1829,7 @@ void Backend::attachDocument(QObject *textDocument) {
     // consumer debounces this signal before recomputing the displayed metrics.
     connect(m_document, &QTextDocument::contentsChanged,
             this, &Backend::documentStatisticsChanged);
+    connect(m_document, &QTextDocument::contentsChange, this, &Backend::forwardLiveChange);
 
     connect(m_document, &QTextDocument::undoCommandAdded, this, [this] {
         if (m_loading || m_formattingTypography || m_sourceHistoryTraversal) return;
@@ -3615,8 +3616,23 @@ void Backend::syncLiveEditor() {
     // Appearance (fonts, focus, typewriter, dark) is pushed by LiveEditorPane,
     // which binds the same preferences the Source editor uses.
     m_editorBridge->applyTheme(m_publisher->currentCss());
-    m_editorBridge->loadDocument(currentDocumentText());
+    m_liveMirror = currentDocumentText();
+    m_liveMirrorValid = true;
+    m_editorBridge->loadDocument(m_liveMirror);
     m_editorBridge->selectMode(QStringLiteral("live"));
+}
+
+void Backend::forwardLiveChange(int position, int charsRemoved, int charsAdded) {
+    if (m_loading) { m_liveMirrorValid = false; return; }
+    if (!m_liveMirrorValid || m_applyingLiveChanges || !m_editorBridge->isReady()) return;
+    const QString now = currentDocumentText();
+    const QString inserted = now.mid(position, charsAdded);
+    // Format-only changes (authorship marks, highlighting) report equal spans
+    // with identical text; the page's text is unaffected.
+    if (charsRemoved == charsAdded && m_liveMirror.mid(position, charsRemoved) == inserted) return;
+    const QJsonArray changes{QJsonObject{{"from", position}, {"to", position + charsRemoved}, {"insert", inserted}}};
+    m_liveMirror = now;
+    m_editorBridge->pushChanges(QString::fromUtf8(QJsonDocument(changes).toJson(QJsonDocument::Compact)));
 }
 
 void Backend::resolveLiveImage(int token, const QString &src) {
@@ -3649,6 +3665,7 @@ bool Backend::applyLiveChanges(const QString &changesJson, int revision) {
         previousFrom = from;
     }
     QTextCursor cursor(m_document);
+    m_applyingLiveChanges = true;
     cursor.beginEditBlock();
     for (int i = changes.size() - 1; i >= 0; --i) {
         const auto change = changes[i].toObject();
@@ -3657,6 +3674,8 @@ bool Backend::applyLiveChanges(const QString &changesJson, int revision) {
         cursor.insertText(change.value("insert").toString());
     }
     cursor.endEditBlock();
+    m_applyingLiveChanges = false;
+    if (m_liveMirrorValid) m_liveMirror = currentDocumentText();
     return true;
 }
 

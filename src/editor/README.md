@@ -30,6 +30,7 @@ JS **calls** (slots):
 - `metric(name: string, ms: number)` - `keystroke-to-dispatch` (keydown/beforeinput/input -> `documentChanged`), `setDocument`, `decorate` (slowest live-decoration rebuild per 100 ms window).
 - `log(message: string)`.
 - `textReply(token: number, text: string)` - answer to `requestText`.
+- `scrolled(fraction: number)` - the editor's vertical position as a 0..1 fraction, debounced 60 ms, for host pane sync (not sent while applying `scrollToFraction`).
 - `requestImage(token: number, src: string)` - live mode asks the host for an image. `src` is the raw URL from the markdown (angle brackets stripped); the host resolves it relative to the document, and answers with `imageReply` (below) using the same `token`. One request per distinct `src`; replies are cached by `src` until the next `setDocument`, and failed `src`s are retried after 5 s the next time their widget is created. Hosts without this slot make images show the placeholder.
 
 JS **connects to** (signals):
@@ -40,6 +41,7 @@ JS **connects to** (signals):
 - `setTheme(css)` - sets `<style id="fomawrite-theme">`; empty string removes it.
 - `setAppearance(json)` - `{fontFamily, fontSize, lineHeight, dark, typewriter, focus, appearance}`; unknown keys are ignored, missing keys leave the previous value. `fontFamily/fontSize/lineHeight` -> CSS vars `--fw-font`, `--fw-font-size` (px), `--fw-line-height` on `#write` (they override the appearance defaults below); `dark` toggles `html.dark`. The remaining keys are owned by `src/appearance.ts` (see "Appearances"): `appearance` (`"manuscript" | "editorial" | "book" | "code"`) -> class `fw-appearance-<name>` on `#write`; `focus` -> `#write.fw-focus`; `typewriter` -> `#write.fw-typewriter`.
 - `imageReply(token: number, dataUrl: string, error: string)` - answer to `requestImage`. On success `dataUrl` is a `data:image/...` URL and `error` is `""`; on failure `error` is a short message (shown as the placeholder tooltip) and `dataUrl` is ignored. Anything that is not a `data:image/` URL is treated as an error. Unknown/stale tokens are ignored. In mock mode the page answers itself with a 1x1 PNG after 50 ms.
+- `scrollToFraction(fraction: number)` - scroll the editor to a 0..1 fraction without echoing `scrolled`.
 - `focusEditor()`.
 - `requestText(token)` -> JS calls `bridge.textReply(token, fullText)`.
 - Test hooks (the CSP forbids eval): `simulateUserChanges(changesJson)` applies the changes as an ordinary user transaction (`userEvent: "input"`), so it **is** reported via `documentChanged`; `undo()` / `redo()` run CM6's commands (resulting changes are reported like user edits).

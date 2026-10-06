@@ -17,6 +17,8 @@ export interface Bridge {
   log(message: string): void;
   textReply(token: number, text: string): void;
   requestImage(token: number, src: string): void;
+  // Vertical scroll position as a 0..1 fraction (debounced), for pane sync.
+  scrolled(fraction: number): void;
   // C++ -> JS signals
   setDocument: Signal<[string, number]>;
   applyChanges: Signal<[string, number]>;
@@ -29,6 +31,8 @@ export interface Bridge {
   undo: Signal<[]>;
   redo: Signal<[]>;
   imageReply: Signal<[number, string, string]>;
+  // Host asks the editor to scroll to a 0..1 fraction (not echoed back as scrolled()).
+  scrollToFraction: Signal<[number]>;
 }
 
 export interface BridgeConnection {
@@ -86,7 +90,7 @@ const MOCK_PNG =
 
 const SIGNALS = [
   "setDocument", "applyChanges", "setMode", "setTheme", "setAppearance",
-  "focusEditor", "requestText", "simulateUserChanges", "undo", "redo", "imageReply",
+  "focusEditor", "requestText", "simulateUserChanges", "undo", "redo", "imageReply", "scrollToFraction"
 ] as const;
 
 export type MockBridge = Bridge & {
@@ -103,7 +107,7 @@ export function createMockBridge(): MockBridge {
     calls.push({ name, args });
     console.log("[bridge mock]", name, ...args);
   };
-  for (const s of ["ready", "documentChanged", "cursorChanged", "metric", "log", "textReply"]) mock[s] = slot(s);
+  for (const s of ["ready", "documentChanged", "cursorChanged", "metric", "log", "textReply", "scrolled"]) mock[s] = slot(s);
   for (const s of SIGNALS) {
     handlers[s] = [];
     mock[s] = { connect: (fn: (...a: any[]) => void) => handlers[s].push(fn) };

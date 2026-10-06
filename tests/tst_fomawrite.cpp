@@ -75,6 +75,7 @@ private slots:
     void liveEditorPageMirrorsUserEditsByteExactly();
     void liveEditorRoundTripsPersistenceFixturesThroughThePage();
     void liveEditorLoadsLargeDocumentQuickly();
+    void liveEditorFollowsHostEdits();
     void liveEditorCapturesEachPresentation();
     void persistenceRefusesLossyDecodeAndSaveAsWritesUtf8();
     void crlfDocumentsKeepAutosaveRenameAndMove();
@@ -383,16 +384,34 @@ private slots:
 
     void initTestCase() {
         QCoreApplication::setOrganizationName("FomawriteTests");
-        QCoreApplication::setApplicationName("FomawriteTests");
+        // One app-data directory per test process: several suites can run at
+        // once (worktrees, CI matrix) without their recovery snapshots and
+        // locks appearing in each other's directories. Removed in cleanupTestCase.
+        QCoreApplication::setApplicationName("FomawriteTests-" + QString::number(QCoreApplication::applicationPid()));
         QVERIFY(m_settingsDirectory.isValid());
         for (const QString &face : {"Regular", "Italic", "Bold", "BoldItalic"})
             QVERIFY(QFontDatabase::addApplicationFont(QFINDTESTDATA("../fonts/iAWriterMonoS-" + face + ".ttf")) >= 0);
         QCoreApplication::setAttribute(Qt::AA_DontUseNativeDialogs);
         QStandardPaths::setTestModeEnabled(true);
+        // Backends adopt orphaned recovery snapshots on construction. A draft
+        // left behind by an aborted earlier run (e.g. a failed focus test)
+        // would be adopted and rewritten mid-test, so start from a clean slate.
+        {
+            QDir data(QStandardPaths::writableLocation(QStandardPaths::AppDataLocation));
+            int removed = 0;
+            for (const QString &name : data.entryList({QStringLiteral("recovery-*.json"), QStringLiteral("recovery-*.lock")}, QDir::Files))
+                removed += data.remove(name) ? 1 : 0;
+            if (removed) qInfo("Removed %d stale recovery file(s) from %s", removed, qPrintable(data.path()));
+        }
         QQuickStyle::setStyle(QStringLiteral("Material"));
         QSettings::setDefaultFormat(QSettings::IniFormat);
         QSettings::setPath(QSettings::IniFormat, QSettings::UserScope,
                            m_settingsDirectory.path());
+    }
+
+    void cleanupTestCase() {
+        QDir data(QStandardPaths::writableLocation(QStandardPaths::AppDataLocation));
+        if (data.dirName().startsWith("FomawriteTests-")) data.removeRecursively();
     }
 
     void contextFileAndFolderActionsUseClickedPath() {
