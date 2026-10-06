@@ -42,6 +42,7 @@ JS **connects to** (signals):
 - `setTheme(css)` - sets `<style id="fomawrite-theme">`; empty string removes it.
 - `setAppearance(json)` - `{fontFamily, fontSize, lineHeight, dark, typewriter, focus, appearance}`; unknown keys are ignored, missing keys leave the previous value. `fontFamily/fontSize/lineHeight` -> CSS vars `--fw-font`, `--fw-font-size` (px), `--fw-line-height` on `#write` (they override the appearance defaults below); `dark` toggles `html.dark`. The remaining keys are owned by `src/appearance.ts` (see "Appearances"): `appearance` (`"manuscript" | "editorial" | "book" | "code"`) -> class `fw-appearance-<name>` on `#write`; `focus` -> `#write.fw-focus`; `typewriter` -> `#write.fw-typewriter`.
 - `imageReply(token: number, dataUrl: string, error: string)` - answer to `requestImage`. On success `dataUrl` is a `data:image/...` URL and `error` is `""`; on failure `error` is a short message (shown as the placeholder tooltip) and `dataUrl` is ignored. Anything that is not a `data:image/` URL is treated as an error. Unknown/stale tokens are ignored. In mock mode the page answers itself with a 1x1 PNG after 50 ms.
+- `command(name: string)` - run an editor command from the host: `find`/`replace` open CodeMirror's search panel, `selectAll` selects the document; unknown names are logged.
 - `setCursor(pos: number)` - place the caret at a UTF-16 offset (clamped) and scroll it into view.
 - `scrollToFraction(fraction: number)` - scroll the editor to a 0..1 fraction without echoing `scrolled`.
 - `focusEditor()`.

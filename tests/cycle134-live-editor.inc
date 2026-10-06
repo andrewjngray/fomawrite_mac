@@ -285,6 +285,28 @@ void FomawriteTest::liveEditorAppliesFormatCommandsAtThePageSelection() {
     page.backend.discardRecovery();
 }
 
+void FomawriteTest::liveEditorRunsHostCommands() {
+    Cycle103SettingsSnapshot settings;
+    Cycle134Page page; QVERIFY2(page.create(), qPrintable(page.error));
+    QTRY_VERIFY_WITH_TIMEOUT(page.bridge()->isReady(), 15000);
+    const QString text = QString::fromUtf8("one two three\n");
+    page.editor->setProperty("text", text);
+    page.backend.syncLiveEditor(0);
+    QTRY_COMPARE_WITH_TIMEOUT(page.pageText(), text, 10000);
+    // selectAll: the page reports the whole document as the selection.
+    QSignalSpy cursor(page.bridge(), &EditorBridge::cursorMoved);
+    page.bridge()->runCommand("selectAll");
+    QTRY_VERIFY_WITH_TIMEOUT(page.bridge()->lastSelectionStart() == 0 && page.bridge()->lastSelectionEnd() == text.size(), 5000);
+    // find: must not throw or change the document; an unknown command is logged.
+    QSignalSpy logged(page.bridge(), &EditorBridge::messageLogged);
+    page.bridge()->runCommand("find");
+    page.bridge()->runCommand("no-such-command");
+    QTRY_VERIFY_WITH_TIMEOUT(logged.count() >= 1, 5000);
+    QCOMPARE(page.canonical(), text);
+    QCOMPARE(page.pageText(), text);
+    page.backend.discardRecovery();
+}
+
 void FomawriteTest::liveEditorRoundTripsPersistenceFixturesThroughThePage() {
     Cycle103SettingsSnapshot settings;
     QTemporaryDir directory; QVERIFY(directory.isValid());

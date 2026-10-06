@@ -35,6 +35,8 @@ export interface Bridge {
   scrollToFraction: Signal<[number]>;
   // Host places the caret (UTF-16 offset) and scrolls it into view.
   setCursor: Signal<[number]>;
+  // Host-invoked editor commands: "find", "replace", "selectAll".
+  command: Signal<[string]>;
 }
 
 export interface BridgeConnection {
@@ -92,7 +94,7 @@ const MOCK_PNG =
 
 const SIGNALS = [
   "setDocument", "applyChanges", "setMode", "setTheme", "setAppearance",
-  "focusEditor", "requestText", "simulateUserChanges", "undo", "redo", "imageReply", "scrollToFraction", "setCursor"
+  "focusEditor", "requestText", "simulateUserChanges", "undo", "redo", "imageReply", "scrollToFraction", "setCursor", "command"
 ] as const;
 
 export type MockBridge = Bridge & {

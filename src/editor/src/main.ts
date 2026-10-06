@@ -1,6 +1,8 @@
 // Bootstrap + bridge glue. Mounts the CM6 view in #editor, connects to the Qt bridge
 // (or a mock) and wires signals/slots per the contract documented in README.md.
 import { EditorView } from "@codemirror/view";
+import { openSearchPanel } from "@codemirror/search";
+import { selectAll } from "@codemirror/commands";
 import { SAMPLE_DOCUMENT, connectBridge, onSignal } from "./bridge";
 import { setDecorateMetricSink } from "./live";
 import { blocksExtension } from "./blocks";
@@ -126,6 +128,13 @@ async function main() {
     if (scrollTimer) clearTimeout(scrollTimer);
     scrollTimer = setTimeout(() => bridge.scrolled(scrollFraction()), 60);
   }, { passive: true });
+  onSignal(bridge.command, guard("command", (name: string) => {
+    switch (name) {
+      case "find": case "replace": view.focus(); openSearchPanel(view); break;
+      case "selectAll": view.focus(); selectAll(view); break;
+      default: bridge.log("unknown command: " + name);
+    }
+  }));
   onSignal(bridge.setCursor, guard("setCursor", (pos: number) => {
     const at = Math.max(0, Math.min(view.state.doc.length, Math.floor(pos)));
     view.dispatch({ selection: { anchor: at }, scrollIntoView: true });

@@ -84,8 +84,8 @@ Platform.MenuBar {
     }
     Platform.Menu {
         title: "Edit"
-        Platform.MenuItem { objectName: "editUndo"; text: "Undo"; enabled: win.editTarget.canUndo; onTriggered: win.performDocumentEdit(function() { win.undoEditing(); }) }
-        Platform.MenuItem { objectName: "editRedo"; text: "Redo"; enabled: win.editTarget.canRedo; onTriggered: win.performDocumentEdit(function() { win.redoEditing(); }) }
+        Platform.MenuItem { objectName: "editUndo"; text: "Undo"; enabled: win.canFormatLive || win.editTarget.canUndo; onTriggered: win.performDocumentEdit(function() { win.undoEditing(); }) }
+        Platform.MenuItem { objectName: "editRedo"; text: "Redo"; enabled: win.canFormatLive || win.editTarget.canRedo; onTriggered: win.performDocumentEdit(function() { win.redoEditing(); }) }
         Platform.MenuSeparator {}
         Platform.MenuItem { text: "Cut"; enabled: win.sourceClipboardAllowed && !win.editTarget.readOnly && win.editTarget.selectedText.length > 0; onTriggered: { if (win.editTarget === editor) { backend.copySelection(editor.selectionStart, editor.selectionEnd, "markdown"); win.performDocumentEdit(function() { editor.remove(editor.selectionStart, editor.selectionEnd); }); } else win.editTarget.cut(); } }
         Platform.MenuItem { text: "Copy"; enabled: win.sourceClipboardAllowed && win.editTarget.selectedText.length > 0; onTriggered: { if (win.editTarget === editor) backend.copySelection(editor.selectionStart, editor.selectionEnd, "markdown"); else win.editTarget.copy(); } }

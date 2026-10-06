@@ -70,10 +70,14 @@ ApplicationWindow {
         documentChromeHidden = true;
     }
     function undoEditing() {
+        // The Live editor keeps its own history; undoing the mirrored document
+        // underneath it would diverge the two. Route to the page instead.
+        if (canFormatLive) { backend.editorBridge.requestUndo(); return; }
         if (editTarget === editor) editor.cursorPosition = backend.undoSource(editor.cursorPosition);
         else editTarget.undo();
     }
     function redoEditing() {
+        if (canFormatLive) { backend.editorBridge.requestRedo(); return; }
         if (editTarget === editor) editor.cursorPosition = backend.redoSource(editor.cursorPosition);
         else editTarget.redo();
     }
@@ -1491,6 +1495,8 @@ ApplicationWindow {
     readonly property bool sourceClipboardAllowed: !visualEditorActive && (sourceEditorVisible || editTarget !== editor)
 
     function openSearch(withReplace, useSelection) {
+        // In Live, Find/Replace is the editor page's own search panel.
+        if (workspaceLayout.liveEditEnabled && liveEditorLoader.item) { backend.editorBridge.runCommand(withReplace ? "replace" : "find"); return; }
         cancelDocumentViewportTransition();
         var selected = editor.selectedText;
         // Find/Replace acts on canonical Markdown. Reveal that editor explicitly

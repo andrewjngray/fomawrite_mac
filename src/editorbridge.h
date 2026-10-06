@@ -33,6 +33,8 @@ public:
     Q_INVOKABLE void injectUserChanges(const QString &changesJson);
     Q_INVOKABLE void requestUndo();
     Q_INVOKABLE void requestRedo();
+    // Host-invoked editor commands: "find", "replace", "selectAll".
+    Q_INVOKABLE void runCommand(const QString &name);
     // Ask the page to scroll to a 0..1 fraction (pane sync); not echoed back.
     Q_INVOKABLE void scrollTo(double fraction);
     // Host-side document changes the page must apply (not reported back).
@@ -74,6 +76,7 @@ signals:
     void imageReply(int token, const QString &dataUrl, const QString &error);
     void scrollToFraction(double fraction);
     void setCursor(int position);
+    void command(const QString &name);
     // For the app.
     void scrollFractionChanged(double fraction);
     void imageRequested(int token, const QString &src);
