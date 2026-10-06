@@ -78,6 +78,8 @@ public:
     Q_INVOKABLE bool liveWrapSelection(const QString &before, const QString &after);
     Q_INVOKABLE bool liveReplaceSelection(const QString &replacement);
     Q_INVOKABLE bool liveEditMarkdown(const QString &action);
+    // Copy the Live page's selection in a clipboard format ("markdown", "html", "formatted").
+    Q_INVOKABLE bool liveCopySelection(const QString &format);
     QUrl documentBaseUrl() const override;
 
     void setParentWindow(QWindow *window);

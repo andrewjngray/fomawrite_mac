@@ -3635,6 +3635,12 @@ bool Backend::liveWrapSelection(const QString &before, const QString &after) {
     return true;
 }
 
+bool Backend::liveCopySelection(const QString &format) {
+    const int start = m_editorBridge->lastSelectionStart(), end = m_editorBridge->lastSelectionEnd();
+    if (start < 0 || end <= start) return false;
+    return copySelection(start, end, format);
+}
+
 bool Backend::liveReplaceSelection(const QString &replacement) {
     const int start = m_editorBridge->lastSelectionStart(), end = m_editorBridge->lastSelectionEnd();
     if (!m_liveMirrorValid || start < 0) return false;

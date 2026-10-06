@@ -420,6 +420,30 @@ void FomawriteTest::liveEditorRecoversFromOutOfRangeHostChanges() {
     page.backend.discardRecovery();
 }
 
+// Copy Markdown/HTML in Live use the page's selection; nothing is copied without one.
+void FomawriteTest::liveEditorCopiesThePageSelection() {
+    Cycle103SettingsSnapshot settings;
+    Cycle134Page page; QVERIFY2(page.create(), qPrintable(page.error));
+    QTRY_VERIFY_WITH_TIMEOUT(page.bridge()->isReady(), 15000);
+    const QString text = QStringLiteral("# Title\n\nsome *words*\n");
+    page.editor->setProperty("text", text);
+    page.backend.syncLiveEditor(0);
+    QTRY_COMPARE_WITH_TIMEOUT(page.pageText(), text, 10000);
+    QGuiApplication::clipboard()->setText(QStringLiteral("untouched"));
+    QVERIFY(!page.backend.liveCopySelection("markdown"));
+    QCOMPARE(QGuiApplication::clipboard()->text(), QStringLiteral("untouched"));
+    page.bridge()->runCommand("selectAll");
+    QTRY_VERIFY_WITH_TIMEOUT(page.bridge()->lastSelectionEnd() == text.size(), 5000);
+    QVERIFY(page.backend.liveCopySelection("markdown"));
+    QCOMPARE(QGuiApplication::clipboard()->text(), text);
+    QVERIFY(page.backend.liveCopySelection("html"));
+    QVERIFY(QGuiApplication::clipboard()->text().contains("italic"));
+    QVERIFY(page.backend.liveCopySelection("formatted"));
+    QVERIFY(QGuiApplication::clipboard()->mimeData()->hasHtml());
+    QCOMPARE(QGuiApplication::clipboard()->mimeData()->text().trimmed(), QStringLiteral("Title\nsome words"));
+    page.backend.discardRecovery();
+}
+
 void FomawriteTest::liveEditorRunsHostCommands() {
     Cycle103SettingsSnapshot settings;
     Cycle134Page page; QVERIFY2(page.create(), qPrintable(page.error));
