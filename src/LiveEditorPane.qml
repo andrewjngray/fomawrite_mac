@@ -12,7 +12,26 @@ Rectangle {
     objectName: "liveEditorPane"
     required property var bridge
     property real bottomInset: 0
+    // Presentation follows the same preferences as the Source editor.
+    property string appearance: "manuscript"
+    property string fontFamily: ""
+    property int fontSize: 17
+    property bool typewriter: false
+    property bool focusMode: false
+    property bool dark: false
     signal writingActivity()
+
+    function pushAppearance() {
+        if (!root.bridge) return;
+        root.bridge.applyAppearance(JSON.stringify({ appearance: root.appearance, fontFamily: root.fontFamily,
+            fontSize: root.fontSize, typewriter: root.typewriter, focus: root.focusMode, dark: root.dark }));
+    }
+    onAppearanceChanged: pushAppearance()
+    onFontFamilyChanged: pushAppearance()
+    onFontSizeChanged: pushAppearance()
+    onTypewriterChanged: pushAppearance()
+    onFocusModeChanged: pushAppearance()
+    onDarkChanged: pushAppearance()
 
     color: backend.palette.editor
 
@@ -21,6 +40,7 @@ Rectangle {
     // its objects when the page initialises the channel.
     Component.onCompleted: {
         channel.registerObject("bridge", root.bridge);
+        pushAppearance();
         web.url = "qrc:/editor/index.html";
     }
 

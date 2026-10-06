@@ -3612,8 +3612,9 @@ void Backend::cancelPublishingPreview(QObject *consumer) { m_publisher->cancelPr
 void Backend::invalidatePublishingDocument() { m_publisher->invalidateDocument(); }
 
 void Backend::syncLiveEditor() {
+    // Appearance (fonts, focus, typewriter, dark) is pushed by LiveEditorPane,
+    // which binds the same preferences the Source editor uses.
     m_editorBridge->applyTheme(m_publisher->currentCss());
-    m_editorBridge->applyAppearance(QString::fromUtf8(QJsonDocument(QJsonObject{{"dark", m_darkMode}}).toJson(QJsonDocument::Compact)));
     m_editorBridge->loadDocument(currentDocumentText());
     m_editorBridge->selectMode(QStringLiteral("live"));
 }

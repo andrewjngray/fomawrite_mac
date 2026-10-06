@@ -3049,6 +3049,12 @@ ApplicationWindow {
             bottomInset: documentFooter.height
             visible: workspaceLayout.liveEditEnabled
             bridge: backend.editorBridge
+            appearance: workspaceSettings.writingAppearance
+            fontFamily: win.editorFontFamily
+            fontSize: win.editorFontPixelSize
+            typewriter: workspaceSettings.typewriter
+            focusMode: workspaceSettings.paragraphFocus || workspaceSettings.sentenceFocus
+            dark: win.darkMode
             onWritingActivity: win.writingActivity()
         }
 

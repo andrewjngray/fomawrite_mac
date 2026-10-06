@@ -56,11 +56,6 @@ async function main() {
     EditorView.updateListener.of((u) => {
       if (u.docChanged) session.handleTransactions(u.transactions);
       if (u.selectionSet || u.docChanged) scheduleCursor(u.view);
-      if (session.appearance.typewriter && (u.selectionSet || u.docChanged)) {
-        const head = u.state.selection.main.head;
-        // Cannot dispatch from inside an update listener.
-        queueMicrotask(() => view.dispatch({ effects: EditorView.scrollIntoView(head, { y: "center" }) }));
-      }
     }),
   ]);
 
