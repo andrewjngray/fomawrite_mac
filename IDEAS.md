@@ -78,4 +78,5 @@ The semantic indexing work with Rami: `potentiacap/vaultmcp` (document vault wit
 Moved here when a box becomes Yes or No, with the date and the reason.
 
 - **Retire the Visual Edit pane** — Yes, 7 October 2026, Cycle 135. Live covers it with the Markdown text itself as the editing model.
+- **Live follows the publishing theme, lighter (Option 3 via a CSS filter)** — Yes, 7 October 2026; design in [docs/live-appearance-design.md](docs/live-appearance-design.md). Text size shared with Source; Split kept; an exact-theme setting as the escape hatch.
 - **Code in the Live dropdown drops back to Source silently** — Yes (keep as is), 7 October 2026. Code is a specific kind of editing; the silent switch works well in practice. A fuller code editor is a possible later idea, but the lightweight line-numbered appearance is enough for now.

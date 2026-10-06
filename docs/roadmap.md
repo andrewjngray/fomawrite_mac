@@ -1,6 +1,6 @@
 # Fomawrite: local Markdown workspace
 
-> The mission is in [MISSION.md](../MISSION.md); it also states the current measure of progress. As of 7 October 2026 (after Cycle 135) that measure is one question: **is Live good enough to be the daily editor?** The next cycles answer it: Andrew writes real documents in Live, the native acceptance harnesses are rerun against build 135, and the friction list from that use becomes the next cycle before any new capability is started.
+> The mission is in [MISSION.md](../MISSION.md); it also states the current measure of progress. As of 7 October 2026 (after Cycle 135) that measure is one question: **is Live good enough to be the daily editor?** The next cycles answer it: Andrew writes real documents in Live, the native acceptance harnesses are rerun against build 135, and the friction list from that use becomes the next cycle before any new capability is started. First item on that list, decided 7 October: Live follows the publishing theme with its layout filtered out ([design](live-appearance-design.md)); that is Cycle 136.
 >
 > The current build, test count and open items are in [STATUS.md](../STATUS.md); every cycle is listed in [CHANGELOG.md](../CHANGELOG.md). The checkpoints below are kept as the history of goals and plans.
 
