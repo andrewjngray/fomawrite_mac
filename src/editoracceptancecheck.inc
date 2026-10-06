@@ -89,26 +89,6 @@
         check(click(window, linkCancel), "Cannot cancel stale editor");
         check(editor->property("text").toString() == changed, "Stale Cancel changed document");
     });
-    acceptance("visual-table-real-tab-navigation", [&] {
-        window->resize(1100, 720); backend.setThemePreset("studio");
-        const QString text = QString::fromUtf8("# Table keyboard navigation\n\n| Name | Note |\n| --- | --- |\n| café | **bold** |\n| Empty |   |\n\nAfter.\n");
-        if (!loadSample("Table navigation", text)) return;
-        action("visualEditToggle", 0, true);
-        auto *visual = visualPane->findChild<QQuickItem *>("visualEditor");
-        const QVariantList cells = backend.visualProjection().value("tableCells").toList();
-        if (!check(visual && cells.size() == 6, "Visual table projection is missing six cells")) return;
-        visual->setProperty("cursorPosition", cells.first().toMap().value("visualStart")); visual->forceActiveFocus();
-        for (int index = 1; index < cells.size(); ++index) {
-            key(window, Qt::Key_Tab);
-            check(visual->property("cursorPosition").toInt() == cells[index].toMap().value("visualStart").toInt(), "Tab did not move to next table cell");
-        }
-        key(window, Qt::Key_Tab);
-        check(visual->property("cursorPosition").toInt() == cells.last().toMap().value("visualStart").toInt(), "Last-cell Tab escaped table boundary");
-        key(window, Qt::Key_Backtab, {}, Qt::ShiftModifier);
-        check(visual->property("cursorPosition").toInt() == cells[4].toMap().value("visualStart").toInt(), "Shift Tab did not move back");
-        check(editor->property("text").toString() == text && !backend.modified() && !editor->property("canUndo").toBool(), "Table navigation changed source/Undo");
-        capture("acceptance-visual-table-navigation");
-    });
     acceptance("continuous-resize-and-workspace-restoration", [&] {
         window->resize(1440, 800); QMetaObject::invokeMethod(window, "applyReferenceWorkspace");
         action("previewSplitButton", 1, false);
@@ -136,7 +116,7 @@
         check(QMetaObject::invokeMethod(window, "restoreWorkspacePaneState", Q_ARG(QVariant, savedState)), "Cannot restore workspace checkpoint");
         check(waitUntil(ready), "Restored workspace did not settle");
         check(layout->property("organizerVisible").toBool() && layout->property("filesVisible").toBool(), "Workspace checkpoint lost navigation visibility");
-        for (const char *name : {"organizerWidth", "fileWidth", "previewWidth", "layoutMode", "visualEditEnabled"})
+        for (const char *name : {"organizerWidth", "fileWidth", "previewWidth", "layoutMode", "liveEditEnabled"})
             check(layout->property(name) == savedMap.value(QString::fromLatin1(name)), "Workspace checkpoint changed preference: " + QString::fromLatin1(name));
         check(editor->property("text").toString() == unchanged, "Workspace restoration changed Markdown");
         capture("acceptance-restored-workspace-dark");

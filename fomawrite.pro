@@ -9,8 +9,6 @@ HEADERS += \
     src/backend.h \
     src/documentviewcheck.h \
     src/markdownhighlighter.h \
-    src/sourcevisualmapping.h \
-    src/visualtexthighlighter.h \
     src/outputcss.h \
     src/systemtheme.h
 
@@ -19,8 +17,6 @@ SOURCES += \
     src/documentviewcheck.cpp \
     src/backend.cpp \
     src/markdownhighlighter.cpp \
-    src/sourcevisualmapping.cpp \
-    src/visualtexthighlighter.cpp \
     src/outputcss.cpp
 
 macx {

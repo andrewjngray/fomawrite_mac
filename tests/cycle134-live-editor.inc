@@ -636,7 +636,7 @@ void FomawriteTest::viewportTransitionKeepsAuxiliaryFocus() {
     library->setProperty("showFilterBar", true);
     auto *filter = window->findChild<QQuickItem *>("libraryFilter"); QVERIFY(filter);
     QTRY_VERIFY(filter->isVisible());
-    for (const char *mode : {"visual", "source"}) {
+    for (const char *mode : {"preview", "source"}) {
         // Start a transition, then immediately move into the auxiliary field.
         QVERIFY(QMetaObject::invokeMethod(window.data(), "selectWritingMode", Q_ARG(QVariant, QString::fromLatin1(mode))));
         QVERIFY(window->property("changingDocumentView").toBool());
@@ -648,7 +648,7 @@ void FomawriteTest::viewportTransitionKeepsAuxiliaryFocus() {
     }
     // Without an auxiliary field, the transition still restores editing focus.
     editor->forceActiveFocus();
-    QVERIFY(QMetaObject::invokeMethod(window.data(), "selectWritingMode", Q_ARG(QVariant, QStringLiteral("visual"))));
+    QVERIFY(QMetaObject::invokeMethod(window.data(), "selectWritingMode", Q_ARG(QVariant, QStringLiteral("preview"))));
     QTRY_VERIFY_WITH_TIMEOUT(!window->property("changingDocumentView").toBool(), 5000);
     QVERIFY(QMetaObject::invokeMethod(window.data(), "selectWritingMode", Q_ARG(QVariant, QStringLiteral("source"))));
     QTRY_VERIFY_WITH_TIMEOUT(!window->property("changingDocumentView").toBool(), 5000);
@@ -673,7 +673,6 @@ void FomawriteTest::liveModeInMainWindowLoadsPageAndNavigatesOutline() {
     editor->setProperty("text", text);
     QVERIFY(QMetaObject::invokeMethod(window.data(), "selectWritingMode", Q_ARG(QVariant, QStringLiteral("live"))));
     QVERIFY(layout->property("liveEditEnabled").toBool());
-    QVERIFY(!layout->property("visualEditEnabled").toBool());
     auto *bridge = backend.editorBridge();
     QTRY_VERIFY_WITH_TIMEOUT(bridge->isReady(), 20000);
     QSignalSpy received(bridge, &EditorBridge::textReceived);

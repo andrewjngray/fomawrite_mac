@@ -1,20 +1,18 @@
 // Cycle134 — Live is a third option in the footer's editing-mode capsule,
-// after Source and Visual Edit. The capsule keeps its pane-owned position and
+// after Source (Visual Edit was retired in Cycle 135). The capsule keeps its pane-owned position and
 // the options stay in order at wide and narrow window widths.
 
 void FomawriteTest::footerLiveOptionJoinsEditingCapsule() {
     Cycle103SettingsSnapshot isolatedSettings;
     Cycle117Window f; QVERIFY2(f.start(1100), qPrintable(f.error));
-    auto *source = f.item("sourceModeButton"), *visual = f.item("visualEditToggle"), *live = f.item("liveEditToggle");
+    auto *source = f.item("sourceModeButton"), *live = f.item("liveEditToggle");
     auto *single = f.item("singleModeButton"), *capsule = f.item("documentEditingControls"), *view = f.item("documentViewControls");
-    QVERIFY(source && visual && live && single && capsule && view);
+    QVERIFY(source && live && single && capsule && view);
     QCOMPARE(live->property("text").toString(), QStringLiteral("Live"));
     QCOMPARE(live->parentItem(), source->parentItem());
-    const auto checks = [&](bool sourceOn, bool visualOn, bool liveOn) {
+    const auto checks = [&](bool sourceOn, bool liveOn) {
         QCOMPARE(source->property("checked").toBool(), sourceOn);
-        QCOMPARE(visual->property("checked").toBool(), visualOn);
         QCOMPARE(live->property("checked").toBool(), liveOn);
-        QCOMPARE(f.layout->property("visualEditEnabled").toBool(), visualOn);
         QCOMPARE(f.layout->property("liveEditEnabled").toBool(), liveOn);
         QVERIFY(cycle107ViewChecked(f.footer, f.layout));
     };
@@ -24,29 +22,22 @@ void FomawriteTest::footerLiveOptionJoinsEditingCapsule() {
         QTRY_COMPARE(f.quick->size(), QSize(width, 720));
         QVERIFY(cycle118FooterRenderBarrier(f.quick));
         QVERIFY(cycle102Click(f.quick, source)); QTRY_VERIFY(f.editor->isVisible());
-        checks(true, false, false);
+        checks(true, false);
         const auto fixed = cycle107ViewBounds(f.footer);
         for (int pass = 0; pass < 2; ++pass) {
-            // Live replaces Source and Visual Edit; neither stays checked.
+            // Live replaces Source; Source does not stay checked.
             QVERIFY(cycle102Click(f.quick, live));
             QTRY_VERIFY(f.layout->property("liveEditEnabled").toBool());
-            checks(false, false, true);
+            checks(false, true);
             QVERIFY(!f.editor->isVisible());
-            // Visual Edit and Source each turn Live off again.
-            QVERIFY(cycle102Click(f.quick, visual));
-            QTRY_VERIFY(!f.layout->property("liveEditEnabled").toBool());
-            checks(false, true, false);
-            QVERIFY(cycle102Click(f.quick, live));
-            QTRY_VERIFY(f.layout->property("liveEditEnabled").toBool());
-            QVERIFY(!f.layout->property("visualEditEnabled").toBool());
-            checks(false, false, true);
+            // Source turns Live off again.
             QVERIFY(cycle102Click(f.quick, source));
             QTRY_VERIFY(!f.layout->property("liveEditEnabled").toBool());
             QTRY_VERIFY(f.editor->isVisible());
-            checks(true, false, false);
+            checks(true, false);
             // Clicking the active Live option twice leaves it on.
             QVERIFY(cycle102Click(f.quick, live)); QVERIFY(cycle102Click(f.quick, live));
-            checks(false, false, true);
+            checks(false, true);
             QVERIFY(cycle102Click(f.quick, source));
             QTRY_VERIFY(!f.layout->property("liveEditEnabled").toBool());
         }
@@ -55,11 +46,10 @@ void FomawriteTest::footerLiveOptionJoinsEditingCapsule() {
         QVERIFY(cycle102Click(f.quick, live));
         QTRY_VERIFY(f.layout->property("liveEditEnabled").toBool());
         QVERIFY(cycle118FooterRenderBarrier(f.quick));
-        const auto sourceBounds = cycle103SceneBounds(source), visualBounds = cycle103SceneBounds(visual),
+        const auto sourceBounds = cycle103SceneBounds(source),
             liveBounds = cycle103SceneBounds(live), capsuleBounds = cycle103SceneBounds(capsule),
             footerBounds = cycle103SceneBounds(f.footer);
-        QVERIFY(sourceBounds.right() <= visualBounds.left() + 0.5);
-        QVERIFY(visualBounds.right() <= liveBounds.left() + 0.5);
+        QVERIFY(sourceBounds.right() <= liveBounds.left() + 0.5);
         QVERIFY(capsuleBounds.adjusted(-0.1, -0.1, 0.1, 0.1).contains(sourceBounds)
                 && capsuleBounds.adjusted(-0.1, -0.1, 0.1, 0.1).contains(liveBounds));
         QVERIFY(footerBounds.adjusted(-0.1, -0.1, 0.1, 0.1).contains(capsuleBounds));
@@ -89,10 +79,8 @@ void FomawriteTest::footerLiveOptionJoinsEditingCapsule() {
     auto *appearance = f.item("sourceAppearanceButton"); QVERIFY(appearance);
     QVERIFY(cycle118FooterRenderBarrier(f.quick));
     QVERIFY(live->isVisible() && appearance->isVisible());
-    QTRY_COMPARE(visual->property("text").toString(), QStringLiteral("Visual"));
-    QCOMPARE(visual->property("hint").toString(), QStringLiteral("Visual Edit \u2014 edit the document visually"));
     QCOMPARE(live->property("hint").toString(), QStringLiteral("Live \u2014 edit with Markdown rendered in place"));
-    checks(false, false, true);
+    checks(false, true);
     QTRY_VERIFY(cycle107ViewLabelsReadable(f.footer));
     QTRY_VERIFY(cycle106FooterControlsFit(f.window.data()));
     QTRY_VERIFY(cycle117PaneFooterAnchors(f.window.data()));
@@ -103,5 +91,5 @@ void FomawriteTest::footerLiveOptionJoinsEditingCapsule() {
     QVERIFY(cycle118ReadPreview(f.window.data()));
     QTRY_COMPARE(f.layout->property("effectiveLayoutMode").toInt(), 2);
     QVERIFY(!capsule->isVisible());
-    QVERIFY(!source->property("checked").toBool() && !visual->property("checked").toBool() && !live->property("checked").toBool());
+    QVERIFY(!source->property("checked").toBool() && !live->property("checked").toBool());
 }

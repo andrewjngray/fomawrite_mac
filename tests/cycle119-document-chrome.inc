@@ -130,27 +130,6 @@ void FomawriteTest::documentChromeHidesForUserInputAndRevealsEdgesWithoutReflow(
     QTRY_COMPARE(f.editor->property("text").toString(), clipboardDraft);
     QTRY_VERIFY(!header->property("documentChromeVisible").toBool());
 
-    // Visual Edit also keeps Copy/Select All visible until text actually changes.
-    QVERIFY(QMetaObject::invokeMethod(f.window.data(), "selectWritingMode", Q_ARG(QVariant, "visual")));
-    auto *visual = f.item("visualEditor"), *visualPane = f.item("visualEditorPane");
-    QVERIFY(visual && visualPane);
-    QTRY_VERIFY(visual->isVisible());
-    QTRY_VERIFY(!visualPane->property("viewportRefreshPending").toBool());
-    QTRY_VERIFY(!f.window->property("changingDocumentView").toBool());
-    visual->forceActiveFocus(Qt::MouseFocusReason);
-    QVERIFY(QMetaObject::invokeMethod(f.window.data(), "writingActivity"));
-    QVERIFY(revealTop());
-    QTest::keyClick(f.quick, Qt::Key_A, Qt::ControlModifier);
-    QTRY_VERIFY(!visual->property("selectedText").toString().isEmpty());
-    QTest::keyClick(f.quick, Qt::Key_C, Qt::ControlModifier);
-    QTRY_COMPARE(QGuiApplication::clipboard()->text(), visual->property("selectedText").toString());
-    QVERIFY(header->property("documentChromeVisible").toBool());
-    // Edit within the paragraph; replacing the entire projection can include
-    // structural boundaries that deliberately require Source.
-    visual->setProperty("cursorPosition", 1);
-    cycle111KeyClick(f.quick, 'v');
-    QTRY_VERIFY(f.editor->property("text").toString() != clipboardDraft);
-    QTRY_VERIFY(!header->property("documentChromeVisible").toBool());
     QCOMPARE(cycle119DocumentGeometry(f), geometry);
 }
 
@@ -260,7 +239,7 @@ void FomawriteTest::publishingWebCommandSelectsWebWithoutChangingEditor() {
     auto *command = f.window->findChild<QObject *>("native_webPreview");
     QVERIFY(settings && command);
     QVERIFY(f.mode(1));
-    QVERIFY(QMetaObject::invokeMethod(f.window.data(), "selectWritingMode", Q_ARG(QVariant, "visual")));
+    QVERIFY(QMetaObject::invokeMethod(f.window.data(), "selectWritingMode", Q_ARG(QVariant, "live")));
     f.editor->setProperty("text", "# Keep this draft\n\n**Unchanged** Markdown.\n");
     const QString source = f.editor->property("text").toString();
     settings->setProperty("publishingFormat", "pdf");
@@ -270,7 +249,7 @@ void FomawriteTest::publishingWebCommandSelectsWebWithoutChangingEditor() {
     QVERIFY(QMetaObject::invokeMethod(command, "triggered"));
     QTRY_COMPARE(settings->property("publishingFormat").toString(), QString("web"));
     QTRY_VERIFY(command->property("checked").toBool());
-    QVERIFY(f.layout->property("visualEditEnabled").toBool());
+    QVERIFY(f.layout->property("liveEditEnabled").toBool());
     QCOMPARE(f.layout->property("effectiveLayoutMode").toInt(), 1);
     QCOMPARE(f.editor->property("text").toString(), source);
 }

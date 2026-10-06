@@ -12,7 +12,7 @@ export interface Bridge {
   // JS -> C++ slots
   ready(): void;
   documentChanged(changesJson: string, revision: number): void;
-  cursorChanged(anchor: number, head: number): void;
+  cursorChanged(anchor: number, head: number, byUser?: boolean): void;
   metric(name: string, ms: number): void;
   log(message: string): void;
   textReply(token: number, text: string): void;

@@ -5,6 +5,7 @@ EditorBridge::EditorBridge(QObject *parent) : QObject(parent) {}
 void EditorBridge::loadDocument(const QString &text) {
     m_text = text;
     m_hasDocument = true;
+    m_caretMovedByUser = false;
     ++m_revision;
     emit revisionChanged();
     if (m_ready) emit setDocument(m_text, m_revision);
@@ -67,8 +68,14 @@ void EditorBridge::documentChanged(const QString &changesJson, int revision) {
     emit changesReceived(changesJson, revision);
 }
 
-void EditorBridge::cursorChanged(int anchor, int head) { m_lastAnchor = anchor; m_lastCursor = head; emit cursorMoved(anchor, head); }
-void EditorBridge::placeCursor(int position) { if (m_ready && m_hasDocument) emit setCursor(position); }
+void EditorBridge::cursorChanged(int anchor, int head, bool byUser) { m_lastAnchor = anchor; m_lastCursor = head; if (byUser) m_caretMovedByUser = true; emit cursorMoved(anchor, head); }
+void EditorBridge::placeCursor(int position) {
+    // Record the requested position at once so liveCursor() never reports a
+    // stale caret from an earlier document while the page is still catching up.
+    if (position >= 0) { m_lastCursor = position; m_lastAnchor = position; }
+    m_caretMovedByUser = false;
+    if (m_ready && m_hasDocument) emit setCursor(position);
+}
 void EditorBridge::metric(const QString &name, double ms) { emit metricRecorded(name, ms); }
 void EditorBridge::log(const QString &message) { emit messageLogged(message); }
 void EditorBridge::textReply(int token, const QString &text) { emit textReceived(token, text); }

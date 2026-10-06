@@ -69,7 +69,6 @@ QtObject {
         { id: "writingBook", title: "Book (Serif)", toggle: true },
         { id: "writingCode", title: "Code", toggle: true },
         { id: "sourceEditing", title: "Source", toggle: true },
-        { id: "visualEditing", title: "Visual Edit", toggle: true },
         { id: "liveEditing", title: "Live", toggle: true },
         { id: "editor", title: "Single", toggle: true },
         { id: "split", title: "Split", toggle: true },
@@ -153,8 +152,7 @@ QtObject {
         case "excerpts": return libraryPane.showExcerpts;
         case "navigationTree": return library.navigationMode === 0;
         case "navigationList": return library.navigationMode === 1;
-        case "sourceEditing": return layoutState.effectiveLayoutMode !== 2 && !layoutState.visualEditEnabled && !layoutState.liveEditEnabled;
-        case "visualEditing": return layoutState.effectiveLayoutMode !== 2 && layoutState.visualEditEnabled && !layoutState.liveEditEnabled;
+        case "sourceEditing": return layoutState.effectiveLayoutMode !== 2 && !layoutState.liveEditEnabled;
         case "liveEditing": return layoutState.effectiveLayoutMode !== 2 && layoutState.liveEditEnabled;
         case "editor": return layoutState.effectiveLayoutMode === 0;
         case "split": return layoutState.effectiveLayoutMode === 1;
@@ -222,7 +220,6 @@ QtObject {
         case "writingBook": settings.writingAppearance = "book"; break;
         case "writingCode": window.selectWritingMode("source"); settings.writingAppearance = "code"; break;
         case "sourceEditing": window.selectWritingMode("source"); break;
-        case "visualEditing": window.selectWritingMode("visual"); break;
         case "liveEditing": window.selectWritingMode("live"); break;
         case "editor": window.setDocumentView(0); break;
         case "split": window.setDocumentView(1); break;

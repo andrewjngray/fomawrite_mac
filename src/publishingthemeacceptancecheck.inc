@@ -201,20 +201,20 @@
                            "Cannot create one native source edit for theme Undo verification")) return;
                 const int revision = backend.documentRevision();
                 const auto baseline = currentBounds();
-                for (bool visual : {false, true}) {
-                    action(visual ? "visualEditToggle" : "sourceModeButton", 1, visual);
+                for (bool live : {false, true}) {
+                    action(live ? "liveEditToggle" : "sourceModeButton", 1, live);
                     for (const QString &format : {QString("pdf"), QString("web"), QString("pdf"), QString("web")}) {
                         if (!chooseFormat(format)) return;
-                        check(layout->property("effectiveLayoutMode").toInt() == 1 && layout->property("visualEditEnabled").toBool() == visual
+                        check(layout->property("effectiveLayoutMode").toInt() == 1 && layout->property("liveEditEnabled").toBool() == live
                             && editor->property("text").toString() == draft && backend.documentRevision() == revision && backend.modified()
                             && backend.publishingThemeId() == "claude-like", "Web/PDF switching changed chosen editor, layout, theme or source");
                         for (const QString &name : stationaryNames)
                             check(bounds(buttons.value(name)) == baseline.value(name), "Web/PDF switching moved layout control: " + name);
                     }
-                    action("singleModeButton", 0, visual);
-                    check(!pane->isVisible() && layout->property("visualEditEnabled").toBool() == visual,
+                    action("singleModeButton", 0, live);
+                    check(!pane->isVisible() && layout->property("liveEditEnabled").toBool() == live,
                           "Single layout lost the chosen editor while using a publishing theme");
-                    action("previewSplitButton", 1, visual);
+                    action("previewSplitButton", 1, live);
                 }
                 action("sourceModeButton", 1, false);
                 editor->forceActiveFocus();

@@ -50,7 +50,7 @@ bool cycle106FootersAlign(QObject *window) {
 bool cycle106FooterControlsFit(QObject *window) {
     QList<QPair<QString, QRectF>> visible;
     for (const char *name : {"libraryFilter", "sourceModeButton", "sourceAppearanceButton", "toolbarStatistic",
-                            "previewTemplateButton", "visualEditToggle", "liveEditToggle", "previewSplitButton", "singleModeButton",
+                            "previewTemplateButton", "liveEditToggle", "previewSplitButton", "singleModeButton",
                             "webPublishingButton", "pdfPublishingButton"}) {
         auto *document = window->findChild<QQuickItem *>("documentFooter");
         auto *item = document ? document->findChild<QQuickItem *>(name) : nullptr;
@@ -107,22 +107,19 @@ void FomawriteTest::footerModesAndTemplatesPreserveDraftAndUndo() {
 
     auto *split = footer->findChild<QQuickItem *>("previewSplitButton");
     auto *single = footer->findChild<QQuickItem *>("singleModeButton");
-    auto *visual = footer->findChild<QQuickItem *>("visualEditToggle");
-    auto *visualPane = window->findChild<QQuickItem *>("visualEditorPane");
-    QVERIFY(split && single && visual && visualPane);
+    auto *live = footer->findChild<QQuickItem *>("liveEditToggle");
+    QVERIFY(split && single && live);
     for (int pass = 0; pass < 2; ++pass) {
         for (auto *arrangement : {single, split}) {
             QVERIFY(cycle102Click(quick, arrangement));
             const int expected = arrangement == single ? 0 : 1;
             QTRY_COMPARE(layout->property("effectiveLayoutMode").toInt(), expected);
-            for (auto *editing : {visual, visual, mode, mode}) {
+            for (auto *editing : {live, live, mode, mode}) {
                 QVERIFY(cycle102Click(quick, editing));
                 QTRY_COMPARE(layout->property("effectiveLayoutMode").toInt(), expected);
-                QTRY_COMPARE(layout->property("visualEditEnabled").toBool(), editing == visual);
-                QTRY_COMPARE(visualPane->isVisible(), editing == visual);
+                QTRY_COMPARE(layout->property("liveEditEnabled").toBool(), editing == live);
                 QTRY_COMPARE(editor->isVisible(), editing == mode);
                 QCOMPARE(pane->isVisible(), expected == 1);
-                QVERIFY(!pane->property("visualEditEnabled").toBool());
                 QVERIFY(editing->property("checked").toBool());
                 QCOMPARE(editor->property("text").toString(), draft);
             }
@@ -295,7 +292,7 @@ void FomawriteTest::footerControlsAndMenusRemainReachableWhenResized() {
         QCOMPARE(QColor(backend.palette().value("page").toString()).lightness() < 128, dark);
         for (int mode : {0, 1, 2}) {
             layout->setProperty("layoutMode", mode);
-            layout->setProperty("visualEditEnabled", false);
+            layout->setProperty("liveEditEnabled", false);
             for (int width : {1440, 960, 720}) {
                 quick->resize(width, width == 1440 ? 800 : 520);
                 layout->setProperty("previewWidth", 320);
@@ -323,23 +320,23 @@ void FomawriteTest::footerControlsAndMenusRemainReachableWhenResized() {
                     QVERIFY(cycle102Capture(quick, QString("cycle106-footer-%1-%2-%3").arg(mode).arg(width).arg(dark ? "dark" : "light")));
             }
         }
-        // Visual Edit keeps the same Source return segment and view capsule.
+        // Live keeps the same Source return segment and view capsule.
         quick->resize(960, 520);
         QTest::qWait(50);
         layout->setProperty("layoutMode", 1);
-        layout->setProperty("visualEditEnabled", true);
+        layout->setProperty("liveEditEnabled", true);
         QTRY_VERIFY(cycle106FootersAlign(window.data()));
         QTRY_VERIFY(cycle106FooterControlsFit(window.data()));
         QVERIFY(cycle102Click(quick, footer->findChild<QQuickItem *>("singleModeButton")));
         QTRY_COMPARE(layout->property("effectiveLayoutMode").toInt(), 0);
-        QTRY_VERIFY(layout->property("visualEditEnabled").toBool());
+        QTRY_VERIFY(layout->property("liveEditEnabled").toBool());
         QTRY_VERIFY(cycle106FootersAlign(window.data()));
         QTRY_VERIFY(cycle106FooterControlsFit(window.data()));
         QVERIFY(cycle102Click(quick, footer->findChild<QQuickItem *>("previewSplitButton")));
         QTRY_COMPARE(layout->property("effectiveLayoutMode").toInt(), 1);
         QVERIFY(cycle102Click(quick, footer->findChild<QQuickItem *>("sourceModeButton")));
         QTRY_COMPARE(layout->property("effectiveLayoutMode").toInt(), 1);
-        QTRY_VERIFY(!layout->property("visualEditEnabled").toBool());
+        QTRY_VERIFY(!layout->property("liveEditEnabled").toBool());
         QTRY_VERIFY(cycle106FootersAlign(window.data()));
         QTRY_VERIFY(cycle106FooterControlsFit(window.data()));
     }

@@ -305,7 +305,7 @@ Dialog {
                             }
                         }
                         Rectangle { visible: hub.previewLayoutMode === 1; Layout.fillHeight: true; Layout.preferredWidth: 1; color: backend.palette.border }
-                        PublishingPreview { objectName: "exportHubPreviewPane"; visualEditorObjectName: "exportHubVisualEditor"; allowVisualEdit: false; publishingMode: hub.selectedFormat === "pdf" ? "pdf" : "web"; showFooter: false; Layout.fillWidth: true; Layout.fillHeight: true; renderer: hub.renderer; markdown: hub.markdown; documentBaseUrl: hub.documentBaseUrl; darkMode: hub.darkMode; typeface: backend.outputFont; textSize: backend.outputPointSize; layoutMode: hub.previewLayoutMode; onLayoutRequested: function(mode) { hub.previewLayoutMode = mode }; onLinkRequested: function(link) {} }
+                        PublishingPreview { objectName: "exportHubPreviewPane"; publishingMode: hub.selectedFormat === "pdf" ? "pdf" : "web"; showFooter: false; Layout.fillWidth: true; Layout.fillHeight: true; renderer: hub.renderer; markdown: hub.markdown; documentBaseUrl: hub.documentBaseUrl; darkMode: hub.darkMode; typeface: backend.outputFont; textSize: backend.outputPointSize; layoutMode: hub.previewLayoutMode; onLayoutRequested: function(mode) { hub.previewLayoutMode = mode }; onLinkRequested: function(link) {} }
                     }
                 }
                 RowLayout {

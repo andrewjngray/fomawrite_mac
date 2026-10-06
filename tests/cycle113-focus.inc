@@ -137,11 +137,11 @@ void FomawriteTest::formattingRejectsAuxiliaryAndPreviewFocus() {
     }
     QVERIFY(QMetaObject::invokeMethod(linkDialog, "close"));
     QTRY_VERIFY(!linkDialog->property("opened").toBool());
-    for (const auto &mode : {"preview", "visual"}) {
+    for (const auto &mode : {"preview"}) {
         QVERIFY(QMetaObject::invokeMethod(window.data(), "selectWritingMode", Q_ARG(QVariant, mode)));
         QTRY_VERIFY(!window->property("changingDocumentView").toBool());
         QTRY_VERIFY(!preview->property("viewportRefreshPending").toBool());
-        auto *field = window->findChild<QQuickItem *>(QString::fromLatin1(mode) == "visual" ? "visualEditor" : "renderedPreview");
+        auto *field = window->findChild<QQuickItem *>("renderedPreview");
         QVERIFY(cycle113SettleViewport(window.data()));
         field->forceActiveFocus(); QTRY_VERIFY(!window->property("canFormatSource").toBool());
         QVERIFY(cycle113TryEveryFormattingRoute(window.data(), editor, backend));
@@ -243,11 +243,9 @@ void FomawriteTest::workspaceFocusCycleIncludesRenderedPreview() {
     auto *editor = window->findChild<QQuickItem *>("sourceEditor");
     auto *preview = window->findChild<QQuickItem *>("previewPane");
     auto *rendered = preview ? preview->findChild<QQuickItem *>("renderedPreview") : nullptr;
-    auto *visualPane = window->findChild<QQuickItem *>("visualEditorPane");
-    auto *visual = visualPane ? visualPane->findChild<QQuickItem *>("visualEditor") : nullptr;
     auto *header = window->findChild<QQuickItem *>("topChrome");
     auto *layout = window->findChild<QObject *>("workspaceLayout");
-    QVERIFY(quick && editor && preview && rendered && visual && header && layout);
+    QVERIFY(quick && editor && preview && rendered && header && layout);
     cycle106KeepNativeFocus(quick); Cycle106MouseInputIsolation input(quick);
     quick->resize(1440, 800); quick->show(); QVERIFY(QTest::qWaitForWindowExposed(quick));
     if (QGuiApplication::platformName() != "cocoa") { quick->requestActivate(); QTRY_VERIFY(quick->isActive()); }
@@ -272,19 +270,15 @@ void FomawriteTest::workspaceFocusCycleIncludesRenderedPreview() {
         QTest::keyClick(quick, Qt::Key_F6, reverse ? Qt::ShiftModifier : Qt::NoModifier);
         return true;
     };
-    for (const bool visualEnabled : {false, true}) {
+    for (const bool visualEnabled : {false}) {
         QVERIFY(QMetaObject::invokeMethod(window.data(), "selectWritingMode", Q_ARG(QVariant, "source")));
         QTRY_VERIFY(!window->property("changingDocumentView").toBool());
         editor->forceActiveFocus(); QTRY_VERIFY(window->property("canFormatSource").toBool());
         QVERIFY(QMetaObject::invokeMethod(editor, "select", Q_ARG(int, start), Q_ARG(int, start + 4)));
-        if (visualEnabled)
-            QVERIFY(QMetaObject::invokeMethod(window.data(), "selectWritingMode", Q_ARG(QVariant, "visual")));
         QTRY_VERIFY(!window->property("changingDocumentView").toBool());
         QTRY_VERIFY(!preview->property("viewportRefreshPending").toBool());
-        auto *editingSurface = visualEnabled ? visual : editor;
+        auto *editingSurface = editor;
         QTRY_COMPARE(quick->activeFocusItem(), editingSurface);
-        // The right-hand output Preview stays read-only with either left editor.
-        QVERIFY(preview->property("allowVisualEdit").toBool() == false);
         QVERIFY(cycle(false)); QTRY_VERIFY(within(quick->activeFocusItem(), rendered));
         QVERIFY(!window->property("canFormatSource").toBool());
         QVERIFY(cycle(false)); QTRY_VERIFY(within(quick->activeFocusItem(), header));

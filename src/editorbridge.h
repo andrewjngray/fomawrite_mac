@@ -43,6 +43,10 @@ public:
     Q_INVOKABLE void placeCursor(int position);
     // The page's last reported caret (selection head), -1 before any report.
     int lastCursor() const { return m_lastCursor; }
+    // True once the writer moved the page caret since the last host placement.
+    Q_INVOKABLE bool caretMovedByUser() const { return m_caretMovedByUser; }
+    // Outline jumps and the like: a host placement the writer asked for.
+    Q_INVOKABLE void noteCaretMovedByUser() { m_caretMovedByUser = true; }
     int lastSelectionStart() const { return m_lastCursor < 0 ? -1 : qMin(m_lastAnchor, m_lastCursor); }
     int lastSelectionEnd() const { return m_lastCursor < 0 ? -1 : qMax(m_lastAnchor, m_lastCursor); }
 
@@ -50,7 +54,7 @@ public slots:
     // Page → app (over QWebChannel).
     void ready();
     void documentChanged(const QString &changesJson, int revision);
-    void cursorChanged(int anchor, int head);
+    void cursorChanged(int anchor, int head, bool byUser = true);
     void metric(const QString &name, double ms);
     void log(const QString &message);
     void textReply(int token, const QString &text);
@@ -98,6 +102,7 @@ private:
     int m_revision = 0;
     int m_nextToken = 0;
     int m_lastCursor = -1;
+    bool m_caretMovedByUser = false;
     int m_lastAnchor = -1;
     bool m_hasDocument = false;
     QString m_text;

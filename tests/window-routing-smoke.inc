@@ -376,11 +376,11 @@ const auto smokeWorkspace = [&](const std::shared_ptr<Session> &original,
                    && second->backend->outputStyle() == outputStyle,
                    "Studio action applies the writing composition and preserves output style")) return;
     smokeOriginalPanes = {{"version", 2}, {"organizerVisible", false}, {"filesVisible", true},
-        {"layoutMode", 0}, {"visualEditEnabled", false}, {"lastEditingLayoutMode", 0}, {"organizerWidth", 232.0}, {"fileWidth", 304.0}, {"previewWidth", 400.0}};
+        {"layoutMode", 0}, {"liveEditEnabled", false}, {"lastEditingLayoutMode", 0}, {"organizerWidth", 232.0}, {"fileWidth", 304.0}, {"previewWidth", 400.0}};
     smokeSecondPanes = {{"version", 2}, {"organizerVisible", true}, {"filesVisible", true},
-        {"layoutMode", 1}, {"visualEditEnabled", false}, {"lastEditingLayoutMode", 1}, {"organizerWidth", 216.0}, {"fileWidth", 296.0}, {"previewWidth", 360.0}};
+        {"layoutMode", 1}, {"liveEditEnabled", false}, {"lastEditingLayoutMode", 1}, {"organizerWidth", 216.0}, {"fileWidth", 296.0}, {"previewWidth", 360.0}};
     smokeTabPanes = {{"version", 2}, {"organizerVisible", true}, {"filesVisible", false},
-        {"layoutMode", 2}, {"visualEditEnabled", false}, {"lastEditingLayoutMode", 0}, {"organizerWidth", 224.0}, {"fileWidth", 320.0}, {"previewWidth", 420.0}};
+        {"layoutMode", 2}, {"liveEditEnabled", false}, {"lastEditingLayoutMode", 0}, {"organizerWidth", 224.0}, {"fileWidth", 320.0}, {"previewWidth", 420.0}};
     if (!smokeCheck(smokeRestorePanes(original->window, smokeOriginalPanes)
                    && smokeRestorePanes(second->window, smokeSecondPanes)
                    && smokeRestorePanes(tab->window, smokeTabPanes), "restore three independent per-window pane states")) return;

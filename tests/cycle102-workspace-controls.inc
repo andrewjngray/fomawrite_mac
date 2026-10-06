@@ -178,7 +178,7 @@ void FomawriteTest::collapsedPaneButtonsRestoreEveryLayout() {
     quick->resize(1440, 860);
     settings->setProperty("toolbarVisibilityMode", 1);
     layout->setProperty("layoutMode", 2);
-    layout->setProperty("visualEditEnabled", false);
+    layout->setProperty("liveEditEnabled", false);
     layout->setProperty("organizerVisible", true);
     layout->setProperty("filesVisible", true);
     quick->show();
@@ -285,7 +285,7 @@ void FomawriteTest::previewTemplateFooterAndNativeMenuShareState() {
     const auto cleanup = qScopeGuard([&] { backend.setOutputStyle(originalStyle); backend.discardRecovery(); });
     quick->resize(1100, 800);
     layout->setProperty("layoutMode", 2);
-    layout->setProperty("visualEditEnabled", false);
+    layout->setProperty("liveEditEnabled", false);
     layout->setProperty("organizerVisible", false);
     layout->setProperty("filesVisible", false);
 #ifdef Q_OS_MACOS
@@ -393,11 +393,11 @@ void FomawriteTest::previewTemplateRemainsReachableInNarrowSplit() {
     auto *footer = window->findChild<QQuickItem *>("documentFooter");
     auto *button = footer ? footer->findChild<QQuickItem *>("previewTemplateButton") : nullptr;
     auto *menu = window->findChild<QObject *>("previewTemplateMenu");
-    auto *visual = footer->findChild<QQuickItem *>("visualEditToggle");
+    auto *live = footer->findChild<QQuickItem *>("liveEditToggle");
     auto *split = footer->findChild<QQuickItem *>("previewSplitButton");
     auto *single = footer->findChild<QQuickItem *>("singleModeButton");
     auto *source = footer->findChild<QQuickItem *>("sourceModeButton");
-    QVERIFY(quick && layout && pane && button && menu && visual && split && single && source);
+    QVERIFY(quick && layout && pane && button && menu && live && split && single && source);
     Cycle106MouseInputIsolation mouseInput(quick);
     const int originalStyle = backend.outputStyle();
     const auto cleanup = qScopeGuard([&] { backend.setOutputStyle(originalStyle); });
@@ -405,7 +405,7 @@ void FomawriteTest::previewTemplateRemainsReachableInNarrowSplit() {
     layout->setProperty("organizerVisible", false);
     layout->setProperty("filesVisible", false);
     layout->setProperty("layoutMode", 1);
-    layout->setProperty("visualEditEnabled", false);
+    layout->setProperty("liveEditEnabled", false);
 #ifdef Q_OS_MACOS
     if (QGuiApplication::platformName() == "cocoa") quick->setFlag(Qt::WindowDoesNotAcceptFocus);
 #endif
@@ -419,14 +419,14 @@ void FomawriteTest::previewTemplateRemainsReachableInNarrowSplit() {
             QTRY_VERIFY(button->isVisible());
             QCoreApplication::processEvents();
             QRectF previous;
-            for (auto *control : {source, visual, button, single, split}) {
+            for (auto *control : {source, live, button, single, split}) {
                 const QRectF bounds = control->mapRectToItem(footer, control->boundingRect());
                 QVERIFY2(bounds.left() >= 11 && bounds.right() <= footer->width() - 11,
                          qPrintable(QString("%1 outside %2px footer: x=%3 width=%4").arg(control->objectName()).arg(width).arg(bounds.x()).arg(bounds.width())));
                 QVERIFY(bounds.height() >= 32);
                 if (!previous.isNull()) {
-                    // Source/Visual and Single/Split each form a separate capsule.
-                    const qreal gap = control == visual || control == split ? 0 : 3;
+                    // Source/Live and Single/Split each form a separate capsule.
+                    const qreal gap = control == live || control == split ? 0 : 3;
                     QVERIFY(previous.right() + gap <= bounds.left());
                 }
                 previous = bounds;

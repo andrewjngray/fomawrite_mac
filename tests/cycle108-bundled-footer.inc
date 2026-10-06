@@ -24,9 +24,9 @@ bool cycle108NativeViewChecks(QObject *window, int mode) {
     }
     return true;
 }
-bool cycle108WorkspaceViewChecks(QObject *menu, int mode, bool visual) {
+bool cycle108WorkspaceViewChecks(QObject *menu, int mode, bool live) {
     for (const auto &[text, expected] : {
-             std::pair{"Source", mode != 2 && !visual}, std::pair{"Visual Edit", mode != 2 && visual},
+             std::pair{"Source", mode != 2 && !live}, std::pair{"Live", mode != 2 && live},
              std::pair{"Single", mode == 0}, std::pair{"Split", mode == 1}, std::pair{"Preview Only", mode == 2}}) {
         auto *item = cycle108MenuItem(menu, QString::fromLatin1(text));
         if (!item || item->property("checked").toBool() != expected) return false;
@@ -41,7 +41,7 @@ void FomawriteTest::bundledFooterRapidModesPreserveDraftAndViewport() {
     QVERIFY(directory.isValid());
     QString saved = QString::fromUtf8("# A long café draft — 你好\n\n");
     for (int index = 0; index < 90; ++index)
-        saved += QString("Paragraph %1 has **bold words**, an _italic phrase_ and enough text to wrap differently in Split, Source and Visual Edit.\n\n").arg(index);
+        saved += QString("Paragraph %1 has **bold words**, an _italic phrase_ and enough text to wrap differently in Split, Source and Live.\n\n").arg(index);
     const QString path = directory.filePath("Rapid mode draft.md");
     QVERIFY(cycle103Write(path, saved.toUtf8()));
     Backend backend;
@@ -59,8 +59,8 @@ void FomawriteTest::bundledFooterRapidModesPreserveDraftAndViewport() {
     auto *source = footer->findChild<QQuickItem *>("sourceModeButton");
     auto *split = footer->findChild<QQuickItem *>("previewSplitButton");
     auto *full = footer->findChild<QQuickItem *>("singleModeButton");
-    auto *visual = footer->findChild<QQuickItem *>("visualEditToggle");
-    QVERIFY(source && split && full && visual);
+    auto *live = footer->findChild<QQuickItem *>("liveEditToggle");
+    QVERIFY(source && split && full && live);
     cycle106KeepNativeFocus(quick);
     Cycle106MouseInputIsolation mouseInput(quick);
     quick->resize(1440, 800); quick->show();
@@ -95,16 +95,16 @@ void FomawriteTest::bundledFooterRapidModesPreserveDraftAndViewport() {
         const int cursor = editor->property("cursorPosition").toInt();
         const auto bounds = cycle107ViewBounds(footer);
         const QRectF footerBounds = cycle103SceneBounds(footer);
-        QCOMPARE(bounds.size(), 5);
+        QCOMPARE(bounds.size(), 4);
         for (int burst = 0; burst < 4; ++burst) {
-            const QList<QQuickItem *> choices{full, visual, split, full, source, visual, split, full, source};
+            const QList<QQuickItem *> choices{full, live, split, full, source, live, split, full, source};
             int overlappingClicks = 0;
             for (auto *choice : choices) {
                 if (window->property("changingDocumentView").toBool()) ++overlappingClicks;
                 QSignalSpy painted(quick, &QQuickWindow::frameSwapped);
                 // The editing group may compact; use its currently painted position.
                 // Single/Split retain their baseline coordinates.
-                const auto target = choice == visual || choice == source ? cycle103SceneBounds(choice) : bounds.value(choice->objectName());
+                const auto target = choice == live || choice == source ? cycle103SceneBounds(choice) : bounds.value(choice->objectName());
                 QVERIFY(cycle108PaintedClick(quick, choice, target.center().toPoint()));
                 quick->update();
                 // Wait for one presented frame, not the 48–120ms viewport
@@ -118,7 +118,7 @@ void FomawriteTest::bundledFooterRapidModesPreserveDraftAndViewport() {
             QTRY_COMPARE(layout->property("effectiveLayoutMode").toInt(), 0);
             QTRY_VERIFY(!window->property("changingDocumentView").toBool());
             QTRY_VERIFY(!pane->property("viewportRefreshPending").toBool());
-            QVERIFY(!layout->property("visualEditEnabled").toBool());
+            QVERIFY(!layout->property("liveEditEnabled").toBool());
             QVERIFY(cycle107ViewChecked(footer, layout));
             QVERIFY(cycle108NativeViewChecks(window.data(), 0));
             QTRY_VERIFY(cycle107SameBounds(cycle107ViewBounds(footer), bounds));
@@ -129,7 +129,7 @@ void FomawriteTest::bundledFooterRapidModesPreserveDraftAndViewport() {
             QCOMPARE(editor->property("selectionEnd").toInt(), end);
             QTRY_VERIFY2(qAbs(scroll->property("contentY").toReal() - sourceY) <= 2,
                          "A rapid mode change must return to the same Source reading position.");
-            // No late visual refresh or timer may undo the final Source choice.
+            // No late refresh or timer may undo the final Source choice.
             QTest::qWait(320);
             QCOMPARE(layout->property("effectiveLayoutMode").toInt(), 0);
             QVERIFY(cycle107SameBounds(cycle107ViewBounds(footer), bounds));
@@ -156,15 +156,15 @@ void FomawriteTest::bundledFooterRoutesFollowResponsivePresentation() {
     auto *footer = window->findChild<QQuickItem *>("documentFooter");
     auto *editor = window->findChild<QQuickItem *>("sourceEditor");
     auto *pane = window->findChild<QQuickItem *>("previewPane");
-    auto *visualEditor = window->findChild<QQuickItem *>("visualEditor");
     auto *workspaceButton = window->findChild<QQuickItem *>("topChromeLibraryButton");
     auto *workspaceMenu = window->findChild<QObject *>("workspaceMenu");
-    QVERIFY(quick && layout && footer && editor && pane && visualEditor && workspaceButton && workspaceMenu);
+    QVERIFY(quick && layout && footer && editor && pane && workspaceButton && workspaceMenu);
     auto *source = footer->findChild<QQuickItem *>("sourceModeButton");
     auto *split = footer->findChild<QQuickItem *>("previewSplitButton");
     auto *single = footer->findChild<QQuickItem *>("singleModeButton");
-    auto *visual = footer->findChild<QQuickItem *>("visualEditToggle");
-    QVERIFY(source && split && single && visual);
+    auto *live = footer->findChild<QQuickItem *>("liveEditToggle");
+    QVERIFY(source && split && single && live);
+    const auto liveVisible = [&] { auto *p = window->findChild<QQuickItem *>("liveEditorPane"); return p && p->isVisible(); };
     cycle106KeepNativeFocus(quick); Cycle106MouseInputIsolation mouseInput(quick);
     quick->resize(1440, 800); quick->show();
     QVERIFY(QMetaObject::invokeMethod(window.data(), "applyReferenceWorkspace"));
@@ -173,38 +173,37 @@ void FomawriteTest::bundledFooterRoutesFollowResponsivePresentation() {
     const auto cleanup = qScopeGuard([&] { backend.discardRecovery(); });
     QVERIFY(QTest::qWaitForWindowExposed(quick));
     // Width pressure contracts the layout, never changes the chosen editor.
-    for (auto *editing : {source, visual}) {
+    for (auto *editing : {source, live}) {
         quick->resize(1440, 800); QTRY_VERIFY(split->isEnabled());
         QVERIFY(cycle102Click(quick, editing)); QVERIFY(cycle102Click(quick, split));
         QTRY_COMPARE(layout->property("effectiveLayoutMode").toInt(), 1);
-        QVERIFY(!pane->property("visualEditEnabled").toBool());
         quick->resize(720, 800);
         QTRY_COMPARE(layout->property("effectiveLayoutMode").toInt(), 0);
-        QCOMPARE(layout->property("visualEditEnabled").toBool(), editing == visual);
-        QTRY_COMPARE(visualEditor->isVisible(), editing == visual);
+        QCOMPARE(layout->property("liveEditEnabled").toBool(), editing == live);
+        QTRY_COMPARE(liveVisible(), editing == live);
         QVERIFY(cycle107ViewChecked(footer, layout));
         QVERIFY(cycle108NativeViewChecks(window.data(), 0));
-        QVERIFY(cycle108WorkspaceViewChecks(workspaceMenu, 0, editing == visual));
+        QVERIFY(cycle108WorkspaceViewChecks(workspaceMenu, 0, editing == live));
         quick->resize(820, 800); QTRY_VERIFY(split->isEnabled());
         QCOMPARE(layout->property("effectiveLayoutMode").toInt(), 0);
         QVERIFY(cycle102Click(quick, split));
         QTRY_COMPARE(layout->property("effectiveLayoutMode").toInt(), 1);
-        QCOMPARE(layout->property("visualEditEnabled").toBool(), editing == visual);
+        QCOMPARE(layout->property("liveEditEnabled").toBool(), editing == live);
         QVERIFY(cycle107ViewChecked(footer, layout));
     }
     quick->resize(1440, 800); QVERIFY(cycle102Click(quick, single)); QVERIFY(cycle102Click(quick, source));
     QTest::qWait(100); const auto initial = cycle107ViewBounds(footer);
     for (const auto &[text, mode, editing] : {
-             std::tuple{"Visual Edit", 0, true}, std::tuple{"Visual Edit", 0, true},
+             std::tuple{"Live", 0, true}, std::tuple{"Live", 0, true},
              std::tuple{"Split", 1, true}, std::tuple{"Source", 1, false},
-             std::tuple{"Single", 0, false}, std::tuple{"Visual Edit", 0, true},
-             std::tuple{"Preview Only", 2, true}, std::tuple{"Visual Edit", 0, true},
+             std::tuple{"Single", 0, false}, std::tuple{"Live", 0, true},
+             std::tuple{"Preview Only", 2, true}, std::tuple{"Live", 0, true},
              std::tuple{"Source", 0, false}, std::tuple{"Split", 1, false}}) {
         QVERIFY(cycle102Click(quick, workspaceButton)); QTRY_VERIFY(workspaceMenu->property("opened").toBool());
         QVERIFY(cycle102Click(quick, cycle108MenuItem(workspaceMenu, QString::fromLatin1(text))));
         QTRY_VERIFY(!workspaceMenu->property("visible").toBool());
         QTRY_COMPARE(layout->property("effectiveLayoutMode").toInt(), mode);
-        QCOMPARE(layout->property("visualEditEnabled").toBool(), editing);
+        QCOMPARE(layout->property("liveEditEnabled").toBool(), editing);
         QVERIFY(cycle107ViewChecked(footer, layout));
         QTRY_VERIFY(cycle108WorkspaceViewChecks(workspaceMenu, mode, editing));
         QVERIFY(cycle108NativeViewChecks(window.data(), mode));
@@ -216,10 +215,10 @@ void FomawriteTest::bundledFooterRoutesFollowResponsivePresentation() {
     for (auto *item : window->findChildren<QQuickItem *>())
         if (item->property("hint").toString() == "Hide preview") { hidePreview = item; break; }
     QVERIFY(hidePreview && hidePreview->isVisible());
-    QVERIFY(cycle102Click(quick, visual));
+    QVERIFY(cycle102Click(quick, live));
     QVERIFY(cycle102Click(quick, hidePreview));
     QTRY_COMPARE(layout->property("effectiveLayoutMode").toInt(), 0);
-    QVERIFY(layout->property("visualEditEnabled").toBool());
+    QVERIFY(layout->property("liveEditEnabled").toBool());
     QVERIFY(cycle107ViewChecked(footer, layout));
     QCOMPARE(editor->property("text").toString(), draft);
 }

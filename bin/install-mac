@@ -1,0 +1,20 @@
+#!/usr/bin/env sh
+# Install the packaged bundle into /Applications. Never replaces a running app.
+set -eu
+ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
+[ "$(uname -s)" = Darwin ] || { echo 'Run on macOS.' >&2; exit 1; }
+SOURCE="$ROOT/dist/Fomawrite.app"
+TARGET="${1:-/Applications/Fomawrite.app}"
+[ -d "$SOURCE" ] || { echo 'Run ./bin/package-mac first.' >&2; exit 1; }
+PROCESS_LIST="$(/bin/ps -axo comm=)" || { echo 'Cannot check running apps; leaving the installed bundle untouched.' >&2; exit 1; }
+for executable in "$TARGET/Contents/MacOS/Fomawrite" "$SOURCE/Contents/MacOS/Fomawrite"; do
+    if printf '%s\n' "$PROCESS_LIST" | /usr/bin/awk -v executable="$executable" '$0 == executable {found=1} END {exit !found}'; then
+        echo 'Fomawrite is running. Save and quit normally before installing.' >&2
+        exit 2
+    fi
+done
+codesign --verify --deep --strict "$SOURCE"
+# Replace only our own bundle at the target path, after the running-process guard above.
+rm -rf "$TARGET"
+ditto "$SOURCE" "$TARGET"
+printf 'Installed %s (build %s)\n' "$TARGET" "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$TARGET/Contents/Info.plist")"

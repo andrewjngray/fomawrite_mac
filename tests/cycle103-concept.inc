@@ -111,7 +111,7 @@ void FomawriteTest::referenceWorkspacePresetPreservesDraftAndOutput() {
         QTRY_VERIFY(layout->property("effectiveOrganizerVisible").toBool());
         QTRY_VERIFY(layout->property("effectiveFilesVisible").toBool());
         QCOMPARE(layout->property("layoutMode").toInt(), 0);
-        QVERIFY(!layout->property("visualEditEnabled").toBool());
+        QVERIFY(!layout->property("liveEditEnabled").toBool());
         QCOMPARE(settings->property("writingAppearance").toString(), QStringLiteral("manuscript"));
         QVERIFY(settings->property("showMarkup").toBool());
         QCOMPARE(backend.themePreset(), QStringLiteral("studio"));

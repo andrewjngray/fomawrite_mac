@@ -27,7 +27,6 @@
 #include <QStringDecoder>
 #include "backend.h"
 #include "macbridge.h"
-#include "sourcevisualmapping.h"
 #include <QClipboard>
 #include <QColor>
 #include <QCoreApplication>
@@ -65,7 +64,6 @@
 #include <algorithm>
 
 #include "markdownhighlighter.h"
-#include "visualtexthighlighter.h"
 
 // Extra baseline space keeps literal Markdown readable in Source.
 constexpr qreal sourceLineHeightPercent = 155;
@@ -1047,142 +1045,6 @@ QVariantMap Backend::replaceText(int start, int end, const QString &replacement)
     return {{"start", first}, {"end", first + normalized.size()}};
 }
 
-int Backend::visualPositionForSource(int sourcePosition) const {
-    const QString source = currentDocumentText();
-    const auto mapping = SourceVisualMapping::create(source);
-    int position = qBound(0, sourcePosition, int(source.size()));
-    if (position == source.size()) return int(mapping.visualText().size());
-    // History and anchors normally provide valid cursor boundaries. Clamp an
-    // arbitrary caller's interior UTF-16/combining position to a whole grapheme.
-    QTextBoundaryFinder boundary(QTextBoundaryFinder::Grapheme, source);
-    boundary.setPosition(position);
-    if (!boundary.isAtBoundary()) position = qMax(0, int(boundary.toPreviousBoundary()));
-    // The edit mapper intentionally rejects empty spans. One represented unit
-    // gives the same start position without changing any source or Undo state.
-    const auto precise = mapping.visualSpanForSource({position, 1});
-    if (precise.isValid()) return precise.start;
-    for (const auto &block : mapping.blocks()) {
-        if (position <= block.source.start || position < block.source.end())
-            return qBound(0, block.visual.start, int(mapping.visualText().size()));
-    }
-    return int(mapping.visualText().size());
-}
-
-QVariantMap Backend::visualProjection() const {
-    const QString source = currentDocumentText();
-    const SourceVisualMapping mapping = SourceVisualMapping::create(source);
-    QVariantList blocks;
-    const auto kindName = [](SourceVisualMapping::BlockKind kind) {
-        switch (kind) {
-        case SourceVisualMapping::BlockKind::Paragraph: return QStringLiteral("paragraph");
-        case SourceVisualMapping::BlockKind::Heading: return QStringLiteral("heading");
-        case SourceVisualMapping::BlockKind::ListItem: return QStringLiteral("listItem");
-        case SourceVisualMapping::BlockKind::Image: return QStringLiteral("image");
-        case SourceVisualMapping::BlockKind::TableRow: return QStringLiteral("tableRow");
-        case SourceVisualMapping::BlockKind::TableDelimiter: return QStringLiteral("tableDelimiter");
-        case SourceVisualMapping::BlockKind::SourceOnly: return QStringLiteral("sourceOnly");
-        }
-        return QStringLiteral("sourceOnly");
-    };
-    for (const SourceVisualMapping::Block &block : mapping.blocks()) {
-        blocks.append(QVariantMap{{"kind", kindName(block.kind)},
-                                  {"sourceStart", block.source.start},
-                                  {"sourceLength", block.source.length},
-                                  {"visualStart", block.visual.start},
-                                  {"visualLength", block.visual.length},
-                                  {"editable", block.editable}});
-    }
-    QVariantList images;
-    for (const auto &image : mapping.imageObjects()) {
-        const QUrl resolved = documentBaseUrl().resolved(QUrl(image.destination));
-        const QString localPreview = resolved.isLocalFile() && QFileInfo(resolved.toLocalFile()).isFile()
-            ? resolved.toString() : QString();
-        images.append(QVariantMap{{"visualStart", image.visual.start}, {"visualLength", image.visual.length},
-                                  {"altText", image.altText}, {"destination", image.destination},
-                                  {"previewUrl", localPreview}});
-    }
-    QVariantList cells;
-    for (const auto &cell : mapping.tableCellObjects()) {
-        cells.append(QVariantMap{{"tableStart", cell.tableStart}, {"row", cell.row}, {"column", cell.column},
-            {"sourceStart", cell.source.start}, {"sourceLength", cell.source.length},
-            {"visualStart", cell.visual.start}, {"visualLength", cell.visual.length}});
-    }
-    return {{"source", source}, {"visualText", mapping.visualText()}, {"blocks", blocks}, {"images", images}, {"tableCells", cells}};
-}
-
-QVariantMap Backend::navigateVisualTable(int start, int end, bool backwards, const QString &expectedSource) const {
-    if (!m_document || expectedSource != currentDocumentText())
-        return {{"handled", true}, {"reason", "stale"}};
-    const auto mapping = SourceVisualMapping::create(expectedSource);
-    if (start < 0 || end < 0 || start > mapping.visualText().size() || end > mapping.visualText().size())
-        return {{"handled", true}, {"reason", "selection"}};
-    const auto navigation = mapping.navigateTable({qMin(start, end), qAbs(end - start)}, backwards);
-    using Status = SourceVisualMapping::TableNavigationStatus;
-    switch (navigation.status) {
-    case Status::OutsideTable: return {{"handled", false}};
-    case Status::Moved: return {{"handled", true}, {"reason", "moved"}, {"cursor", navigation.cursor}};
-    case Status::Boundary: return {{"handled", true}, {"reason", "boundary"}};
-    case Status::UnsupportedSelection: return {{"handled", true}, {"reason", "selection"}};
-    }
-    return {{"handled", false}};
-}
-
-bool Backend::applyVisualEdit(int start, int length, const QString &replacement,
-                              const QString &expectedSource) {
-    if (!m_document || expectedSource != currentDocumentText() || start < 0 || length < 0
-            || replacement.contains(QRegularExpression(QStringLiteral("[\\\\`*_\\[\\]<>\\r]"))))
-        return false;
-    const SourceVisualMapping mapping = SourceVisualMapping::create(expectedSource);
-    if (start > mapping.visualText().size() || length > mapping.visualText().size() - start) return false;
-    // TextEdit's minimal diff may contain only the changed accent or emoji
-    // modifier. Expand that diff to complete graphemes before source mapping.
-    int first = start, last = start + length;
-    QTextBoundaryFinder boundary(QTextBoundaryFinder::Grapheme, mapping.visualText());
-    boundary.setPosition(first);
-    if (first > 0 && first < mapping.visualText().size() && !boundary.isAtBoundary()) first = boundary.toPreviousBoundary();
-    boundary.setPosition(last);
-    if (last > 0 && last < mapping.visualText().size() && !boundary.isAtBoundary()) last = boundary.toNextBoundary();
-    if (first < 0 || last < 0) return false;
-    const QString expanded = mapping.visualText().mid(first, start - first) + replacement
-        + mapping.visualText().mid(start + length, last - start - length);
-    const auto edit = mapping.sourceEditForVisualReplacement({first, last - first}, expanded);
-    if (!edit.has_value()) return false;
-    const qint64 now = QDateTime::currentMSecsSinceEpoch();
-    const bool continueTyping = length == 0 && !replacement.isEmpty()
-        && expectedSource == m_lastVisualResultSource
-        && edit->source.start == m_lastVisualEditEnd
-        && now >= m_lastVisualEditAt && now - m_lastVisualEditAt < 1500;
-    QTextCursor cursor(m_document);
-    cursor.setPosition(edit->source.start);
-    cursor.setPosition(edit->source.end(), QTextCursor::KeepAnchor);
-    if (continueTyping) cursor.joinPreviousEditBlock();
-    else cursor.beginEditBlock();
-    cursor.insertText(edit->replacement);
-    cursor.endEditBlock();
-    m_lastVisualResultSource = currentDocumentText();
-    m_lastVisualEditAt = now;
-    m_lastVisualEditEnd = edit->source.start + edit->replacement.size();
-    return true;
-}
-
-QVariantMap Backend::applyVisualBreak(int position, bool softBreak, const QString &expectedSource) {
-    if (!m_document || expectedSource != currentDocumentText()) return {{"applied", false}};
-    const auto mapping = SourceVisualMapping::create(expectedSource);
-    const auto change = mapping.sourceEditForVisualBreak(position, softBreak);
-    if (!change) return {{"applied", false}};
-    QTextCursor cursor(m_document);
-    cursor.setPosition(change->edit.source.start);
-    cursor.setPosition(change->edit.source.end(), QTextCursor::KeepAnchor);
-    cursor.beginEditBlock();
-    cursor.insertText(change->edit.replacement);
-    cursor.endEditBlock();
-    // A structural break starts a new undo unit; following typing must not
-    // merge into the edit that created a new list item or paragraph.
-    m_lastVisualResultSource.clear();
-    m_lastVisualEditEnd = -1;
-    return {{"applied", true}, {"cursor", change->visualCursor}};
-}
-
 QVariantMap Backend::wrapSelection(int start, int end, const QString &before, const QString &after) {
     if (!m_document) return {};
     const QString text = currentDocumentText();
@@ -1632,32 +1494,6 @@ int Backend::markdownAnchorPosition(const QString &markdown, const QString &anch
         if (slug == anchor) return heading["position"].toInt();
     }
     return -1;
-}
-
-void Backend::styleVisualEditor(QObject *textDocument, int textSize, const QString &typeface) {
-    auto *quick = qobject_cast<QQuickTextDocument *>(textDocument);
-    if (!quick || !quick->textDocument() || quick->textDocument() == m_document) return;
-    QTextDocument *visual = quick->textDocument();
-    // This document is a projection only; canonical source owns Undo/Redo.
-    visual->setUndoRedoEnabled(false);
-    QTextCursor spacing(visual);
-    spacing.select(QTextCursor::Document);
-    QTextBlockFormat format;
-    format.setLineHeight(150, QTextBlockFormat::ProportionalHeight);
-    spacing.mergeBlockFormat(format);
-    if (m_visualHighlighter && m_visualHighlighter->document() != visual)
-        delete m_visualHighlighter.data();
-    if (!m_visualHighlighter)
-        m_visualHighlighter = new VisualTextHighlighter(visual);
-    VisualTextHighlighter::Style style;
-    if (!typeface.isEmpty()) style.font.setFamily(typeface);
-    style.font.setPointSizeF(qMax(9, textSize) * 0.75);
-    style.textColor = QColor(m_themeForeground);
-    style.linkColor = QColor(m_themeAccent);
-    style.sourceOnlyColor = QColor(m_darkMode ? QStringLiteral("#a4a7aa") : QStringLiteral("#60666a"));
-    style.sourceOnlyBackground = QColor(m_darkMode ? QStringLiteral("#35383a") : QStringLiteral("#f0f1f2"));
-    m_visualHighlighter->setStyle(style);
-    m_visualHighlighter->setMapping(SourceVisualMapping::create(currentDocumentText()));
 }
 
 void Backend::stylePreview(QObject *textDocument) {

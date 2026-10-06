@@ -25,7 +25,6 @@
         <file>LineIcon.qml</file>
         <file>OrganizerPane.qml</file>
         <file>DocumentOutline.qml</file>
-        <file>VisualEditPane.qml</file>
         <file>LiveEditorPane.qml</file>
         <file>editor/index.html</file>
         <file>editor/editor.css</file>

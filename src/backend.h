@@ -19,7 +19,6 @@
 #include "editorbridge.h"
 
 class MarkdownHighlighter;
-class VisualTextHighlighter;
 class QTextDocument;
 class QWindow;
 class QPagedPaintDevice;
@@ -122,21 +121,8 @@ public:
     Q_INVOKABLE int markdownAnchorPosition(const QString &markdown, const QString &anchor) const;
     Q_INVOKABLE QString tableOfContents(const QString &markdown) const;
     Q_INVOKABLE void stylePreview(QObject *textDocument);
-    Q_INVOKABLE void styleVisualEditor(QObject *textDocument, int textSize, const QString &typeface = QString());
     Q_INVOKABLE QVariantMap wrapSelection(int start, int end, const QString &before, const QString &after);
     Q_INVOKABLE QVariantMap replaceText(int start, int end, const QString &replacement);
-    // A conservative snapshot for the visual editor. `source` is the exact
-    // canonical Markdown that callers must return to applyVisualEdit().
-    Q_INVOKABLE QVariantMap visualProjection() const;
-    // Read-only navigation: hidden Markdown syntax falls back to its visual block.
-    Q_INVOKABLE int visualPositionForSource(int sourcePosition) const;
-    Q_INVOKABLE QVariantMap navigateVisualTable(int start, int end, bool backwards,
-                                                const QString &expectedSource) const;
-    // Applies one inline visual replacement only when expectedSource is still
-    // the current canonical source and the mapping can produce one source edit.
-    Q_INVOKABLE QVariantMap applyVisualBreak(int position, bool softBreak, const QString &expectedSource);
-    Q_INVOKABLE bool applyVisualEdit(int start, int length, const QString &replacement,
-                                     const QString &expectedSource);
     Q_INVOKABLE QVariantMap editMarkdown(const QString &action, int start, int end);
     Q_INVOKABLE QVariantList searchPositions(const QString &query) const;
     Q_INVOKABLE int replaceMatches(const QString &query, const QString &replacement, int position);
@@ -386,10 +372,6 @@ private:
     QPointer<QTextDocument> m_document;
     QPointer<QWindow> m_parentWindow;
     QPointer<MarkdownHighlighter> m_highlighter;
-    QPointer<VisualTextHighlighter> m_visualHighlighter;
-    QString m_lastVisualResultSource;
-    qint64 m_lastVisualEditAt = 0;
-    int m_lastVisualEditEnd = -1;
     QString m_lastDocumentText;
     QByteArray m_lastKnownFileContents;
     bool m_requiresExplicitSave = false;

@@ -62,8 +62,8 @@ void FomawriteTest::paneAlignedFooterMenusFollowDividerWithoutEditing() {
     QVERIFY(QMetaObject::invokeMethod(f.editor, "insert", Q_ARG(int, saved.size()), Q_ARG(QString, "Unsaved ending.")));
     const QString draft = f.editor->property("text").toString();
     auto *appearance = f.item("sourceAppearanceButton"), *output = f.item("previewTemplateButton");
-    auto *visual = f.item("visualEditToggle");
-    auto *rule = f.item("documentFooterPaneDivider"); QVERIFY(appearance && output && visual && rule);
+    auto *live = f.item("liveEditToggle"), *source = f.item("sourceModeButton");
+    auto *rule = f.item("documentFooterPaneDivider"); QVERIFY(appearance && output && live && source && rule);
     QVERIFY(f.mode(1)); QTRY_COMPARE(f.layout->property("effectiveLayoutMode").toInt(), 1);
     QTRY_VERIFY(cycle117PaneFooterAnchors(f.window.data()));
     QTRY_VERIFY(!f.window->property("changingDocumentView").toBool());
@@ -107,10 +107,10 @@ void FomawriteTest::paneAlignedFooterMenusFollowDividerWithoutEditing() {
     }
     QVERIFY(f.mode(2)); QTRY_VERIFY(!appearance->isVisible() && output->isVisible());
     QVERIFY(f.mode(0)); QTRY_VERIFY(appearance->isVisible() && !output->isVisible());
-    QVERIFY(cycle102Click(f.quick, visual)); QTRY_VERIFY(f.layout->property("visualEditEnabled").toBool());
-    QVERIFY(!f.preview->property("visualEditEnabled").toBool());
+    QVERIFY(cycle102Click(f.quick, live)); QTRY_VERIFY(f.layout->property("liveEditEnabled").toBool());
     QVERIFY(f.mode(0));
     QCOMPARE(f.editor->property("text").toString(), draft);
+    QVERIFY(cycle102Click(f.quick, source)); QTRY_VERIFY(!f.layout->property("liveEditEnabled").toBool());
     QVERIFY(QMetaObject::invokeMethod(f.window.data(), "undoEditing")); QCOMPARE(f.editor->property("text").toString(), saved);
     QVERIFY(QMetaObject::invokeMethod(f.window.data(), "redoEditing")); QCOMPARE(f.editor->property("text").toString(), draft);
     QCOMPARE(cycle103Read(path), saved.toUtf8());

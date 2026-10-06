@@ -19,7 +19,6 @@ Item {
     property string documentName: backend.fileName
     property bool documentModified: backend.modified
     readonly property bool fullPreview: !editorPane.visible && previewPane.visible
-    readonly property bool visualEditor: editorPane.visible && layoutState.visualEditEnabled
     property bool keyboardReveal: false
     // Edge entry reveals until the next editing or scrolling gesture.
     property bool pointerReveal: false
@@ -234,22 +233,7 @@ Item {
                 Layout.fillWidth: true
                 Layout.minimumWidth: 0
             }
-            Label {
-                objectName: "visualEditorHeaderModeLabel"
-                visible: root.visualEditor && root.toolbarContentVisible && root.writingControlsWidth >= 540
-                text: "Visual Edit"
-                font.pixelSize: 13
-                color: backend.palette.muted
-                opacity: root.toolbarContentOpacity
-            }
-            PreviewDocumentIdentity {
-                identityPrefix: "visualEditorDocument"
-                visible: root.visualEditor && root.toolbarContentVisible
-                opacity: root.titleContentOpacity
-                Layout.fillWidth: true
-                Layout.minimumWidth: 0
-            }
-            Item { visible: !root.fullPreview && !root.visualEditor; Layout.fillWidth: true; Layout.minimumWidth: 6 }
+            Item { visible: !root.fullPreview; Layout.fillWidth: true; Layout.minimumWidth: 6 }
             Row {
                 id: trailing
                 objectName: "topChromeToolbarTrailing"
@@ -258,13 +242,13 @@ Item {
                 ToolbarGroup {
                     objectName: "compactWritingControls"
                     property bool sourceFormattingControl: true
-                    visible: !root.fullPreview && !root.visualEditor && root.writingClusterExpanded
+                    visible: !root.fullPreview && root.writingClusterExpanded
                     ToolbarButton { id: sourceBoldButton; objectName: "compactBoldButton"; grouped: true; text: "B"; font.pixelSize: 16; font.weight: Font.Bold; hint: trailing.formattingAllowed ? "Bold selection" : "Choose Source to apply formatting"; enabled: trailing.formattingAllowed; onClicked: root.actionRequested("bold", this) }
                     ToolbarButton { objectName: "compactItalicButton"; grouped: true; text: "I"; font.family: "Times New Roman"; font.pixelSize: 18; font.italic: true; hint: "Italic selection"; enabled: trailing.formattingAllowed; onClicked: root.actionRequested("italic", this) }
                     ToolbarButton { objectName: "compactLinkButton"; grouped: true; iconName: "link"; hint: "Insert or edit link"; enabled: trailing.formattingAllowed; onClicked: root.actionRequested("link", this) }
                     ToolbarButton { objectName: "compactParagraphButton"; grouped: true; iconName: "paragraph"; hint: "Paragraph formatting"; enabled: trailing.formattingAllowed; onClicked: root.actionRequested("format", this) }
                 }
-                ToolbarButton { id: sourceFormatButton; property bool sourceFormattingControl: true; objectName: "compactFormatButton"; visible: !root.fullPreview && !root.visualEditor && !root.writingClusterExpanded; iconName: "paragraph"; hint: "Formatting"; enabled: trailing.formattingAllowed; onClicked: root.actionRequested("format", this) }
+                ToolbarButton { id: sourceFormatButton; property bool sourceFormattingControl: true; objectName: "compactFormatButton"; visible: !root.fullPreview && !root.writingClusterExpanded; iconName: "paragraph"; hint: "Formatting"; enabled: trailing.formattingAllowed; onClicked: root.actionRequested("format", this) }
                 PaneZoomControls {
                     id: editorZoomControls
                     zoomController: root.zoomController

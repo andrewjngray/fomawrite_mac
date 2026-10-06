@@ -191,7 +191,7 @@
                     window->raise();
                     settings->setProperty("synchronizedScroll", false);
                     layout->setProperty("layoutMode", 1);
-                    layout->setProperty("visualEditEnabled", false);
+                    layout->setProperty("liveEditEnabled", false);
                     backend.selectPublishingTheme("claude-like");
                     themeCheck("natural-cocoa-pdf-document-a-to-nps-document-b", [&] {
                         settings->setProperty("publishingFormat", "pdf");

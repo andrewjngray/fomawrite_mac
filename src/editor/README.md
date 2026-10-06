@@ -29,7 +29,7 @@ JS **calls** (slots):
 
 - `ready()` - once mounted and connected (all signals below are connected before this call).
 - `documentChanged(changesJson: string, revision: number)` - one call per user doc-changing transaction. `changesJson` = JSON array of `{from, to, insert}`; offsets are UTF-16 offsets into the **pre-change** document, ascending by `from`, non-overlapping, so applying them in reverse order needs no adjustment. `revision` = new revision counter (incremented per doc-changing transaction). Includes undo/redo and `simulateUserChanges`; excludes `setDocument`/`applyChanges`.
-- `cursorChanged(anchor: number, head: number)` - main selection range, debounced 30 ms; also sent immediately (0, 0) after `setDocument`.
+- `cursorChanged(anchor: number, head: number, byUser: boolean)` - main selection range, debounced 30 ms; `byUser` is true when a transaction carrying a user event (typing, keys, pointer) moved it and false for host-driven changes (`setDocument`, `setCursor`, `applyChanges`); also sent immediately (0, 0, false) after `setDocument`.
 - `metric(name: string, ms: number)` - `keystroke-to-dispatch` (keydown/beforeinput/input -> `documentChanged`), `setDocument`, `decorate` (slowest live-decoration rebuild per 100 ms window).
 - `log(message: string)`.
 - `textReply(token: number, text: string)` - answer to `requestText`.

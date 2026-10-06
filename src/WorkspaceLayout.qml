@@ -9,7 +9,6 @@ QtObject {
     property bool filesVisible: true
     property int layoutMode: 1 // 0 Single editor, 1 Editor + Preview, 2 Preview only
     property int lastEditingLayoutMode: 1 // Restore this arrangement when leaving Preview only.
-    property bool visualEditEnabled: false
     property bool liveEditEnabled: false // The CodeMirror Live editor replaces the Source/Visual surface.
     property real organizerWidth: 208
     property real fileWidth: 288
@@ -110,7 +109,7 @@ QtObject {
 
     function saveState() {
         return { version: 2, organizerVisible: organizerVisible, filesVisible: filesVisible,
-            layoutMode: desiredMode(), visualEditEnabled: visualEditEnabled, liveEditEnabled: liveEditEnabled,
+            layoutMode: desiredMode(), liveEditEnabled: liveEditEnabled,
             lastEditingLayoutMode: lastEditingLayoutMode === 1 ? 1 : 0,
             organizerWidth: boundedWidth(organizerWidth, 184, 288, 208),
             fileWidth: boundedWidth(fileWidth, 232, 420, 288),
@@ -122,10 +121,10 @@ QtObject {
             return false
         var restoredMode = typeof state.layoutMode === "number" && state.layoutMode % 1 === 0
                 && state.layoutMode >= 0 && state.layoutMode <= 2 ? state.layoutMode : 1
-        var restoredVisual = typeof state.visualEditEnabled === "boolean" ? state.visualEditEnabled : false
+        // Visual Edit (retired in Cycle 135) is carried over as Live editing.
         // Version 1 combined editing mode and arrangement: Full Visual Edit
-        // was mode 2, while mode 0 always selected Source. Migrate user intent
-        // before restoring the independently selectable version-2 controls.
+        // was mode 2, while mode 0 always selected Source.
+        var restoredVisual = typeof state.visualEditEnabled === "boolean" ? state.visualEditEnabled : false
         if (state.version === 1) {
             if (restoredMode === 0) restoredVisual = false
             else if (restoredMode === 2 && restoredVisual) restoredMode = 0
@@ -134,8 +133,7 @@ QtObject {
         organizerVisible = typeof state.organizerVisible === "boolean" ? state.organizerVisible : true
         filesVisible = typeof state.filesVisible === "boolean" ? state.filesVisible : true
         layoutMode = restoredMode
-        visualEditEnabled = restoredVisual
-        liveEditEnabled = typeof state.liveEditEnabled === "boolean" ? state.liveEditEnabled : false
+        liveEditEnabled = restoredVisual || (typeof state.liveEditEnabled === "boolean" ? state.liveEditEnabled : false)
         lastEditingLayoutMode = restoredMode !== 2 ? restoredMode
                 : state.version === 2 && state.lastEditingLayoutMode === 1 ? 1 : 0
         organizerWidth = boundedWidth(state.organizerWidth, 184, 288, 208)
@@ -148,7 +146,7 @@ QtObject {
 
     function restoreDefaults() {
         restoreState({ version: 2, organizerVisible: true, filesVisible: true,
-            layoutMode: 1, visualEditEnabled: false, lastEditingLayoutMode: 1,
+            layoutMode: 1, liveEditEnabled: false, lastEditingLayoutMode: 1,
             organizerWidth: 208, fileWidth: 288, previewWidth: 420 })
     }
 
@@ -159,7 +157,6 @@ QtObject {
             lastEditingLayoutMode = layoutMode
         recalculate(true)
     }
-    onVisualEditEnabledChanged: recalculate(false)
     onOrganizerWidthChanged: recalculate(false)
     onFileWidthChanged: recalculate(false)
     onPreviewWidthChanged: recalculate(false)

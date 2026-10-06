@@ -23,7 +23,7 @@ const QUrl smokeLegacyFile = QUrl::fromLocalFile(smokeDirectory.filePath("Before
     const QString legacyWorkspacePath = QDir(legacyStateDirectory).filePath(
         "workspace-" + workspaceIdentity(QCoreApplication::applicationFilePath()) + ".json");
     const QJsonObject panes{{"version", 1}, {"organizerVisible", false}, {"filesVisible", false},
-        {"layoutMode", 2}, {"visualEditEnabled", false}, {"organizerWidth", 244.0},
+        {"layoutMode", 2}, {"liveEditEnabled", false}, {"organizerWidth", 244.0},
         {"fileWidth", 320.0}, {"previewWidth", 460.0}};
     const QJsonObject window{{"url", smokeLegacyFile.toString()}, {"cursor", 4},
         {"x", 80}, {"y", 80}, {"width", 1100}, {"height", 800}, {"state", 0},

@@ -28,9 +28,6 @@ Rectangle {
     property string publishingMode: "web"
     property real zoom: 1
     // Compatible assignments from the document workspace; this surface is read-only.
-    property bool allowVisualEdit: false
-    property bool visualEditEnabled: false
-    property string visualEditorObjectName: "outputPreviewVisualEditor"
     property bool showFooter: false
     property real bottomInset: 0
     property bool suspendViewportUpdates: false

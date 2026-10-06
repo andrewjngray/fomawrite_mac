@@ -73,9 +73,9 @@ void FomawriteTest::findReplaceContinuesFromCaretAndPreservesUndo() {
     QVERIFY(cycle118ReadPreview(window.data()));
     QTRY_VERIFY(!window->property("searchOpen").toBool());
     QTRY_COMPARE(layout->property("effectiveLayoutMode").toInt(), 2);
-    // Find opened during a pending Preview/Visual transition takes keyboard
+    // Find opened during a pending Preview transition takes keyboard
     // ownership immediately and keeps it after the old transition would finish.
-    for (const QString &mode : {QStringLiteral("preview"), QStringLiteral("visual")}) {
+    for (const QString &mode : {QStringLiteral("preview")}) {
         QVERIFY(QMetaObject::invokeMethod(window.data(), "closeSearch", Q_ARG(QVariant, false)));
         QVERIFY(QMetaObject::invokeMethod(window.data(), "selectWritingMode", Q_ARG(QVariant, "source")));
         QTRY_VERIFY(!window->property("changingDocumentView").toBool());

@@ -1,3 +1,4 @@
+import { Transaction } from "@codemirror/state";
 // Bootstrap + bridge glue. Mounts the CM6 view in #editor, connects to the Qt bridge
 // (or a mock) and wires signals/slots per the contract documented in README.md.
 import { EditorView } from "@codemirror/view";
@@ -48,14 +49,19 @@ async function main() {
     lastInputAt = performance.now();
   };
 
-  // ---- cursor reporting (debounced)
+  // ---- cursor reporting (debounced). `byUser` tells the host whether the
+  // writer moved the caret (typing, keys, pointer) or the host did (setDocument,
+  // setCursor, applyChanges), so a mode switch only carries back real moves.
   let cursorTimer: ReturnType<typeof setTimeout> | null = null;
-  const scheduleCursor = (view: EditorView) => {
+  let cursorByUser = false;
+  const scheduleCursor = (view: EditorView, byUser: boolean) => {
+    cursorByUser = cursorByUser || byUser;
     if (cursorTimer !== null) clearTimeout(cursorTimer);
     cursorTimer = setTimeout(() => {
       cursorTimer = null;
       const sel = view.state.selection.main;
-      bridge.cursorChanged(sel.anchor, sel.head);
+      const flag = cursorByUser; cursorByUser = false;
+      bridge.cursorChanged(sel.anchor, sel.head, flag);
     }, CURSOR_DEBOUNCE_MS);
   };
 
@@ -69,7 +75,8 @@ async function main() {
     linksExtension(),
     EditorView.updateListener.of((u) => {
       if (u.docChanged) session.handleTransactions(u.transactions);
-      if (u.selectionSet || u.docChanged) scheduleCursor(u.view);
+      if (u.selectionSet || u.docChanged)
+        scheduleCursor(u.view, u.transactions.some((tr) => tr.annotation(Transaction.userEvent) !== undefined));
     }),
   ]);
 
@@ -108,7 +115,8 @@ async function main() {
     const t0 = performance.now();
     session.setDocument(text, revision);
     bridge.metric("setDocument", performance.now() - t0);
-    bridge.cursorChanged(0, 0); // selection was reset; tell the host immediately
+    cursorByUser = false;
+    bridge.cursorChanged(0, 0, false); // selection was reset by the host; tell it immediately
   }));
   onSignal(bridge.applyChanges, guard("applyChanges", (json: string, revision: number) => session.applyChanges(json, revision)));
   onSignal(bridge.setMode, guard("setMode", (mode: string) => session.setMode(mode)));

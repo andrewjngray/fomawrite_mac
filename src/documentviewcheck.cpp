@@ -49,8 +49,7 @@ void applyMacWindowTheme(QWindow *window, bool followSystem, bool dark);
 #endif
 
 namespace {
-const QStringList viewNames{QStringLiteral("sourceModeButton"), QStringLiteral("visualEditToggle"),
-                           QStringLiteral("liveEditToggle"), QStringLiteral("singleModeButton"), QStringLiteral("previewSplitButton")};
+const QStringList viewNames{QStringLiteral("sourceModeButton"), QStringLiteral("liveEditToggle"), QStringLiteral("singleModeButton"), QStringLiteral("previewSplitButton")};
 const QStringList stationaryNames{QStringLiteral("singleModeButton"), QStringLiteral("previewSplitButton")};
 const QStringList controlNames = viewNames + QStringList{QStringLiteral("sourceAppearanceButton"), QStringLiteral("previewTemplateButton"),
     QStringLiteral("webPublishingButton"), QStringLiteral("pdfPublishingButton")};
@@ -345,10 +344,8 @@ int runDocumentViewCheck(QApplication &app, const QString &outputDirectory) {
         for (const auto &warning : warnings) {
             const QString message = warning.toString();
             // The incomplete-image fixture deliberately exercises a missing
-            // resource. Its left visual editor also reports that exact URL.
-            // Keep this expected diagnostic separate; all other warnings fail.
-            if (!expectedMissingPreviewImage.isEmpty() && message.startsWith("qrc:/VisualEditPane.qml:")
-                    && message.endsWith("QML QQuickTextEdit: Cannot open: " + expectedMissingPreviewImage))
+            // resource; keep that expected diagnostic separate, all other warnings fail.
+            if (!expectedMissingPreviewImage.isEmpty() && message.contains("Cannot open: " + expectedMissingPreviewImage))
                 expectedImageWarnings.append(message);
             else qmlWarnings.append(message);
         }
@@ -370,7 +367,6 @@ int runDocumentViewCheck(QApplication &app, const QString &outputDirectory) {
     auto *editor = window->findChild<QQuickItem *>("sourceEditor");
     auto *layout = window->findChild<QObject *>("workspaceLayout");
     auto *pane = window->findChild<QQuickItem *>("previewPane");
-    auto *visualPane = window->findChild<QQuickItem *>("visualEditorPane");
     auto *sourceScroll = window->findChild<QQuickItem *>("editorScroll");
     auto *settings = window->findChild<QObject *>("workspaceSettings");
     if (!check(footer && editor && layout && pane && sourceScroll && settings,
@@ -439,8 +435,7 @@ int runDocumentViewCheck(QApplication &app, const QString &outputDirectory) {
     const int revision = backend.documentRevision();
     const auto ready = [&] {
         return !window->property("changingDocumentView").toBool()
-            && !pane->property("viewportRefreshPending").toBool()
-            && visualPane && !visualPane->property("viewportRefreshPending").toBool();
+            && !pane->property("viewportRefreshPending").toBool();
     };
     const auto capture = [&](const QString &name) {
         settle(100);
@@ -454,7 +449,7 @@ int runDocumentViewCheck(QApplication &app, const QString &outputDirectory) {
         check(renderBarrier(window), step + ": cannot render settled geometry frame");
         QJsonObject controls;
         const int mode = layout->property("effectiveLayoutMode").toInt();
-        const bool visual = layout->property("visualEditEnabled").toBool();
+        const bool live = layout->property("liveEditEnabled").toBool();
         for (const QString &name : controlNames) {
             auto *button = buttons.value(name);
             const QRectF rect = bounds(button);
@@ -465,7 +460,7 @@ int runDocumentViewCheck(QApplication &app, const QString &outputDirectory) {
             auto *label = button->findChild<QQuickItem *>("footerButtonLabel");
             entry.insert("truncated", !label || label->property("truncated").toBool());
             controls.insert(name, entry);
-            const bool shouldBeVisible = name == "sourceAppearanceButton" || name == "sourceModeButton" || name == "visualEditToggle" || name == "liveEditToggle" ? mode != 2
+            const bool shouldBeVisible = name == "sourceAppearanceButton" || name == "sourceModeButton" || name == "liveEditToggle" ? mode != 2
                 : name == "previewTemplateButton" || name == "webPublishingButton" || name == "pdfPublishingButton" ? mode != 0 : true;
             check(button->isVisible() == shouldBeVisible, step + ": wrong pane control visibility: " + name);
             if (!button->isVisible()) continue;
@@ -483,10 +478,8 @@ int runDocumentViewCheck(QApplication &app, const QString &outputDirectory) {
                       && rect.right() <= bounds(owner).right() - 11.5, step + ": control lost its pane anchor: " + name);
             }
             if (!viewNames.contains(name)) continue;
-            const bool live = layout->property("liveEditEnabled").toBool();
             const bool checked = name == "liveEditToggle" ? mode != 2 && live
-                : name == "visualEditToggle" ? mode != 2 && visual && !live
-                : name == "sourceModeButton" ? mode != 2 && !visual && !live : name == "previewSplitButton" ? mode == 1 : mode == 0;
+                : name == "sourceModeButton" ? mode != 2 && !live : name == "previewSplitButton" ? mode == 1 : mode == 0;
             check(button->property("checked").toBool() == checked, step + ": incorrect checked state: " + name);
         }
         for (int first = 0; first < controlNames.size(); ++first) {
@@ -504,7 +497,7 @@ int runDocumentViewCheck(QApplication &app, const QString &outputDirectory) {
         check(backend.documentRevision() == revision && backend.modified(), step + ": document revision/dirty state changed");
         auto *previewScroll = pane->findChild<QQuickItem *>("previewScroll");
         scenarios.append(QJsonObject{{"step", step}, {"windowWidth", window->width()},
-            {"windowHeight", window->height()}, {"layoutMode", mode}, {"visualEditing", visual},
+            {"windowHeight", window->height()}, {"layoutMode", mode}, {"liveEditing", live},
             {"documentFooter", rectJson(bounds(footer))}, {"controls", controls},
             {"draftSha256", sha256(editor->property("text").toString().toUtf8())},
             {"documentRevision", backend.documentRevision()}, {"cursor", editor->property("cursorPosition").toInt()},
@@ -514,13 +507,13 @@ int runDocumentViewCheck(QApplication &app, const QString &outputDirectory) {
             {"previewScrollY", previewScroll ? previewScroll->property("contentY").toDouble() : -1},
             {"previewContentHeight", previewScroll ? previewScroll->property("contentHeight").toDouble() : -1}});
     };
-    const auto action = [&](const QString &name, int mode, bool visual) {
+    const auto action = [&](const QString &name, int mode, bool live) {
         if (name == "previewOnly")
             check(QMetaObject::invokeMethod(window, "selectWritingMode", Q_ARG(QVariant, "preview")), "Cannot open Preview Only reading action");
         else check(click(window, buttons.value(name), true), "Cannot click visible control: " + name);
         check(waitUntil([&] { return layout->property("effectiveLayoutMode").toInt() == mode
-            && layout->property("visualEditEnabled").toBool() == visual && ready(); }),
-            QString("Click %1 did not settle in mode %2, visual %3").arg(name).arg(mode).arg(visual));
+            && layout->property("liveEditEnabled").toBool() == live && ready(); }),
+            QString("Click %1 did not settle in mode %2, live %3").arg(name).arg(mode).arg(live));
         settle(30);
     };
     const auto sourceSingle = [&] {
@@ -540,14 +533,14 @@ int runDocumentViewCheck(QApplication &app, const QString &outputDirectory) {
         const bool canSplit = width >= 803;
         check(buttons.value("previewSplitButton")->isEnabled() == canSplit, "Split availability does not match window width");
         for (int pass = 0; pass < 3; ++pass) {
-            struct Step { const char *button; int mode; bool visual; };
-            const QList<Step> steps{{"singleModeButton", 0, false}, {"visualEditToggle", 0, true},
-                {"visualEditToggle", 0, true}, {"previewSplitButton", canSplit ? 1 : 0, true},
+            struct Step { const char *button; int mode; bool live; };
+            const QList<Step> steps{{"singleModeButton", 0, false}, {"liveEditToggle", 0, true},
+                {"liveEditToggle", 0, true}, {"previewSplitButton", canSplit ? 1 : 0, true},
                 {"sourceModeButton", canSplit ? 1 : 0, false}, {"singleModeButton", 0, false},
-                {"visualEditToggle", 0, true}, {"sourceModeButton", 0, false}};
+                {"liveEditToggle", 0, true}, {"sourceModeButton", 0, false}};
             for (int index = 0; index < steps.size(); ++index) {
                 const auto &step = steps.at(index);
-                action(step.button, step.mode, step.visual);
+                action(step.button, step.mode, step.live);
                 const QString name = QString("width-%1-pass-%2-step-%3").arg(width).arg(pass).arg(index);
                 record(name, baseline);
                 if (pass == 0 && (index == 0 || index == 1 || index == 3 || index == 7)) capture(name);
@@ -563,26 +556,26 @@ int runDocumentViewCheck(QApplication &app, const QString &outputDirectory) {
             if (buttons.value(name)->isVisible()) result.insert(name, bounds(buttons.value(name)));
         return result;
     };
-    const auto beginNarrowSplit = [&](bool visual) {
+    const auto beginNarrowSplit = [&](bool live) {
         window->resize(1440, 800); settle(100); sourceSingle();
-        if (visual) action("visualEditToggle", 0, true);
-        action("previewSplitButton", 1, visual);
+        if (live) action("liveEditToggle", 0, true);
+        action("previewSplitButton", 1, live);
         window->resize(720, 800); settle(150);
         check(layout->property("effectiveLayoutMode").toInt() == 0
-              && layout->property("visualEditEnabled").toBool() == visual,
+              && layout->property("liveEditEnabled").toBool() == live,
               "Narrow Split changed the chosen editor instead of contracting layout");
     };
     beginNarrowSplit(false);
     auto narrowBounds = currentBounds();
     record("narrow-source-single-fallback", narrowBounds);
-    action("visualEditToggle", 0, true);
-    record("narrow-source-to-visual-one-click", narrowBounds);
-    capture("narrow-source-to-visual");
+    action("liveEditToggle", 0, true);
+    record("narrow-source-to-live-one-click", narrowBounds);
+    capture("narrow-source-to-live");
     beginNarrowSplit(true);
     narrowBounds = currentBounds();
     action("sourceModeButton", 0, false);
-    record("narrow-visual-to-source-one-click", narrowBounds);
-    capture("narrow-visual-to-source");
+    record("narrow-live-to-source-one-click", narrowBounds);
+    capture("narrow-live-to-source");
     window->resize(1440, 800);
     settle(100);
     sourceSingle();
@@ -731,10 +724,10 @@ int runDocumentViewCheck(QApplication &app, const QString &outputDirectory) {
             daily("find-narrow-layout-and-escape", [&] {
                 window->resize(720, 800);
                 settle(100);
-                action("visualEditToggle", 0, true);
-                check(click(window, searchButton), "Cannot open Find from narrow Visual Edit");
+                action("sourceModeButton", 0, false);
+                check(click(window, searchButton), "Cannot open Find from the narrow Source editor");
                 check(waitUntil([&] { return findBar->isVisible() && layout->property("effectiveLayoutMode").toInt() == 0; }),
-                      "Find from narrow Visual Edit did not reveal Source");
+                      "Find in the narrow Source editor did not open");
                 check(enterText(window, findField, "missing-phrase"), "Cannot enter no-match query");
                 check(click(window, replaceToggle), "Cannot reveal narrow replacement row");
                 settle(80);
@@ -798,7 +791,7 @@ int runDocumentViewCheck(QApplication &app, const QString &outputDirectory) {
                       "Dismissing Outline changed the document selection");
                 check(editor->property("text").toString() == outlineSource, "Outline search changed source text");
             });
-            daily("outline-keyboard-jump-and-narrow-visual-source-routing", [&] {
+            daily("outline-keyboard-jump-and-narrow-live-routing", [&] {
                 openOutline();
                 key(window, Qt::Key_Down);
                 check(outlineList->property("currentIndex").toInt() == 2, "Outline Down did not move the selected result");
@@ -806,70 +799,21 @@ int runDocumentViewCheck(QApplication &app, const QString &outputDirectory) {
                 check(waitUntil([&] { return !outline->property("visible").toBool() && editor->property("cursorPosition").toInt() == lastHeading; }),
                       "Outline Enter did not jump to the exact heading source offset");
                 window->resize(720, 800); settle(100);
-                action("visualEditToggle", 0, true);
+                action("liveEditToggle", 0, true);
                 openOutline();
-                check(enterText(window, outlineSearch, "second"), "Cannot filter Outline in narrow Visual Edit");
-                capture("daily-outline-narrow-visual");
+                check(enterText(window, outlineSearch, "second"), "Cannot filter Outline in narrow Live");
+                capture("daily-outline-narrow-live");
                 key(window, Qt::Key_Return);
                 check(waitUntil([&] { return !outline->property("visible").toBool()
-                    && layout->property("effectiveLayoutMode").toInt() == 0 && editor->hasActiveFocus()
-                    && editor->property("cursorPosition").toInt() == middleHeading; }),
-                    "Narrow Outline jump did not reveal and focus the exact Source heading");
+                    && layout->property("effectiveLayoutMode").toInt() == 0 && layout->property("liveEditEnabled").toBool()
+                    && backend.liveCursor() == middleHeading; }),
+                    "Narrow Outline jump did not place the Live caret at the exact heading");
                 check(editor->property("text").toString() == outlineSource && !backend.modified(), "Heading navigation modified the document");
-                capture("daily-outline-jump-source");
+                capture("daily-outline-jump-live");
+                action("sourceModeButton", 0, false);
             });
         }
     }
-
-    daily("visual-list-middle-return-and-undo", [&] {
-        window->resize(1440, 800); settle(100);
-        const QList<QPair<QString, QString>> samples{
-            {QString::fromUtf8("- café猫\n"), QString::fromUtf8("- café\n- 猫\n")},
-            {QStringLiteral("7) alphabeta\n"), QStringLiteral("7) alpha\n8) beta\n")},
-            {QStringLiteral("- [x] alphabeta\n"), QStringLiteral("- [x] alpha\n- [ ] beta\n")},
-            {QString::fromUtf8("# Tasks\n\n03) [X] café🚀東京\n04) [ ] Preserve this item.\n"),
-             QString::fromUtf8("# Tasks\n\n03) [X] café🚀\n04) [ ] 東京\n04) [ ] Preserve this item.\n")}};
-        for (int index = 0; index < samples.size(); ++index) {
-            const auto &entry = samples.at(index);
-            if (!loadSample("List split " + QString::number(index), entry.first)) return;
-            action("visualEditToggle", 0, true);
-            auto *visualEditor = visualPane->findChild<QQuickItem *>("visualEditor");
-            if (!check(visualEditor, "Visual editor missing for list split")) return;
-            check(waitUntil(ready), "Visual list fixture did not settle");
-            const QString projected = visualEditor->property("text").toString();
-            const QString left = index == 0 ? QString::fromUtf8("café") : index == 3 ? QString::fromUtf8("café🚀") : "alpha";
-            const int point = projected.indexOf(left) + left.size();
-            check(point >= left.size(), "List text missing in editable projection");
-            visualEditor->setProperty("cursorPosition", point);
-            visualEditor->forceActiveFocus();
-            if (index == 3) capture("daily-list-before-return");
-            key(window, Qt::Key_Return);
-            check(waitUntil([&] { return editor->property("text").toString() == entry.second; }), "Visual middle Return did not preserve exact list Markdown: " + QString::number(index));
-            if (index == 3) capture("daily-list-after-return");
-            QMetaObject::invokeMethod(window, "undoEditing");
-            check(editor->property("text").toString() == entry.first, "Visual split was not one exact undo step");
-            QMetaObject::invokeMethod(window, "redoEditing");
-            check(editor->property("text").toString() == entry.second, "Visual list split Redo changed source bytes");
-        }
-    });
-
-    daily("visual-list-formatting-boundary-refuses-unsafe-return", [&] {
-        const QString formatted = "- **alphabeta**\n";
-        if (!loadSample("Protected list formatting", formatted)) return;
-        action("visualEditToggle", 0, true);
-        auto *visualEditor = visualPane->findChild<QQuickItem *>("visualEditor");
-        if (!check(visualEditor, "Visual editor missing for protected split")) return;
-        check(waitUntil(ready), "Protected visual fixture did not settle");
-        const int beforeRevision = backend.documentRevision();
-        const int point = visualEditor->property("text").toString().indexOf("alpha") + 5;
-        visualEditor->setProperty("cursorPosition", point);
-        visualEditor->forceActiveFocus();
-        key(window, Qt::Key_Return);
-        settle(100);
-        check(editor->property("text").toString() == formatted && backend.documentRevision() == beforeRevision,
-              "Unsafe break inside bold list text changed the canonical document");
-        check(visualPane->property("visualStatus").toString().contains("Source"), "Refused structural break did not explain Source fallback");
-    });
 
     // View zoom is a presentation preference. Exercise the shipped pane controls
     // independently of the existing footer/daily-writing regression counts.
@@ -995,14 +939,11 @@ int runDocumentViewCheck(QApplication &app, const QString &outputDirectory) {
                 for (int round = 0; round < 2; ++round) {
                     action("previewOnly", 2, false);
                     check(zoomItem("preview", "MenuButton") && zoomItem("preview", "MenuButton")->isVisible(), "Full Preview has no percentage control");
-                    check(QMetaObject::invokeMethod(window, "selectWritingMode", Q_ARG(QVariant, "visual")),
-                          "Cannot return from Preview Only to Visual Edit");
+                    check(QMetaObject::invokeMethod(window, "selectWritingMode", Q_ARG(QVariant, "live")),
+                          "Cannot return from Preview Only to Live");
                     check(waitUntil([&] { return layout->property("effectiveLayoutMode").toInt() == 1
-                        && layout->property("visualEditEnabled").toBool() && ready(); }),
-                          "Preview Only return did not restore Visual Split");
-                    auto *visual = visualPane->findChild<QQuickItem *>("visualEditor");
-                    check(visual && visualPane->property("visualTextSize").toInt() == window->property("editorFontPixelSize").toInt(),
-                          "Visual Edit did not use the chosen editor magnification");
+                        && layout->property("liveEditEnabled").toBool() && ready(); }),
+                          "Preview Only return did not restore Live Split");
                     sourceSingle();
                     check(zoomItem("source", "MenuButton") && zoomItem("source", "MenuButton")->isVisible(), "Source view has no percentage control");
                     action("previewSplitButton", 1, false);
@@ -1203,9 +1144,9 @@ int runDocumentViewCheck(QApplication &app, const QString &outputDirectory) {
         capture("source-readable-single");
         for (int mode : {1, 0, 1}) {
             action(mode ? "previewSplitButton" : "singleModeButton", mode, false);
-            action("visualEditToggle", mode, true);
+            action("liveEditToggle", mode, true);
             action("sourceModeButton", mode, false);
-            check(document->toPlainText() == sample && !backend.modified(), "Source/Visual cycles altered literal Markdown or dirty state");
+            check(document->toPlainText() == sample && !backend.modified(), "Source/Live cycles altered literal Markdown or dirty state");
             check(backend.hiddenRangesAt(marker).isEmpty(), "Returning to Source hid Markdown markers");
         }
         capture("source-readable-split");

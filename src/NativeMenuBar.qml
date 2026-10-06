@@ -323,7 +323,6 @@ Platform.MenuBar {
         Platform.Menu {
             title: "Editing"
             NativeCommand { commandId: "sourceEditing" }
-            NativeCommand { commandId: "visualEditing" }
             NativeCommand { commandId: "liveEditing" }
         }
         Platform.Menu {
