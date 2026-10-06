@@ -488,17 +488,22 @@ ApplicationWindow {
         if (!enabled) { workspaceLayout.liveEditEnabled = false; return; }
         if (searchOpen) closeSearch(false);
         workspaceLayout.visualEditEnabled = false;
+        liveEditorLoader.cursorOnEnter = editor.cursorPosition;
         workspaceLayout.liveEditEnabled = true;
         if (workspaceLayout.layoutMode === 2)
             workspaceLayout.layoutMode = workspaceLayout.lastEditingLayoutMode;
         lastWritingSurface = "live";
         sourceFormattingOwned = false;
-        backend.syncLiveEditor();
         if (liveEditorLoader.item) liveEditorLoader.item.focusLive();
     }
     function setEditingMode(visual) {
         if (visual && searchOpen) closeSearch(false);
-        workspaceLayout.liveEditEnabled = false;
+        if (workspaceLayout.liveEditEnabled) {
+            // Carry the Live caret back to the Source editor.
+            var liveCursor = backend.liveCursor();
+            workspaceLayout.liveEditEnabled = false;
+            if (liveCursor >= 0) editor.cursorPosition = Math.min(liveCursor, editor.length);
+        }
         if (workspaceLayout.visualEditEnabled === visual && workspaceLayout.effectiveLayoutMode !== 2) {
             focusWritingSurface();
             return;
@@ -3051,10 +3056,12 @@ ApplicationWindow {
             // Created on first use and then kept (hidden) so switching modes does
             // not reload the editor page; documents that never use Live pay nothing.
             property bool used: false
+            property int cursorOnEnter: -1
             onActiveChanged: if (active) used = true
             active: workspaceLayout.liveEditEnabled || used
             visible: workspaceLayout.liveEditEnabled
             sourceComponent: LiveEditorPane {
+                cursorOnEnter: liveEditorLoader.cursorOnEnter
                 bottomInset: documentFooter.height
                 bridge: backend.editorBridge
                 appearance: workspaceSettings.writingAppearance

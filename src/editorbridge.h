@@ -37,6 +37,10 @@ public:
     Q_INVOKABLE void scrollTo(double fraction);
     // Host-side document changes the page must apply (not reported back).
     Q_INVOKABLE void pushChanges(const QString &changesJson);
+    // Place the page's caret (UTF-16 offset); the page scrolls it into view.
+    Q_INVOKABLE void placeCursor(int position);
+    // The page's last reported caret (selection head), -1 before any report.
+    int lastCursor() const { return m_lastCursor; }
 
 public slots:
     // Page → app (over QWebChannel).
@@ -67,6 +71,7 @@ signals:
     void redo();
     void imageReply(int token, const QString &dataUrl, const QString &error);
     void scrollToFraction(double fraction);
+    void setCursor(int position);
     // For the app.
     void scrollFractionChanged(double fraction);
     void imageRequested(int token, const QString &src);
@@ -82,6 +87,7 @@ private:
     bool m_ready = false;
     int m_revision = 0;
     int m_nextToken = 0;
+    int m_lastCursor = -1;
     bool m_hasDocument = false;
     QString m_text;
     QString m_mode = QStringLiteral("live");

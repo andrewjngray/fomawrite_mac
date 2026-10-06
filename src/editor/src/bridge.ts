@@ -33,6 +33,8 @@ export interface Bridge {
   imageReply: Signal<[number, string, string]>;
   // Host asks the editor to scroll to a 0..1 fraction (not echoed back as scrolled()).
   scrollToFraction: Signal<[number]>;
+  // Host places the caret (UTF-16 offset) and scrolls it into view.
+  setCursor: Signal<[number]>;
 }
 
 export interface BridgeConnection {
@@ -90,7 +92,7 @@ const MOCK_PNG =
 
 const SIGNALS = [
   "setDocument", "applyChanges", "setMode", "setTheme", "setAppearance",
-  "focusEditor", "requestText", "simulateUserChanges", "undo", "redo", "imageReply", "scrollToFraction"
+  "focusEditor", "requestText", "simulateUserChanges", "undo", "redo", "imageReply", "scrollToFraction", "setCursor"
 ] as const;
 
 export type MockBridge = Bridge & {

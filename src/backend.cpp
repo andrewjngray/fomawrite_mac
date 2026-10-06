@@ -3612,7 +3612,7 @@ QVariantMap Backend::requestPublishingPreview(const QString &format, QObject *co
 void Backend::cancelPublishingPreview(QObject *consumer) { m_publisher->cancelPreview(consumer); }
 void Backend::invalidatePublishingDocument() { m_publisher->invalidateDocument(); }
 
-void Backend::syncLiveEditor() {
+void Backend::syncLiveEditor(int cursor) {
     // Appearance (fonts, focus, typewriter, dark) is pushed by LiveEditorPane,
     // which binds the same preferences the Source editor uses.
     m_editorBridge->applyTheme(m_publisher->currentCss());
@@ -3620,7 +3620,10 @@ void Backend::syncLiveEditor() {
     m_liveMirrorValid = true;
     m_editorBridge->loadDocument(m_liveMirror);
     m_editorBridge->selectMode(QStringLiteral("live"));
+    if (cursor >= 0) m_editorBridge->placeCursor(qMin(cursor, int(m_liveMirror.size())));
 }
+
+void Backend::pushLiveTheme() { m_editorBridge->applyTheme(m_publisher->currentCss()); }
 
 void Backend::forwardLiveChange(int position, int charsRemoved, int charsAdded) {
     if (m_loading) { m_liveMirrorValid = false; return; }

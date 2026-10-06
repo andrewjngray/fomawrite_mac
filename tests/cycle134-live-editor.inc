@@ -230,6 +230,29 @@ void FomawriteTest::liveEditorFollowsHostEdits() {
     page.backend.discardRecovery();
 }
 
+void FomawriteTest::liveEditorPlacesCursorAndRestylesWithoutReload() {
+    Cycle103SettingsSnapshot settings;
+    Cycle134Page page; QVERIFY2(page.create(), qPrintable(page.error));
+    QTRY_VERIFY_WITH_TIMEOUT(page.bridge()->isReady(), 15000);
+    const QString text = QString::fromUtf8("# One\n\ntwo three four\n\nfive\n");
+    page.editor->setProperty("text", text);
+    QSignalSpy cursor(page.bridge(), &EditorBridge::cursorMoved);
+    page.backend.syncLiveEditor(12);
+    QTRY_COMPARE_WITH_TIMEOUT(page.pageText(), text, 10000);
+    QTRY_VERIFY_WITH_TIMEOUT(page.bridge()->lastCursor() == 12, 5000);
+    QCOMPARE(page.backend.liveCursor(), 12);
+    // A theme change re-styles the page but must not reload the document.
+    QSignalSpy documents(page.bridge(), &EditorBridge::setDocument), themes(page.bridge(), &EditorBridge::setTheme);
+    QVERIFY(page.backend.selectPublishingTheme("claude-like"));
+    page.backend.pushLiveTheme();
+    QCOMPARE(documents.count(), 0);
+    // The pane re-styles on publishingCssChanged and the explicit push adds one more; never a reload.
+    QVERIFY(themes.count() >= 1);
+    QVERIFY(themes.first().at(0).toString().contains("#write"));
+    QCOMPARE(page.bridge()->lastCursor(), 12);
+    page.backend.discardRecovery();
+}
+
 void FomawriteTest::liveEditorRoundTripsPersistenceFixturesThroughThePage() {
     Cycle103SettingsSnapshot settings;
     QTemporaryDir directory; QVERIFY(directory.isValid());

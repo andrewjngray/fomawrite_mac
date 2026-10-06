@@ -124,6 +124,10 @@ async function main() {
     if (scrollTimer) clearTimeout(scrollTimer);
     scrollTimer = setTimeout(() => bridge.scrolled(scrollFraction()), 60);
   }, { passive: true });
+  onSignal(bridge.setCursor, guard("setCursor", (pos: number) => {
+    const at = Math.max(0, Math.min(view.state.doc.length, Math.floor(pos)));
+    view.dispatch({ selection: { anchor: at }, scrollIntoView: true });
+  }));
   onSignal(bridge.scrollToFraction, guard("scrollToFraction", (fraction: number) => {
     const el = view.scrollDOM;
     const range = el.scrollHeight - el.clientHeight;

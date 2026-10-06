@@ -19,6 +19,8 @@ Rectangle {
     property bool typewriter: false
     property bool focusMode: false
     property bool dark: false
+    // Caret to place when the pane becomes visible (carried over from Source).
+    property int cursorOnEnter: -1
     signal writingActivity()
     signal scrollFractionChanged(real fraction)
 
@@ -47,7 +49,7 @@ Rectangle {
         web.url = "qrc:/editor/index.html";
         // Created lazily when Live is switched on: push the document straight
         // away (the bridge replays it once the page connects).
-        if (visible) backend.syncLiveEditor();
+        if (visible) { backend.syncLiveEditor(root.cursorOnEnter); root.cursorOnEnter = -1; }
     }
 
     function focusLive() {
@@ -83,10 +85,12 @@ Rectangle {
         Accessible.name: "Live Markdown editor"
     }
 
-    onVisibleChanged: if (visible) backend.syncLiveEditor()
+    onVisibleChanged: if (visible) { backend.syncLiveEditor(root.cursorOnEnter); root.cursorOnEnter = -1; }
     Connections {
         target: backend
         function onDocumentLoaded() { if (root.visible) backend.syncLiveEditor(); }
+        function onPublishingCssChanged() { if (root.visible) backend.pushLiveTheme(); }
+        function onOutputStyleChanged() { if (root.visible) backend.pushLiveTheme(); }
     }
     Connections {
         target: root.bridge

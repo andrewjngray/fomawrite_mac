@@ -67,7 +67,11 @@ public:
     QObject *publisher() { return m_publisher.get(); }
     EditorBridge *editorBridge() { return m_editorBridge.get(); }
     // Push the current document, theme and appearance to the Live editor page.
-    Q_INVOKABLE void syncLiveEditor();
+    Q_INVOKABLE void syncLiveEditor(int cursor = -1);
+    // Re-style the Live editor after a theme change without reloading the document.
+    Q_INVOKABLE void pushLiveTheme();
+    // The Live editor's last caret position, for carrying it back to Source.
+    Q_INVOKABLE int liveCursor() const { return m_editorBridge->lastCursor(); }
     QUrl documentBaseUrl() const override;
 
     void setParentWindow(QWindow *window);
