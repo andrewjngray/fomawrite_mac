@@ -29,6 +29,7 @@
         <file>LiveEditorPane.qml</file>
         <file>editor/index.html</file>
         <file>editor/editor.css</file>
+        <file>editor/blocks.css</file>
         <file>editor/dist/editor.js</file>
         <file>NativeMenuBar.qml</file>
         <file>PublishingPreview.qml</file>
