@@ -60,6 +60,10 @@ private slots:
     void publishingSelectedThemeCssIsMemoizedUntilItChanges();
     void publishingThemeFolderIsNotRecreatedByRefresh();
     void publishingComponentWebModeCompletesAndReloadsSameUrl();
+    void perfThemeHeavyPreviewCost();
+    void perfPdfRenderProfileReuse();
+    void perfMapperScaling();
+    void perfImageDecodeCaching();
     void publishingPreviewCacheTracksAssetsAndConsumerLifetime();
     void manuscriptHeadingMarkersHangOutsideBodyColumn();
     void sourceCodeBackgroundAndAppearancePreserveSavedBytes();
@@ -5556,6 +5560,7 @@ private:
 #include "sourcevisualmapping-cycle99.inc"
 #include "cycle131-persistence.inc"
 #include "cycle132-publishing.inc"
+#include "perf-profile.inc"
 
 int main(int argc, char **argv) {
     QtWebEngineQuick::initialize();
