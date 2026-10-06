@@ -1,0 +1,111 @@
+/* Base styles for both editor modes. Typora-style themes (injected as <style id="fomawrite-theme">)
+   target #write and may override anything here. */
+
+:root {
+  --fw-fg: #24292f;
+  --fw-bg: #ffffff;
+  --fw-muted: #8c959f;
+  --fw-accent: #0969da;
+  --fw-code-bg: rgba(175, 184, 193, 0.2);
+  --fw-selection: rgba(9, 105, 218, 0.22);
+  --fw-quote-bar: #d0d7de;
+}
+:root.dark {
+  --fw-fg: #e6edf3;
+  --fw-bg: #1e1f22;
+  --fw-muted: #7d8590;
+  --fw-accent: #58a6ff;
+  --fw-code-bg: rgba(110, 118, 129, 0.3);
+  --fw-selection: rgba(88, 166, 255, 0.3);
+  --fw-quote-bar: #3d444d;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--fw-bg);
+  color: var(--fw-fg);
+  color-scheme: light;
+}
+html.dark, html.dark body { color-scheme: dark; }
+
+#write {
+  box-sizing: border-box;
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 48px 40px 40vh;
+  font-size: var(--fw-font-size, 16px);
+  line-height: var(--fw-line-height, 1.6);
+}
+
+#editor .cm-editor { background: transparent; color: inherit; }
+#editor .cm-editor.cm-focused { outline: none; }
+#editor .cm-scroller { font-family: inherit; line-height: inherit; overflow: visible; }
+#editor .cm-content { padding: 0; caret-color: var(--fw-fg); }
+#editor .cm-line { padding: 0; }
+#editor .cm-cursor, #editor .cm-dropCursor { border-left-color: var(--fw-fg); }
+#editor .cm-selectionBackground, #editor .cm-editor .cm-selectionBackground { background: var(--fw-selection) !important; }
+#editor .cm-panels { background: var(--fw-bg); color: var(--fw-fg); border-color: var(--fw-quote-bar); }
+
+/* ---------------------------------------------------------------- source mode (monospace) */
+#write.fw-mode-source .cm-content,
+#write:not(.fw-mode-live) .cm-content {
+  font-family: var(--fw-font, "iA Writer Mono S", Menlo, monospace);
+}
+.fw-heading { font-weight: 700; }
+.fw-emphasis { font-style: italic; }
+.fw-strong { font-weight: 700; }
+.fw-code { background: var(--fw-code-bg); border-radius: 3px; }
+.fw-link { color: var(--fw-accent); }
+.fw-quote { color: var(--fw-muted); }
+.fw-list-mark { color: var(--fw-accent); }
+.fw-mark { color: var(--fw-muted); }
+
+/* ---------------------------------------------------------------- live mode (proportional) */
+#write.fw-mode-live .cm-content {
+  font-family: var(--fw-live-font, Georgia, serif);
+}
+#write.fw-mode-live .fw-em { font-style: italic; }
+#write.fw-mode-live .fw-strong { font-weight: 700; }
+#write.fw-mode-live .fw-strike { text-decoration: line-through; }
+#write.fw-mode-live .fw-code {
+  font-family: var(--fw-code-font, Menlo, Consolas, monospace);
+  font-size: 0.9em;
+  background: var(--fw-code-bg);
+  border-radius: 3px;
+  padding: 0 0.2em;
+}
+#write.fw-mode-live .fw-live-link { color: var(--fw-accent); text-decoration: underline; text-underline-offset: 2px; }
+#write.fw-mode-live .fw-list-mark { color: var(--fw-muted); }
+/* Revealed markers: the node's source is visible, dim it slightly so it reads as editing chrome. */
+#write.fw-mode-live .fw-revealed { color: inherit; }
+#write.fw-mode-live .fw-revealed.fw-live-link { text-decoration: none; }
+
+#write.fw-mode-live .fw-h1,
+#write.fw-mode-live .fw-h2,
+#write.fw-mode-live .fw-h3,
+#write.fw-mode-live .fw-h4,
+#write.fw-mode-live .fw-h5,
+#write.fw-mode-live .fw-h6 { font-weight: 700; line-height: 1.25; padding-top: 0.6em; }
+#write.fw-mode-live .fw-h1 { font-size: 2em; }
+#write.fw-mode-live .fw-h2 { font-size: 1.6em; }
+#write.fw-mode-live .fw-h3 { font-size: 1.35em; }
+#write.fw-mode-live .fw-h4 { font-size: 1.15em; }
+#write.fw-mode-live .fw-h5 { font-size: 1em; }
+#write.fw-mode-live .fw-h6 { font-size: 0.9em; color: var(--fw-muted); }
+
+#write.fw-mode-live .fw-quote-line {
+  border-left: 3px solid var(--fw-quote-bar);
+  padding-left: 1em !important;
+  color: var(--fw-muted);
+}
+#write.fw-mode-live .fw-list-line { padding-left: 0.5em !important; }
+#write.fw-mode-live .fw-code-line {
+  font-family: var(--fw-code-font, Menlo, Consolas, monospace);
+  font-size: 0.9em;
+  background: var(--fw-code-bg);
+  padding: 0 0.75em !important;
+}
+
+/* ---------------------------------------------------------------- focus / typewriter */
+#write.fw-focus .fw-dim { opacity: 0.35; transition: opacity 0.15s; }

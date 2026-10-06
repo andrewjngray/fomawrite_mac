@@ -1,0 +1,31 @@
+{
+  "name": "fomawrite-editor",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "CodeMirror 6 Markdown editor bundle hosted by Fomawrite in a Qt WebEngineView",
+  "scripts": {
+    "build": "node esbuild.mjs",
+    "test": "node --import tsx --test test/*.test.mjs",
+    "dev": "node esbuild.mjs --serve",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@codemirror/commands": "^6.11.1",
+    "@codemirror/lang-markdown": "^6.5.2",
+    "@codemirror/language": "^6.12.4",
+    "@codemirror/search": "^6.7.2",
+    "@codemirror/state": "^6.7.6",
+    "@codemirror/view": "^6.43.13",
+    "@lezer/common": "^1.5.3",
+    "@lezer/highlight": "^1.2.5",
+    "@lezer/markdown": "^1.7.2",
+    "codemirror": "^6.0.2"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.4",
+    "esbuild": "^0.28.2",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2"
+  }
+}
