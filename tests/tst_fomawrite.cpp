@@ -55,7 +55,11 @@ private slots:
     void publishingComponentReplacementLoadsWithoutCaptureFrames();
     void publishingComponentSwitchRejectsStalePdfResults();
     void publishingComponentRapidSwitchModesAndHiddenRejectStaleResults();
-    void publishingComponentTimeoutClearsStalePagesAndRecovers();
+    void publishingComponentTimeoutKeepsLastOutputAndRecovers();
+    void publishingUnrelatedThemeFolderChurnKeepsPreviewsAlive();
+    void publishingSelectedThemeCssIsMemoizedUntilItChanges();
+    void publishingThemeFolderIsNotRecreatedByRefresh();
+    void publishingComponentWebModeCompletesAndReloadsSameUrl();
     void publishingPreviewCacheTracksAssetsAndConsumerLifetime();
     void manuscriptHeadingMarkersHangOutsideBodyColumn();
     void sourceCodeBackgroundAndAppearancePreserveSavedBytes();
@@ -5551,6 +5555,7 @@ private:
 #include "cycle99-integration.inc"
 #include "sourcevisualmapping-cycle99.inc"
 #include "cycle131-persistence.inc"
+#include "cycle132-publishing.inc"
 
 int main(int argc, char **argv) {
     QtWebEngineQuick::initialize();

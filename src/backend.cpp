@@ -540,7 +540,8 @@ Backend::Backend(QObject *parent, bool outputOnly) : QObject(parent), m_library(
     connect(this, &Backend::outputStyleChanged, this, invalidatePublishingSettings);
     connect(this, &Backend::outputPageLayoutChanged, this, invalidatePublishingSettings);
     connect(this, &Backend::outputCssChanged, this, invalidatePublishingSettings);
-    connect(this, &Backend::publishingThemesChanged, this, invalidatePublishingSettings);
+    // Catalog-only changes keep rendering; only CSS that reaches the output cancels it.
+    connect(this, &Backend::publishingCssChanged, this, invalidatePublishingSettings);
     connect(&m_library, &FileLibrary::rootFolderChanged, this, &Backend::fileUrlChanged);
     const QString stateDirectory = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
     QDir().mkpath(stateDirectory);
@@ -611,11 +612,9 @@ Backend::Backend(QObject *parent, bool outputOnly) : QObject(parent), m_library(
     });
     connect(&m_publishingThemeWatcher, &QFileSystemWatcher::directoryChanged, this, queueThemeRefresh);
     m_publishingThemeSnapshot = watchPublishingThemes();
-    if (!m_publishingThemeId.isEmpty()) {
-        QString error, advisory;
-        PublishingThemes::css(m_publishingThemeId, &error, &advisory);
-        m_publishingThemeError = error.isEmpty() ? advisory : error;
-    }
+    m_publishingCatalogSnapshot = QCryptographicHash::hash(
+        QJsonDocument::fromVariant(publishingThemes()).toJson(QJsonDocument::Compact), QCryptographicHash::Sha256);
+    updatePublishingCss();
     // New installations start with the composed writing palette; a stored
     // choice, including System, always takes precedence.
     const auto preset = QSettings().value("appearance/theme", "studio").toString();

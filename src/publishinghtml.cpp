@@ -4,6 +4,8 @@
 #include <QHash>
 #include <QBuffer>
 #include <QFile>
+#include <QFileInfo>
+#include <QDateTime>
 #include <QImageReader>
 #include <QRegularExpression>
 #include <QSet>
@@ -267,9 +269,11 @@ QString PublishingHtml::body(const QString &expandedMarkdown, QString *error) {
 }
 
 QString PublishingHtml::embedImages(QString html, const QUrl &baseUrl, bool preview,
-                                    QString *error, QString *warning) {
+                                    QString *error, QString *warning,
+                                    ImageCache *cache, QByteArray *assetSignature) {
     if (error) error->clear();
     if (warning) warning->clear();
+    QByteArray signature;
     // Only inspect renderer-produced image tags, never escaped raw HTML.
     const QRegularExpression images(QStringLiteral("<img\\b[^>]*>"), QRegularExpression::CaseInsensitiveOption);
     const QRegularExpression source(QStringLiteral("\\bsrc=\"([^\"]*)\""));
@@ -286,28 +290,47 @@ QString PublishingHtml::embedImages(QString html, const QUrl &baseUrl, bool prev
         const auto src = source.match(match.captured());
         if (!src.hasMatch()) continue;
         const auto asset = baseUrl.resolved(QUrl(entity(src.captured(1))));
-        QByteArray data, format;
-        QString reason;
+        QString reason, dataUrl;
+        qint64 size = 0;
         if (!asset.isLocalFile()) reason = QStringLiteral("remote images are unavailable");
         else {
-            QFile file(asset.toLocalFile());
-            if (!file.open(QIODevice::ReadOnly)) reason = QStringLiteral("local image could not be read");
-            else if (file.size() > individualLimit) reason = QStringLiteral("image exceeds 5 MiB");
-            else if (total + file.size() > totalLimit) reason = QStringLiteral("images exceed 20 MiB in total");
+            const QString path = asset.toLocalFile();
+            const QFileInfo info(path);
+            const qint64 statSize = info.exists() ? info.size() : -1;
+            const qint64 modified = info.exists() ? info.lastModified().toMSecsSinceEpoch() : -1;
+            signature += path.toUtf8() + '\0' + QByteArray::number(statSize) + '\0' + QByteArray::number(modified) + '\0';
+            ImageEntry entry;
+            const bool reusable = cache && modified >= 0 && cache->contains(path)
+                && cache->value(path).size == statSize && cache->value(path).modified == modified;
+            if (reusable) entry = cache->value(path);
             else {
-                data = file.read(individualLimit + 1);
-                if (file.error() != QFile::NoError) reason = QStringLiteral("local image could not be read");
-                else if (data.size() > individualLimit) reason = QStringLiteral("image exceeds 5 MiB");
-                else if (total + data.size() > totalLimit) reason = QStringLiteral("images exceed 20 MiB in total");
+                entry.size = statSize; entry.modified = modified;
+                QByteArray data, format;
+                QFile file(path);
+                if (!file.open(QIODevice::ReadOnly)) entry.reason = QStringLiteral("local image could not be read");
+                else if (file.size() > individualLimit) entry.reason = QStringLiteral("image exceeds 5 MiB");
                 else {
-                    QBuffer buffer(&data); buffer.open(QIODevice::ReadOnly);
-                    QImageReader reader(&buffer);
-                    format = reader.format();
-                    if (!QList<QByteArray>{"png", "jpeg", "gif", "webp"}.contains(format))
-                        reason = QStringLiteral("image must be PNG, JPEG, GIF or WebP");
-                    else if (reader.read().isNull()) reason = QStringLiteral("image is damaged or could not be decoded");
+                    data = file.read(individualLimit + 1);
+                    if (file.error() != QFile::NoError) entry.reason = QStringLiteral("local image could not be read");
+                    else if (data.size() > individualLimit) entry.reason = QStringLiteral("image exceeds 5 MiB");
+                    else {
+                        QBuffer buffer(&data); buffer.open(QIODevice::ReadOnly);
+                        QImageReader reader(&buffer);
+                        format = reader.format();
+                        if (!QList<QByteArray>{"png", "jpeg", "gif", "webp"}.contains(format))
+                            entry.reason = QStringLiteral("image must be PNG, JPEG, GIF or WebP");
+                        else if (reader.read().isNull()) entry.reason = QStringLiteral("image is damaged or could not be decoded");
+                        else entry.dataUrl = QStringLiteral("data:image/") + QString::fromLatin1(format)
+                            + QStringLiteral(";base64,") + QString::fromLatin1(data.toBase64());
+                    }
                 }
+                if (cache) { if (cache->size() >= 64) cache->clear(); cache->insert(path, entry); }
             }
+            reason = entry.reason;
+            size = qMax<qint64>(0, entry.size);
+            // The per-document total is not a property of one file; apply it per render.
+            if (reason.isEmpty() && total + size > totalLimit) reason = QStringLiteral("images exceed 20 MiB in total");
+            dataUrl = entry.dataUrl;
         }
         if (!reason.isEmpty()) {
             if (!preview) {
@@ -323,12 +346,12 @@ QString PublishingHtml::embedImages(QString html, const QUrl &baseUrl, bool prev
                     .arg(reason.toHtmlEscaped(), description.toHtmlEscaped())});
             continue;
         }
-        total += data.size();
-        replacements.append({match.capturedStart() + src.capturedStart(1), src.capturedLength(1),
-            QStringLiteral("data:image/") + QString::fromLatin1(format) + QStringLiteral(";base64,") + QString::fromLatin1(data.toBase64())});
+        total += size;
+        replacements.append({match.capturedStart() + src.capturedStart(1), src.capturedLength(1), dataUrl});
     }
     for (auto it = replacements.crbegin(); it != replacements.crend(); ++it)
         html.replace(it->start, it->length, it->value);
+    if (assetSignature) *assetSignature = signature;
     if (warning && unavailable)
         *warning = QStringLiteral("%1 image(s) unavailable in preview. Publishing requires readable local PNG/JPEG/GIF/WebP images (5 MiB each, 20 MiB total).")
             .arg(unavailable);

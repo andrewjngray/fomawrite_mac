@@ -84,8 +84,10 @@ bool Backend::selectPublishingTheme(const QString &id) {
         return false;
     }
     m_publishingThemeId = id;
-    m_publishingThemeError = advisory;
     QSettings().setValue("output/publishingTheme", id);
+    const bool cssChanged = updatePublishingCss();
+    m_publishingThemeError = advisory;
+    if (cssChanged) emit publishingCssChanged();
     emit publishingThemesChanged();
     setStatus(advisory.isEmpty() ? publishingThemeName() + " publishing theme selected." : advisory);
     return true;
@@ -107,74 +109,127 @@ bool Backend::importPublishingTheme(const QUrl &file) {
 }
 QByteArray Backend::watchPublishingThemes() {
     const QString folder = PublishingThemes::directory();
-    QStringList paths;
-    if (QDir(folder).exists() || QDir().mkpath(folder)) {
+    QStringList watches, entries;
+    if (QDir(folder).exists()) {
         const QString canonicalFolder = QDir(folder).canonicalPath();
-        paths.append(canonicalFolder);
-        QDirIterator entries(canonicalFolder, QDir::Files | QDir::Dirs | QDir::NoDotAndDotDot | QDir::NoSymLinks, QDirIterator::Subdirectories);
-        while (entries.hasNext() && paths.size() < 512) {
-            const QString path = entries.next();
-            if (QFileInfo(path).canonicalFilePath() == path) paths.append(path);
+        watches.append(canonicalFolder);
+        QDirIterator iterator(canonicalFolder, QDir::Files | QDir::Dirs | QDir::NoDotAndDotDot | QDir::NoSymLinks, QDirIterator::Subdirectories);
+        while (iterator.hasNext() && entries.size() < 4096) {
+            const QString path = iterator.next();
+            const QFileInfo info(path);
+            if (info.canonicalFilePath() != path) continue;
+            entries.append(path);
+            // Directories report additions, removals and atomic replacements
+            // of everything inside them. CSS is the only kind of file edited
+            // in place by hand; fonts and images change through their folder.
+            if (info.isDir() || path.endsWith(QLatin1String(".css"), Qt::CaseInsensitive)) watches.append(path);
         }
     } else {
+        // Never create the folder from a refresh: a user who moved it aside
+        // must not find an empty replacement. Watch the parent for its return.
         const QString parent = QFileInfo(folder).absolutePath();
-        if (QDir(parent).exists()) paths.append(parent);
+        if (QDir(parent).exists()) watches.append(parent);
     }
-    paths.sort();
+    // Sort before capping so the watched subset is stable between refreshes;
+    // an unstable subset would churn watches and replay notifications.
+    watches.sort(); entries.sort();
+    if (watches.size() > 512) {
+        qWarning("Fomawrite: watching 512 of %lld publishing theme entries", static_cast<long long>(watches.size()));
+        watches = watches.mid(0, 512);
+    }
     const QStringList watched = m_publishingThemeWatcher.files() + m_publishingThemeWatcher.directories();
     QStringList removed, added;
-    for (const QString &path : watched) if (!paths.contains(path)) removed.append(path);
-    for (const QString &path : paths) if (!watched.contains(path)) added.append(path);
+    for (const QString &path : watched) if (!watches.contains(path)) removed.append(path);
+    for (const QString &path : watches) if (!watched.contains(path)) added.append(path);
     // Re-registering the whole tree replays macOS filesystem notifications.
     // Keep unchanged watches; atomic saves still re-add dropped file watches.
     if (!removed.isEmpty()) m_publishingThemeWatcher.removePaths(removed);
     if (!added.isEmpty()) m_publishingThemeWatcher.addPaths(added);
 
     for (auto it = m_publishingThemeFileHashes.begin(); it != m_publishingThemeFileHashes.end();) {
-        if (!paths.contains(it.key())) it = m_publishingThemeFileHashes.erase(it);
+        if (!entries.contains(it.key())) it = m_publishingThemeFileHashes.erase(it);
         else ++it;
     }
     QCryptographicHash snapshot(QCryptographicHash::Sha256);
-    for (const QString &path : paths) {
+    for (const QString &path : entries) {
         const QFileInfo entry(path);
         snapshot.addData(path.toUtf8());
         snapshot.addData(QByteArray(1, '\0'));
-        // Directory timestamp/access notifications are not theme edits. Hash
-        // file contents, caching unchanged files so font trees are not re-read
-        // for each directory notification. File events invalidate this cache.
         if (entry.isFile()) {
             const QByteArray metadata = QByteArray::number(entry.size()) + ':'
                 + QByteArray::number(entry.lastModified().toMSecsSinceEpoch()) + ':'
                 + QByteArray::number(entry.birthTime().toMSecsSinceEpoch());
-            auto cached = m_publishingThemeFileHashes.constFind(path);
-            if (cached == m_publishingThemeFileHashes.cend() || cached->first != metadata) {
-                QCryptographicHash content(QCryptographicHash::Sha256);
-                QFile file(path);
-                // The CSS importer accepts at most 128 MiB per expanded file;
-                // unsupported oversized files need only discovery metadata.
-                const bool readable = entry.size() <= 128 * 1024 * 1024
-                    && file.open(QIODevice::ReadOnly) && content.addData(&file);
-                m_publishingThemeFileHashes.insert(path, {metadata, readable ? content.result() : metadata});
+            // CSS content is hashed (cached by metadata, invalidated by file
+            // events) so same-size preserved-mtime edits are still noticed.
+            // Fonts and images are identified by metadata alone.
+            if (path.endsWith(QLatin1String(".css"), Qt::CaseInsensitive)) {
+                auto cached = m_publishingThemeFileHashes.constFind(path);
+                if (cached == m_publishingThemeFileHashes.cend() || cached->first != metadata) {
+                    QCryptographicHash content(QCryptographicHash::Sha256);
+                    QFile file(path);
+                    const bool readable = entry.size() <= 128 * 1024 * 1024
+                        && file.open(QIODevice::ReadOnly) && content.addData(&file);
+                    m_publishingThemeFileHashes.insert(path, {metadata, readable ? content.result() : metadata});
+                }
+                snapshot.addData(m_publishingThemeFileHashes.value(path).second);
+            } else {
+                snapshot.addData(metadata);
             }
-            snapshot.addData(m_publishingThemeFileHashes.value(path).second);
         }
         snapshot.addData(QByteArray(1, '\0'));
     }
     return snapshot.result();
 }
+// Recomputes the selected theme's CSS from the current folder state, memoizes
+// it for publishingHtml(), updates the theme error and reports whether the
+// output-affecting CSS (or its error) changed since the previous computation.
+bool Backend::updatePublishingCss() {
+    QString error, advisory, css;
+    if (!m_publishingThemeId.isEmpty()) {
+        if (auto selected = PublishingThemes::css(m_publishingThemeId, &error, &advisory)) css = *selected;
+    }
+    m_publishingCssMemo = {m_publishingThemeId, m_publishingThemeSnapshot, css,
+                           QCryptographicHash::hash(css.toUtf8(), QCryptographicHash::Sha256), error, error.isEmpty()};
+    m_publishingThemeError = error.isEmpty() ? advisory : error;
+    QCryptographicHash state(QCryptographicHash::Sha256);
+    state.addData(m_publishingThemeId.toUtf8()); state.addData(QByteArray(1, '\0'));
+    state.addData(m_publishingCssMemo.hash); state.addData(QByteArray(1, '\0'));
+    state.addData(error.toUtf8());
+    const QByteArray snapshot = state.result();
+    const bool changed = snapshot != m_publishingCssSnapshot;
+    m_publishingCssSnapshot = snapshot;
+    return changed;
+}
+std::optional<QString> Backend::selectedPublishingCss(QString *error, QByteArray *hash) const {
+    if (m_publishingThemeId.isEmpty()) { if (hash) hash->clear(); return QString(); }
+    auto &memo = m_publishingCssMemo;
+    if (!memo.valid || memo.themeId != m_publishingThemeId || memo.snapshot != m_publishingThemeSnapshot) {
+        QString failure;
+        const auto selected = PublishingThemes::css(m_publishingThemeId, &failure);
+        const QString css = selected.value_or(QString());
+        memo = {m_publishingThemeId, m_publishingThemeSnapshot, css,
+                QCryptographicHash::hash(css.toUtf8(), QCryptographicHash::Sha256), failure, selected.has_value()};
+    }
+    if (!memo.valid) { if (error) *error = memo.error; return std::nullopt; }
+    if (hash) *hash = memo.hash;
+    return memo.css;
+}
 void Backend::refreshPublishingThemes(bool force) {
     const QByteArray snapshot = watchPublishingThemes();
     if (!force && snapshot == m_publishingThemeSnapshot) return;
     m_publishingThemeSnapshot = snapshot;
-    if (!m_publishingThemeId.isEmpty()) {
-        QString error, advisory;
-        PublishingThemes::css(m_publishingThemeId, &error, &advisory);
-        m_publishingThemeError = error.isEmpty() ? advisory : error;
-        if (!m_publishingThemeError.isEmpty()) setStatus(m_publishingThemeError);
-    }
-    // Preview consumers already listen to this signal, so selected CSS and
-    // imported resources are rendered again without changing document state.
-    emit publishingThemesChanged();
+    const QByteArray catalog = QCryptographicHash::hash(
+        QJsonDocument::fromVariant(publishingThemes()).toJson(QJsonDocument::Compact), QCryptographicHash::Sha256);
+    const bool catalogChanged = catalog != m_publishingCatalogSnapshot;
+    m_publishingCatalogSnapshot = catalog;
+    const bool cssChanged = updatePublishingCss();
+    if ((cssChanged || force) && !m_publishingThemeError.isEmpty()) setStatus(m_publishingThemeError);
+    // Finder metadata, editor swap files and edits to an unselected theme
+    // change the folder but not the published CSS: they must neither cancel
+    // in-flight renders nor restart the preview debounce. Only output-affecting
+    // changes (or an explicit Reload) reach the preview consumers.
+    if (cssChanged || force) emit publishingCssChanged();
+    if (catalogChanged || cssChanged || force) emit publishingThemesChanged();
 }
 void Backend::reloadPublishingThemes() {
     refreshPublishingThemes(true);
@@ -216,12 +271,13 @@ QString Backend::publishingPrintCss() const {
 )CSS").arg(size.width()).arg(size.height()).arg(margins.top()).arg(margins.right()).arg(margins.bottom()).arg(margins.left()).arg(header, footer);
 }
 
-QString Backend::publishingHtml(QString *error, bool preview, QString *warning) const {
+QString Backend::publishingHtml(QString *error, bool preview, QString *warning, QByteArray *fingerprint) const {
     QString body = PublishingHtml::body(previewMarkdown(currentDocumentText()), error);
     if (error && !error->isEmpty()) return {};
     QString css;
+    QByteArray cssHash;
     if (!m_publishingThemeId.isEmpty()) {
-        auto selected = PublishingThemes::css(m_publishingThemeId, error);
+        auto selected = selectedPublishingCss(error, &cssHash);
         if (!selected) return {};
         css = *selected;
     } else {
@@ -243,23 +299,43 @@ a { color: #245da8; } hr { border: 0; border-top: 1px solid #d0d7de; margin: 1.5
 )CSS").arg(outputPointSize()).arg(cssString(outputFont())).arg(m_outputStyle == 2 || m_outputStyle == 7 ? "2" : "1.5");
         css.replace("100%%", "100%");
         if (m_outputStyle == 7) css += "#write > p { text-indent: 3em; } h1 { text-align: center; font-size: 1em; font-weight: normal; }";
+        cssHash = QCryptographicHash::hash(css.toUtf8(), QCryptographicHash::Sha256);
     }
     const QString foundations = "body { margin: 0; } img { max-width: 100%; height: auto; } .highlight { background: #fff2a8; } .pagebreak { height: 0; } .fomawrite-title-page { display: none; }";
+    QString customCss;
     if (!m_outputCssFile.isEmpty()) {
         const auto custom = OutputCss::load(m_outputCssFile, error);
         if (!custom) return {};
-        css += '\n' + *custom;
+        customCss = *custom;
+        css += '\n' + customCss;
     }
     const QString styleAttribute = m_outputCssFile.isEmpty() ? QString() : " data-fomawrite-user-style";
     QString titlePage;
     if (m_outputStyle == 3 && m_outputTitlePage)
         titlePage = "<section class=\"fomawrite-title-page\"><h1>" + fileName().toHtmlEscaped() + "</h1></section>";
     // A restrictive content policy also protects exported HTML opened elsewhere.
+    const QString printCss = publishingPrintCss();
     QString html = "<!doctype html><html><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">"
         "<meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'none'; style-src 'unsafe-inline'; img-src data:; font-src data:; base-uri 'self'; form-action 'none'\">"
-        "<title>" + fileName().toHtmlEscaped() + "</title><style" + styleAttribute + ">" + foundations + '\n' + css + publishingPrintCss()
+        "<title>" + fileName().toHtmlEscaped() + "</title><style" + styleAttribute + ">" + foundations + '\n' + css + printCss
         + "</style></head><body>" + titlePage + "<article id=\"write\">" + body + "</article></body></html>";
-    return PublishingHtml::embedImages(html, documentBaseUrl(), preview, error, warning);
+    QByteArray assets;
+    html = PublishingHtml::embedImages(html, documentBaseUrl(), preview, error, warning, &m_publishingImageCache, &assets);
+    if (fingerprint) {
+        // Identify this output without hashing megabytes of embedded fonts and
+        // images: every input that can change the document is hashed or
+        // stat-signed instead, so a cache lookup costs the same for a theme
+        // with 30 MB of fonts as for the basic style.
+        QCryptographicHash identity(QCryptographicHash::Sha256);
+        for (const QByteArray &part : {body.toUtf8(), cssHash, customCss.toUtf8(), printCss.toUtf8(), titlePage.toUtf8(),
+                                       styleAttribute.toUtf8(), fileName().toUtf8(), assets,
+                                       warning ? warning->toUtf8() : QByteArray(), QByteArray(preview ? "preview" : "export")}) {
+            identity.addData(part);
+            identity.addData(QByteArray(1, '\0'));
+        }
+        *fingerprint = identity.result();
+    }
+    return html;
 }
 QString Backend::outputHtml(QTextDocument &, QString *error) const { return publishingHtml(error); }
 QByteArray Backend::publishingPdfBytes(const QString &html, QString *error) const {
@@ -345,20 +421,22 @@ QVariantMap Backend::requestPublishingPreview(const QString &format, QObject *co
         return identified({{"ok", false}, {"error", "Publishing preview is unavailable."}});
     }
     QString error, warning;
-    QString html = publishingHtml(&error, true, &warning);
+    QByteArray fingerprint;
+    QString html = publishingHtml(&error, true, &warning, &fingerprint);
     if (!error.isEmpty()) {
         cancelPublishingPreview(consumer);
         return identified({{"ok", false}, {"error", error}});
     }
     const QUrl baseUrl = documentBaseUrl();
     // Bind cached output to the canonical source and document lifetime, even
-    // when two sources produce identical HTML. Embedded bytes track assets.
+    // when two sources produce identical HTML. The fingerprint tracks the
+    // theme CSS, settings and image assets without hashing the embedded bytes.
     const QByteArray key = QCryptographicHash::hash(
         (format + QChar::Null + documentIdentity + QChar::Null
          + documentUrl.toString(QUrl::FullyEncoded) + QChar::Null
          + QString::fromLatin1(sourceHash.toHex()) + QChar::Null
          + baseUrl.toString(QUrl::FullyEncoded) + QChar::Null
-         + warning + QChar::Null + html).toUtf8(), QCryptographicHash::Sha256);
+         + warning + QChar::Null + QString::fromLatin1(fingerprint.toHex())).toUtf8(), QCryptographicHash::Sha256);
     identity.insert("renderKey", QString::fromLatin1(key.toHex()));
     const auto cached = m_publishingPreviewCache.constFind(consumer);
     if (cached != m_publishingPreviewCache.cend() && cached->key == key

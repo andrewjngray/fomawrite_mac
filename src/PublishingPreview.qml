@@ -184,7 +184,10 @@ Rectangle {
     }
     function failRefresh(message) {
         cancelRequest();
-        clearOutput();
+        // Keep the last readable output that belongs to this document behind
+        // the notice: a timeout or transient failure must not blank the pane.
+        // Output from another document is never kept.
+        if (appliedDocumentIdentity !== documentIdentity || String(outputUrl) === "") clearOutput();
         errorText = message;
     }
     function finishRefresh() {
@@ -237,8 +240,16 @@ Rectangle {
         appliedDocumentIdentity = documentIdentity;
         pdfAnchors = result.anchors || ({});
         outputUrl = result.url;
-        if (publishingMode === "web") webOutputUrl = result.url;
-        else {
+        if (publishingMode === "web") {
+            var sameUrl = String(webOutputUrl) === String(result.url);
+            webOutputUrl = result.url;
+            // Re-assigning an unchanged URL navigates nowhere, so no load
+            // callback would ever complete this refresh. Force the load.
+            if (sameUrl) {
+                if (String(web.url) === String(result.url)) web.reload();
+                else web.url = result.url;
+            }
+        } else {
             pdfPagesReady = false;
             // Destroy old page delegates before changing their document.
             var revision = refreshRevision, identity = documentIdentity;
@@ -259,6 +270,7 @@ Rectangle {
         if (appliedDocumentIdentity !== documentIdentity) clearOutput();
         refreshTimer.restart();
     }
+    onWebOutputUrlChanged: web.url = webOutputUrl
     onDocumentIdentityChanged: { clearOutput(); reload(); }
     onMarkdownChanged: reload()
     onDocumentBaseUrlChanged: reload()
@@ -270,13 +282,15 @@ Rectangle {
     Component.onCompleted: reload()
     Timer { id: userScrollExpiry; interval: 350; onTriggered: root.webUserScrolling = false }
     Timer { id: refreshTimer; interval: 220; onTriggered: root.refresh() }
-    Timer { id: refreshDeadline; objectName: "publishingRefreshDeadline"; interval: 30000; onTriggered: root.failRefresh("Preview loading timed out. Use Reload Preview to try again.") }
+    // Longer than the renderer's own 30 s limit, so its precise error wins.
+    Timer { id: refreshDeadline; objectName: "publishingRefreshDeadline"; interval: 35000; onTriggered: root.failRefresh("Preview loading timed out. Use Reload Preview to try again.") }
     Connections {
         target: root.renderer
         function onOutputStyleChanged() { root.reload(); }
         function onOutputPageLayoutChanged() { root.reload(); }
         function onOutputCssChanged() { root.reload(); }
-        function onPublishingThemesChanged() { root.reload(); }
+        // Catalog changes only update menus; CSS that reaches the output re-renders.
+        function onPublishingCssChanged() { root.reload(); }
         function onPublishingPreviewReady(requestId, result) {
             if (requestId !== root.pendingRequest || root.publishingMode !== "pdf") return;
             root.pendingRequest = -1;
@@ -388,11 +402,11 @@ Rectangle {
         anchors.fill: parent
         anchors.bottomMargin: root.bottomInset
         visible: root.publishingMode === "web" && String(root.webOutputUrl) !== ""
-        url: root.webOutputUrl
         zoomFactor: root.zoom
         backgroundColor: "white"
         settings.javascriptEnabled: false
-        settings.localContentCanAccessFileUrls: true
+        // Every asset is embedded as a data: URL; the page needs no file access.
+        settings.localContentCanAccessFileUrls: false
         settings.localContentCanAccessRemoteUrls: false
         settings.pluginsEnabled: false
         onNavigationRequested: function(request) {
@@ -415,8 +429,17 @@ Rectangle {
         onContextMenuRequested: function(request) { request.accepted = true; }
         onLoadingChanged: function(info) {
             if (root.appliedRevision !== root.refreshRevision || root.publishingMode !== "web" || String(info.url) !== String(root.outputUrl)) return;
-            if (info.status === WebEngineView.LoadSucceededStatus) root.webViewportCommand("", false, root.finishRefresh);
+            if (info.status === WebEngineView.LoadSucceededStatus) {
+                // Complete the refresh directly; the viewport script only
+                // restores metrics and may legitimately return nothing.
+                root.finishRefresh();
+                root.webViewportCommand("", false);
+            }
             else if (info.status === WebEngineView.LoadFailedStatus) root.failRefresh(info.errorString);
+        }
+        onRenderProcessTerminated: function(terminationStatus, exitCode) {
+            root.failRefresh("The web preview stopped unexpectedly. Reloading…");
+            root.reload();
         }
         onScrollPositionChanged: if (!root.previewRefreshInFlight && root.publishingMode === "web") root.webViewportCommand("", true)
         onContentsSizeChanged: if (!root.previewRefreshInFlight && root.publishingMode === "web") root.webViewportCommand("", false)

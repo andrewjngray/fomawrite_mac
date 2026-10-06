@@ -74,13 +74,13 @@ struct Request {
     QPageLayout layout;
 };
 
-// Each job owns a fresh off-record profile, so cancelled loads cannot leak
-// storage, resources or state into later output. Destruction order matters:
-// page before profile, and both before removing the private HTML directory.
+// Each job owns its page and private HTML directory; the off-the-record
+// profile (no cache, no cookies, no storage) is shared across jobs so every
+// render does not create a new browser context. Destruction order matters:
+// page before the private HTML directory, and all pages before the profile.
 struct Job final : QObject {
     explicit Job(QObject *parent) : QObject(parent) {}
     QTemporaryDir directory;
-    std::unique_ptr<QWebEngineProfile> profile;
     std::unique_ptr<PdfPage> page;
     QTimer timeout;
     Request request;
@@ -113,6 +113,7 @@ struct PublishingPdf::Private {
     std::optional<Request> pending;
     Job *job = nullptr;
     quint64 generation = 0;
+    std::unique_ptr<QWebEngineProfile> profile; // destroyed after the jobs (d outlives the destructor body)
 };
 
 PublishingPdf::PublishingPdf(QObject *parent) : QObject(parent), d(std::make_unique<Private>()) {}
@@ -173,13 +174,15 @@ void PublishingPdf::startPending()
     }
     file.close();
     const QUrl documentUrl = QUrl::fromLocalFile(path);
-    job->profile = std::make_unique<QWebEngineProfile>();
-    job->profile->setHttpCacheType(QWebEngineProfile::NoCache);
-    job->profile->setPersistentCookiesPolicy(QWebEngineProfile::NoPersistentCookies);
-    job->profile->setPersistentPermissionsPolicy(QWebEngineProfile::PersistentPermissionsPolicy::AskEveryTime);
-    connect(job->profile.get(), &QWebEngineProfile::downloadRequested, this,
-            [](QWebEngineDownloadRequest *download) { download->cancel(); });
-    job->page = std::make_unique<PdfPage>(job->profile.get(), documentUrl);
+    if (!d->profile) {
+        d->profile = std::make_unique<QWebEngineProfile>();
+        d->profile->setHttpCacheType(QWebEngineProfile::NoCache);
+        d->profile->setPersistentCookiesPolicy(QWebEngineProfile::NoPersistentCookies);
+        d->profile->setPersistentPermissionsPolicy(QWebEngineProfile::PersistentPermissionsPolicy::AskEveryTime);
+        connect(d->profile.get(), &QWebEngineProfile::downloadRequested, this,
+                [](QWebEngineDownloadRequest *download) { download->cancel(); });
+    }
+    job->page = std::make_unique<PdfPage>(d->profile.get(), documentUrl);
     job->page->setUrlRequestInterceptor(new OfflineResources(documentUrl, job->page.get()));
     auto *settings = job->page->settings();
     settings->setAttribute(QWebEngineSettings::JavascriptEnabled, false);

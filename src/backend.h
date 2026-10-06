@@ -13,7 +13,9 @@
 #include <QJsonObject>
 #include <memory>
 #include <functional>
+#include <optional>
 #include "filelibrary.h"
+#include "publishinghtml.h"
 
 class MarkdownHighlighter;
 class VisualTextHighlighter;
@@ -261,6 +263,10 @@ signals:
     void outputPageLayoutChanged();
     void outputCssChanged();
     void publishingThemesChanged();
+    // Emitted only when the CSS that reaches published output (the selected
+    // theme's sanitized stylesheet, or its error) actually changed. Catalog
+    // changes and unrelated files in the themes folder do not emit it.
+    void publishingCssChanged();
     void publishingPreviewReady(quint64 requestId, const QVariantMap &result);
     void publishingDocumentIdentityChanged();
     void themePresetChanged();
@@ -288,7 +294,8 @@ private:
     QString outputHtml(QTextDocument &document, QString *error) const;
     QByteArray publishingPdfBytes(const QString &html, QString *error) const;
     QVariantMap storePublishingOutput(quint64 generation, const QString &format, const QByteArray &bytes, const QString &html = {});
-    QString publishingHtml(QString *error, bool preview = false, QString *warning = nullptr) const;
+    QString publishingHtml(QString *error, bool preview = false, QString *warning = nullptr,
+                           QByteArray *fingerprint = nullptr) const;
     QString publishingPrintCss() const;
     QString m_publishingThemeId;
     QString m_publishingThemeError;
@@ -298,6 +305,15 @@ private:
     QHash<QString, QPair<QByteArray, QByteArray>> m_publishingThemeFileHashes;
     QByteArray watchPublishingThemes();
     void refreshPublishingThemes(bool force = false);
+    bool updatePublishingCss();
+    std::optional<QString> selectedPublishingCss(QString *error, QByteArray *hash = nullptr) const;
+    // The selected theme's sanitized CSS (fonts and images embedded) is
+    // computed once per theme-folder state, not on every preview request.
+    struct PublishingCssMemo { QString themeId; QByteArray snapshot; QString css; QByteArray hash; QString error; bool valid = false; };
+    mutable PublishingCssMemo m_publishingCssMemo;
+    QByteArray m_publishingCssSnapshot;
+    QByteArray m_publishingCatalogSnapshot;
+    mutable PublishingHtml::ImageCache m_publishingImageCache;
     void invalidatePublishingDocument();
     quint64 m_publishingDocumentGeneration = 0;
     quint64 m_publishingSettingsGeneration = 0;

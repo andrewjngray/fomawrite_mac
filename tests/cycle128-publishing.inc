@@ -51,6 +51,7 @@ Item {
         signal outputPageLayoutChanged()
         signal outputCssChanged()
         signal publishingThemesChanged()
+        signal publishingCssChanged()
         signal publishingPreviewReady(double requestId, var result)
         function requestPublishingPreview(format, consumer, requestIdentity) {
             ++requests; lastFormat = format;
@@ -256,7 +257,7 @@ void FomawriteTest::publishingComponentRapidSwitchModesAndHiddenRejectStaleResul
     QCOMPARE(fixture.preview()->property("displayedDocumentIdentity").toString(), QString("untitled:3"));
 }
 
-void FomawriteTest::publishingComponentTimeoutClearsStalePagesAndRecovers() {
+void FomawriteTest::publishingComponentTimeoutKeepsLastOutputAndRecovers() {
     QTemporaryDir directory; QVERIFY(directory.isValid());
     const auto first = QUrl::fromLocalFile(directory.filePath("first.pdf"));
     const auto abandoned = QUrl::fromLocalFile(directory.filePath("abandoned.pdf"));
@@ -274,20 +275,29 @@ void FomawriteTest::publishingComponentTimeoutClearsStalePagesAndRecovers() {
     QTRY_COMPARE_WITH_TIMEOUT(fixture.preview()->property("pendingRequest").toInt(), 301, 2000);
     QTRY_VERIFY_WITH_TIMEOUT(!fixture.preview()->property("errorText").toString().isEmpty(), 2000);
     QVERIFY(!fixture.preview()->property("viewportRefreshPending").toBool());
-    QTRY_VERIFY_WITH_TIMEOUT(fixture.blankDisplayed(), 1000);
-    QVERIFY(fixture.complete(301, cycle128PdfResult(first)));
-    QVERIFY(fixture.blankDisplayed());
+    // Cycle132: the readable render of this document stays on screen behind
+    // the notice. A slow or failed refresh must not blank a good preview.
+    QCOMPARE(fixture.pdfSource(), first);
+    QVERIFY(fixture.preview()->property("pdfPagesReady").toBool());
+    QVERIFY(fixture.visiblePdfPages() > 0);
+    QCOMPARE(fixture.preview()->property("displayedDocumentIdentity").toString(), QString("untitled:1"));
+    // The late result for the timed-out request is still rejected.
+    QVERIFY(fixture.complete(301, cycle128PdfResult(abandoned)));
+    QTest::qWait(250);
+    QCOMPARE(fixture.pdfSource(), first);
     QVERIFY(!fixture.preview()->property("errorText").toString().isEmpty());
-    QVERIFY(deadline->setProperty("interval", 30000));
-    // Retry returns the same cache URL. Qt retained that PDF resource while
-    // the error removed its pages, so there will be no new Ready transition.
+    QVERIFY(deadline->setProperty("interval", 35000));
+    // Retry returns the same cache URL; the notice clears and pages remain.
     fixture.root->setProperty("response", cycle128PdfResult(first));
     QVERIFY(QMetaObject::invokeMethod(fixture.preview(), "reload"));
     QTRY_VERIFY_WITH_TIMEOUT(fixture.ready(first), 3000);
     QTRY_VERIFY_WITH_TIMEOUT(fixture.visiblePdfPages() > 0, 2000);
     QVERIFY(fixture.preview()->property("errorText").toString().isEmpty());
     QCOMPARE(fixture.preview()->property("displayedDocumentIdentity").toString(), QString("untitled:1"));
-    QVERIFY(fixture.complete(301, cycle128PdfResult(abandoned)));
-    QTest::qWait(250);
-    QCOMPARE(fixture.pdfSource(), first);
+    // Output from another document is never kept behind a failure.
+    QVERIFY(deadline->setProperty("interval", 250));
+    fixture.root->setProperty("response", cycle128PendingResult(302));
+    fixture.document("untitled:2", "# Other document");
+    QTRY_VERIFY_WITH_TIMEOUT(!fixture.preview()->property("errorText").toString().isEmpty(), 2000);
+    QTRY_VERIFY_WITH_TIMEOUT(fixture.blankDisplayed(), 1000);
 }
