@@ -125,6 +125,10 @@ private slots:
     void visualInlineCodePreservesDelimitersAndUnicode();
     void visualListsContinueAndExitWithoutLosingMarkers();
     void visualEmptyParagraphsAndStructuralEditsStaySafe();
+    void mapperFuzzProjectionInvariantsHold();
+    void mapperFuzzVisualEditsNeverCorruptSource();
+    void mapperBreakCursorAfterZeroWidthSpaceSplitsGrapheme();
+    void mapperParagraphBreakBeforeQuoteMarkerLeavesCursorUneditable();
     void navigationFragmentsKeepSnapshotsAndReportMissing();
     void explicitDocumentViewsPreserveFragments();
     void visualObjectsKeepMarkdownUndoAndLocalImages();
@@ -5556,6 +5560,7 @@ private:
 #include "sourcevisualmapping-cycle99.inc"
 #include "cycle131-persistence.inc"
 #include "cycle132-publishing.inc"
+#include "mapper-fuzz.inc"
 
 int main(int argc, char **argv) {
     QtWebEngineQuick::initialize();
