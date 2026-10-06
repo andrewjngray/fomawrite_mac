@@ -1,6 +1,17 @@
 /* Base styles for both editor modes. Typora-style themes (injected as <style id="fomawrite-theme">)
    target #write and may override anything here. */
 
+/* Bundled iA Writer Mono S (src/resources.qrc: qrc:/fonts/iAWriterMonoS-*.ttf). Outside Qt (dev server) the
+   qrc: URL fails to load and the stack falls back to Menlo. */
+@font-face { font-family: "iA Writer Mono S"; font-style: normal; font-weight: 400;
+  src: url("qrc:/fonts/iAWriterMonoS-Regular.ttf") format("truetype"), local("iA Writer Mono S"); }
+@font-face { font-family: "iA Writer Mono S"; font-style: italic; font-weight: 400;
+  src: url("qrc:/fonts/iAWriterMonoS-Italic.ttf") format("truetype"), local("iA Writer Mono S Italic"); }
+@font-face { font-family: "iA Writer Mono S"; font-style: normal; font-weight: 700;
+  src: url("qrc:/fonts/iAWriterMonoS-Bold.ttf") format("truetype"), local("iA Writer Mono S Bold"); }
+@font-face { font-family: "iA Writer Mono S"; font-style: italic; font-weight: 700;
+  src: url("qrc:/fonts/iAWriterMonoS-BoldItalic.ttf") format("truetype"), local("iA Writer Mono S Bold Italic"); }
+
 :root {
   --fw-fg: #24292f;
   --fw-bg: #ffffff;
@@ -9,6 +20,9 @@
   --fw-code-bg: rgba(175, 184, 193, 0.2);
   --fw-selection: rgba(9, 105, 218, 0.22);
   --fw-quote-bar: #d0d7de;
+  --fw-guide: rgba(140, 149, 159, 0.35);
+  --fw-linenum: #8c959f;
+  --fw-dim-opacity: 0.38;
 }
 :root.dark {
   --fw-fg: #e6edf3;
@@ -18,6 +32,9 @@
   --fw-code-bg: rgba(110, 118, 129, 0.3);
   --fw-selection: rgba(88, 166, 255, 0.3);
   --fw-quote-bar: #3d444d;
+  --fw-guide: rgba(125, 133, 144, 0.4);
+  --fw-linenum: #7d8590;
+  --fw-dim-opacity: 0.32;
 }
 
 html, body {
@@ -108,4 +125,105 @@ html.dark, html.dark body { color-scheme: dark; }
 }
 
 /* ---------------------------------------------------------------- focus / typewriter */
-#write.fw-focus .fw-dim { opacity: 0.35; transition: opacity 0.15s; }
+
+#write.fw-focus .fw-dim { opacity: var(--fw-dim-opacity); transition: opacity 0.15s; }
+/* Top/bottom room so the first/last line can reach the vertical centre. */
+#write.fw-typewriter { padding-top: 50vh; padding-bottom: 50vh; }
+
+/* ================================================================ writing appearances (source mode)
+   Class `fw-appearance-<name>` is set on #write by appearance.ts. Qt's fontFamily/fontSize/lineHeight
+   (--fw-font, --fw-font-size, --fw-line-height) win over these defaults when sent. Live mode keeps its own
+   styling: every rule below is scoped with :not(.fw-mode-live). */
+:root {
+  --fw-font-mono: "iA Writer Mono S", Menlo, monospace;
+  --fw-font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --fw-font-serif: Georgia, "Times New Roman", serif;
+  --fw-font-code: Menlo, Monaco, "Courier New", monospace;
+}
+
+/* ---- Manuscript: iA Writer Mono, 18px / 1.6, 680px column, markers hang in a 4ch left gutter. */
+#write.fw-appearance-manuscript:not(.fw-mode-live) {
+  --fw-gutter: 4;
+  font-family: var(--fw-font, var(--fw-font-mono));
+  font-size: var(--fw-font-size, 18px);
+  line-height: var(--fw-line-height, 1.6);
+  max-width: calc(760px + var(--fw-gutter) * 1ch); /* 680px body column + 2x40px padding + gutter */
+}
+#write.fw-appearance-manuscript:not(.fw-mode-live) .cm-content {
+  font-family: var(--fw-font, var(--fw-font-mono));
+  padding-left: calc(var(--fw-gutter) * 1ch);
+}
+/* A marker line: body text stays on the column (padding = nesting indent), the first line is pulled back
+   by the whole prefix so the marker sits in the gutter; wrapped lines align with the body. */
+#write.fw-appearance-manuscript:not(.fw-mode-live) .cm-line.fw-hang {
+  padding-left: calc(var(--fw-lead, 0) * 1ch);
+  text-indent: calc(var(--fw-hang, 0) * -1ch);
+}
+#write.fw-appearance-manuscript:not(.fw-mode-live) .fw-mark,
+#write.fw-appearance-manuscript:not(.fw-mode-live) .fw-list-mark { color: var(--fw-muted); }
+
+/* ---- Editorial: system sans, 19px / 1.6. */
+#write.fw-appearance-editorial:not(.fw-mode-live) {
+  font-family: var(--fw-font, var(--fw-font-sans));
+  font-size: var(--fw-font-size, 19px);
+  line-height: var(--fw-line-height, 1.6);
+}
+#write.fw-appearance-editorial:not(.fw-mode-live) .cm-content { font-family: var(--fw-font, var(--fw-font-sans)); }
+
+/* ---- Book: Georgia, 20px / 1.65. */
+#write.fw-appearance-book:not(.fw-mode-live) {
+  font-family: var(--fw-font, var(--fw-font-serif));
+  font-size: var(--fw-font-size, 20px);
+  line-height: var(--fw-line-height, 1.65);
+}
+#write.fw-appearance-book:not(.fw-mode-live) .cm-content { font-family: var(--fw-font, var(--fw-font-serif)); }
+
+/* Proportional appearances: inline/fenced code stays monospace. */
+#write.fw-appearance-editorial:not(.fw-mode-live) .fw-code,
+#write.fw-appearance-book:not(.fw-mode-live) .fw-code {
+  font-family: var(--fw-font-code);
+  font-size: 0.9em;
+}
+
+/* ---- Code: Menlo 15px / 1.5, full width, no wrapping (horizontal scroll), line numbers, indent guides. */
+#write.fw-appearance-code:not(.fw-mode-live) {
+  --fw-indent: 4;
+  max-width: none;
+  padding-left: 56px;
+  padding-right: 56px;
+  font-family: var(--fw-font, var(--fw-font-code));
+  font-size: var(--fw-font-size, 15px);
+  line-height: var(--fw-line-height, 1.5);
+}
+#write.fw-appearance-code:not(.fw-mode-live) .cm-content {
+  font-family: var(--fw-font, var(--fw-font-code));
+  tab-size: 4;
+}
+#write.fw-appearance-code:not(.fw-mode-live) .cm-scroller { overflow-x: auto; overflow-y: hidden; }
+#write.fw-appearance-code:not(.fw-mode-live) .cm-gutters {
+  background: transparent;
+  border: none;
+  color: var(--fw-linenum);
+  position: sticky;
+  left: 0;
+  z-index: 1;
+}
+#write.fw-appearance-code:not(.fw-mode-live) .cm-gutterElement { font-family: inherit; line-height: inherit; }
+#write.fw-appearance-code:not(.fw-mode-live) .cm-lineNumbers .cm-gutterElement {
+  min-width: 3ch;
+  padding: 0 1.25em 0 0;
+  text-align: right;
+  opacity: 0.75;
+}
+/* Indentation guides: N one-pixel bars, one per indent level, drawn in the line's leading whitespace. */
+#write.fw-appearance-code:not(.fw-mode-live) .cm-line.fw-guided {
+  background-image: repeating-linear-gradient(
+    to right,
+    var(--fw-guide) 0,
+    var(--fw-guide) 1px,
+    transparent 1px,
+    transparent calc(var(--fw-indent, 4) * 1ch)
+  );
+  background-repeat: no-repeat;
+  background-size: calc(var(--fw-guides, 0) * var(--fw-indent, 4) * 1ch) 100%;
+}

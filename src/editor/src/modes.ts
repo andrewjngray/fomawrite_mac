@@ -4,7 +4,7 @@
 import {
   Annotation, Compartment, EditorState, Extension, Prec, Transaction, TransactionSpec,
 } from "@codemirror/state";
-import { Decoration, DecorationSet, EditorView, ViewPlugin, ViewUpdate, drawSelection, keymap } from "@codemirror/view";
+import { EditorView, drawSelection, keymap } from "@codemirror/view";
 import { defaultKeymap, history, historyKeymap, undo as cmUndo, redo as cmRedo } from "@codemirror/commands";
 import { HighlightStyle, syntaxHighlighting, syntaxTree } from "@codemirror/language";
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
@@ -12,6 +12,7 @@ import { searchKeymap, search } from "@codemirror/search";
 import { Tag, styleTags, tags as t } from "@lezer/highlight";
 import { changesToJson, jsonToChangeSpecs } from "./changes";
 import { liveExtension } from "./live";
+import { appearanceEffect, parseAppearancePatch, AppearanceState } from "./appearance";
 
 export type Mode = "source" | "live";
 
@@ -22,6 +23,8 @@ export interface Appearance {
   dark?: boolean;
   typewriter?: boolean;
   focus?: boolean;
+  /** "manuscript" | "editorial" | "book" | "code" - see appearance.ts */
+  appearance?: string;
 }
 
 /** Marks transactions that come from the host (setDocument/applyChanges/mode) so they are not echoed back. */
@@ -85,46 +88,11 @@ export function listOutdent(view: { state: EditorState; dispatch: (s: Transactio
   return true;
 }
 
-// ---------------------------------------------------------------- focus mode
-const dimLine = Decoration.line({ class: "fw-dim" });
-const focusPlugin = ViewPlugin.fromClass(
-  class {
-    decorations: DecorationSet;
-    constructor(view: EditorView) {
-      this.decorations = this.build(view);
-    }
-    update(u: ViewUpdate) {
-      if (u.docChanged || u.selectionSet || u.viewportChanged) this.decorations = this.build(u.view);
-    }
-    build(view: EditorView): DecorationSet {
-      const active = new Set<number>();
-      for (const r of view.state.selection.ranges) {
-        const a = view.state.doc.lineAt(r.from).number, b = view.state.doc.lineAt(r.to).number;
-        for (let i = a; i <= b; i++) active.add(i);
-      }
-      const out = [];
-      for (const { from, to } of view.visibleRanges) {
-        for (let pos = from; pos <= to; ) {
-          const l = view.state.doc.lineAt(pos);
-          if (!active.has(l.number)) out.push(dimLine.range(l.from));
-          pos = l.to + 1;
-        }
-      }
-      return Decoration.set(out);
-    }
-  },
-  { decorations: (v) => v.decorations },
-);
-
 // ---------------------------------------------------------------- extensions
 const modeCompartment = new Compartment();
-const focusCompartment = new Compartment();
 
 function modeExtension(mode: Mode): Extension {
   return mode === "live" ? liveExtension : syntaxHighlighting(fwHighlight);
-}
-function focusExtension(on: boolean): Extension {
-  return on ? focusPlugin : [];
 }
 
 export function baseExtensions(): Extension[] {
@@ -134,7 +102,7 @@ export function baseExtensions(): Extension[] {
     search({ top: true }),
     // GFM (Table, TaskList, Strikethrough, Autolink) is already part of markdownLanguage's parser.
     markdown({ base: markdownLanguage, extensions: [{ props: [styleTags({ ListMark: listMarkTag })] }] }),
-    EditorView.lineWrapping,
+    // Line wrapping lives in appearance.ts (off in Code appearance).
     EditorView.contentAttributes.of({ spellcheck: "true", autocorrect: "off" }),
     Prec.high(
       keymap.of([
@@ -163,8 +131,6 @@ export function applyAppearanceDom(a: Appearance, doc: Document | undefined = ty
     if (a.fontFamily !== undefined) set("--fw-font", a.fontFamily || null);
     if (typeof a.fontSize === "number") set("--fw-font-size", a.fontSize + "px");
     if (typeof a.lineHeight === "number") set("--fw-line-height", String(a.lineHeight));
-    if (a.focus !== undefined) write.classList.toggle("fw-focus", !!a.focus);
-    if (a.typewriter !== undefined) write.classList.toggle("fw-typewriter", !!a.typewriter);
   }
   if (a.dark !== undefined) doc.documentElement.classList.toggle("dark", !!a.dark);
 }
@@ -195,7 +161,10 @@ export interface ViewLike {
 export class Session {
   revision = 0;
   mode: Mode = "source";
+  /** Legacy font/colour keys only. Focus, typewriter and the named appearance are owned by appearance.ts
+   *  (so `appearance.typewriter` is never set here; `presentation` holds the merged patch). */
   appearance: Appearance = {};
+  private presentation: Partial<AppearanceState> = {};
   /** Called for every user (non-External) doc-changing transaction. */
   onDocChanged: ((changesJson: string, revision: number) => void) | null = null;
   private view!: ViewLike;
@@ -212,7 +181,6 @@ export class Session {
       extensions: [
         baseExtensions(),
         modeCompartment.of(modeExtension(this.mode)),
-        focusCompartment.of(focusExtension(!!this.appearance.focus)),
         this.extra,
       ],
     });
@@ -230,6 +198,8 @@ export class Session {
   setDocument(text: string, revision: number) {
     this.view.setState(this.createState(text));
     this.revision = revision;
+    // A fresh state starts with default presentation; put the current one back (same tick, no repaint between).
+    this.view.dispatch({ effects: appearanceEffect.of({ ...this.presentation, mode: this.mode }), annotations: External.of(true) });
   }
 
   /** Apply host-side changes without echoing them back. Throws on malformed/out-of-range input. */
@@ -261,19 +231,21 @@ export class Session {
     if (mode !== "source" && mode !== "live") throw new Error("unknown mode: " + mode);
     if (mode === this.mode) return;
     this.mode = mode;
-    this.view.dispatch({ effects: modeCompartment.reconfigure(modeExtension(mode)), annotations: External.of(true) });
+    this.view.dispatch({
+      effects: [modeCompartment.reconfigure(modeExtension(mode)), appearanceEffect.of({ mode })],
+      annotations: External.of(true),
+    });
     applyModeClass(mode);
   }
 
   setAppearance(a: Appearance) {
-    const focusChanged = a.focus !== undefined && !!a.focus !== !!this.appearance.focus;
-    this.appearance = { ...this.appearance, ...a };
+    const { focus: _f, typewriter: _t, appearance: _a, ...legacy } = a;
+    this.appearance = { ...this.appearance, ...legacy };
     applyAppearanceDom(a);
-    if (focusChanged)
-      this.view.dispatch({
-        effects: focusCompartment.reconfigure(focusExtension(!!this.appearance.focus)),
-        annotations: External.of(true),
-      });
+    const patch = parseAppearancePatch(a);
+    this.presentation = { ...this.presentation, ...patch };
+    if (Object.keys(patch).length)
+      this.view.dispatch({ effects: appearanceEffect.of(patch), annotations: External.of(true) });
   }
 
   /** Feed transactions from the view's update listener; reports user doc changes. */
