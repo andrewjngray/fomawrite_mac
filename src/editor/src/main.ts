@@ -5,6 +5,7 @@ import { SAMPLE_DOCUMENT, connectBridge, onSignal } from "./bridge";
 import { setDecorateMetricSink } from "./live";
 import { blocksExtension } from "./blocks";
 import { tablesExtension } from "./tables";
+import { mathExtension } from "./math";
 import { Session, applyModeClass, applyThemeDom, Appearance } from "./modes";
 import { appearanceExtension } from "./appearance";
 
@@ -57,6 +58,7 @@ async function main() {
     appearanceExtension(),
     blocksExtension(bridge),
     tablesExtension(),
+    mathExtension(),
     EditorView.updateListener.of((u) => {
       if (u.docChanged) session.handleTransactions(u.transactions);
       if (u.selectionSet || u.docChanged) scheduleCursor(u.view);
