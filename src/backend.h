@@ -15,7 +15,7 @@
 #include <functional>
 #include <optional>
 #include "filelibrary.h"
-#include "publishinghtml.h"
+#include "publisher.h"
 
 class MarkdownHighlighter;
 class VisualTextHighlighter;
@@ -25,9 +25,8 @@ class QPagedPaintDevice;
 class QLockFile;
 class QTemporaryDir;
 class QIODevice;
-class PublishingPdf;
 
-class Backend : public QObject {
+class Backend : public QObject, public PublishingSource {
     Q_OBJECT
     Q_PROPERTY(QString applicationPath READ applicationPath CONSTANT)
     Q_PROPERTY(int outputStyle READ outputStyle NOTIFY outputStyleChanged)
@@ -39,6 +38,7 @@ class Backend : public QObject {
     Q_PROPERTY(QVariantList publishingThemes READ publishingThemes NOTIFY publishingThemesChanged)
     Q_PROPERTY(QString publishingThemeError READ publishingThemeError NOTIFY publishingThemesChanged)
     Q_PROPERTY(QObject *library READ library CONSTANT)
+    Q_PROPERTY(QObject *publisher READ publisher CONSTANT)
     Q_PROPERTY(QUrl documentBaseUrl READ documentBaseUrl NOTIFY fileUrlChanged)
     Q_PROPERTY(QUrl fileUrl READ fileUrl NOTIFY fileUrlChanged)
     Q_PROPERTY(QString publishingDocumentIdentity READ publishingDocumentIdentity NOTIFY publishingDocumentIdentityChanged)
@@ -63,7 +63,8 @@ public:
 
     QString applicationPath() const;
     QObject *library() { return &m_library; }
-    QUrl documentBaseUrl() const;
+    QObject *publisher() { return m_publisher.get(); }
+    QUrl documentBaseUrl() const override;
 
     void setParentWindow(QWindow *window);
     std::function<bool(const QUrl &)> focusExistingDocument;
@@ -158,11 +159,11 @@ public:
     Q_INVOKABLE QVariantMap publishingPreview(const QString &format);
     Q_INVOKABLE QVariantMap requestPublishingPreview(const QString &format, QObject *consumer, const QString &requestIdentity = QString());
     Q_INVOKABLE void cancelPublishingPreview(QObject *consumer);
-    QString publishingDocumentIdentity() const { return QString::number(m_publishingDocumentGeneration); }
-    QString publishingThemeId() const { return m_publishingThemeId; }
+    QString publishingDocumentIdentity() const { return m_publisher->documentIdentity(); }
+    QString publishingThemeId() const { return m_publisher->themeId(); }
     QString publishingThemeName() const;
     QVariantList publishingThemes() const;
-    QString publishingThemeError() const { return m_publishingThemeError; }
+    QString publishingThemeError() const { return m_publisher->themeError(); }
     Q_INVOKABLE bool selectPublishingTheme(const QString &id);
     Q_INVOKABLE bool importPublishingTheme(const QUrl &file);
     Q_INVOKABLE void reloadPublishingThemes();
@@ -170,7 +171,7 @@ public:
     int outputStyle() const { return m_outputStyle; }
     QString outputFont() const;
     int outputPointSize() const;
-    QString outputTemplateName() const;
+    QString outputTemplateName() const override;
     // Stable, lowercase identifiers for the export hub. Invalid requests leave
     // the active layout unchanged, so QML can safely pass untrusted selections.
     Q_INVOKABLE QString exportPaperSize() const;
@@ -292,42 +293,21 @@ private:
     bool saveAuthorship(const QUrl &url);
     void loadAuthorship(const QUrl &url);
     QString outputHtml(QTextDocument &document, QString *error) const;
-    QByteArray publishingPdfBytes(const QString &html, QString *error) const;
-    QVariantMap storePublishingOutput(quint64 generation, const QString &format, const QByteArray &bytes, const QString &html = {});
-    QString publishingHtml(QString *error, bool preview = false, QString *warning = nullptr,
-                           QByteArray *fingerprint = nullptr) const;
-    QString publishingPrintCss() const;
-    QString m_publishingThemeId;
-    QString m_publishingThemeError;
-    QFileSystemWatcher m_publishingThemeWatcher;
-    QTimer m_publishingThemeRefreshTimer;
-    QByteArray m_publishingThemeSnapshot;
-    QHash<QString, QPair<QByteArray, QByteArray>> m_publishingThemeFileHashes;
-    QByteArray watchPublishingThemes();
-    void refreshPublishingThemes(bool force = false);
-    bool updatePublishingCss();
-    std::optional<QString> selectedPublishingCss(QString *error, QByteArray *hash = nullptr) const;
-    // The selected theme's sanitized CSS (fonts and images embedded) is
-    // computed once per theme-folder state, not on every preview request.
-    struct PublishingCssMemo { QString themeId; QByteArray snapshot; QString css; QByteArray hash; QString error; bool valid = false; };
-    mutable PublishingCssMemo m_publishingCssMemo;
-    QByteArray m_publishingCssSnapshot;
-    QByteArray m_publishingCatalogSnapshot;
-    mutable PublishingHtml::ImageCache m_publishingImageCache;
+    // PublishingSource: what Publisher may know about this document and the
+    // output settings. Publishing state itself lives in Publisher.
+    bool hasDocument() const override;
+    QString publishingMarkdown() const override;
+    QByteArray sourceHash() const override;
+    int sourceRevision() const override;
+    QUrl documentUrl() const override;
+    QString documentTitle() const override;
+    QString basicStyleCss() const override;
+    QString printCss() const override;
+    QString titlePageHtml() const override;
+    QUrl outputCssFile() const override;
+    QPageLayout outputPageLayout() const override;
     void invalidatePublishingDocument();
-    quint64 m_publishingDocumentGeneration = 0;
-    quint64 m_publishingSettingsGeneration = 0;
-    struct PublishingPreviewCache { QByteArray key; QVariantMap result; };
-    QHash<QObject *, PublishingPreviewCache> m_publishingPreviewCache;
-    QHash<QObject *, QByteArray> m_publishingPendingKeys;
-    QHash<QObject *, QMetaObject::Connection> m_publishingConnections;
-    QSet<QObject *> m_publishingConsumers;
-    QHash<QObject *, PublishingPdf *> m_publishingRenderers;
-    QHash<QObject *, quint64> m_publishingRequests;
-    QHash<QObject *, QString> m_publishingPinned;
-    std::unique_ptr<QTemporaryDir> m_publishingDirectory;
-    QStringList m_publishingFiles;
-    quint64 m_publishingGeneration = 0;
+    std::unique_ptr<Publisher> m_publisher;
     void paintOutput(QPagedPaintDevice &device, QTextDocument &document) const;
     void paintPublishingOutput(QPagedPaintDevice &device);
     void applyTemplate(QTextDocument &document, bool preview) const;

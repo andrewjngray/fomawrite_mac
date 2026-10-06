@@ -533,15 +533,6 @@ QString Backend::normalizedLinkUrl(const QString &clipboardText) {
 
 Backend::Backend(QObject *parent, bool outputOnly) : QObject(parent), m_library(this) {
     if (!outputOnly) liveBackends.insert(this);
-    const auto invalidatePublishingSettings = [this] {
-        ++m_publishingSettingsGeneration;
-        for (QObject *consumer : m_publishingRequests.keys()) cancelPublishingPreview(consumer);
-    };
-    connect(this, &Backend::outputStyleChanged, this, invalidatePublishingSettings);
-    connect(this, &Backend::outputPageLayoutChanged, this, invalidatePublishingSettings);
-    connect(this, &Backend::outputCssChanged, this, invalidatePublishingSettings);
-    // Catalog-only changes keep rendering; only CSS that reaches the output cancels it.
-    connect(this, &Backend::publishingCssChanged, this, invalidatePublishingSettings);
     connect(&m_library, &FileLibrary::rootFolderChanged, this, &Backend::fileUrlChanged);
     const QString stateDirectory = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
     QDir().mkpath(stateDirectory);
@@ -599,22 +590,17 @@ Backend::Backend(QObject *parent, bool outputOnly) : QObject(parent), m_library(
     const QString cssPath = QSettings().value(QStringLiteral("output/cssFile")).toString();
     if (!cssPath.isEmpty()) m_outputCssFile = QUrl::fromLocalFile(cssPath);
     loadUserOutputStyles();
-    m_publishingThemeId = QSettings().value("output/publishingTheme").toString();
-    m_publishingThemeRefreshTimer.setSingleShot(true);
-    m_publishingThemeRefreshTimer.setInterval(200);
-    connect(&m_publishingThemeRefreshTimer, &QTimer::timeout, this, [this] { refreshPublishingThemes(); });
-    const auto queueThemeRefresh = [this]() { m_publishingThemeRefreshTimer.start(); };
-    connect(&m_publishingThemeWatcher, &QFileSystemWatcher::fileChanged, this, [this](const QString &path) {
-        // In-place edits can preserve size and coarse timestamps. Re-read only
-        // the file actually notified, while directory event replays stay cheap.
-        m_publishingThemeFileHashes.remove(path);
-        m_publishingThemeRefreshTimer.start();
-    });
-    connect(&m_publishingThemeWatcher, &QFileSystemWatcher::directoryChanged, this, queueThemeRefresh);
-    m_publishingThemeSnapshot = watchPublishingThemes();
-    m_publishingCatalogSnapshot = QCryptographicHash::hash(
-        QJsonDocument::fromVariant(publishingThemes()).toJson(QJsonDocument::Compact), QCryptographicHash::Sha256);
-    updatePublishingCss();
+    // Publishing state lives in Publisher; Backend relays its signals under the
+    // existing names and tells it when output settings change.
+    m_publisher = std::make_unique<Publisher>(*this);
+    connect(m_publisher.get(), &Publisher::themesChanged, this, &Backend::publishingThemesChanged);
+    connect(m_publisher.get(), &Publisher::cssChanged, this, &Backend::publishingCssChanged);
+    connect(m_publisher.get(), &Publisher::previewReady, this, &Backend::publishingPreviewReady);
+    connect(m_publisher.get(), &Publisher::documentIdentityChanged, this, &Backend::publishingDocumentIdentityChanged);
+    connect(m_publisher.get(), &Publisher::statusMessage, this, &Backend::setStatus);
+    connect(this, &Backend::outputStyleChanged, m_publisher.get(), &Publisher::invalidateSettings);
+    connect(this, &Backend::outputPageLayoutChanged, m_publisher.get(), &Publisher::invalidateSettings);
+    connect(this, &Backend::outputCssChanged, m_publisher.get(), &Publisher::invalidateSettings);
     // New installations start with the composed writing palette; a stored
     // choice, including System, always takes precedence.
     const auto preset = QSettings().value("appearance/theme", "studio").toString();
@@ -3404,9 +3390,7 @@ bool Backend::deleteUserOutputStyle(const QString &id) {
 
 void Backend::setOutputStyle(int style) {
     if (style < 0 || style > 7) return;
-    m_publishingThemeId.clear();
-    m_publishingThemeError.clear();
-    QSettings().remove("output/publishingTheme");
+    m_publisher->clearTheme();
     if (style != 3 && !m_selectedUserOutputStyleId.isEmpty()) {
         m_selectedUserOutputStyleId.clear();
         QSettings().remove(QStringLiteral("output/userStyleId"));
@@ -3565,7 +3549,127 @@ void Backend::pageSetup() {
     }
 }
 
-#include "backendpublishing.inc"
+// Publishing lives in Publisher. Backend supplies the document and output
+// settings through PublishingSource and keeps one-line forwarders for the
+// existing QML surface (backend.publishingThemeId, requestPublishingPreview…)
+// until callers move to backend.publisher.
+namespace {
+QString cssString(QString value) {
+    value.replace('\\', "\\\\").replace('"', "\\\"").replace('\n', "\\a ").replace('\r', "");
+    value.replace('<', "\\3c "); // Never let CSS text terminate its HTML style element.
+    return '"' + value + '"';
+}
+QString pageContent(QString pattern, const QString &title) {
+    pattern.replace("{title}", title);
+    QStringList parts;
+    const QRegularExpression token("\\{(page|pages)\\}");
+    int start = 0;
+    auto matches = token.globalMatch(pattern);
+    while (matches.hasNext()) {
+        const auto match = matches.next();
+        parts << cssString(pattern.mid(start, match.capturedStart() - start));
+        parts << (match.captured(1) == "page" ? "counter(page)" : "counter(pages)");
+        start = match.capturedEnd();
+    }
+    parts << cssString(pattern.mid(start));
+    return parts.join(' ');
+}
+}
+
+bool Backend::hasDocument() const { return m_document != nullptr; }
+QString Backend::publishingMarkdown() const { return previewMarkdown(currentDocumentText()); }
+QByteArray Backend::sourceHash() const { return QCryptographicHash::hash(currentDocumentText().toUtf8(), QCryptographicHash::Sha256); }
+int Backend::sourceRevision() const { return documentRevision(); }
+QUrl Backend::documentUrl() const { return m_fileUrl; }
+QString Backend::documentTitle() const { return fileName(); }
+QUrl Backend::outputCssFile() const { return m_outputCssFile; }
+QPageLayout Backend::outputPageLayout() const { return effectiveOutputPageLayout(); }
+QString Backend::titlePageHtml() const {
+    if (!(m_outputStyle == 3 && m_outputTitlePage)) return {};
+    return "<section class=\"fomawrite-title-page\"><h1>" + fileName().toHtmlEscaped() + "</h1></section>";
+}
+QString Backend::basicStyleCss() const {
+    QString css = QStringLiteral(R"CSS(
+html { font-size: %1pt; background: white; color: #24292f; }
+body { margin: 0; font-family: %2, serif; line-height: %3; }
+#write { max-width: 800px; padding: 32px; margin: auto; overflow-wrap: anywhere; }
+h1,h2,h3,h4,h5,h6 { line-height: 1.25; margin: 1.3em 0 .6em; font-weight: 700; }
+h1 { font-size: 2em; } h2 { font-size: 1.5em; } h3 { font-size: 1.25em; }
+p,ul,ol,blockquote,pre,table { margin: .8em 0; }
+ul,ol { padding-left: 1.7em; } li > p { margin: .3em 0; }
+blockquote { border-left: 3px solid #d0d7de; color: #57606a; padding: .2em 1em; margin-left: 0; }
+pre { background: #f3f4f6; padding: 1em; border-radius: 5px; white-space: pre-wrap; }
+code { font-family: Menlo,monospace; background: #f3f4f6; padding: .1em .2em; }
+pre code { background: transparent; padding: 0; }
+table { border-collapse: collapse; width: 100%%; } th,td { border: 1px solid #d0d7de; padding: .5em; text-align: left; }
+th { font-weight: bold; } tr:nth-child(even) { background: #f8f9fa; }
+a { color: #245da8; } hr { border: 0; border-top: 1px solid #d0d7de; margin: 1.5em 0; }
+)CSS").arg(outputPointSize()).arg(cssString(outputFont())).arg(m_outputStyle == 2 || m_outputStyle == 7 ? "2" : "1.5");
+    css.replace("100%%", "100%");
+    if (m_outputStyle == 7) css += "#write > p { text-indent: 3em; } h1 { text-align: center; font-size: 1em; font-weight: normal; }";
+    return css;
+}
+QString Backend::printCss() const {
+    const auto layout = effectiveOutputPageLayout();
+    const QSizeF size = layout.fullRect(QPageLayout::Millimeter).size();
+    const auto margins = layout.margins(QPageLayout::Millimeter);
+    const bool decorated = m_outputStyle != 0 && (m_outputStyle != 3 || m_customPageFurniture);
+    const QString header = decorated ? pageContent(m_outputStyle == 3 ? m_outputHeader : "{title}", fileName()) : "none";
+    const QString footer = decorated ? pageContent(m_outputStyle == 3 ? m_outputFooter : "{page} / {pages}", fileName()) : "none";
+    return QStringLiteral(R"CSS(
+@page { size: %1mm %2mm; margin: %3mm %4mm %5mm %6mm;
+ @top-left { content: %7; font: 8pt Helvetica,Arial,sans-serif; color: #555; }
+ @bottom-center { content: %8; font: 8pt Helvetica,Arial,sans-serif; color: #555; }
+}
+@media print {
+ html, body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+ html body #write { max-width: none; width: auto; margin: 0; padding: 0; }
+ .pagebreak { break-before: page; page-break-before: always; }
+ h1,h2,h3,h4,h5,h6 { break-after: avoid; }
+ p,li { orphans: 2; widows: 2; }
+ tr,figure { break-inside: avoid; } thead { display: table-header-group; }
+ .fomawrite-title-page { display: flex; align-items: center; justify-content: center; min-height: 80vh; break-after: page; }
+}
+)CSS").arg(size.width()).arg(size.height()).arg(margins.top()).arg(margins.right()).arg(margins.bottom()).arg(margins.left()).arg(header, footer);
+}
+
+QString Backend::publishingThemeName() const { return m_publisher->themeName(); }
+QVariantList Backend::publishingThemes() const { return m_publisher->themes(); }
+bool Backend::selectPublishingTheme(const QString &id) { return m_publisher->selectTheme(id); }
+bool Backend::importPublishingTheme(const QUrl &file) { return m_publisher->importTheme(file); }
+void Backend::reloadPublishingThemes() { m_publisher->reloadThemes(); }
+bool Backend::openPublishingThemesFolder() { return m_publisher->openThemesFolder(); }
+QString Backend::outputHtml(QTextDocument &, QString *error) const { return m_publisher->html(error); }
+QVariantMap Backend::publishingPreview(const QString &format) { return m_publisher->preview(format); }
+QVariantMap Backend::requestPublishingPreview(const QString &format, QObject *consumer, const QString &requestIdentity) {
+    return m_publisher->requestPreview(format, consumer, requestIdentity);
+}
+void Backend::cancelPublishingPreview(QObject *consumer) { m_publisher->cancelPreview(consumer); }
+void Backend::invalidatePublishingDocument() { m_publisher->invalidateDocument(); }
+
+void Backend::paintPublishingOutput(QPagedPaintDevice &device) {
+    const QPageLayout previous = m_pageLayout;
+    m_pageLayout = device.pageLayout();
+    const auto restore = qScopeGuard([&] { m_pageLayout = previous; });
+    QString error;
+    const QString html = m_publisher->html(&error);
+    const QByteArray bytes = error.isEmpty() ? m_publisher->pdfBytes(html, &error) : QByteArray{};
+    if (!error.isEmpty()) { setStatus(error); return; }
+    QBuffer buffer; buffer.setData(bytes); buffer.open(QIODevice::ReadOnly);
+    QPdfDocument pdf; pdf.load(&buffer);
+    QPainter painter(&device);
+    // Native printer painting uses the actual browser PDF pages. PDF export
+    // itself retains Chromium's vector text, links and embedded fonts.
+    const QRect pixels = device.pageLayout().paintRectPixels(device.logicalDpiX());
+    const QRect fullPage = device.pageLayout().fullRectPixels(device.logicalDpiX());
+    for (int page = 0; page < pdf.pageCount(); ++page) {
+        if (page) device.newPage();
+        const QSizeF points = pdf.pagePointSize(page);
+        const QImage image = pdf.render(page, (points * (300.0 / 72.0)).toSize());
+        const QRectF target(-pixels.x(), -pixels.y(), fullPage.width(), fullPage.height());
+        painter.drawImage(target, image);
+    }
+}
 
 bool Backend::exportDocument(const QUrl &destination, const QString &format) {
     if (!m_document || !destination.isLocalFile() || (format != "html" && format != "pdf")) return false;
@@ -3588,7 +3692,7 @@ bool Backend::exportDocument(const QUrl &destination, const QString &format) {
         QString error;
         const QString html = outputHtml(rendered, &error);
         if (!error.isEmpty()) { setStatus(error); return false; }
-        const QByteArray bytes = publishingPdfBytes(html, &error);
+        const QByteArray bytes = m_publisher->pdfBytes(html, &error);
         if (bytes.isEmpty() || output.write(bytes) != bytes.size()) { setStatus(error.isEmpty() ? output.errorString() : error); return false; }
     }
     if (!output.commit()) { setStatus(output.errorString()); return false; }
