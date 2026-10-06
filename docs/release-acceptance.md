@@ -1,6 +1,10 @@
 # Acceptance ledger — current follow-through and Cycle 59 history
 
-## Current review build — Cycle 130
+## Current review build — Cycle 131
+
+**0.3.0-dev27 / macOS 0.3.0 (131)** makes file persistence byte-exact: untouched documents round-trip byte-for-byte (CRLF, CR, BOM, no-break spaces, U+2028), edits keep the file's own conventions, non-UTF-8/UTF-16 files are readable but cannot be saved in place (Save As writes a UTF-8 copy), CRLF files autosave/rename/move again, and a manual Save that would overwrite a newer on-disk version is stopped with a File changed / Save Anyway choice. **208 regressions pass, 0 failed, 0 skipped.** Source/tests only; no bundle refreshed. [Evidence and limits](../research/cycle-131/README.md). Findings C1–C6 of the [independent review](../../INDEPENDENT_REVIEW.md) are addressed; its other findings remain open.
+
+## Previous review build — Cycle 130
 
 **0.3.0-dev26 / macOS 0.3.0 (130)** groups CSS themes under **Custom Themes ›** above the basic presets and names the control **Output Style**. Existing selection, import and settings actions retain their behavior. [Menu instructions](output-style-menu.md), [verification and limits](../research/cycle-130/README.md). Native menu checks passed; a broad-run unexposed-window preview failure and successful focused rerun are recorded rather than hidden. Final counts and app identities are in the Cycle130 manifest.
 

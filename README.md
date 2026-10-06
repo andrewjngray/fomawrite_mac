@@ -36,7 +36,7 @@ The first launch of a renamed Mac bundle migrates prior preferences and copies m
 
 ## Project and status
 
-Current review build: **0.3.0-dev26 / macOS 0.3.0 (130)**. The compact **Output Style → Custom Themes** menu is described in the [menu guide](docs/output-style-menu.md) and [Cycle130 verification](research/cycle-130/README.md).
+Current review build: **0.3.0-dev27 / macOS 0.3.0 (131)** — byte-exact persistence ([Cycle131 record](research/cycle-131/README.md), [independent review](INDEPENDENT_REVIEW.md)). Previous: **0.3.0-dev26 / macOS 0.3.0 (130)**. The compact **Output Style → Custom Themes** menu is described in the [menu guide](docs/output-style-menu.md) and [Cycle130 verification](research/cycle-130/README.md).
 
 For an independent developer review, start with the [developer handoff](DEVELOPER_HANDOFF.md): implemented behavior, source/build/data locations, Git baseline, verification evidence and remaining review priorities.
 

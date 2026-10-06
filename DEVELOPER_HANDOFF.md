@@ -8,7 +8,7 @@ Prepared **6 October 2026 (Pacific/Auckland)** for Andrew Gray. This is a snapsh
 - Git clone URL: `https://github.com/andrewjngray/fomawrite_mac.git`; current branch: **`master`**.
 - Upstream: [omacom/omawrite](https://github.com/omacom/omawrite), retained as remote `upstream`. This is an MIT-licensed fork, renamed Fomawrite.
 - Andrew's current checkout: **`/Users/andrewgray/repo/projects/fomawrite_mac`**. Historical tooling may still mention `omawrite_mac`; that is the obsolete checkout path.
-- Current review build: **`0.3.0-dev26`**, macOS version **`0.3.0 (130)`**.
+- Current review build: **`0.3.0-dev26`**, macOS version **`0.3.0 (130)`**. *Post-handoff:* Cycle 131 (`0.3.0-dev27` / build 131, source and tests only) addresses the data-integrity findings of [INDEPENDENT_REVIEW.md](INDEPENDENT_REVIEW.md); see [research/cycle-131](research/cycle-131/README.md).
 - Cycle130 source/test commit: **`644d9e0`**. Its following documentation commit records the menu guide and verified build identities.
 - Historical Cycle129 source/test commit: **`cf0ed37982169f01773441b31d7d0759f5a98e81`**. The following documentation commit records its verified bundle identities. Historical Cycle128 baseline: `0466c3c3cdaad3ae0b0a35bb87607a0c9cd8b50b`.
 - Authoritative current evidence: [Cycle130 report](research/cycle-130/README.md) and [manifest](research/cycle-130/verified-builds.json). The Output Style/Custom Themes menu is explained in [the user guide](docs/output-style-menu.md). The Cycle129 incident evidence remains below.
