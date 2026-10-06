@@ -44,6 +44,11 @@ Yes [ ]  No [ ]  Maybe [x]
 
 Saves about 280 KB of the 1.4 MB editor bundle. Costs highlighting for fences in those languages.
 
+### A fuller code editing appearance
+Yes [ ]  No [ ]  Maybe [x]
+
+Code today is a lightweight Source appearance: line numbers, indent guides, no wrap, syntax colours for known fences. Andrew likes it as is; fleshing it out (bracket matching, folding, more languages) is possible later.
+
 ### Authorship marks visible in Live
 Yes [ ]  No [ ]  Maybe [x]
 
@@ -73,3 +78,4 @@ The semantic indexing work with Rami: `potentiacap/vaultmcp` (document vault wit
 Moved here when a box becomes Yes or No, with the date and the reason.
 
 - **Retire the Visual Edit pane** — Yes, 7 October 2026, Cycle 135. Live covers it with the Markdown text itself as the editing model.
+- **Code in the Live dropdown drops back to Source silently** — Yes (keep as is), 7 October 2026. Code is a specific kind of editing; the silent switch works well in practice. A fuller code editor is a possible later idea, but the lightweight line-numbered appearance is enough for now.
