@@ -35,4 +35,4 @@ Acts on the independent review's §4 (architecture), §7 (process) and the revie
 ## Limits
 
 - Offscreen only; no bundle refreshed; no native harness rerun (installed app in use).
-- CI is written and reviewed but has not yet produced a run; the Qt download on the runner is the likely first failure point and the YAML comment carries the Homebrew fallback.
+- CI's first run proved the pipeline (pinned Qt 6.11.3 installed, app and tests built, full suite executed on the runner in ~3.6 min) but is **red**: 4 of 220 tests fail only on the runner — three `cycle102Click` synthetic-click tests and the known link-dialog flake. They pass locally in every run; the runner reports missing font families, so the geometry the clicks target differs. Next cycle: make those tests geometry-independent (drive the controls by signal/method where the test's point is the behaviour, not the hit-test) or give the runner the fonts.
