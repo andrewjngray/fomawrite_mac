@@ -21,7 +21,8 @@
     "@lezer/common": "^1.5.3",
     "@lezer/highlight": "^1.2.5",
     "@lezer/markdown": "^1.7.2",
-    "codemirror": "^6.0.2"
+    "codemirror": "^6.0.2",
+    "katex": "^0.16.47"
   },
   "devDependencies": {
     "@types/node": "^26.6.4",

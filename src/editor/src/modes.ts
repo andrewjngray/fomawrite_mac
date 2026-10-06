@@ -14,6 +14,7 @@ import { changesToJson, jsonToChangeSpecs } from "./changes";
 import { liveExtension } from "./live";
 import { appearanceEffect, parseAppearancePatch, AppearanceState } from "./appearance";
 import { fenceLanguages } from "./blocks";
+import { mathMarkdown } from "./math";
 
 export type Mode = "source" | "live";
 
@@ -102,7 +103,7 @@ export function baseExtensions(): Extension[] {
     drawSelection(),
     search({ top: true }),
     // GFM (Table, TaskList, Strikethrough, Autolink) is already part of markdownLanguage's parser.
-    markdown({ base: markdownLanguage, codeLanguages: fenceLanguages, extensions: [{ props: [styleTags({ ListMark: listMarkTag })] }] }),
+    markdown({ base: markdownLanguage, codeLanguages: fenceLanguages, extensions: [{ props: [styleTags({ ListMark: listMarkTag })] }, mathMarkdown] }),
     // Line wrapping lives in appearance.ts (off in Code appearance).
     EditorView.contentAttributes.of({ spellcheck: "true", autocorrect: "off" }),
     Prec.high(
