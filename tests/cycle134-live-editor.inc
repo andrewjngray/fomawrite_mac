@@ -87,6 +87,41 @@ void FomawriteTest::liveImagesResolveThroughTheHost() {
     backend.discardRecovery();
 }
 
+void FomawriteTest::liveImagesSaveBesideTheDocument() {
+    Cycle103SettingsSnapshot settings;
+    QTemporaryDir directory; QVERIFY(directory.isValid());
+    Backend backend;
+    QQmlEngine engine; engine.rootContext()->setContextProperty("backend", &backend);
+    QQmlComponent component(&engine);
+    component.setData("import QtQuick\nTextEdit { Component.onCompleted: backend.attachDocument(textDocument); onTextChanged: backend.editorTextChanged() }", QUrl());
+    QScopedPointer<QObject> editor(component.create()); QVERIFY2(editor, qPrintable(component.errorString()));
+    QImage image(10, 6, QImage::Format_RGB32); image.fill(Qt::magenta);
+    QByteArray png; { QBuffer buffer(&png); buffer.open(QIODevice::WriteOnly); QVERIFY(image.save(&buffer, "PNG")); }
+    auto *bridge = backend.editorBridge();
+    QSignalSpy saved(bridge, &EditorBridge::imageSaved);
+    // Untitled document: refused with a reason.
+    QVERIFY(QMetaObject::invokeMethod(bridge, "saveImage", Q_ARG(int, 1), Q_ARG(QString, "shot.png"), Q_ARG(QString, "image/png"), Q_ARG(QString, QString::fromLatin1(png.toBase64()))));
+    QCOMPARE(saved.count(), 1); QVERIFY(saved.at(0).at(1).toString().isEmpty()); QVERIFY(saved.at(0).at(2).toString().contains("Save the document"));
+    // Saved document: stored under images/ with a unique, safe name.
+    editor->setProperty("text", "# Doc\n");
+    backend.saveAs(QUrl::fromLocalFile(directory.filePath("doc.md")));
+    QVERIFY(!backend.modified());
+    QVERIFY(QMetaObject::invokeMethod(bridge, "saveImage", Q_ARG(int, 2), Q_ARG(QString, "My Shot (1).png"), Q_ARG(QString, "image/png"), Q_ARG(QString, QString::fromLatin1(png.toBase64()))));
+    QCOMPARE(saved.count(), 2);
+    QCOMPARE(saved.at(1).at(1).toString(), QString("images/My-Shot-1.png"));
+    QVERIFY(saved.at(1).at(2).toString().isEmpty());
+    QVERIFY(QFileInfo::exists(directory.filePath("images/My-Shot-1.png")));
+    QVERIFY(QMetaObject::invokeMethod(bridge, "saveImage", Q_ARG(int, 3), Q_ARG(QString, "My Shot (1).png"), Q_ARG(QString, "image/png"), Q_ARG(QString, QString::fromLatin1(png.toBase64()))));
+    QCOMPARE(saved.at(2).at(1).toString(), QString("images/My-Shot-1-2.png"));
+    // Bad data and bad types are refused and nothing is written.
+    QVERIFY(QMetaObject::invokeMethod(bridge, "saveImage", Q_ARG(int, 4), Q_ARG(QString, "x.png"), Q_ARG(QString, "image/png"), Q_ARG(QString, QString::fromLatin1(QByteArray("not an image").toBase64()))));
+    QVERIFY(!saved.at(3).at(2).toString().isEmpty());
+    QVERIFY(QMetaObject::invokeMethod(bridge, "saveImage", Q_ARG(int, 5), Q_ARG(QString, "x.svg"), Q_ARG(QString, "image/svg+xml"), Q_ARG(QString, QString::fromLatin1(png.toBase64()))));
+    QVERIFY(!saved.at(4).at(2).toString().isEmpty());
+    QCOMPARE(QDir(directory.filePath("images")).entryList(QDir::Files).size(), 2);
+    backend.discardRecovery();
+}
+
 void FomawriteTest::liveBridgeReplaysStateToLatePage() {
     EditorBridge bridge;
     QSignalSpy document(&bridge, &EditorBridge::setDocument), mode(&bridge, &EditorBridge::setMode),
@@ -282,6 +317,50 @@ void FomawriteTest::liveEditorAppliesFormatCommandsAtThePageSelection() {
     QVERIFY(page.canonical().contains("[snippet]"));
     // Without a known selection nothing happens.
     EditorBridge fresh; Q_UNUSED(fresh);
+    page.backend.discardRecovery();
+}
+
+// Whole stack: a synthetic paste of a real PNG in the page goes to the host,
+// is written beside the document, and comes back as a Markdown image.
+void FomawriteTest::liveEditorPastesImagesThroughTheHost() {
+    Cycle103SettingsSnapshot settings;
+    QTemporaryDir directory; QVERIFY(directory.isValid());
+    Cycle134Page page; QVERIFY2(page.create(), qPrintable(page.error));
+    QTRY_VERIFY_WITH_TIMEOUT(page.bridge()->isReady(), 15000);
+    page.editor->setProperty("text", QStringLiteral("before after\n"));
+    page.backend.saveAs(QUrl::fromLocalFile(directory.filePath("notes.md")));
+    QVERIFY(!page.backend.modified());
+    page.backend.syncLiveEditor(0);
+    QTRY_COMPARE_WITH_TIMEOUT(page.pageText(), QStringLiteral("before after\n"), 10000);
+    QImage image(12, 8, QImage::Format_RGB32); image.fill(Qt::darkCyan);
+    QByteArray png; { QBuffer buffer(&png); buffer.open(QIODevice::WriteOnly); QVERIFY(image.save(&buffer, "PNG")); }
+    auto *view = page.root->findChild<QObject *>("liveEditorView"); QVERIFY(view);
+    QSignalSpy saved(page.bridge(), &EditorBridge::imageSaved);
+    // Place the caret after "before " then dispatch a paste carrying the file.
+    page.bridge()->placeCursor(7);
+    QTRY_COMPARE_WITH_TIMEOUT(page.bridge()->lastCursor(), 7, 5000);
+    const QString script = QStringLiteral(R"JS(
+        (function() {
+            const bytes = Uint8Array.from(atob("%1"), c => c.charCodeAt(0));
+            const file = new File([bytes], "Screen Shot.png", { type: "image/png" });
+            const dt = new DataTransfer(); dt.items.add(file);
+            const target = document.querySelector(".cm-content");
+            target.dispatchEvent(new ClipboardEvent("paste", { clipboardData: dt, bubbles: true, cancelable: true }));
+            return "dispatched";
+        })())JS").arg(QString::fromLatin1(png.toBase64()));
+    QVERIFY(QMetaObject::invokeMethod(view, "runJavaScript", Q_ARG(QString, script)));
+    QTRY_COMPARE_WITH_TIMEOUT(saved.count(), 1, 10000);
+    QCOMPARE(saved.at(0).at(1).toString(), QStringLiteral("images/Screen-Shot.png"));
+    QVERIFY(saved.at(0).at(2).toString().isEmpty());
+    QVERIFY(QFileInfo::exists(directory.filePath("images/Screen-Shot.png")));
+    const QString expected = QStringLiteral("before ![Screen-Shot](images/Screen-Shot.png)after\n");
+    QTRY_COMPARE_WITH_TIMEOUT(page.canonical(), expected, 10000);
+    QCOMPARE(page.pageText(), expected);
+    // The host resolves the new relative path for the page's inline preview.
+    QSignalSpy replied(page.bridge(), &EditorBridge::imageReply);
+    QVERIFY(QMetaObject::invokeMethod(page.bridge(), "requestImage", Q_ARG(int, 77), Q_ARG(QString, "images/Screen-Shot.png")));
+    QTRY_COMPARE_WITH_TIMEOUT(replied.count(), 1, 5000);
+    QVERIFY(replied.at(0).at(1).toString().startsWith("data:image/png;base64,"));
     page.backend.discardRecovery();
 }
 

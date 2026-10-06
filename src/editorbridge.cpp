@@ -74,3 +74,5 @@ void EditorBridge::log(const QString &message) { emit messageLogged(message); }
 void EditorBridge::textReply(int token, const QString &text) { emit textReceived(token, text); }
 void EditorBridge::requestImage(int token, const QString &src) { emit imageRequested(token, src); }
 void EditorBridge::replyImage(int token, const QString &dataUrl, const QString &error) { emit imageReply(token, dataUrl, error); }
+void EditorBridge::saveImage(int token, const QString &name, const QString &mime, const QString &base64) { emit imageSaveRequested(token, name, mime, base64); }
+void EditorBridge::replyImageSaved(int token, const QString &relativePath, const QString &error) { emit imageSaved(token, relativePath, error); }

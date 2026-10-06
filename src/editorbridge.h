@@ -58,6 +58,9 @@ public slots:
     void requestImage(int token, const QString &src);
     // Called by the host with the answer (emits imageReply to the page).
     void replyImage(int token, const QString &dataUrl, const QString &error);
+    // Pasted/dropped image bytes the page wants saved next to the document.
+    void saveImage(int token, const QString &name, const QString &mime, const QString &base64);
+    void replyImageSaved(int token, const QString &relativePath, const QString &error);
     // The page reports its vertical position as a 0..1 fraction (debounced).
     void scrolled(double fraction);
 
@@ -74,12 +77,14 @@ signals:
     void undo();
     void redo();
     void imageReply(int token, const QString &dataUrl, const QString &error);
+    void imageSaved(int token, const QString &relativePath, const QString &error);
     void scrollToFraction(double fraction);
     void setCursor(int position);
     void command(const QString &name);
     // For the app.
     void scrollFractionChanged(double fraction);
     void imageRequested(int token, const QString &src);
+    void imageSaveRequested(int token, const QString &name, const QString &mime, const QString &base64);
     void readyChanged();
     void revisionChanged();
     void changesReceived(const QString &changesJson, int revision);

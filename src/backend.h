@@ -319,6 +319,7 @@ private:
     // Mirrors the Live editor's change lists into the canonical document.
     bool applyLiveChanges(const QString &changesJson, int revision);
     void resolveLiveImage(int token, const QString &src);
+    void saveLiveImage(int token, const QString &name, const QString &mime, const QString &base64);
     // The other direction: document edits made on the C++ side (format commands,
     // version restore, replace) reach the page while Live is active.
     void forwardLiveChange(int position, int charsRemoved, int charsAdded);

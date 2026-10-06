@@ -603,6 +603,7 @@ Backend::Backend(QObject *parent, bool outputOnly) : QObject(parent), m_library(
     m_editorBridge = std::make_unique<EditorBridge>();
     connect(m_editorBridge.get(), &EditorBridge::changesReceived, this, &Backend::applyLiveChanges);
     connect(m_editorBridge.get(), &EditorBridge::imageRequested, this, &Backend::resolveLiveImage);
+    connect(m_editorBridge.get(), &EditorBridge::imageSaveRequested, this, &Backend::saveLiveImage);
     connect(m_editorBridge.get(), &EditorBridge::messageLogged, this, [](const QString &message) { qWarning("Live editor: %s", qPrintable(message)); });
     // New installations start with the composed writing palette; a stored
     // choice, including System, always takes precedence.
@@ -3663,6 +3664,38 @@ void Backend::forwardLiveChange(int position, int charsRemoved, int charsAdded) 
     const QJsonArray changes{QJsonObject{{"from", position}, {"to", position + charsRemoved}, {"insert", inserted}}};
     m_liveMirror = now;
     m_editorBridge->pushChanges(QString::fromUtf8(QJsonDocument(changes).toJson(QJsonDocument::Compact)));
+}
+
+void Backend::saveLiveImage(int token, const QString &name, const QString &mime, const QString &base64) {
+    // Pasted or dropped images live in an images/ folder beside the document,
+    // referenced by a relative path, so the file stays portable with its folder.
+    if (!m_fileUrl.isLocalFile()) { m_editorBridge->replyImageSaved(token, QString(), QStringLiteral("Save the document first so the image can be stored beside it.")); return; }
+    const QMap<QString, QString> extensions{{"image/png", "png"}, {"image/jpeg", "jpg"}, {"image/gif", "gif"}, {"image/webp", "webp"}};
+    if (!extensions.contains(mime)) { m_editorBridge->replyImageSaved(token, QString(), QStringLiteral("Only PNG, JPEG, GIF or WebP images can be inserted.")); return; }
+    const QByteArray bytes = QByteArray::fromBase64(base64.toLatin1());
+    if (bytes.isEmpty() || bytes.size() > 20 * 1024 * 1024) { m_editorBridge->replyImageSaved(token, QString(), QStringLiteral("The image is empty or larger than 20 MiB.")); return; }
+    {
+        QBuffer buffer; buffer.setData(bytes); buffer.open(QIODevice::ReadOnly);
+        QImageReader reader(&buffer);
+        if (reader.read().isNull()) { m_editorBridge->replyImageSaved(token, QString(), QStringLiteral("The image data could not be decoded.")); return; }
+    }
+    const QDir documentDir = QFileInfo(m_fileUrl.toLocalFile()).absoluteDir();
+    if (!documentDir.mkpath(QStringLiteral("images"))) { m_editorBridge->replyImageSaved(token, QString(), QStringLiteral("Could not create the images folder.")); return; }
+    QString stem = QFileInfo(name).completeBaseName().trimmed();
+    stem.replace(QRegularExpression(QStringLiteral("[^A-Za-z0-9._-]+")), QStringLiteral("-"));
+    while (stem.startsWith('.') || stem.startsWith('-')) stem.remove(0, 1);
+    while (stem.endsWith('.') || stem.endsWith('-')) stem.chop(1);
+    if (stem.isEmpty()) stem = QStringLiteral("image");
+    const QString extension = extensions.value(mime);
+    QString fileName = stem + '.' + extension;
+    for (int n = 2; QFileInfo::exists(documentDir.filePath(QStringLiteral("images/") + fileName)); ++n)
+        fileName = stem + '-' + QString::number(n) + '.' + extension;
+    QSaveFile file(documentDir.filePath(QStringLiteral("images/") + fileName));
+    if (!file.open(QIODevice::WriteOnly) || file.write(bytes) != bytes.size() || !file.commit()) {
+        m_editorBridge->replyImageSaved(token, QString(), QStringLiteral("Could not write the image file."));
+        return;
+    }
+    m_editorBridge->replyImageSaved(token, QStringLiteral("images/") + fileName, QString());
 }
 
 void Backend::resolveLiveImage(int token, const QString &src) {

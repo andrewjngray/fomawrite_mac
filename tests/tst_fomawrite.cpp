@@ -72,6 +72,8 @@ private slots:
     void liveChangesApplyToDocumentByteExactly();
     void liveBridgeReplaysStateToLatePage();
     void liveImagesResolveThroughTheHost();
+    void liveImagesSaveBesideTheDocument();
+    void liveEditorPastesImagesThroughTheHost();
     void liveEditorPageMirrorsUserEditsByteExactly();
     void liveEditorRoundTripsPersistenceFixturesThroughThePage();
     void liveEditorLoadsLargeDocumentQuickly();
