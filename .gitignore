@@ -17,104 +17,15 @@ Makefile
 # Menu audit raw captures can contain private window content.
 /research/menu-audit-2026-09-12/raw/
 
-# Cycle112 keeps final Dev captures and compact reports; exclude duplicate/intermediate pixels.
-/research/cycle-112/initial/
-/research/cycle-112/native/
-/research/cycle-112/demo/*.png
-/research/cycle-112/applications/*.png
-
-# Keep raw Cycle112 machine reports and screenshots local; publish the summary.
-/research/cycle-112/*
-!/research/cycle-112/README.md
-!/research/cycle-112/verified-builds.json
-
-# Publish reviewed cycle summaries; keep generated native evidence local.
-/research/cycle-113/*
-!/research/cycle-113/README.md
-!/research/cycle-113/verified-builds.json
-/research/cycle-114/*
-!/research/cycle-114/README.md
-!/research/cycle-114/verified-builds.json
-/research/cycle-115/*
-!/research/cycle-115/README.md
-!/research/cycle-115/verified-builds.json
-/research/cycle-116/*
-!/research/cycle-116/README.md
-!/research/cycle-116/verified-builds.json
-
-/research/cycle-117/*
-!/research/cycle-117/README.md
-!/research/cycle-117/verified-builds.json
-
-# Cycle118 local UI evidence; publish only the reviewed handoff and identities.
-/research/cycle-118/*
-!/research/cycle-118/README.md
-!/research/cycle-118/verified-builds.json
-
-# Cycle119 local UI evidence.
-/research/cycle-119/*
-!/research/cycle-119/README.md
-!/research/cycle-119/verified-builds.json
-
-# Cycle120 local UI evidence.
-/research/cycle-120/*
-!/research/cycle-120/README.md
-!/research/cycle-120/verified-builds.json
-
-# Cycle121 local UI evidence.
-/research/cycle-121/*
-!/research/cycle-121/README.md
-!/research/cycle-121/verified-builds.json
-
-# Cycle122 local UI evidence.
-/research/cycle-122/*
-!/research/cycle-122/README.md
-!/research/cycle-122/verified-builds.json
-
-# Cycle123 local UI evidence.
-/research/cycle-123/*
-!/research/cycle-123/README.md
-!/research/cycle-123/verified-builds.json
+# Cycle evidence: every research/cycle-*/ folder publishes only its reviewed
+# summary (README.md) and verified build identities (verified-builds.json).
+# Raw native reports, screenshots and private captures stay local. Files that
+# were committed before this rule stay tracked; stage any new extra file with
+# the force flag only after reviewing it for private writing.
+/research/cycle-*/*
+!/research/cycle-*/README.md
+!/research/cycle-*/verified-builds.json
 
 # Personal correspondence and raw desktop reference captures stay local.
 /examples/ken_email.md
 /screenshots/
-
-# Cycle124 local UI and private document comparisons.
-/research/cycle-124/*
-!/research/cycle-124/README.md
-!/research/cycle-124/verified-builds.json
-
-# Cycle125 local native theme verification.
-/research/cycle-125/*
-!/research/cycle-125/README.md
-!/research/cycle-125/verified-builds.json
-
-# Cycle126 local theme-gallery verification.
-/research/cycle-126/*
-!/research/cycle-126/README.md
-!/research/cycle-126/verified-builds.json
-
-# Cycle127 local preview-continuity and private-document evidence.
-/research/cycle-127/*
-!/research/cycle-127/README.md
-!/research/cycle-127/verified-builds.json
-
-# Cycle128 local preview identity and rendering evidence.
-/research/cycle-128/*
-!/research/cycle-128/README.md
-!/research/cycle-128/verified-builds.json
-
-# Cycle129 local startup reports may contain private themes, writing and captures.
-/research/cycle-129/*
-!/research/cycle-129/README.md
-!/research/cycle-129/verified-builds.json
-
-# Cycle130 local menu and preview verification.
-/research/cycle-130/*
-!/research/cycle-130/README.md
-!/research/cycle-130/verified-builds.json
-/research/cycle-131/*
-!/research/cycle-131/README.md
-/research/cycle-132/*
-!/research/cycle-132/README.md

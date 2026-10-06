@@ -1,12 +1,14 @@
 # Acceptance ledger — current follow-through and Cycle 59 history
 
+> The current review build, test count and open items are summarised in [STATUS.md](../STATUS.md); this ledger keeps the per-cycle acceptance history.
+
 ## Current review build — Cycle 132
 
-**0.3.0-dev28 / macOS 0.3.0 (132)** makes the publishing preview robust against the conditions behind the Cycle 127–129 incidents: unrelated changes in the themes folder no longer cancel renders, the selected theme's CSS and decoded images are memoized so cache hits are cheap, failures keep the current document's last readable output, Web mode completes without depending on a viewport script, and the themes folder is never recreated by a refresh. ****212 passed, 0 failed, 0 skipped** (208 prior + 4 new; one test re-specified), with the two known Qt Material `SplitView` warnings unchanged. The folder test was strengthened to force a refresh after that run and re-verified green on its own.** Source/tests only; no bundle refreshed. [Evidence and limits](../research/cycle-132/README.md). Findings A1–A8/E4 of the [independent review](../../INDEPENDENT_REVIEW.md) are addressed.
+**0.3.0-dev28 / macOS 0.3.0 (132)** makes the publishing preview robust against the conditions behind the Cycle 127–129 incidents: unrelated changes in the themes folder no longer cancel renders, the selected theme's CSS and decoded images are memoized so cache hits are cheap, failures keep the current document's last readable output, Web mode completes without depending on a viewport script, and the themes folder is never recreated by a refresh. ****212 passed, 0 failed, 0 skipped** (208 prior + 4 new; one test re-specified), with the two known Qt Material `SplitView` warnings unchanged. The folder test was strengthened to force a refresh after that run and re-verified green on its own.** Source/tests only; no bundle refreshed. [Evidence and limits](../research/cycle-132/README.md). Findings A1–A8/E4 of the [independent review](../INDEPENDENT_REVIEW.md) are addressed.
 
 ## Previous review build — Cycle 131
 
-**0.3.0-dev27 / macOS 0.3.0 (131)** makes file persistence byte-exact: untouched documents round-trip byte-for-byte (CRLF, CR, BOM, no-break spaces, U+2028), edits keep the file's own conventions, non-UTF-8/UTF-16 files are readable but cannot be saved in place (Save As writes a UTF-8 copy), CRLF files autosave/rename/move again, and a manual Save that would overwrite a newer on-disk version is stopped with a File changed / Save Anyway choice. **208 regressions pass, 0 failed, 0 skipped.** Source/tests only; no bundle refreshed. [Evidence and limits](../research/cycle-131/README.md). Findings C1–C6 of the [independent review](../../INDEPENDENT_REVIEW.md) are addressed; its other findings remain open.
+**0.3.0-dev27 / macOS 0.3.0 (131)** makes file persistence byte-exact: untouched documents round-trip byte-for-byte (CRLF, CR, BOM, no-break spaces, U+2028), edits keep the file's own conventions, non-UTF-8/UTF-16 files are readable but cannot be saved in place (Save As writes a UTF-8 copy), CRLF files autosave/rename/move again, and a manual Save that would overwrite a newer on-disk version is stopped with a File changed / Save Anyway choice. **208 regressions pass, 0 failed, 0 skipped.** Source/tests only; no bundle refreshed. [Evidence and limits](../research/cycle-131/README.md). Findings C1–C6 of the [independent review](../INDEPENDENT_REVIEW.md) are addressed; its other findings remain open.
 
 ## Previous review build — Cycle 130
 
@@ -89,7 +91,7 @@ The next priority is Andrew’s normal composition and active-app keyboard revie
 
 ## Historical Cycle 59 checkpoint and subsequent September follow-ups
 
-**Cycle 60 product identity:** Current source and local bundles use Fomawrite/Fomawrite Dev. Historical Cycle 59 evidence and the iA parity gaps below remain as recorded; the rename is not a parity claim. See [rename notes](product-rename.md).
+**Cycle 60 product identity:** Current source and local bundles use Fomawrite/Fomawrite Dev. Historical Cycle 59 evidence and the iA parity gaps below remain as recorded; the rename is not a parity claim. See [rename notes](archive/product-rename.md).
 
 **24 September follow-up — Cycle 50b:** Edit → Transformations now has all four captured labels and a directly observed Capitalize subset. The current `./bin/build` and full native-access `./bin/test` pass **102/0/0**. Refreshed Dev verified `tEST of THE wORLD` → `Test Of The World` and first Undo on a disposable draft; ordinary and Dev bundles were refreshed and strict-signature verified. Cycle 50c subsequently separated Make Title Case and matched two observed iA samples, with the same 102/0/0 suite; unobserved title-style rules remain open. [Capitalize record](../research/cycle-50/native-capitalize.txt), [Title Case record](../research/cycle-50/native-title-case.txt).
 

@@ -1,6 +1,6 @@
 # Next development phases: visual writing and export styles
 
-Proposed 25 September 2026 after Cycle 61; updated after the Cycle 62–69 implementation pass. The table records original gates, not a claim that every gate is complete. It adds Ulysses and Typora-inspired work to the existing [iA Writer menu backlog](ia-writer-inventory.md) and [release acceptance ledger](release-acceptance.md); the open iA gaps remain open. Cycle numbers are proposed sequential checkpoints and may split into lettered increments when needed.
+Proposed 25 September 2026 after Cycle 61; updated after the Cycle 62–69 implementation pass. The table records original gates, not a claim that every gate is complete. It adds Ulysses and Typora-inspired work to the existing [iA Writer menu backlog](../ia-writer-inventory.md) and [release acceptance ledger](../release-acceptance.md); the open iA gaps remain open. Cycle numbers are proposed sequential checkpoints and may split into lettered increments when needed.
 
 ## Reference audit and current baseline
 

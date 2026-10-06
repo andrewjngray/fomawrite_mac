@@ -20,4 +20,4 @@ Status: **in progress; native capture blocked pending approval for incidental pr
 
 Capture each top-level dropdown and each static submenu separately. Record disabled items and keyboard shortcuts; do not execute commands just to inventory them. Dynamic Recent/Window lists must be excluded or redacted before any shared capture. Raw screenshots, if approved, stay local and untracked. Store menu-only reviewed images under the respective app folders.
 
-See docs/menu-comparison.md for the working matrix and proposed sequence. No product code changed during this audit.
+See docs/archive/menu-comparison.md for the working matrix and proposed sequence. No product code changed during this audit.

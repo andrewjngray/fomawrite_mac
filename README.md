@@ -2,7 +2,7 @@
 
 Fomawrite is a calm, local-file Markdown editor for macOS, built with Qt Quick/QML and C++. It grew from the MIT-licensed [Omawrite project](https://github.com/omacom/omawrite); that history and attribution remain in this repository. The writing files stay plain UTF-8 Markdown.
 
-The current app supports a resizable library and organizer, live preview, native menus and file dialogs, Markdown formatting, local links, search, themes, focus tools, export/print, recovery and unsaved-change protection. The [iA Writer menu audit](docs/ia-menu-audit-2026-09-23.md) distinguishes working behavior from partial support and unverified features. Fomawrite is **not yet a full iA Writer or Typora replacement**.
+The current app supports a resizable library and organizer, live preview, native menus and file dialogs, Markdown formatting, local links, search, themes, focus tools, export/print, recovery and unsaved-change protection. The [iA Writer menu audit](docs/archive/ia-menu-audit-2026-09-23.md) distinguishes working behavior from partial support and unverified features. Fomawrite is **not yet a full iA Writer or Typora replacement**.
 
 ## Build and run
 
@@ -32,15 +32,15 @@ To verify the UI inside a specific local bundle, using disposable documents and 
 
 This runs native Qt pointer-event checks, captures the app's window and compares embedded QML/version metadata with the checkout. It does not use macOS accessibility automation or touch the normal workspace. The report identifies the tested executable. Use **Fomawrite → About Fomawrite** to identify a normally running copy.
 
-The first launch of a renamed Mac bundle migrates prior preferences and copies matching workspace/recovery state from the matching former Omawrite identity, leaving the old files in place. Existing hidden `.omawrite-authors.json` sidecars and clipboard metadata remain compatible so a product rename does not discard authorship annotations. [Migration details](docs/product-rename.md).
+The first launch of a renamed Mac bundle migrates prior preferences and copies matching workspace/recovery state from the matching former Omawrite identity, leaving the old files in place. Existing hidden `.omawrite-authors.json` sidecars and clipboard metadata remain compatible so a product rename does not discard authorship annotations. [Migration details](docs/archive/product-rename.md).
 
 ## Project and status
 
-Current review build: **0.3.0-dev28 / macOS 0.3.0 (132)** — publishing robustness ([Cycle132 record](research/cycle-132/README.md)); Cycle 131 added byte-exact persistence ([record](research/cycle-131/README.md)). Both act on the [independent review](INDEPENDENT_REVIEW.md). The compact **Output Style → Custom Themes** menu is described in the [menu guide](docs/output-style-menu.md) and [Cycle130 verification](research/cycle-130/README.md).
+The current review build, test count and open items live in **[STATUS.md](STATUS.md)** — the only place they are recorded. [CHANGELOG.md](CHANGELOG.md) has one line per cycle with links to each cycle's record under `research/cycle-NN/`, and [ARCHITECTURE.md](ARCHITECTURE.md) maps the source. The latest cycles act on the [independent review](INDEPENDENT_REVIEW.md). The compact **Output Style → Custom Themes** menu is described in the [menu guide](docs/output-style-menu.md).
 
 For an independent developer review, start with the [developer handoff](DEVELOPER_HANDOFF.md): implemented behavior, source/build/data locations, Git baseline, verification evidence and remaining review priorities.
 
-Source lives in `src/` (QML interface, C++ document I/O and formatting), `macos/` (bundle metadata), `bin/` (build and packaging), and `tests/` (Qt checks). The [roadmap](docs/roadmap.md), [cycle log](docs/build-cycles.md) and [acceptance ledger](docs/release-acceptance.md) track current work and explicit gaps. Cycle 60 is the Fomawrite identity migration; the prior menu work remains an implemented subset.
+Source lives in `src/` (QML interface, C++ document I/O and formatting), `macos/` (bundle metadata), `bin/` (build and packaging), and `tests/` (Qt checks). The [roadmap](docs/roadmap.md) and [acceptance ledger](docs/release-acceptance.md) hold the longer history of goals and explicit gaps; the [cycle log](docs/archive/build-cycles.md) is frozen at Cycle 132 and superseded by `CHANGELOG.md`. Cycle 60 is the Fomawrite identity migration; the prior menu work remains an implemented subset.
 
 The project repository is [andrewjngray/fomawrite_mac](https://github.com/andrewjngray/fomawrite_mac). `upstream` remains the original Omawrite repository. The earlier Mac 0.2.0 RC1 download uses the old name and predates the later menu cycles; do not present it as this Fomawrite build.
 
@@ -50,17 +50,9 @@ The upstream Omawrite code is copyright David Heinemeier Hansson and remains und
 
 Semantic publishing uses [MD4C 0.5.3](src/vendor/md4c/LICENSE.md), copyright Martin Mitáš, under the MIT license. Its notice is included in app bundles.
 
-## Current workspace review build
+## What the app does today
 
-Cycle **129**, **0.3.0-dev25 / macOS 0.3.0 (129)**, repairs a separate theme-watcher loop that kept restarting publishing generation on normal macOS startup. The old implementation fails the new native cold/restored startup check with a populated copy of Andrew's themes; the corrected implementation passes. Cycle128's document-identity repair remains valid, but its checks missed this startup failure. **204 final regressions pass, with zero failures/skips.** Final verification and bundle status are recorded in the [Cycle129 handoff](research/cycle-129/README.md).
-
-Previous Cycle **128**, **0.3.0-dev24 / macOS 0.3.0 (128)**, repaired stale document identity and screenshot-gated replacement. Its 202 passing regressions and native component checks did not establish normal startup with the populated user theme folder. [Historical verification](research/cycle-128/README.md).
-
-Previous Cycle **127**, **0.3.0-dev23 / macOS 0.3.0 (127)**, attempted to keep publishing previews readable around unavailable images, reuses unchanged output and retains painted content while replacement pages load. **197 regressions pass; Dev and the installed copy each pass 159 native checks.** Andrew subsequently reported stale/blank PDFs; Cycle128 replaces its screenshot-dependent refresh. [Historical verification](research/cycle-127/README.md).
-
-Cycle **126**, **0.3.0-dev22 / macOS 0.3.0 (126)**, adds **Get More Themes…** in the publishing menus and export dialog, opening [Typora’s theme gallery](https://theme.typora.io/). [Build verification](research/cycle-126/README.md).
-
-Cycle **125**, **0.3.0-dev21 / macOS 0.3.0 (125)**, repairs folder-based publishing themes. Copy top-level CSS files and their resource folders into **Open Themes Folder**; the menu and selected preview refresh automatically. Import Theme uses that same folder. Only the accepted selection stays checked; failures and font fallbacks are explained. CSS themes are separate from basic font/page settings, and long menus scroll above the footer. **195 regressions and 157 native checks per app copy pass**; installed-copy identities are recorded in the [Cycle125 handoff](research/cycle-125/README.md).
+Build identity and verification status are in [STATUS.md](STATUS.md); the history of each build (Cycles 125–132 and earlier) is in [CHANGELOG.md](CHANGELOG.md) and the linked `research/cycle-NN/README.md` records. The paragraphs below describe the current behaviour.
 
 The left pane owns **Source / Visual Edit** and writing appearance. The right pane is read-only publishing output with **Web / PDF** and its output style. **Single / Split** remains a separate group at the far right. Web renders the exported HTML; PDF displays the actual exported pages, including paper settings and page furniture.
 

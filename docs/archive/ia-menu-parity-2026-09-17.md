@@ -55,15 +55,15 @@ Implemented in source and covered by automated checks; native sign-off remains p
 | V13 | Native label follows enter/exit state; existing fullscreen shortcut retained. |
 | C01 / C03 / C04 | Existing independent paragraph/typewriter controls exposed in Focus; master-switch semantics and sentence focus remain partial. |
 
-Outline, statistics and Markdown markup visibility are also exposed in View. See [Cycle 14 evidence](../research/cycle-14/README.md). No full row is promoted to verified iA parity solely from automated menu tests.
+Outline, statistics and Markdown markup visibility are also exposed in View. See [Cycle 14 evidence](../../research/cycle-14/README.md). No full row is promoted to verified iA parity solely from automated menu tests.
 
 ## Cycle 17 implementation overlay
 
-E01/E02/E09/E10: focused-field Undo/Redo/Cut/Copy/Paste/Delete/Select All states; Find submenu with Find, Replace, Next/Previous and selection search. Literal case-insensitive matching and single-step replacement undo tested; native menu/replacement/wrapping verified. 34 tests pass. Hidden reference options remain unverified; rich clipboard remains Cycle 19. [Evidence](../research/cycle-17/README.md).
+E01/E02/E09/E10: focused-field Undo/Redo/Cut/Copy/Paste/Delete/Select All states; Find submenu with Find, Replace, Next/Previous and selection search. Literal case-insensitive matching and single-step replacement undo tested; native menu/replacement/wrapping verified. 34 tests pass. Hidden reference options remain unverified; rich clipboard remains Cycle 19. [Evidence](../../research/cycle-17/README.md).
 
 ## Cycle 16b implementation overlay
 
-**F10 Move To — implemented local workflow; verification partial.** Select a folder, retain filename/dirty buffer/undo, copy saved bytes exclusively, verify destination/recheck source before removal, update recovery/watcher/organizer paths. Failed removal leaves both files and original active. 33 tests pass including picker acceptance and permission failure. Live picker navigation/collision/cancel pass; live successful move and separate-volume testing remain pending. Qt picker used on macOS because native Open stayed disabled. Relative assets are not relocated. [Evidence and limits](../research/cycle-16b/README.md).
+**F10 Move To — implemented local workflow; verification partial.** Select a folder, retain filename/dirty buffer/undo, copy saved bytes exclusively, verify destination/recheck source before removal, update recovery/watcher/organizer paths. Failed removal leaves both files and original active. 33 tests pass including picker acceptance and permission failure. Live picker navigation/collision/cancel pass; live successful move and separate-volume testing remain pending. Qt picker used on macOS because native Open stayed disabled. Relative assets are not relocated. [Evidence and limits](../../research/cycle-16b/README.md).
 
 ## Cycle 16a completion overlay
 
@@ -71,7 +71,7 @@ E01/E02/E09/E10: focused-field Undo/Redo/Cut/Copy/Paste/Delete/Select All states
 - **F09 Rename — implemented local subset:** same-folder rename retains text/undo and updates active URL, watcher, recovery, recents and favorites. Native collision/cancel/dirty rename/save and automated Unicode/recovery/watch checks pass. Case-only rename on insensitive filesystems is refused; cross-window coordination and recovery relaunch remain unverified.
 - **F10 Move To — see Cycle 16b overlay above.** No autosave/version/native-title integration claim.
 
-Build and 32 tests pass. [Cycle 16a evidence](../research/cycle-16a/README.md). Audit-baseline rows below remain historical; this overlay records current support.
+Build and 32 tests pass. [Cycle 16a evidence](../../research/cycle-16a/README.md). Audit-baseline rows below remain historical; this overlay records current support.
 
 ## Cycle 15 completion overlay
 
@@ -83,7 +83,7 @@ Build and 32 tests pass. [Cycle 16a evidence](../research/cycle-16a/README.md). 
 | F13 | Explicit reveal clears filter, expands ancestors, switches outside-root location and scrolls to row. Automated nested/outside-root coverage and native filter-clear check passed. |
 | F04/F06/F07 | Existing open/save/close retained; native sample Save passed. A picker attempt was inconclusive; no blanket native lifecycle sign-off. |
 
-New Folder is also exposed in File. Build and 31 tests pass. No claim of version/autosave/duplicate/rename/move support. See [Cycle 15 evidence](../research/cycle-15/README.md).
+New Folder is also exposed in File. Build and 31 tests pass. No claim of version/autosave/duplicate/rename/move support. See [Cycle 15 evidence](../../research/cycle-15/README.md).
 
 ## File — S1
 
@@ -223,7 +223,7 @@ The tag list continues below the screenshot. Its individual personal values are 
 
 ## Remaining reference capture work
 
-No screenshots in this batch open the iA Writer application menu, Authors or Help. Keep the earlier [reference inventory](ia-writer-inventory.md) for these, with its older evidence date. None of the visible nested submenus are expanded. Before implementing the corresponding cycle, inspect those children using a sample document, including enabled/disabled states and modifier-key variants. Export formats, share targets, version behavior, completion behavior and settings are not established by a top-level label.
+No screenshots in this batch open the iA Writer application menu, Authors or Help. Keep the earlier [reference inventory](../ia-writer-inventory.md) for these, with its older evidence date. None of the visible nested submenus are expanded. Before implementing the corresponding cycle, inspect those children using a sample document, including enabled/disabled states and modifier-key variants. Export formats, share targets, version behavior, completion behavior and settings are not established by a top-level label.
 
 ## Implementation evidence
 

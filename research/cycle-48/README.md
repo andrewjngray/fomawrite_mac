@@ -1,6 +1,6 @@
 # Cycle 48 evidence
 
-Scope: selectable created/modified/hidden dates in the library, with one command state shared by native and in-window menus. See [cycle record](../../docs/build-cycles.md) and [usability exercise](../usability/cycle-48.md).
+Scope: selectable created/modified/hidden dates in the library, with one command state shared by native and in-window menus. See [cycle record](../../docs/archive/build-cycles.md) and [usability exercise](../usability/cycle-48.md).
 
 Build and tests: `./bin/build` passed; `./bin/test` passed with 78 tests and zero failures. `./bin/prepare-dev-app` passed, including strict signature verification. `./bin/package-mac` produced the ordinary locally ad-hoc-signed app. Existing Qt font-alias and SplitView teardown warnings remain.
 

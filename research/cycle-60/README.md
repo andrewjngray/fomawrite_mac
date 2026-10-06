@@ -1,6 +1,6 @@
 # Cycle 60 — Fomawrite identity migration
 
-This cycle rebrands the current source and both local macOS bundles while retaining upstream attribution and the old storage formats that hold user metadata. No private writing or screenshot was copied into this record. [Migration decisions](../../docs/product-rename.md).
+This cycle rebrands the current source and both local macOS bundles while retaining upstream attribution and the old storage formats that hold user metadata. No private writing or screenshot was copied into this record. [Migration decisions](../../docs/archive/product-rename.md).
 
 A sandbox-only test attempt could not create the new test identity’s Application Support state; the required native-access run was used for acceptance. `./bin/build` passed. The full native-access `./bin/test` passed **102 tests, zero failures, zero skips**; see [build log](build.log) and [test log](test.log). Both local bundles were regenerated ([package log](package.log)); bundle IDs are `io.github.andrewjngray.fomawrite` and `io.github.andrewjngray.fomawrite.dev`, and both passed `codesign --verify --deep --strict`.
 

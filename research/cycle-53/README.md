@@ -1,6 +1,6 @@
 # Cycle 53: Go menu and bounded hashtag refresh (native QA pending)
 
-Synthetic fixtures live under `sample/`. The captured Go menu is mapped in `docs/ia-menu-audit-2026-09-23.md`; this source checkpoint adds menu access to existing library navigation, recent files, saved queries and hashtags without changing Markdown storage.
+Synthetic fixtures live under `sample/`. The captured Go menu is mapped in `docs/archive/ia-menu-audit-2026-09-23.md`; this source checkpoint adds menu access to existing library navigation, recent files, saved queries and hashtags without changing Markdown storage.
 
 Go → Smart Folders lists saved queries and opens a blank Quick Search for New Smart Folder. A query is persisted only on Save. Unavailable roots and missing recent files cannot silently redirect the library. The present Recents submenu does not yet match iA's direct Recents action.
 

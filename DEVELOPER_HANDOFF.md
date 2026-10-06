@@ -13,7 +13,7 @@ Prepared **6 October 2026 (Pacific/Auckland)** for Andrew Gray. This is a snapsh
 - Historical Cycle129 source/test commit: **`cf0ed37982169f01773441b31d7d0759f5a98e81`**. The following documentation commit records its verified bundle identities. Historical Cycle128 baseline: `0466c3c3cdaad3ae0b0a35bb87607a0c9cd8b50b`.
 - Authoritative current evidence: [Cycle130 report](research/cycle-130/README.md) and [manifest](research/cycle-130/verified-builds.json). The Output Style/Custom Themes menu is explained in [the user guide](docs/output-style-menu.md). The Cycle129 incident evidence remains below.
 
-Read [AGENTS.md](AGENTS.md), [README](README.md), this handoff, and the [current acceptance ledger](docs/release-acceptance.md) before changing behavior. The [complete cycle log](docs/build-cycles.md) preserves the detailed history. Older plans contain historical checkpoints; use the current source and latest cycle evidence when they differ.
+Read [AGENTS.md](AGENTS.md), [README](README.md), this handoff, and the [current acceptance ledger](docs/release-acceptance.md) before changing behavior. The [complete cycle log](docs/archive/build-cycles.md) preserves the detailed history. Older plans contain historical checkpoints; use the current source and latest cycle evidence when they differ.
 
 ## 2. Product intent and agreed behavior
 
@@ -69,9 +69,9 @@ The repository contains many incremental cycles. This groups the work by capabil
 
 | Cycles | Main work | Record |
 | --- | --- | --- |
-| 60–61 | Fomawrite identity/migration and checkout rename | [Rename design](docs/product-rename.md) |
+| 60–61 | Fomawrite identity/migration and checkout rename | [Rename design](docs/archive/product-rename.md) |
 | 90–108 | Workspace redesign, mapped editing/navigation, responsive controls and bundle checks | [Workspace plan](docs/workspace-ui-redesign-plan.md) |
-| 109–116 | Lists, outline, find, pane zoom, formatting focus, links and table navigation | [Cycle log](docs/build-cycles.md) |
+| 109–116 | Lists, outline, find, pane zoom, formatting focus, links and table navigation | [Cycle log](docs/archive/build-cycles.md) |
 | 117–118 | Pane-owned footer controls, filename/file-list clarity, separate Editing/Layout groups | [117](research/cycle-117/README.md), [118](research/cycle-118/README.md) |
 | 119–121 | Left editing/right publishing, quiet bars, sticky reveal and visibility preferences | [119](research/cycle-119/README.md), [120](research/cycle-120/README.md), [121](research/cycle-121/README.md) |
 | 122–123 | Literal readable Source, Code appearance, hanging headings and block shading | [122](research/cycle-122/README.md), [123](research/cycle-123/README.md) |
@@ -222,6 +222,6 @@ A minimum manual preview matrix should include two unmistakably different docume
 
 > Please independently review Fomawrite at the repository and baseline above. Start with the latest publishing-preview regressions and their tests, then assess document integrity, theme handling, native workflows and maintainability. Build and run the applicable checks; distinguish recorded historical results from your own observations. Use disposable fixtures and preserve existing user files/settings. For each finding, give severity, source file/line, reproduction, expected versus actual behavior, proposed fix and a regression test that would catch it. Separate confirmed defects from hypotheses and optional improvements. Recommend a short prioritized next cycle rather than a broad rewrite.
 
-Further references: [iA Writer inventory](docs/ia-writer-inventory.md), [menu audit](docs/ia-menu-audit-2026-09-23.md), [editor redesign](docs/editor-surface-redesign.md), [roadmap](docs/roadmap.md), [acceptance ledger](docs/release-acceptance.md), and [cycle log](docs/build-cycles.md).
+Further references: [iA Writer inventory](docs/ia-writer-inventory.md), [menu audit](docs/archive/ia-menu-audit-2026-09-23.md), [editor redesign](docs/editor-surface-redesign.md), [roadmap](docs/roadmap.md), [acceptance ledger](docs/release-acceptance.md), and [cycle log](docs/archive/build-cycles.md).
 
 Licenses to preserve: [MIT](LICENSE), [iA Writer Mono SIL OFL](fonts/OFL.txt), and [MD4C MIT](src/vendor/md4c/LICENSE.md). Personal reference documents and themes should not be added to the public repository merely to support a review.
