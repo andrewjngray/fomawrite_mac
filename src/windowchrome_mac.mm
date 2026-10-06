@@ -1,3 +1,4 @@
+#include "macbridge.h"
 #include <QVariantMap>
 #include <QFile>
 #include <QGuiApplication>

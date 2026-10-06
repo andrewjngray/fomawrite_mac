@@ -2178,11 +2178,6 @@ ApplicationWindow {
             saveFileDialog.open();
         }
 
-        function onCloseAfterSave() {
-            win.closeConfirmed = true;
-            win.close();
-        }
-
         function onSaveFailed() { win.awaitingPendingSave = false; win.pendingAction = ""; }
 
         function onSaveSucceeded() {

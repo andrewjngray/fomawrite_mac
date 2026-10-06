@@ -28,6 +28,7 @@
 #include "workspace.h"
 
 #include "backend.h"
+#include "macbridge.h"
 #include "systemtheme.h"
 #include "documentviewcheck.h"
 #ifdef FOMAWRITE_STARTUP_PREVIEW_CHECK
@@ -196,7 +197,7 @@ int main(int argc, char *argv[]) {
 
     // Carry the desktop's text scale into the default font, so the chrome that
     // inherits it (dialog titles, buttons) grows along with the writing area.
-#ifdef Q_OS_MAC
+#ifdef Q_OS_MACOS
     const QFont interfaceFont = QFontDatabase::systemFont(QFontDatabase::GeneralFont);
 #else
     const QFont interfaceFont(QStringLiteral("iA Writer Mono S"));

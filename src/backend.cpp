@@ -26,6 +26,7 @@
 #include <QTextBoundaryFinder>
 #include <QStringDecoder>
 #include "backend.h"
+#include "macbridge.h"
 #include "sourcevisualmapping.h"
 #include <QClipboard>
 #include <QColor>
@@ -366,7 +367,6 @@ bool Backend::libraryItemAction(const QUrl &url, const QString &action, const QS
         if (owner && owner->modified())
             return fail("Save this document before sharing so the shared file includes your latest edits.");
 #ifdef Q_OS_MACOS
-        extern bool shareMacFile(QWindow *, const QString &);
         if (!shareMacFile(m_parentWindow, path)) return fail("Could not open sharing options for this window.");
         return true;
 #else
@@ -553,9 +553,6 @@ Backend::Backend(QObject *parent, bool outputOnly) : QObject(parent), m_library(
             }
         }
     }
-    m_wordCountTimer.setSingleShot(true);
-    m_wordCountTimer.setInterval(120);
-    connect(&m_wordCountTimer, &QTimer::timeout, this, &Backend::refreshWordCount);
     m_recoveryTimer.setSingleShot(true);
     m_recoveryTimer.setInterval(750);
     connect(&m_recoveryTimer, &QTimer::timeout, this, &Backend::writeRecovery);
@@ -2048,16 +2045,6 @@ void Backend::save() {
     saveTo(m_fileUrl);
 }
 
-void Backend::saveForClose() {
-    if (!m_modified) {
-        emit closeAfterSave();
-        return;
-    }
-
-    m_closeAfterSave = true;
-    save();
-}
-
 void Backend::saveAsDialog() {
     emit saveDialogRequested(suggestedSaveUrl());
 }
@@ -2067,7 +2054,7 @@ void Backend::saveAs(const QUrl &url) {
 }
 
 void Backend::fileDialogCanceled() {
-    m_closeAfterSave = false;
+    // Close-after-save is owned by the window's pending action; nothing to reset.
 }
 
 void Backend::discardRecovery() {
@@ -2434,7 +2421,6 @@ bool Backend::editorTextChanged() {
 
     if (m_document) reapplyTypographyToChange();
 
-    scheduleWordCount();
     emit documentStatisticsChanged();
     setModified(true);
     setStatus(QStringLiteral("Unsaved"));
@@ -2519,8 +2505,6 @@ void Backend::loadDocumentText(const QString &text) {
     m_loading = false;
 
     applyDocumentTypography();
-    m_wordCountTimer.stop();
-    setWordCount(countWords(text));
     emit documentLoaded();
 }
 
@@ -2562,7 +2546,6 @@ void Backend::saveTo(const QUrl &url, bool protectExternalChanges) {
         emit saveFailed(); emit quitCanceled(); return;
     }
     if (!url.isLocalFile()) {
-        m_closeAfterSave = false;
         setStatus(QStringLiteral("Only local files can be saved."));
         emit saveFailed();
         emit quitCanceled();
@@ -2573,7 +2556,6 @@ void Backend::saveTo(const QUrl &url, bool protectExternalChanges) {
     if (sameDocument && m_lossyDecode) {
         // The bytes on disk were not read exactly; writing our decoded text
         // over them would destroy the original. Save As elsewhere is allowed.
-        m_closeAfterSave = false;
         setStatus(QStringLiteral("Save paused: %1 is not valid UTF-8 and was not read exactly. Use Save As to write a UTF-8 copy.").arg(targetName));
         emit saveFailed();
         emit quitCanceled();
@@ -2592,7 +2574,6 @@ void Backend::saveTo(const QUrl &url, bool protectExternalChanges) {
         const auto bytes = prior.readAll();
         if (prior.error() != QFile::NoError) { emit saveFailed(); emit quitCanceled(); return; }
         if (bytes != contents) {
-            extern QString createMacVersion(const QString &);
             const auto error = createMacVersion(url.toLocalFile());
             if (!error.isEmpty()) {
                 setStatus("Save paused: could not preserve the previous version. " + error);
@@ -2603,7 +2584,6 @@ void Backend::saveTo(const QUrl &url, bool protectExternalChanges) {
 #endif
     QSaveFile file(url.toLocalFile());
     if (!file.open(QIODevice::WriteOnly)) {
-        m_closeAfterSave = false;
         setStatus(QStringLiteral("Could not save %1.").arg(targetName));
         emit saveFailed();
         emit quitCanceled();
@@ -2611,7 +2591,7 @@ void Backend::saveTo(const QUrl &url, bool protectExternalChanges) {
     }
 
     if (file.write(contents) != contents.size()) {
-        file.cancelWriting(); m_closeAfterSave = false;
+        file.cancelWriting();
         setStatus("Could not write complete document; original file retained.");
         emit saveFailed(); emit quitCanceled(); return;
     }
@@ -2622,7 +2602,6 @@ void Backend::saveTo(const QUrl &url, bool protectExternalChanges) {
         if (QFileInfo(url.toLocalFile()).isSymLink() || !current.open(QIODevice::ReadOnly)
             || current.readAll() != m_lastKnownFileContents || current.error() != QFile::NoError) {
             file.cancelWriting();
-            m_closeAfterSave = false;
             setStatus(anotherView ? "Save paused: another view changed this file. Review the changes or use Save As."
                                   : "Autosave paused: file changed outside Fomawrite.");
             emit saveFailed(); emit quitCanceled(); return;
@@ -2635,7 +2614,6 @@ void Backend::saveTo(const QUrl &url, bool protectExternalChanges) {
         if (current.open(QIODevice::ReadOnly) && current.readAll() != m_lastKnownFileContents
                 && current.error() == QFile::NoError) {
             file.cancelWriting();
-            m_closeAfterSave = false;
             setStatus(QStringLiteral("Save paused: %1 changed on disk. Reload it, or keep yours and save again.").arg(targetName));
             emit externalChangeDetected(false, true);
             emit saveFailed(); emit quitCanceled(); return;
@@ -2652,15 +2630,12 @@ void Backend::saveTo(const QUrl &url, bool protectExternalChanges) {
     // returning false (and leaving the original untouched) on any write error.
     if (!file.commit()) {
         watchCurrentFile();
-        m_closeAfterSave = false;
         setStatus(QStringLiteral("Could not write %1.").arg(targetName));
         emit saveFailed();
         emit quitCanceled();
         return;
     }
 
-    const bool shouldClose = m_closeAfterSave;
-    m_closeAfterSave = false;
     m_lastKnownFileContents = contents;
     m_hasKnownFileContents = true;
     m_lossyDecode = false; // What is on disk is now exactly what we hold.
@@ -2680,8 +2655,6 @@ void Backend::saveTo(const QUrl &url, bool protectExternalChanges) {
     clearRecovery();
     emit saveSucceeded();
 
-    if (shouldClose)
-        emit closeAfterSave();
 }
 
 void Backend::scheduleRecovery() {
@@ -2908,21 +2881,6 @@ QString Backend::suggestedFileName(const QString &text) {
     return name;
 }
 
-void Backend::setWordCount(int words) {
-    if (m_wordCount == words)
-        return;
-
-    m_wordCount = words;
-    emit wordCountChanged();
-}
-
-void Backend::refreshWordCount() {
-    setWordCount(countWords(currentDocumentText()));
-}
-
-void Backend::scheduleWordCount() {
-    m_wordCountTimer.start();
-}
 
 void Backend::applyDocumentTypography() {
     if (!m_document) return;
@@ -3701,19 +3659,9 @@ bool Backend::exportDocument(const QUrl &destination, const QString &format) {
 
 void Backend::nativeWindowAction(const QString &action) {
 #ifdef Q_OS_MACOS
-    extern void performMacWindowAction(QWindow *, const QString &, const QString &);
     performMacWindowAction(m_parentWindow, action, currentDocumentText());
 #else
     Q_UNUSED(action);
-#endif
-}
-QStringList Backend::spellingIssues(const QString &text) {
-#ifdef Q_OS_MACOS
-    extern QStringList macSpellingIssues(const QString &);
-    return macSpellingIssues(text);
-#else
-    Q_UNUSED(text);
-    return {};
 #endif
 }
 
@@ -3722,7 +3670,6 @@ void Backend::setAutomaticVersions(bool enabled) { QSettings().setValue("safety/
 bool Backend::createVersion() {
 #ifdef Q_OS_MACOS
     if (!m_fileUrl.isLocalFile() || !QFileInfo::exists(m_fileUrl.toLocalFile())) return false;
-    extern QString createMacVersion(const QString &);
     const QString error = createMacVersion(m_fileUrl.toLocalFile());
     setStatus(error.isEmpty() ? "Version of saved file created." : error);
     return error.isEmpty();
@@ -3732,7 +3679,6 @@ bool Backend::createVersion() {
 }
 QVariantList Backend::versions() const {
 #ifdef Q_OS_MACOS
-    extern QVariantList macVersions(const QString &);
     return m_fileUrl.isLocalFile() ? macVersions(m_fileUrl.toLocalFile()) : QVariantList();
 #else
     return {};
@@ -3901,9 +3847,6 @@ QVariantList Backend::customReviewSpans(const QString &customWords) const {
     return styleReviewSpans(customWords, true, false);
 }
 
-void Backend::setCustomReviewWords(const QString &customWords) {
-    setStyleReviewWords(customWords, true, false);
-}
 
 void Backend::setStyleReviewWords(const QString &customWords,
                                   bool customEnabled,
@@ -3923,14 +3866,13 @@ void Backend::setStyleReviewWords(const QString &customWords,
 
 QStringList Backend::writingLanguages() const {
 #ifdef Q_OS_MACOS
-    extern QStringList macWritingLanguages(); return macWritingLanguages();
+    return macWritingLanguages();
 #else
     return {};
 #endif
 }
 QVariantList Backend::writingIssues(const QString &text, const QString &language, bool grammar) {
 #ifdef Q_OS_MACOS
-    extern QVariantList macWritingIssues(const QString &, const QString &, bool);
     return macWritingIssues(proseForReview(text),language,grammar);
 #else
     Q_UNUSED(text); Q_UNUSED(language); Q_UNUSED(grammar); return {};
@@ -3944,21 +3886,20 @@ bool Backend::correctWriting(int start,int end,const QString &expected,const QSt
 }
 void Backend::speakText(const QString &text) {
 #ifdef Q_OS_MACOS
-    extern void macSpeakText(const QString &); macSpeakText(proseForReview(text));
+    macSpeakText(proseForReview(text));
 #else
     Q_UNUSED(text);
 #endif
 }
 void Backend::stopSpeaking() {
 #ifdef Q_OS_MACOS
-    extern void macStopSpeaking(); macStopSpeaking();
+    macStopSpeaking();
 #endif
 }
 QVariantList Backend::writingAnalysis(const QString &markdown, const QString &customWords) {
     const QString text=proseForReview(markdown);
     QVariantList result;
 #ifdef Q_OS_MACOS
-    extern QVariantList macWordClasses(const QString &);
     result = macWordClasses(text.left(50000));
 #endif
     QStringList watchWords = customWords.split(',', Qt::SkipEmptyParts);
@@ -4051,7 +3992,6 @@ void Backend::loadAuthorship(const QUrl &url) {
 
 int Backend::nativeTabInset() const {
 #ifdef Q_OS_MACOS
-    extern int macTabInset(QWindow *);
     return macTabInset(m_parentWindow);
 #else
     return 0;

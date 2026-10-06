@@ -45,7 +45,6 @@ class Backend : public QObject, public PublishingSource {
     Q_PROPERTY(QString fileName READ fileName NOTIFY fileUrlChanged)
     Q_PROPERTY(bool modified READ modified NOTIFY modifiedChanged)
     Q_PROPERTY(QString status READ status NOTIFY statusChanged)
-    Q_PROPERTY(int wordCount READ wordCount NOTIFY wordCountChanged)
     Q_PROPERTY(QString themePreset READ themePreset WRITE setThemePreset NOTIFY themePresetChanged)
     Q_PROPERTY(QVariantMap palette READ palette NOTIFY themeColorsChanged)
     Q_PROPERTY(bool darkMode READ darkMode WRITE setDarkMode NOTIFY darkModeChanged)
@@ -79,7 +78,6 @@ public:
 
     bool modified() const { return m_modified; }
     QString status() const { return m_status; }
-    int wordCount() const { return m_wordCount; }
     QString themePreset() const { return m_themePreset; }
     void setThemePreset(const QString &preset);
     QVariantMap palette() const;
@@ -144,7 +142,6 @@ public:
     bool canGoBack() const { return m_historyIndex > 0; }
     bool canGoForward() const { return m_historyIndex + 1 < m_history.size(); }
     Q_INVOKABLE void save();
-    Q_INVOKABLE void saveForClose();
     Q_INVOKABLE void saveAsDialog();
     Q_INVOKABLE void saveAs(const QUrl &url);
     Q_INVOKABLE void fileDialogCanceled();
@@ -212,7 +209,6 @@ public:
     Q_INVOKABLE QVariantList styleReviewSpans(const QString &customWords,
                                                bool customEnabled,
                                                bool fillersEnabled) const;
-    Q_INVOKABLE void setCustomReviewWords(const QString &customWords);
     Q_INVOKABLE void setStyleReviewWords(const QString &customWords,
                                          bool customEnabled,
                                          bool fillersEnabled);
@@ -222,7 +218,6 @@ public:
     Q_INVOKABLE void speakText(const QString &text);
     Q_INVOKABLE void stopSpeaking();
     static QString proseForReview(const QString &markdown);
-    Q_INVOKABLE QStringList spellingIssues(const QString &text);
     Q_INVOKABLE void newDocument();
     Q_INVOKABLE bool duplicateDocument(const QString &name);
     Q_INVOKABLE bool renameDocument(const QString &name);
@@ -258,7 +253,6 @@ signals:
     void fileUrlChanged();
     void modifiedChanged();
     void statusChanged();
-    void wordCountChanged();
     void documentStatisticsChanged();
     void outputStyleChanged();
     void outputPageLayoutChanged();
@@ -274,7 +268,6 @@ signals:
     void darkModeChanged();
     void textScaleChanged();
     void themeColorsChanged();
-    void closeAfterSave();
     void openDialogRequested();
     void saveDialogRequested(const QUrl &suggestedUrl);
     void saveSucceeded();
@@ -332,9 +325,6 @@ private:
     void saveTo(const QUrl &url, bool protectExternalChanges = false);
     QUrl suggestedSaveUrl() const;
     QString currentDocumentText() const;
-    void setWordCount(int words);
-    void refreshWordCount();
-    void scheduleWordCount();
     void applyDocumentTypography();
     void reapplyTypographyToChange();
     void scheduleRecovery();
@@ -354,18 +344,15 @@ private:
     QUrl m_fileUrl;
     bool m_modified = false;
     QString m_status;
-    int m_wordCount = 0;
     bool m_systemDarkMode = true;
     QString m_themePreset = "studio";
     bool m_darkMode = true;
     qreal m_textScale = 1.0;
     bool m_loading = false;
-    bool m_closeAfterSave = false;
     bool m_formattingTypography = false;
     QMap<int, int> m_typographyUndoRanges;
     int m_observedUndoSteps = 0;
     bool m_sourceHistoryTraversal = false;
-    QTimer m_wordCountTimer;
     QTimer m_recoveryTimer;
     QFileSystemWatcher m_fileWatcher;
     QPointer<QTextDocument> m_document;
