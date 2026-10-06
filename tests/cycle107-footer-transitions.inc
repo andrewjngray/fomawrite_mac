@@ -14,7 +14,7 @@ bool cycle118FooterRenderBarrier(QQuickWindow *window) {
 }
 QMap<QString, QRectF> cycle107ViewBounds(QQuickItem *footer) {
     QMap<QString, QRectF> result;
-    for (const char *name : {"sourceModeButton", "visualEditToggle", "singleModeButton", "previewSplitButton"}) {
+    for (const char *name : {"sourceModeButton", "visualEditToggle", "liveEditToggle", "singleModeButton", "previewSplitButton"}) {
         auto *button = footer->findChild<QQuickItem *>(name);
         if (!button) return {};
         result.insert(QString::fromLatin1(name), cycle103SceneBounds(button));
@@ -31,9 +31,11 @@ bool cycle107SameBounds(const QMap<QString, QRectF> &actual, const QMap<QString,
             return false;
         }
     }
-    // Source/Visual moves together with its pane; their internal geometry is stable.
+    // Source/Visual/Live moves together with its pane; their internal geometry is stable.
     return qAbs((actual.value("visualEditToggle").left() - actual.value("sourceModeButton").left())
-        - (expected.value("visualEditToggle").left() - expected.value("sourceModeButton").left())) <= 0.1;
+        - (expected.value("visualEditToggle").left() - expected.value("sourceModeButton").left())) <= 0.1
+        && qAbs((actual.value("liveEditToggle").left() - actual.value("sourceModeButton").left())
+        - (expected.value("liveEditToggle").left() - expected.value("sourceModeButton").left())) <= 0.1;
 }
 // Editing and layout are independent pane-owned groups. Style choices belong
 // to their visible pane; changing editing never changes the arrangement.
@@ -73,7 +75,7 @@ bool cycle117PaneFooterAnchors(QObject *window) {
     return cycle106FooterControlsFit(window);
 }
 bool cycle107ViewLabelsReadable(QQuickItem *footer) {
-    for (const char *name : {"visualEditToggle", "sourceModeButton", "previewSplitButton", "singleModeButton"}) {
+    for (const char *name : {"visualEditToggle", "liveEditToggle", "sourceModeButton", "previewSplitButton", "singleModeButton"}) {
         auto *button = footer->findChild<QQuickItem *>(name);
         if (!button || !button->isVisible()) continue;
         auto *label = button->findChild<QQuickItem *>("footerButtonLabel");
@@ -84,8 +86,10 @@ bool cycle107ViewLabelsReadable(QQuickItem *footer) {
 bool cycle107ViewChecked(QQuickItem *footer, QObject *layout) {
     const int mode = layout->property("effectiveLayoutMode").toInt();
     const bool visual = layout->property("visualEditEnabled").toBool();
-    for (const auto &[name, expected] : {std::pair{"sourceModeButton", mode != 2 && !visual},
-             std::pair{"visualEditToggle", mode != 2 && visual},
+    const bool live = layout->property("liveEditEnabled").toBool();
+    for (const auto &[name, expected] : {std::pair{"sourceModeButton", mode != 2 && !visual && !live},
+             std::pair{"visualEditToggle", mode != 2 && visual && !live},
+             std::pair{"liveEditToggle", mode != 2 && live},
              std::pair{"singleModeButton", mode == 0}, std::pair{"previewSplitButton", mode == 1}}) {
         auto *button = footer->findChild<QQuickItem *>(name);
         if (!button || button->property("checked").toBool() != expected) return false;
@@ -133,7 +137,7 @@ void FomawriteTest::footerViewControlsStayStationaryAcrossModes() {
             QVERIFY(cycle118FooterRenderBarrier(quick));
             QTRY_VERIFY(cycle106FooterControlsFit(window.data()));
             const auto initial = cycle107ViewBounds(footer);
-            QCOMPARE(initial.size(), 4);
+            QCOMPARE(initial.size(), 5);
             const QRectF initialFooter = cycle103SceneBounds(footer);
             auto *viewGroup = footer->findChild<QQuickItem *>("documentViewControls"); QVERIFY(viewGroup);
             QVERIFY(qAbs(cycle103SceneBounds(viewGroup).right() - (width - 12)) < 0.1);

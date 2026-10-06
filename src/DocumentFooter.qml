@@ -7,6 +7,7 @@ WorkspaceFooter {
     id: root
     property int layoutMode: 0
     property bool visualEditing: false
+    property bool liveEditing: false
     property bool canSplit: true
     property string publishingFormat: "web"
     property bool activityHidden: false
@@ -30,6 +31,11 @@ WorkspaceFooter {
     property string statisticsText: ""
     readonly property bool hasPreview: layoutMode !== 0
     readonly property real controlsStart: layoutMode === 2 ? publishingControls.x : editingControls.x
+    // The three editing options take 182 px (138 px compact). When the pane cannot
+    // spare 182 px and still leave the style control reachable, the options use
+    // tighter labels ("Visual" for "Visual Edit"); names and hints keep the full wording.
+    readonly property real editingRoom: (layoutMode === 1 ? Math.min(sourcePaneWidth, previewPaneStart) : layoutControls.x) - 12
+    readonly property bool compactEditing: editingRoom - 54 < 182
     readonly property real sourceToolsEnd: editingControls.x - 8
     readonly property real appearanceRoom: Math.max(0, sourceToolsEnd - 12)
     readonly property real templateRoom: Math.max(0, publishingControls.x - previewPaneStart - 20)
@@ -40,6 +46,7 @@ WorkspaceFooter {
     readonly property bool statusVisible: statusLabel.visible
     signal publishingFormatRequested(string format)
     signal editingRequested(bool visual)
+    signal liveEditingRequested()
     signal layoutRequested(int mode)
     signal appearanceMenuRequested(var anchor)
     signal templateMenuRequested(var anchor)
@@ -118,22 +125,33 @@ WorkspaceFooter {
             enabled: root.chromeVisible
             objectName: "sourceModeButton"
             text: "Source"; hint: "Edit Markdown source"
-            leftPadding: 6; rightPadding: 6
-            grouped: true; width: 56
-            checked: root.layoutMode !== 2 && !root.visualEditing
+            leftPadding: root.compactEditing ? 5 : 6; rightPadding: leftPadding
+            grouped: true; width: root.compactEditing ? 54 : 56
+            checked: root.layoutMode !== 2 && !root.visualEditing && !root.liveEditing
             Accessible.checkable: true; Accessible.checked: checked
             onClicked: root.editingRequested(false)
         }
         FooterButton {
             enabled: root.chromeVisible
             objectName: "visualEditToggle"
-            text: "Visual Edit"
+            text: root.compactEditing ? "Visual" : "Visual Edit"
             hint: "Visual Edit — edit the document visually"
-            leftPadding: 6; rightPadding: 6
-            grouped: true; width: 80
-            checked: root.layoutMode !== 2 && root.visualEditing
+            leftPadding: root.compactEditing ? 5 : 6; rightPadding: leftPadding
+            grouped: true; width: root.compactEditing ? 48 : 80
+            checked: root.layoutMode !== 2 && root.visualEditing && !root.liveEditing
             Accessible.checkable: true; Accessible.checked: checked
             onClicked: root.editingRequested(true)
+        }
+        FooterButton {
+            enabled: root.chromeVisible
+            objectName: "liveEditToggle"
+            text: "Live"
+            hint: "Live — edit with Markdown rendered in place"
+            leftPadding: root.compactEditing ? 5 : 6; rightPadding: leftPadding
+            grouped: true; width: root.compactEditing ? 36 : 44
+            checked: root.layoutMode !== 2 && root.liveEditing
+            Accessible.checkable: true; Accessible.checked: checked
+            onClicked: root.liveEditingRequested()
         }
     }
     ToolbarGroup {

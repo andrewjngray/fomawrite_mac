@@ -50,7 +50,7 @@ void applyMacWindowTheme(QWindow *window, bool followSystem, bool dark);
 
 namespace {
 const QStringList viewNames{QStringLiteral("sourceModeButton"), QStringLiteral("visualEditToggle"),
-                           QStringLiteral("singleModeButton"), QStringLiteral("previewSplitButton")};
+                           QStringLiteral("liveEditToggle"), QStringLiteral("singleModeButton"), QStringLiteral("previewSplitButton")};
 const QStringList stationaryNames{QStringLiteral("singleModeButton"), QStringLiteral("previewSplitButton")};
 const QStringList controlNames = viewNames + QStringList{QStringLiteral("sourceAppearanceButton"), QStringLiteral("previewTemplateButton"),
     QStringLiteral("webPublishingButton"), QStringLiteral("pdfPublishingButton")};
@@ -465,7 +465,7 @@ int runDocumentViewCheck(QApplication &app, const QString &outputDirectory) {
             auto *label = button->findChild<QQuickItem *>("footerButtonLabel");
             entry.insert("truncated", !label || label->property("truncated").toBool());
             controls.insert(name, entry);
-            const bool shouldBeVisible = name == "sourceAppearanceButton" || name == "sourceModeButton" || name == "visualEditToggle" ? mode != 2
+            const bool shouldBeVisible = name == "sourceAppearanceButton" || name == "sourceModeButton" || name == "visualEditToggle" || name == "liveEditToggle" ? mode != 2
                 : name == "previewTemplateButton" || name == "webPublishingButton" || name == "pdfPublishingButton" ? mode != 0 : true;
             check(button->isVisible() == shouldBeVisible, step + ": wrong pane control visibility: " + name);
             if (!button->isVisible()) continue;
@@ -483,8 +483,10 @@ int runDocumentViewCheck(QApplication &app, const QString &outputDirectory) {
                       && rect.right() <= bounds(owner).right() - 11.5, step + ": control lost its pane anchor: " + name);
             }
             if (!viewNames.contains(name)) continue;
-            const bool checked = name == "visualEditToggle" ? mode != 2 && visual
-                : name == "sourceModeButton" ? mode != 2 && !visual : name == "previewSplitButton" ? mode == 1 : mode == 0;
+            const bool live = layout->property("liveEditEnabled").toBool();
+            const bool checked = name == "liveEditToggle" ? mode != 2 && live
+                : name == "visualEditToggle" ? mode != 2 && visual && !live
+                : name == "sourceModeButton" ? mode != 2 && !visual && !live : name == "previewSplitButton" ? mode == 1 : mode == 0;
             check(button->property("checked").toBool() == checked, step + ": incorrect checked state: " + name);
         }
         for (int first = 0; first < controlNames.size(); ++first) {

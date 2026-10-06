@@ -3234,6 +3234,7 @@ ApplicationWindow {
         z: 2
         layoutMode: workspaceLayout.effectiveLayoutMode
         visualEditing: workspaceLayout.visualEditEnabled
+        liveEditing: workspaceLayout.liveEditEnabled
         canSplit: workspaceLayout.availableWidth >= 800
         sourcePaneWidth: editorPane.visible ? editorPane.width : 0
         previewPaneStart: previewPane.visible ? previewPane.x - x : width
@@ -3247,6 +3248,7 @@ ApplicationWindow {
         onPublishingFormatRequested: function(format) { workspaceSettings.publishingFormat = format; }
         onLayoutRequested: function(mode) { win.setDocumentView(mode); }
         onEditingRequested: function(visual) { win.setEditingMode(visual); }
+        onLiveEditingRequested: win.setLiveEditing(true)
         onAppearanceMenuRequested: function(anchor) { win.openAnchoredMenu(sourceAppearanceMenu, anchor); }
         onTemplateMenuRequested: function(anchor) { win.openAnchoredMenu(previewTemplateMenu, anchor); }
         onStatisticsRequested: workspaceCommands.run("statistics")

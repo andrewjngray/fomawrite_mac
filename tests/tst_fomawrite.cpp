@@ -117,6 +117,7 @@ private slots:
     void bundledFooterRoutesFollowResponsivePresentation();
     void footerCompactStylesRemainReachableAcrossModes();
     void footerViewControlsStayStationaryAcrossModes();
+    void footerLiveOptionJoinsEditingCapsule();
     void footerViewCyclesPreserveDraftSelectionAndWidths();
     void footerModesAndTemplatesPreserveDraftAndUndo();
     void footerAppearanceAndStatisticsWorkByClick();
@@ -5609,6 +5610,7 @@ private:
 #include "perf-profile.inc"
 #include "mapper-fuzz.inc"
 #include "cycle134-live-editor.inc"
+#include "cycle134-footer-live.inc"
 
 int main(int argc, char **argv) {
     QtWebEngineQuick::initialize();
