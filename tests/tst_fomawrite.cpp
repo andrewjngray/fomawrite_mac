@@ -79,6 +79,7 @@ private slots:
     void liveEditorLoadsLargeDocumentQuickly();
     void liveEditorFollowsHostEdits();
     void liveEditorAppliesFormatCommandsAtThePageSelection();
+    void liveEditorInsertsLinksThroughThePagePanel();
     void liveEditorRunsHostCommands();
     void viewportTransitionKeepsAuxiliaryFocus();
     void liveModeInMainWindowLoadsPageAndNavigatesOutline();

@@ -936,7 +936,7 @@ ApplicationWindow {
         width: 230
         CompactMenuItem { enabled: win.canFormatSource; text: "Bold"; onTriggered: win.tryWrapSelection("**", "**") }
         CompactMenuItem { enabled: win.canFormatSource; text: "Italic"; onTriggered: win.tryWrapSelection("*", "*") }
-        CompactMenuItem { enabled: win.canFormatSource; text: "Link…"; onTriggered: win.tryInsertLink() }
+        CompactMenuItem { enabled: win.canFormatSource || win.canFormatLive; text: "Link…"; onTriggered: win.tryInsertLink() }
         MenuSeparator {}
         CompactMenuItem { enabled: win.canFormatSource; text: "Body"; onTriggered: win.editMarkdown("body") }
         CompactMenuItem { enabled: win.canFormatSource; text: "Heading 1"; onTriggered: win.editMarkdown("heading1") }
@@ -1198,8 +1198,8 @@ ApplicationWindow {
     }
 
     function tryInsertLink() {
-        // The link editor dialog works on the Source text; in Live insert a link skeleton.
-        if (liveFormattingAllowed()) { backend.liveWrapSelection("[", "](https://)"); return; }
+        // The Source link editor dialog works on the Source text; the Live page has its own link panel.
+        if (liveFormattingAllowed()) { backend.editorBridge.runCommand("link"); return; }
         if (sourceFormattingAllowed()) openLinkEditor(null)
     }
 
@@ -1608,7 +1608,7 @@ ApplicationWindow {
     Shortcut {
         sequence: "Ctrl+K"
         context: Qt.WindowShortcut
-        enabled: win.canFormatSource
+        enabled: win.canFormatSource || win.canFormatLive
         onActivated: win.tryInsertLink()
     }
 

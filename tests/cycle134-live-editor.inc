@@ -364,6 +364,43 @@ void FomawriteTest::liveEditorPastesImagesThroughTheHost() {
     page.backend.discardRecovery();
 }
 
+// Insert Link in Live opens the page's own link panel; filling it writes a
+// Markdown link into the canonical document.
+void FomawriteTest::liveEditorInsertsLinksThroughThePagePanel() {
+    Cycle103SettingsSnapshot settings;
+    Cycle134Page page; QVERIFY2(page.create(), qPrintable(page.error));
+    QTRY_VERIFY_WITH_TIMEOUT(page.bridge()->isReady(), 15000);
+    const QString text = QStringLiteral("see docs now\n");
+    page.editor->setProperty("text", text);
+    page.backend.syncLiveEditor(0);
+    QTRY_COMPARE_WITH_TIMEOUT(page.pageText(), text, 10000);
+    auto *view = page.root->findChild<QObject *>("liveEditorView"); QVERIFY(view);
+    // Caret before "docs": open the panel through the host command, fill it and apply.
+    QVERIFY(QMetaObject::invokeMethod(view, "runJavaScript", Q_ARG(QString, QStringLiteral(
+        "document.querySelector('.cm-content').focus();"))));
+    page.bridge()->placeCursor(4);
+    QTRY_COMPARE_WITH_TIMEOUT(page.bridge()->lastCursor(), 4, 5000);
+    page.bridge()->runCommand("link");
+    const QString fill = QStringLiteral(R"JS(
+        (function() {
+            const panel = document.querySelector('.fw-link-panel'); if (!panel) return 'no panel';
+            const set = (name, value) => { const i = panel.querySelector('input[name=' + name + ']'); i.value = value; i.dispatchEvent(new Event('input', {bubbles: true})); };
+            set('label', 'the docs'); set('url', 'https://example.org/a b'); set('title', 'Docs');
+            panel.querySelector('button[name=apply]').click();
+            return 'applied';
+        })())JS");
+    QTRY_VERIFY_WITH_TIMEOUT(([&] {
+        QMetaObject::invokeMethod(view, "runJavaScript", Q_ARG(QString, fill)); QTest::qWait(100);
+        return page.canonical().contains("](https://example.org/a%20b");
+    })(), 10000);
+    QCOMPARE(page.canonical(), QStringLiteral("see [the docs](https://example.org/a%20b \"Docs\")docs now\n"));
+    QCOMPARE(page.pageText(), page.canonical());
+    // The panel is gone and the page's undo removes the link as one step.
+    page.bridge()->requestUndo();
+    QTRY_COMPARE_WITH_TIMEOUT(page.canonical(), text, 5000);
+    page.backend.discardRecovery();
+}
+
 void FomawriteTest::liveEditorRunsHostCommands() {
     Cycle103SettingsSnapshot settings;
     Cycle134Page page; QVERIFY2(page.create(), qPrintable(page.error));
