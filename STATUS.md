@@ -1,6 +1,6 @@
 # Fomawrite — status
 
-This is the only place the current review build is recorded. Update it at the end of every cycle (see [AGENTS.md](AGENTS.md)). History: [CHANGELOG.md](CHANGELOG.md). Source map: [ARCHITECTURE.md](ARCHITECTURE.md).
+This is the only place the current review build is recorded. Update it at the end of every cycle (see [AGENTS.md](AGENTS.md)). What the build is for, and the current measure of progress, are in [MISSION.md](MISSION.md). History: [CHANGELOG.md](CHANGELOG.md). Source map: [ARCHITECTURE.md](ARCHITECTURE.md).
 
 | | |
 | --- | --- |

@@ -1,5 +1,7 @@
 # Fomawrite: local Markdown workspace
 
+> The mission is in [MISSION.md](../MISSION.md); it also states the current measure of progress. As of 7 October 2026 (after Cycle 135) that measure is one question: **is Live good enough to be the daily editor?** The next cycles answer it: Andrew writes real documents in Live, the native acceptance harnesses are rerun against build 135, and the friction list from that use becomes the next cycle before any new capability is started.
+>
 > The current build, test count and open items are in [STATUS.md](../STATUS.md); every cycle is listed in [CHANGELOG.md](../CHANGELOG.md). The checkpoints below are kept as the history of goals and plans.
 
 **Cycle 60 identity update:** The current product and app bundles are Fomawrite and Fomawrite Dev. The GitHub repository is `andrewjngray/fomawrite_mac`; upstream Omawrite history and licences remain intact. The new macOS identities migrate prior preferences and copy matching local workspace/recovery state on first launch. See [rename notes](archive/product-rename.md).

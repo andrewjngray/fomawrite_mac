@@ -1,6 +1,6 @@
 # Fomawrite — architecture
 
-Living document. Keep it current when a cycle moves responsibilities between files, adds a module or changes one of the models below (see [AGENTS.md](AGENTS.md)). It replaces §5 and §7 of the dated [DEVELOPER_HANDOFF.md](DEVELOPER_HANDOFF.md) and incorporates the corrections from [INDEPENDENT_REVIEW.md](INDEPENDENT_REVIEW.md) §4. Current build and open items: [STATUS.md](STATUS.md).
+The mission this shape serves is in [MISSION.md](MISSION.md). Living document. Keep it current when a cycle moves responsibilities between files, adds a module or changes one of the models below (see [AGENTS.md](AGENTS.md)). It replaces §5 and §7 of the dated [DEVELOPER_HANDOFF.md](DEVELOPER_HANDOFF.md) and incorporates the corrections from [INDEPENDENT_REVIEW.md](INDEPENDENT_REVIEW.md) §4. Current build and open items: [STATUS.md](STATUS.md).
 
 ## 1. Stack and shape
 
