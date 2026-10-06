@@ -29,3 +29,7 @@ Makefile
 # Personal correspondence and raw desktop reference captures stay local.
 /examples/ken_email.md
 /screenshots/
+
+# Editor web bundle (src/editor)
+/src/editor/node_modules/
+/src/editor/dist/*.map
