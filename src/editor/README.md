@@ -17,7 +17,7 @@ and driven over `QWebChannel`. The Qt build has no node step: `dist/editor.js` i
 
 - `index.html` - page; strict CSP; `<div id="write"><div id="editor">`; loads `qrc:///qtwebchannel/qwebchannel.js` then `dist/editor.js`.
 - `editor.css` - base styles for both modes (themes override via `#write`).
-- `src/main.ts` - bootstrap + bridge glue. `src/bridge.ts` - QWebChannel connection + mock. `src/changes.ts` - ChangeSet <-> JSON. `src/live.ts` - live-preview decorations. `src/modes.ts` - extensions, mode switching, appearance, `Session`.
+- `src/main.ts` - bootstrap + bridge glue. `src/bridge.ts` - QWebChannel connection + mock. `src/changes.ts` - ChangeSet <-> JSON. `src/live.ts` - live-preview decorations. `src/blocks.ts` + `blocks.css` - live-mode block rendering (phase 2). `src/modes.ts` - extensions, mode switching, appearance, `Session`.
 
 ## Bridge contract (`bridge`)
 
@@ -29,6 +29,7 @@ JS **calls** (slots):
 - `metric(name: string, ms: number)` - `keystroke-to-dispatch` (keydown/beforeinput/input -> `documentChanged`), `setDocument`, `decorate` (slowest live-decoration rebuild per 100 ms window).
 - `log(message: string)`.
 - `textReply(token: number, text: string)` - answer to `requestText`.
+- `requestImage(token: number, src: string)` - live mode asks the host for an image. `src` is the raw URL from the markdown (angle brackets stripped); the host resolves it relative to the document, and answers with `imageReply` (below) using the same `token`. One request per distinct `src`; replies are cached by `src` until the next `setDocument`, and failed `src`s are retried after 5 s the next time their widget is created. Hosts without this slot make images show the placeholder.
 
 JS **connects to** (signals):
 
@@ -37,6 +38,7 @@ JS **connects to** (signals):
 - `setMode("source" | "live")`.
 - `setTheme(css)` - sets `<style id="fomawrite-theme">`; empty string removes it.
 - `setAppearance(json)` - `{fontFamily, fontSize, lineHeight, dark, typewriter, focus}` -> CSS vars `--fw-font`, `--fw-font-size` (px), `--fw-line-height` on `#write`; `dark` toggles `html.dark`; `focus` -> `#write.fw-focus` + dims non-active lines; `typewriter` -> keeps the caret line vertically centred. Missing keys leave the previous value.
+- `imageReply(token: number, dataUrl: string, error: string)` - answer to `requestImage`. On success `dataUrl` is a `data:image/...` URL and `error` is `""`; on failure `error` is a short message (shown as the placeholder tooltip) and `dataUrl` is ignored. Anything that is not a `data:image/` URL is treated as an error. Unknown/stale tokens are ignored. In mock mode the page answers itself with a 1x1 PNG after 50 ms.
 - `focusEditor()`.
 - `requestText(token)` -> JS calls `bridge.textReply(token, fullText)`.
 - Test hooks (the CSP forbids eval): `simulateUserChanges(changesJson)` applies the changes as an ordinary user transaction (`userEvent: "input"`), so it **is** reported via `documentChanged`; `undo()` / `redo()` run CM6's commands (resulting changes are reported like user edits).
@@ -51,6 +53,19 @@ JS **connects to** (signals):
 
 ## Live mode behaviour
 
-Built from the Lezer tree for visible ranges only (rebuilt on doc / viewport / selection / parse changes). Markers (`HeaderMark` + following space, `EmphasisMark`, inline `CodeMark`, `StrikethroughMark`, link `[`, `](url "title")`, `QuoteMark` + following space) are replaced by zero-width decorations and registered as atomic ranges. If any selection range touches a node (inclusive of both ends), its markers stay visible and the node gets `.fw-revealed`; for `QuoteMark` the "node" is its line. Line classes: `fw-h1..6`, `fw-quote-line`, `fw-list-line`, `fw-code-line`; mark classes: `fw-em`, `fw-strong`, `fw-code`, `fw-strike`, `fw-live-link`, `fw-list-mark`. Fence marks, images, tables, math and diagrams are not touched yet.
+Built from the Lezer tree for visible ranges only (rebuilt on doc / viewport / selection / parse changes). Markers (`HeaderMark` + following space, `EmphasisMark`, inline `CodeMark`, `StrikethroughMark`, link `[`, `](url "title")`, `QuoteMark` + following space) are replaced by zero-width decorations and registered as atomic ranges. If any selection range touches a node (inclusive of both ends), its markers stay visible and the node gets `.fw-revealed`; for `QuoteMark` the "node" is its line. Line classes: `fw-h1..6`, `fw-quote-line`, `fw-list-line`, `fw-code-line`; mark classes: `fw-em`, `fw-strong`, `fw-code`, `fw-strike`, `fw-live-link`, `fw-list-mark`. Math and diagrams are not touched yet.
 
 Source mode keeps all syntax visible and highlights it with `.fw-heading`, `.fw-emphasis`, `.fw-strong`, `.fw-code`, `.fw-link`, `.fw-quote`, `.fw-list-mark`, `.fw-strike`, `.fw-mark` (the syntax characters).
+
+### Blocks (phase 2, `src/blocks.ts`)
+
+Same reveal rule as above (a selection range touching the node shows the raw markdown; for task markers the whole line counts). Blocks render only in live mode and only for visible ranges. Because a ViewPlugin cannot supply block decorations, the widgets are inline replace decorations; ones that stand alone on a line are styled as full-width blocks.
+
+- **Images** `![alt](src "title")`: replaced by `.fw-image` (`.fw-image-block` when alone on its line) holding an `<img class="fw-image-img">`, or, while the host has not answered / on error, `.fw-image-placeholder` with the alt text. Reference images, unclosed syntax and images spanning lines stay raw. Clicking puts the caret at the node start (reveals the markdown).
+- **Task items**: `TaskMarker` -> `<input type=checkbox class="fw-task">`; clicking toggles `[ ]`/`[x]` with an ordinary user transaction (`userEvent: "input.toggle"`), so it is reported via `documentChanged` and undoable.
+- **Horizontal rules** -> `<hr class="fw-hr">`.
+- **Fenced code**: lines get `fw-code-open` / `fw-code-close`; when the caret is outside the block the opening line (backticks + info string) is replaced by a `.fw-code-label` showing the info string, the closing fence by an empty `.fw-fence-end`, and both lines get `fw-fence-hidden`. `markdown({ codeLanguages })` is fed `@codemirror/language-data`, so fenced code is parsed per language and coloured with `.fw-tok-*` classes (colours are CSS variables in `blocks.css`). The nested trees are never walked as markdown (`IterMode.IgnoreMounts`).
+- **Tables**: `fw-table-line` on every line, `fw-table-delim-line` + `.fw-table-delim` on the delimiter row. No grid yet.
+- **Blockquotes**: `fw-quote-line` (phase 1) plus `fw-quote-d1..d4` by nesting depth; `blocks.css` adds a bar and indent per level.
+
+`blocksExtension(bridge)` is registered from `main.ts`; it connects `bridge.imageReply` / `bridge.requestImage`.

@@ -1,0 +1,134 @@
+/* Live mode phase 2 (src/blocks.ts): images, task checkboxes, rules, fenced code, tables, nested quotes.
+   Loaded after editor.css; themes (#write overrides) may restyle any of it. */
+
+:root {
+  --fw-tok-keyword: #cf222e;
+  --fw-tok-string: #0a3069;
+  --fw-tok-number: #0550ae;
+  --fw-tok-atom: #0550ae;
+  --fw-tok-comment: #6e7781;
+  --fw-tok-function: #8250df;
+  --fw-tok-type: #953800;
+  --fw-tok-property: #0550ae;
+  --fw-tok-punct: #57606a;
+  --fw-tok-meta: #6e7781;
+  --fw-tok-variable: inherit;
+  --fw-tok-invalid: #cf222e;
+}
+:root.dark {
+  --fw-tok-keyword: #ff7b72;
+  --fw-tok-string: #a5d6ff;
+  --fw-tok-number: #79c0ff;
+  --fw-tok-atom: #79c0ff;
+  --fw-tok-comment: #8b949e;
+  --fw-tok-function: #d2a8ff;
+  --fw-tok-type: #ffa657;
+  --fw-tok-property: #79c0ff;
+  --fw-tok-punct: #8b949e;
+  --fw-tok-meta: #8b949e;
+  --fw-tok-variable: inherit;
+  --fw-tok-invalid: #ff7b72;
+}
+
+/* ---------------------------------------------------------------- images */
+#write.fw-mode-live .fw-image { display: inline-block; max-width: 100%; vertical-align: bottom; cursor: pointer; }
+/* Full-width inline-blocks, not display:block: CM's zero-width widget buffers around an inline widget would
+   otherwise each create an extra empty line box above and below a block child. */
+#write.fw-mode-live .fw-image-block { display: inline-block; width: 100%; vertical-align: top; text-align: center; margin: 0.4em 0; }
+#write.fw-mode-live .fw-image-img { display: inline-block; max-width: 100%; height: auto; border-radius: 3px; }
+#write.fw-mode-live .fw-image-placeholder {
+  display: inline-block;
+  box-sizing: border-box;
+  max-width: 100%;
+  min-width: 8em;
+  padding: 0.5em 0.9em;
+  border: 1px dashed var(--fw-quote-bar);
+  border-radius: 4px;
+  background: var(--fw-code-bg);
+  color: var(--fw-muted);
+  font-size: 0.9em;
+  line-height: 1.3;
+}
+#write.fw-mode-live .fw-image-failed .fw-image-placeholder { border-color: #cf222e; }
+
+/* ---------------------------------------------------------------- task list checkboxes */
+#write.fw-mode-live .fw-task {
+  margin: 0 0.45em 0 0;
+  vertical-align: middle;
+  position: relative;
+  top: -0.05em;
+  cursor: pointer;
+  accent-color: var(--fw-accent);
+}
+
+/* ---------------------------------------------------------------- horizontal rule */
+#write.fw-mode-live .fw-hr-wrap { display: inline-block; width: 100%; vertical-align: top; cursor: pointer; padding: 0.6em 0; }
+#write.fw-mode-live .fw-hr {
+  display: block;
+  height: 0;
+  margin: 0;
+  border: 0;
+  border-top: 2px solid var(--fw-quote-bar);
+}
+
+/* ---------------------------------------------------------------- fenced code */
+#write.fw-mode-live .fw-code-open { border-radius: 6px 6px 0 0; padding-top: 0.4em !important; }
+#write.fw-mode-live .fw-code-close { border-radius: 0 0 6px 6px; padding-bottom: 0.4em !important; }
+#write.fw-mode-live .fw-fence-hidden { line-height: 1.2; }
+#write.fw-mode-live .fw-code-label {
+  display: inline-block;
+  width: 100%;
+  vertical-align: top;
+  text-align: right;
+  color: var(--fw-muted);
+  font-family: var(--fw-live-font, Georgia, serif);
+  font-size: 0.75em;
+  letter-spacing: 0.02em;
+  text-transform: lowercase;
+}
+#write.fw-mode-live .fw-code-label:empty::before { content: "\200b"; }
+#write.fw-mode-live .fw-fence-end { display: inline-block; width: 0; height: 1em; vertical-align: top; }
+
+#write.fw-mode-live .fw-tok-keyword { color: var(--fw-tok-keyword); }
+#write.fw-mode-live .fw-tok-string { color: var(--fw-tok-string); }
+#write.fw-mode-live .fw-tok-number { color: var(--fw-tok-number); }
+#write.fw-mode-live .fw-tok-atom { color: var(--fw-tok-atom); }
+#write.fw-mode-live .fw-tok-comment { color: var(--fw-tok-comment); font-style: italic; }
+#write.fw-mode-live .fw-tok-function { color: var(--fw-tok-function); }
+#write.fw-mode-live .fw-tok-type { color: var(--fw-tok-type); }
+#write.fw-mode-live .fw-tok-property { color: var(--fw-tok-property); }
+#write.fw-mode-live .fw-tok-punct { color: var(--fw-tok-punct); }
+#write.fw-mode-live .fw-tok-meta { color: var(--fw-tok-meta); }
+#write.fw-mode-live .fw-tok-variable { color: var(--fw-tok-variable); }
+#write.fw-mode-live .fw-tok-invalid { color: var(--fw-tok-invalid); }
+
+/* ---------------------------------------------------------------- tables (grid rendering is a later phase) */
+#write.fw-mode-live .fw-table-line {
+  font-family: var(--fw-code-font, Menlo, Consolas, monospace);
+  font-size: 0.92em;
+  white-space: pre-wrap;
+}
+#write.fw-mode-live .fw-table-delim { color: var(--fw-muted); opacity: 0.6; }
+
+/* ---------------------------------------------------------------- nested blockquotes
+   editor.css gives .fw-quote-line its 3px bar and 1em indent; deeper levels add a bar per level. */
+#write.fw-mode-live .fw-quote-d2,
+#write.fw-mode-live .fw-quote-d3,
+#write.fw-mode-live .fw-quote-d4 {
+  background-image: linear-gradient(var(--fw-quote-bar), var(--fw-quote-bar));
+  background-repeat: no-repeat;
+  background-size: 3px 100%;
+}
+#write.fw-mode-live .fw-quote-d2 { background-position: 1em 0; padding-left: 2em !important; }
+#write.fw-mode-live .fw-quote-d3 {
+  background-image: linear-gradient(var(--fw-quote-bar), var(--fw-quote-bar)), linear-gradient(var(--fw-quote-bar), var(--fw-quote-bar));
+  background-position: 1em 0, 2em 0;
+  background-size: 3px 100%, 3px 100%;
+  padding-left: 3em !important;
+}
+#write.fw-mode-live .fw-quote-d4 {
+  background-image: linear-gradient(var(--fw-quote-bar), var(--fw-quote-bar)), linear-gradient(var(--fw-quote-bar), var(--fw-quote-bar)), linear-gradient(var(--fw-quote-bar), var(--fw-quote-bar));
+  background-position: 1em 0, 2em 0, 3em 0;
+  background-size: 3px 100%, 3px 100%, 3px 100%;
+  padding-left: 4em !important;
+}

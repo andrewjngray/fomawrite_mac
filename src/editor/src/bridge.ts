@@ -16,6 +16,7 @@ export interface Bridge {
   metric(name: string, ms: number): void;
   log(message: string): void;
   textReply(token: number, text: string): void;
+  requestImage(token: number, src: string): void;
   // C++ -> JS signals
   setDocument: Signal<[string, number]>;
   applyChanges: Signal<[string, number]>;
@@ -27,6 +28,7 @@ export interface Bridge {
   simulateUserChanges: Signal<[string]>;
   undo: Signal<[]>;
   redo: Signal<[]>;
+  imageReply: Signal<[number, string, string]>;
 }
 
 export interface BridgeConnection {
@@ -56,12 +58,35 @@ and a [link to somewhere](https://example.com/path "title").
 const answer = 42;
 \`\`\`
 
+### Blocks
+
+- [ ] an open task
+- [x] a finished task
+
+---
+
+![a tiny image](example.png "title")
+
+| Name | Value |
+| ---- | ----- |
+| one  | 1     |
+
+> outer quote
+> > nested quote
+
+\`\`\`ts
+const greet = (name: string) => \`hello \${name}\`;
+\`\`\`
+
 Move the cursor into any styled span to reveal its markers.
 `;
 
+const MOCK_PNG =
+  "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==";
+
 const SIGNALS = [
   "setDocument", "applyChanges", "setMode", "setTheme", "setAppearance",
-  "focusEditor", "requestText", "simulateUserChanges", "undo", "redo",
+  "focusEditor", "requestText", "simulateUserChanges", "undo", "redo", "imageReply",
 ] as const;
 
 export type MockBridge = Bridge & {
@@ -83,6 +108,11 @@ export function createMockBridge(): MockBridge {
     handlers[s] = [];
     mock[s] = { connect: (fn: (...a: any[]) => void) => handlers[s].push(fn) };
   }
+  // Host stand-in: resolve every image to a 1x1 PNG after 50 ms.
+  mock.requestImage = (token: number, src: string) => {
+    slot("requestImage")(token, src);
+    setTimeout(() => mock.emit("imageReply", token, MOCK_PNG, ""), 50);
+  };
   mock.emit = (signal: string, ...args: unknown[]) => handlers[signal]?.forEach((f) => f(...args));
   return mock as MockBridge;
 }
