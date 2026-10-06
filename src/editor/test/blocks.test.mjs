@@ -156,7 +156,7 @@ test("fenced code body is not decorated as markdown by live.ts or blocks.ts (nes
   assert.equal(widgetsOf(collect(state), TaskWidget).length, 0);
 });
 
-test("language-data is wired for fences (js, python, css resolve lazily)", () => {
+test("curated language list is wired for fences (js, python, css, rust)", () => {
   for (const n of ["js", "python", "css", "rust"]) assert.ok(LanguageDescription.matchLanguageName(fenceLanguages, n), n);
 });
 

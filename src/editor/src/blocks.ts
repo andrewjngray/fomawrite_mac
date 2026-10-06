@@ -11,15 +11,15 @@
 import { EditorSelection, EditorState, Extension, Range } from "@codemirror/state";
 import { Decoration, DecorationSet, EditorView, ViewPlugin, ViewUpdate, WidgetType } from "@codemirror/view";
 import { ensureSyntaxTree, syntaxHighlighting, syntaxTree } from "@codemirror/language";
-import { languages } from "@codemirror/language-data";
+import { fenceLanguages as curatedLanguages } from "./languages";
 import { IterMode, NodeType } from "@lezer/common";
 import { tagHighlighter, tags as t } from "@lezer/highlight";
 import { liveExtension } from "./live";
 import type { TextRange } from "./live";
 
 // ---------------------------------------------------------------- code languages
-/** Pass to `markdown({ codeLanguages })`: fenced blocks get the language's parser, loaded lazily. */
-export const fenceLanguages = languages;
+/** Pass to `markdown({ codeLanguages })`: fenced blocks get the language's parser, see languages.ts. */
+export const fenceLanguages = curatedLanguages;
 
 /** Token classes for fenced-code highlighting. `scope` skips the markdown tree itself (only nested languages). */
 export const blocksHighlight = tagHighlighter(

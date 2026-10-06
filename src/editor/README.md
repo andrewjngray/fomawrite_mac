@@ -8,7 +8,7 @@ and driven over `QWebChannel`. The Qt build has no node step: `dist/editor.js` i
 | Command | What |
 | --- | --- |
 | `npm ci` | install pinned deps |
-| `npm run build` | bundle `src/main.ts` -> `dist/editor.js` (IIFE, minified, chrome120, no runtime deps). **Re-run and commit `dist/editor.js` after any change in `src/`.** |
+| `npm run build` | bundle `src/main.ts` -> `dist/editor.js` (IIFE, minified, chrome120, no runtime deps). **Re-run and commit `dist/editor.js` after any change in `src/`.** Size: see "Fence languages" below. |
 | `npm test` | `node:test` suites in `test/` (TypeScript is run directly through `tsx`; no DOM needed) |
 | `npm run dev` | esbuild watch + static server on http://localhost:8000/index.html (`?mode=source` for source mode). Opened outside Qt, the page uses a mock bridge that logs calls to `console.log` and loads a sample document. The dev build is unminified with a sourcemap; run `npm run build` before committing. |
 | `npm run typecheck` | `tsc --noEmit` |
@@ -19,7 +19,7 @@ and driven over `QWebChannel`. The Qt build has no node step: `dist/editor.js` i
 - `src/extras.ts` - footnotes, `[toc]` and front matter in live mode (see Footnotes, TOC and front matter below).
 - `src/math.ts` - math parsing + KaTeX rendering (see Math below). `dist/katex.css` + `dist/fonts/*.woff2` - KaTeX assets copied by `esbuild.mjs` (committed).
 - `editor.css` - base styles for both modes (themes override via `#write`).
-- `src/main.ts` - bootstrap + bridge glue. `src/bridge.ts` - QWebChannel connection + mock. `src/changes.ts` - ChangeSet <-> JSON. `src/live.ts` - live-preview decorations. `src/blocks.ts` + `blocks.css` - live-mode block rendering (phase 2). `src/tables.ts` - grid rendering of GFM tables in live mode. `src/modes.ts` - extensions, mode switching, appearance JSON plumbing, `Session`. `src/appearance.ts` - Source/Code appearances, focus and typewriter modes.
+- `src/main.ts` - bootstrap + bridge glue. `src/bridge.ts` - QWebChannel connection + mock. `src/changes.ts` - ChangeSet <-> JSON. `src/live.ts` - live-preview decorations. `src/blocks.ts` + `blocks.css` - live-mode block rendering (phase 2). `src/languages.ts` - curated fenced-code languages. `src/tables.ts` - grid rendering of GFM tables in live mode. `src/modes.ts` - extensions, mode switching, appearance JSON plumbing, `Session`. `src/appearance.ts` - Source/Code appearances, focus and typewriter modes.
 
 ## Bridge contract (`bridge`)
 
@@ -83,11 +83,29 @@ Same reveal rule as above (a selection range touching the node shows the raw mar
 - **Images** `![alt](src "title")`: replaced by `.fw-image` (`.fw-image-block` when alone on its line) holding an `<img class="fw-image-img">`, or, while the host has not answered / on error, `.fw-image-placeholder` with the alt text. Reference images, unclosed syntax and images spanning lines stay raw. Clicking puts the caret at the node start (reveals the markdown).
 - **Task items**: `TaskMarker` -> `<input type=checkbox class="fw-task">`; clicking toggles `[ ]`/`[x]` with an ordinary user transaction (`userEvent: "input.toggle"`), so it is reported via `documentChanged` and undoable.
 - **Horizontal rules** -> `<hr class="fw-hr">`.
-- **Fenced code**: lines get `fw-code-open` / `fw-code-close`; when the caret is outside the block the opening line (backticks + info string) is replaced by a `.fw-code-label` showing the info string, the closing fence by an empty `.fw-fence-end`, and both lines get `fw-fence-hidden`. `markdown({ codeLanguages })` is fed `@codemirror/language-data`, so fenced code is parsed per language and coloured with `.fw-tok-*` classes (colours are CSS variables in `blocks.css`). The nested trees are never walked as markdown (`IterMode.IgnoreMounts`).
+- **Fenced code**: lines get `fw-code-open` / `fw-code-close`; when the caret is outside the block the opening line (backticks + info string) is replaced by a `.fw-code-label` showing the info string, the closing fence by an empty `.fw-fence-end`, and both lines get `fw-fence-hidden`. `markdown({ codeLanguages })` is fed the curated list in `src/languages.ts` (re-exported as `fenceLanguages` from `blocks.ts`), so fenced code is parsed per language and coloured with `.fw-tok-*` classes (colours are CSS variables in `blocks.css`). See "Fence languages" below. The nested trees are never walked as markdown (`IterMode.IgnoreMounts`).
 - **Tables**: raw (selection touches the table): `fw-table-line` on every line, `fw-table-delim-line` + `.fw-table-delim` on the delimiter row. Rendered: see "Tables" below.
 - **Blockquotes**: `fw-quote-line` (phase 1) plus `fw-quote-d1..d4` by nesting depth; `blocks.css` adds a bar and indent per level.
 
 `blocksExtension(bridge)` is registered from `main.ts`; it connects `bridge.imageReply` / `bridge.requestImage`.
+
+### Fence languages (`src/languages.ts`)
+
+**Bundle:** `dist/editor.js` is a single IIFE, and esbuild cannot code-split it, so every language that is imported is inlined. `@codemirror/language-data` (every grammar behind a lazy `import()`) was therefore +1.3 MB and a much slower page load; it has been replaced by an explicit, curated list. Current size: 1.42 MB raw / 474 KB gzip (was 1.93 MB / 653 KB), of which KaTeX is about 260 KB. Do not re-add `language-data`, and check `npm run build` output when adding a language (heavy ones: C/C++ ~100 KB, PHP ~95 KB, Rust ~80 KB, JavaScript/TypeScript ~75 KB).
+
+Matching is `LanguageDescription.matchLanguageName(fenceLanguages, info, true)` (what `lang-markdown` does), which compares only the lowercase `alias` list (the name is added automatically) and, in fuzzy mode, also accepts an info string that merely *contains* an alias longer than 2 characters, so keep aliases lowercase and avoid short, word-like ones. Grammars are built lazily in `load`. An info string that matches nothing (`text`, `plaintext`, `mermaid`, a typo) gets no nested parse: plain code, no error.
+
+| Language | Info strings |
+| --- | --- |
+| JavaScript / TypeScript / JSX / TSX | `js` `mjs` `cjs` / `ts` `mts` `cts` / `jsx` / `tsx` |
+| Python, Java, Go, Rust, PHP | `python` `py` `py3`, `java`, `go` `golang`, `rust` `rs`, `php` |
+| C, C++, Objective-C, C#, Dart | `c` `h`, `c++` `cpp` `cc` `cxx` `hpp`, `objc` `objective-c` `mm`, `cs` `csharp`, `dart` |
+| HTML, CSS, JSON, XML, SQL, YAML, Markdown | `html` `htm` `vue` `svelte` (all HTML), `css`, `json` `jsonc` `json5`, `xml` `svg` `plist`, `sql` `mysql` `postgres` `sqlite`, `yaml` `yml`, `markdown` `md` `mdx` |
+| Shell, PowerShell, Dockerfile, Makefile, Nginx | `sh` `bash` `zsh` `ksh` `fish` `console`, `powershell` `ps1` `pwsh`, `dockerfile` `docker`, `makefile` `make` `mk` (shell grammar, there is no Makefile mode), `nginx` |
+| Swift, Kotlin, Ruby, Scala, Perl, Lua, R, Haskell, Clojure | `swift`, `kotlin` `kt` `kts`, `ruby` `rb`, `scala`, `perl` `pl`, `lua`, `r`, `haskell` `hs`, `clojure` `clj` `cljs` `edn` |
+| TOML, INI / properties, Diff | `toml`, `ini` `properties` `dotenv` `editorconfig`, `diff` `patch` |
+
+Not highlighted (plain code): `text` / `plaintext` / `txt`, `mermaid`, `latex`, `graphql`, `csv`, `protobuf`, `elixir`, `zig` and everything else not listed. Tests: `test/languages.test.mjs`.
 
 ### Tables (live mode, `src/tables.ts`)
 
