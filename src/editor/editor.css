@@ -23,6 +23,7 @@
   --fw-guide: rgba(140, 149, 159, 0.35);
   --fw-linenum: #8c959f;
   --fw-dim-opacity: 0.38;
+  --fw-danger: #cf222e;
 }
 :root.dark {
   --fw-fg: #e6edf3;
@@ -35,6 +36,7 @@
   --fw-guide: rgba(125, 133, 144, 0.4);
   --fw-linenum: #7d8590;
   --fw-dim-opacity: 0.32;
+  --fw-danger: #ff7b72;
 }
 
 html, body {
@@ -63,6 +65,31 @@ html.dark, html.dark body { color-scheme: dark; }
 #editor .cm-cursor, #editor .cm-dropCursor { border-left-color: var(--fw-fg); }
 #editor .cm-selectionBackground, #editor .cm-editor .cm-selectionBackground { background: var(--fw-selection) !important; }
 #editor .cm-panels { background: var(--fw-bg); color: var(--fw-fg); border-color: var(--fw-quote-bar); }
+
+/* Panel controls (search panel + link editor): CodeMirror's own light theme is not switched by html.dark, so give the
+   inputs and buttons the page colours in both appearances. */
+#editor .cm-search .cm-textfield, #editor .fw-link-panel .cm-textfield {
+  background: var(--fw-bg); color: var(--fw-fg); border: 1px solid var(--fw-quote-bar); border-radius: 4px;
+}
+#editor .cm-search .cm-button, #editor .fw-link-panel .cm-button {
+  background: var(--fw-code-bg); color: var(--fw-fg); border: 1px solid var(--fw-quote-bar); border-radius: 4px;
+}
+#editor .cm-search .cm-button:active, #editor .fw-link-panel .cm-button:active { background: var(--fw-selection); }
+#editor .cm-search .cm-button:hover, #editor .fw-link-panel .cm-button:hover { border-color: var(--fw-muted); }
+#editor .cm-search .cm-textfield:focus, #editor .fw-link-panel .cm-textfield:focus { outline: 2px solid var(--fw-accent); outline-offset: -1px; }
+
+/* ---------------------------------------------------------------- link editor panel (src/links.ts) */
+#editor .cm-panel.fw-link-panel {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; padding: 6px;
+  border-bottom: 1px solid var(--fw-quote-bar);
+}
+#editor .fw-link-panel [hidden] { display: none; }
+#editor .fw-link-field { display: flex; align-items: center; gap: 6px; flex: 1 1 150px; min-width: 0; }
+#editor .fw-link-field-url { flex-grow: 2; flex-basis: 220px; }
+#editor .fw-link-field > span { color: var(--fw-muted); font-size: 80%; }
+#editor .fw-link-field .cm-textfield { flex: 1 1 auto; min-width: 0; font-size: 80%; }
+#editor .fw-link-panel .cm-button { font-size: 80%; padding: 0.2em 0.9em; }
+#editor .fw-link-panel .cm-textfield.fw-invalid { border-color: var(--fw-danger); outline-color: var(--fw-danger); }
 
 /* ---------------------------------------------------------------- source mode (monospace) */
 #write.fw-mode-source .cm-content,

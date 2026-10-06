@@ -10,6 +10,7 @@ import { tablesExtension } from "./tables";
 import { mathExtension } from "./math";
 import { extrasExtension } from "./extras";
 import { imagesExtension } from "./images";
+import { linksExtension, openLinkPanel } from "./links";
 import { Session, applyModeClass, applyThemeDom, Appearance } from "./modes";
 import { appearanceExtension } from "./appearance";
 
@@ -65,6 +66,7 @@ async function main() {
     mathExtension(),
     extrasExtension(),
     imagesExtension(bridge),
+    linksExtension(),
     EditorView.updateListener.of((u) => {
       if (u.docChanged) session.handleTransactions(u.transactions);
       if (u.selectionSet || u.docChanged) scheduleCursor(u.view);
@@ -134,6 +136,7 @@ async function main() {
     switch (name) {
       case "find": case "replace": view.focus(); openSearchPanel(view); break;
       case "selectAll": view.focus(); selectAll(view); break;
+      case "link": view.focus(); openLinkPanel(view); break;
       default: bridge.log("unknown command: " + name);
     }
   }));
