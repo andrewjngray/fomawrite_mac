@@ -39,7 +39,7 @@ Item {
         keyboardReveal = true;
         // F6 from Source can enter formatting without first transferring its
         // selection ownership to an unrelated workspace action.
-        if (window.canFormatSource && toolbarContentVisible && toolbarContentOpacity > 0) {
+        if ((window.canFormatSource || window.canFormatLive) && toolbarContentVisible && toolbarContentOpacity > 0) {
             if (writingClusterExpanded) sourceBoldButton.forceActiveFocus(Qt.TabFocusReason);
             else sourceFormatButton.forceActiveFocus(Qt.TabFocusReason);
         } else workspaceButton.forceActiveFocus(Qt.TabFocusReason);
@@ -254,7 +254,7 @@ Item {
                 id: trailing
                 objectName: "topChromeToolbarTrailing"
                 visible: root.toolbarContentVisible; opacity: root.toolbarContentOpacity; enabled: opacity > 0; spacing: 8
-                readonly property bool formattingAllowed: root.window.canFormatSource
+                readonly property bool formattingAllowed: root.window.canFormatSource || root.window.canFormatLive
                 ToolbarGroup {
                     objectName: "compactWritingControls"
                     property bool sourceFormattingControl: true

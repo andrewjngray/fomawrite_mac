@@ -66,7 +66,7 @@ void EditorBridge::documentChanged(const QString &changesJson, int revision) {
     emit changesReceived(changesJson, revision);
 }
 
-void EditorBridge::cursorChanged(int anchor, int head) { m_lastCursor = head; emit cursorMoved(anchor, head); }
+void EditorBridge::cursorChanged(int anchor, int head) { m_lastAnchor = anchor; m_lastCursor = head; emit cursorMoved(anchor, head); }
 void EditorBridge::placeCursor(int position) { if (m_ready && m_hasDocument) emit setCursor(position); }
 void EditorBridge::metric(const QString &name, double ms) { emit metricRecorded(name, ms); }
 void EditorBridge::log(const QString &message) { emit messageLogged(message); }

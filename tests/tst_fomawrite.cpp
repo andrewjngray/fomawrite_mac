@@ -76,6 +76,7 @@ private slots:
     void liveEditorRoundTripsPersistenceFixturesThroughThePage();
     void liveEditorLoadsLargeDocumentQuickly();
     void liveEditorFollowsHostEdits();
+    void liveEditorAppliesFormatCommandsAtThePageSelection();
     void liveEditorPlacesCursorAndRestylesWithoutReload();
     void liveEditorCapturesEachPresentation();
     void persistenceRefusesLossyDecodeAndSaveAsWritesUtf8();

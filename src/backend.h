@@ -72,6 +72,12 @@ public:
     Q_INVOKABLE void pushLiveTheme();
     // The Live editor's last caret position, for carrying it back to Source.
     Q_INVOKABLE int liveCursor() const { return m_editorBridge->lastCursor(); }
+    // Format commands while the Live editor has focus: the existing edit
+    // helpers run on the canonical document at the page's reported selection
+    // and the host->page mirror delivers the result; the caret is then placed.
+    Q_INVOKABLE bool liveWrapSelection(const QString &before, const QString &after);
+    Q_INVOKABLE bool liveReplaceSelection(const QString &replacement);
+    Q_INVOKABLE bool liveEditMarkdown(const QString &action);
     QUrl documentBaseUrl() const override;
 
     void setParentWindow(QWindow *window);

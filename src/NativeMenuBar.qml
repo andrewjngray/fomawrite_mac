@@ -151,52 +151,52 @@ Platform.MenuBar {
         enabled: win.canFormatSource
         Platform.Menu {
             title: "Headings"
-            Platform.MenuItem { enabled: win.canFormatSource; text: "Heading 1"; onTriggered: win.editMarkdown("heading1") }
-            Platform.MenuItem { enabled: win.canFormatSource; text: "Heading 2"; onTriggered: win.editMarkdown("heading2") }
-            Platform.MenuItem { enabled: win.canFormatSource; text: "Heading 3"; onTriggered: win.editMarkdown("heading3") }
-            Platform.MenuItem { enabled: win.canFormatSource; text: "Heading 4"; onTriggered: win.editMarkdown("heading4") }
-            Platform.MenuItem { enabled: win.canFormatSource; text: "Heading 5"; onTriggered: win.editMarkdown("heading5") }
-            Platform.MenuItem { enabled: win.canFormatSource; text: "Heading 6"; onTriggered: win.editMarkdown("heading6") }
+            Platform.MenuItem { enabled: win.canFormatSource || win.canFormatLive; text: "Heading 1"; onTriggered: win.editMarkdown("heading1") }
+            Platform.MenuItem { enabled: win.canFormatSource || win.canFormatLive; text: "Heading 2"; onTriggered: win.editMarkdown("heading2") }
+            Platform.MenuItem { enabled: win.canFormatSource || win.canFormatLive; text: "Heading 3"; onTriggered: win.editMarkdown("heading3") }
+            Platform.MenuItem { enabled: win.canFormatSource || win.canFormatLive; text: "Heading 4"; onTriggered: win.editMarkdown("heading4") }
+            Platform.MenuItem { enabled: win.canFormatSource || win.canFormatLive; text: "Heading 5"; onTriggered: win.editMarkdown("heading5") }
+            Platform.MenuItem { enabled: win.canFormatSource || win.canFormatLive; text: "Heading 6"; onTriggered: win.editMarkdown("heading6") }
         }
         Platform.Menu {
             title: "Lists"
-            Platform.MenuItem { enabled: win.canFormatSource; text: "List"; onTriggered: win.editMarkdown("bullet") }
-            Platform.MenuItem { enabled: win.canFormatSource; text: "Task List"; onTriggered: win.editMarkdown("task") }
-            Platform.MenuItem { enabled: win.canFormatSource; text: "Ordered List"; onTriggered: win.editMarkdown("ordered") }
-            Platform.MenuItem { enabled: win.canFormatSource; text: "Ordered Task List"; onTriggered: win.editMarkdown("orderedTask") }
+            Platform.MenuItem { enabled: win.canFormatSource || win.canFormatLive; text: "List"; onTriggered: win.editMarkdown("bullet") }
+            Platform.MenuItem { enabled: win.canFormatSource || win.canFormatLive; text: "Task List"; onTriggered: win.editMarkdown("task") }
+            Platform.MenuItem { enabled: win.canFormatSource || win.canFormatLive; text: "Ordered List"; onTriggered: win.editMarkdown("ordered") }
+            Platform.MenuItem { enabled: win.canFormatSource || win.canFormatLive; text: "Ordered Task List"; onTriggered: win.editMarkdown("orderedTask") }
             Platform.MenuSeparator {}
-            Platform.MenuItem { enabled: win.canFormatSource; text: "Mark Task as Completed"; onTriggered: win.editMarkdown("toggleTask") }
+            Platform.MenuItem { enabled: win.canFormatSource || win.canFormatLive; text: "Mark Task as Completed"; onTriggered: win.editMarkdown("toggleTask") }
         }
-        Platform.MenuItem { enabled: win.canFormatSource; text: "Blockquote"; onTriggered: win.editMarkdown("quote") }
-        Platform.MenuItem { enabled: win.canFormatSource; text: "Body"; onTriggered: win.editMarkdown("body") }
+        Platform.MenuItem { enabled: win.canFormatSource || win.canFormatLive; text: "Blockquote"; onTriggered: win.editMarkdown("quote") }
+        Platform.MenuItem { enabled: win.canFormatSource || win.canFormatLive; text: "Body"; onTriggered: win.editMarkdown("body") }
         Platform.Menu {
             title: "Structure"
-            Platform.MenuItem { enabled: win.canFormatSource; text: "Indent"; onTriggered: win.editMarkdown("indent") }
-            Platform.MenuItem { enabled: win.canFormatSource; text: "Outdent"; onTriggered: win.editMarkdown("outdent") }
-            Platform.MenuItem { enabled: win.canFormatSource; text: "Move Line Up"; onTriggered: win.editMarkdown("lineUp") }
-            Platform.MenuItem { enabled: win.canFormatSource; text: "Move Line Down"; onTriggered: win.editMarkdown("lineDown") }
+            Platform.MenuItem { enabled: win.canFormatSource || win.canFormatLive; text: "Indent"; onTriggered: win.editMarkdown("indent") }
+            Platform.MenuItem { enabled: win.canFormatSource || win.canFormatLive; text: "Outdent"; onTriggered: win.editMarkdown("outdent") }
+            Platform.MenuItem { enabled: win.canFormatSource || win.canFormatLive; text: "Move Line Up"; onTriggered: win.editMarkdown("lineUp") }
+            Platform.MenuItem { enabled: win.canFormatSource || win.canFormatLive; text: "Move Line Down"; onTriggered: win.editMarkdown("lineDown") }
         }
         Platform.MenuSeparator {}
-        Platform.MenuItem { enabled: win.canFormatSource; text: "Bold"; onTriggered: win.tryWrapSelection("**", "**") }
-        Platform.MenuItem { enabled: win.canFormatSource; text: "Italic"; onTriggered: win.tryWrapSelection("*", "*") }
+        Platform.MenuItem { enabled: win.canFormatSource || win.canFormatLive; text: "Bold"; onTriggered: win.tryWrapSelection("**", "**") }
+        Platform.MenuItem { enabled: win.canFormatSource || win.canFormatLive; text: "Italic"; onTriggered: win.tryWrapSelection("*", "*") }
         NativeCommand { commandId: "strike" }
-        Platform.MenuItem { enabled: win.canFormatSource; text: "Highlight"; onTriggered: win.tryWrapSelection("==", "==") }
+        Platform.MenuItem { enabled: win.canFormatSource || win.canFormatLive; text: "Highlight"; onTriggered: win.tryWrapSelection("==", "==") }
         Platform.MenuSeparator {}
         NativeCommand { commandId: "inlineCode"; text: "Code" }
-        Platform.MenuItem { enabled: win.canFormatSource; text: "Code Block"; onTriggered: win.editMarkdown("codeBlock") }
+        Platform.MenuItem { enabled: win.canFormatSource || win.canFormatLive; text: "Code Block"; onTriggered: win.editMarkdown("codeBlock") }
         Platform.MenuSeparator {}
-        Platform.MenuItem { enabled: win.canFormatSource; text: "Add Link"; onTriggered: win.tryInsertLink() }
-        Platform.MenuItem { enabled: win.canFormatSource; text: "Add Wikilink"; onTriggered: win.tryWrapSelection("[[", "]]") }
-        Platform.MenuItem { enabled: win.canFormatSource; text: "Add Footnote"; onTriggered: win.tryInsertSourceSnippet("[^note]\n\n[^note]: Note text") }
-        Platform.MenuItem { enabled: win.canFormatSource; text: "Add Content Block"; onTriggered: win.tryInsertSourceSnippet("\n/chapter.md\n") }
-        Platform.MenuItem { enabled: win.canFormatSource; text: "Add Hashtag"; onTriggered: win.tryInsertSourceSnippet("#tag") }
+        Platform.MenuItem { enabled: win.canFormatSource || win.canFormatLive; text: "Add Link"; onTriggered: win.tryInsertLink() }
+        Platform.MenuItem { enabled: win.canFormatSource || win.canFormatLive; text: "Add Wikilink"; onTriggered: win.tryWrapSelection("[[", "]]") }
+        Platform.MenuItem { enabled: win.canFormatSource || win.canFormatLive; text: "Add Footnote"; onTriggered: win.tryInsertSourceSnippet("[^note]\n\n[^note]: Note text") }
+        Platform.MenuItem { enabled: win.canFormatSource || win.canFormatLive; text: "Add Content Block"; onTriggered: win.tryInsertSourceSnippet("\n/chapter.md\n") }
+        Platform.MenuItem { enabled: win.canFormatSource || win.canFormatLive; text: "Add Hashtag"; onTriggered: win.tryInsertSourceSnippet("#tag") }
         Platform.MenuSeparator {}
-        Platform.MenuItem { enabled: win.canFormatSource; text: "Add Date"; onTriggered: win.editMarkdown("date") }
-        Platform.MenuItem { enabled: win.canFormatSource; text: "Add Table"; onTriggered: win.editMarkdown("table") }
-        Platform.MenuItem { enabled: win.canFormatSource; text: "Add Table of Contents"; onTriggered: win.tryInsertSourceSnippet(backend.tableOfContents(editor.text)) }
+        Platform.MenuItem { enabled: win.canFormatSource || win.canFormatLive; text: "Add Date"; onTriggered: win.editMarkdown("date") }
+        Platform.MenuItem { enabled: win.canFormatSource || win.canFormatLive; text: "Add Table"; onTriggered: win.editMarkdown("table") }
+        Platform.MenuItem { enabled: win.canFormatSource || win.canFormatLive; text: "Add Table of Contents"; onTriggered: win.tryInsertSourceSnippet(backend.tableOfContents(editor.text)) }
         Platform.MenuSeparator {}
-        Platform.MenuItem { enabled: win.canFormatSource; text: "Add Horizontal Rule"; onTriggered: win.editMarkdown("rule") }
-        Platform.MenuItem { enabled: win.canFormatSource; text: "Add Page Break"; onTriggered: win.tryInsertSourceSnippet("\n\n<!-- pagebreak -->\n\n") }
+        Platform.MenuItem { enabled: win.canFormatSource || win.canFormatLive; text: "Add Horizontal Rule"; onTriggered: win.editMarkdown("rule") }
+        Platform.MenuItem { enabled: win.canFormatSource || win.canFormatLive; text: "Add Page Break"; onTriggered: win.tryInsertSourceSnippet("\n\n<!-- pagebreak -->\n\n") }
         Platform.MenuSeparator {}
         Platform.MenuItem { enabled: win.canFormatSource && editor.selectedText.length > 0; text: "Clear Styles"; onTriggered: win.editMarkdown("clearStyles") }
     }

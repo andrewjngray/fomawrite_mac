@@ -124,7 +124,7 @@ QtObject {
         return item.title;
     }
     function isEnabled(id) {
-        if (["strike", "inlineCode", "pageBreak"].indexOf(id) >= 0) return window.canFormatSource;
+        if (["strike", "inlineCode", "pageBreak"].indexOf(id) >= 0) return window.canFormatSource || window.canFormatLive;
         if (["duplicate", "rename", "move", "reveal"].indexOf(id) >= 0) return backend.fileUrl.toString() !== "";
         if (["quickOpen", "refreshTags"].indexOf(id) >= 0) return library.rootFolder.toString() !== "";
         if (id === "spelling") return window.isMac && editor.length > 0;

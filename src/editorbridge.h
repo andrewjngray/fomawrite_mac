@@ -41,6 +41,8 @@ public:
     Q_INVOKABLE void placeCursor(int position);
     // The page's last reported caret (selection head), -1 before any report.
     int lastCursor() const { return m_lastCursor; }
+    int lastSelectionStart() const { return m_lastCursor < 0 ? -1 : qMin(m_lastAnchor, m_lastCursor); }
+    int lastSelectionEnd() const { return m_lastCursor < 0 ? -1 : qMax(m_lastAnchor, m_lastCursor); }
 
 public slots:
     // Page → app (over QWebChannel).
@@ -88,6 +90,7 @@ private:
     int m_revision = 0;
     int m_nextToken = 0;
     int m_lastCursor = -1;
+    int m_lastAnchor = -1;
     bool m_hasDocument = false;
     QString m_text;
     QString m_mode = QStringLiteral("live");

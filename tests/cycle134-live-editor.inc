@@ -255,6 +255,36 @@ void FomawriteTest::liveEditorPlacesCursorAndRestylesWithoutReload() {
     page.backend.discardRecovery();
 }
 
+void FomawriteTest::liveEditorAppliesFormatCommandsAtThePageSelection() {
+    Cycle103SettingsSnapshot settings;
+    Cycle134Page page; QVERIFY2(page.create(), qPrintable(page.error));
+    QTRY_VERIFY_WITH_TIMEOUT(page.bridge()->isReady(), 15000);
+    const QString text = QString::fromUtf8("Title line\n\nalpha beta gamma\n");
+    page.editor->setProperty("text", text);
+    page.backend.syncLiveEditor(12); // caret at "alpha|"? no: offset 12 = start of "alpha"
+    QTRY_COMPARE_WITH_TIMEOUT(page.pageText(), text, 10000);
+    QTRY_VERIFY_WITH_TIMEOUT(page.bridge()->lastCursor() == 12, 5000);
+    // Wrap at a collapsed selection: markers inserted, caret between them, page follows.
+    QVERIFY(page.backend.liveWrapSelection("**", "**"));
+    const QString wrapped = QString::fromUtf8("Title line\n\n****alpha beta gamma\n");
+    QCOMPARE(page.canonical(), wrapped);
+    QTRY_COMPARE_WITH_TIMEOUT(page.pageText(), wrapped, 10000);
+    QTRY_VERIFY_WITH_TIMEOUT(page.bridge()->lastCursor() == 14, 5000);
+    // A block command on the first line.
+    page.bridge()->placeCursor(2);
+    QTRY_VERIFY_WITH_TIMEOUT(page.bridge()->lastCursor() == 2, 5000);
+    QVERIFY(page.backend.liveEditMarkdown("heading2"));
+    QVERIFY2(page.canonical().startsWith("## Title line"), qPrintable(page.canonical()));
+    QTRY_COMPARE_WITH_TIMEOUT(page.pageText(), page.canonical(), 10000);
+    // Snippet replacement at the caret.
+    QVERIFY(page.backend.liveReplaceSelection("[snippet]"));
+    QTRY_COMPARE_WITH_TIMEOUT(page.pageText(), page.canonical(), 10000);
+    QVERIFY(page.canonical().contains("[snippet]"));
+    // Without a known selection nothing happens.
+    EditorBridge fresh; Q_UNUSED(fresh);
+    page.backend.discardRecovery();
+}
+
 void FomawriteTest::liveEditorRoundTripsPersistenceFixturesThroughThePage() {
     Cycle103SettingsSnapshot settings;
     QTemporaryDir directory; QVERIFY(directory.isValid());

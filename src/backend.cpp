@@ -3625,6 +3625,33 @@ void Backend::syncLiveEditor(int cursor) {
 
 void Backend::pushLiveTheme() { m_editorBridge->applyTheme(m_publisher->currentCss()); }
 
+bool Backend::liveWrapSelection(const QString &before, const QString &after) {
+    const int start = m_editorBridge->lastSelectionStart(), end = m_editorBridge->lastSelectionEnd();
+    if (!m_liveMirrorValid || start < 0) return false;
+    const auto result = wrapSelection(start, end, before, after);
+    if (!result.contains("end")) return false;
+    m_editorBridge->placeCursor(result.value("end").toInt());
+    return true;
+}
+
+bool Backend::liveReplaceSelection(const QString &replacement) {
+    const int start = m_editorBridge->lastSelectionStart(), end = m_editorBridge->lastSelectionEnd();
+    if (!m_liveMirrorValid || start < 0) return false;
+    const auto result = replaceText(start, end, replacement);
+    if (!result.contains("end")) return false;
+    m_editorBridge->placeCursor(result.value("end").toInt());
+    return true;
+}
+
+bool Backend::liveEditMarkdown(const QString &action) {
+    const int start = m_editorBridge->lastSelectionStart(), end = m_editorBridge->lastSelectionEnd();
+    if (!m_liveMirrorValid || start < 0) return false;
+    const auto result = editMarkdown(action, start, end);
+    if (result.contains("end")) m_editorBridge->placeCursor(result.value("end").toInt());
+    else if (result.contains("start")) m_editorBridge->placeCursor(result.value("start").toInt());
+    return !result.isEmpty();
+}
+
 void Backend::forwardLiveChange(int position, int charsRemoved, int charsAdded) {
     if (m_loading) { m_liveMirrorValid = false; return; }
     if (!m_liveMirrorValid || m_applyingLiveChanges || !m_editorBridge->isReady()) return;

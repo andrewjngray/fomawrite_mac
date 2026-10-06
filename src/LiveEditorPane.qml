@@ -23,6 +23,8 @@ Rectangle {
     property int cursorOnEnter: -1
     signal writingActivity()
     signal scrollFractionChanged(real fraction)
+    // The app's Format commands apply to the page while it has keyboard focus.
+    readonly property bool hasLiveFocus: web.activeFocus
 
     function scrollToFraction(fraction) { if (root.bridge) root.bridge.scrollTo(fraction); }
 

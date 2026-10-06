@@ -286,6 +286,8 @@ ApplicationWindow {
     property bool sourceFormattingOwned: false
     readonly property bool sourceEditorVisible: editorPane.visible && !workspaceLayout.visualEditEnabled && !workspaceLayout.liveEditEnabled
     onSourceEditorVisibleChanged: if (!sourceEditorVisible && completionPopup) completionPopup.close()
+    // Format commands reach the Live editor while it has focus (see Backend::liveWrapSelection).
+    readonly property bool canFormatLive: workspaceLayout.liveEditEnabled && liveEditorLoader.item !== null && liveEditorLoader.item.hasLiveFocus
     readonly property bool canFormatSource: sourceEditorVisible && sourceFormattingOwned
         && !editor.readOnly && !editor.inputMethodComposing
     function isSourceFormattingChrome(item) {
@@ -1167,16 +1169,23 @@ ApplicationWindow {
     function sourceFormattingAllowed() {
         return canFormatSource;
     }
+    function liveFormattingAllowed() {
+        return canFormatLive;
+    }
 
     function tryWrapSelection(before, after) {
+        if (liveFormattingAllowed()) { backend.liveWrapSelection(before, after); return; }
         if (sourceFormattingAllowed()) editor.wrapSelection(before, after)
     }
 
     function tryInsertLink() {
+        // The link editor dialog works on the Source text; in Live insert a link skeleton.
+        if (liveFormattingAllowed()) { backend.liveWrapSelection("[", "](https://)"); return; }
         if (sourceFormattingAllowed()) openLinkEditor(null)
     }
 
     function tryInsertSourceSnippet(replacement) {
+        if (liveFormattingAllowed()) { backend.liveReplaceSelection(replacement); return; }
         if (!sourceFormattingAllowed()) return;
         var start = editor.selectionStart;
         var end = editor.selectionEnd;
@@ -1185,6 +1194,7 @@ ApplicationWindow {
     }
 
     function editMarkdown(action) {
+        if (liveFormattingAllowed()) { backend.liveEditMarkdown(action); return; }
         if (!sourceFormattingAllowed()) return
         var result = backend.editMarkdown(action, editor.selectionStart, editor.selectionEnd);
         editor.forceActiveFocus();
@@ -1208,7 +1218,7 @@ ApplicationWindow {
     }
 
     function openQuickFormat(button) {
-        if (!sourceFormattingAllowed()) return;
+        if (!sourceFormattingAllowed() && !liveFormattingAllowed()) return;
         var point = button.mapToItem(win.contentItem, 0, button.height);
         formatQuickMenu.x = Math.max(8, Math.min(win.contentItem.width - formatQuickMenu.width - 8,
                                                   point.x + button.width - formatQuickMenu.width));
