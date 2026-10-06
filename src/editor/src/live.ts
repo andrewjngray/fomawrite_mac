@@ -8,6 +8,7 @@
 import { EditorSelection, EditorState, Range } from "@codemirror/state";
 import { Decoration, DecorationSet, EditorView, ViewPlugin, ViewUpdate } from "@codemirror/view";
 import { ensureSyntaxTree, syntaxTree } from "@codemirror/language";
+import { IterMode } from "@lezer/common";
 
 export interface TextRange {
   from: number;
@@ -104,6 +105,7 @@ export function buildLive(
     tree.iterate({
       from: cFrom,
       to: cTo,
+      mode: IterMode.IgnoreMounts, // nested-language trees (fenced code) are not markdown
       enter: (node) => {
         const name = node.name;
         const nf = node.from, nt = node.to;
@@ -159,6 +161,8 @@ export function buildLive(
               }
               break;
             }
+            case "Image":
+              return false; // rendered/handled by blocks.ts; keep its raw text untouched when revealed
             case "Blockquote":
               lines(nf, nt, "fw-quote-line", cFrom, cTo);
               break;
