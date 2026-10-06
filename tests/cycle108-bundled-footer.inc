@@ -95,7 +95,7 @@ void FomawriteTest::bundledFooterRapidModesPreserveDraftAndViewport() {
         const int cursor = editor->property("cursorPosition").toInt();
         const auto bounds = cycle107ViewBounds(footer);
         const QRectF footerBounds = cycle103SceneBounds(footer);
-        QCOMPARE(bounds.size(), 4);
+        QCOMPARE(bounds.size(), 5);
         for (int burst = 0; burst < 4; ++burst) {
             const QList<QQuickItem *> choices{full, visual, split, full, source, visual, split, full, source};
             int overlappingClicks = 0;
