@@ -2,7 +2,7 @@
 
 This is Andrew Gray's Markdown editor, branded Fomawrite and forked from omacom/omawrite.
 
-- Read MISSION.md first; it is the only statement of what the product is for and what counts as progress right now. Then README.md, STATUS.md, ARCHITECTURE.md and docs/roadmap.md before changing product scope.
+- Read MISSION.md first; it is the only statement of what the product is for and what counts as progress right now. Then README.md, STATUS.md, ARCHITECTURE.md and docs/roadmap.md before changing product scope. IDEAS.md holds undecided ideas (Yes / No / Maybe); do not build a Maybe.
 - Keep the editor calm and local-file based. Build small, useful increments.
 - Preserve plain UTF-8 Markdown, undo behaviour, unsaved-change prompts and recovery.
 - Retain upstream MIT attribution and the bundled font licence.

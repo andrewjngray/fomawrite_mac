@@ -24,3 +24,4 @@ When that question is answered the measure changes, and this section changes wit
 - [AGENTS.md](AGENTS.md) — the working rules that keep cycles honest.
 - [STATUS.md](STATUS.md) — the current build and what is open against the measure.
 - [ARCHITECTURE.md](ARCHITECTURE.md) — how the shape of the code serves the mission.
+- [IDEAS.md](IDEAS.md) — ideas for next steps with a Yes / No / Maybe decision on each; larger concepts such as [roam_concept.md](roam_concept.md) hang off it.
