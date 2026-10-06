@@ -1,6 +1,10 @@
 # Acceptance ledger — current follow-through and Cycle 59 history
 
-## Current review build — Cycle 131
+## Current review build — Cycle 132
+
+**0.3.0-dev28 / macOS 0.3.0 (132)** makes the publishing preview robust against the conditions behind the Cycle 127–129 incidents: unrelated changes in the themes folder no longer cancel renders, the selected theme's CSS and decoded images are memoized so cache hits are cheap, failures keep the current document's last readable output, Web mode completes without depending on a viewport script, and the themes folder is never recreated by a refresh. ****212 passed, 0 failed, 0 skipped** (208 prior + 4 new; one test re-specified), with the two known Qt Material `SplitView` warnings unchanged. The folder test was strengthened to force a refresh after that run and re-verified green on its own.** Source/tests only; no bundle refreshed. [Evidence and limits](../research/cycle-132/README.md). Findings A1–A8/E4 of the [independent review](../../INDEPENDENT_REVIEW.md) are addressed.
+
+## Previous review build — Cycle 131
 
 **0.3.0-dev27 / macOS 0.3.0 (131)** makes file persistence byte-exact: untouched documents round-trip byte-for-byte (CRLF, CR, BOM, no-break spaces, U+2028), edits keep the file's own conventions, non-UTF-8/UTF-16 files are readable but cannot be saved in place (Save As writes a UTF-8 copy), CRLF files autosave/rename/move again, and a manual Save that would overwrite a newer on-disk version is stopped with a File changed / Save Anyway choice. **208 regressions pass, 0 failed, 0 skipped.** Source/tests only; no bundle refreshed. [Evidence and limits](../research/cycle-131/README.md). Findings C1–C6 of the [independent review](../../INDEPENDENT_REVIEW.md) are addressed; its other findings remain open.
 

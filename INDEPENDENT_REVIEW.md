@@ -64,6 +64,8 @@ silently cap at 100 (P4).
 
 ## 3. Publishing / preview lifecycle (the incident area)
 
+> **Status (Cycle 132):** A1–A8 and E4 below are addressed on `master` with tests that fail on the previous code — see [research/cycle-132/README.md](research/cycle-132/README.md). The explicit QML state machine and off-thread generation remain open.
+
 **Backend protocol is now sound** — per-request captured identity, content-hash cache, true cancellation
 (`QPointer` + generation guards, correct destruction order). I could not construct an A→B→C path where a stale
 result lands on the wrong document. **The design around it remains fragile:**
