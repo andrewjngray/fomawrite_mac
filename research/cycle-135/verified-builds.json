@@ -17,7 +17,7 @@
     },
     "nativeChecks": {
       "check-document-views": "run against dist/Fomawrite.app after the resource-list fix: 124 footer states and all daily-writing, pane-zoom, editor, editing-layout and pane-chrome checks passed; 3 of 12 publishing-theme checks failed in the theme-folder fixture family (disposable themes folder could not be created) \u2014 not Live related, open",
-      "check-publishing-startup": "see research/cycle-135/README.md"
+      "check-publishing-startup": "passed: cold and restored startup (7 Oct)"
     }
   },
   "bundles": {
