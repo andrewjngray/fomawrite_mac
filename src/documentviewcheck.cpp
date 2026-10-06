@@ -347,7 +347,7 @@ int runDocumentViewCheck(QApplication &app, const QString &outputDirectory) {
             // The incomplete-image fixture deliberately exercises a missing
             // resource. Its left visual editor also reports that exact URL.
             // Keep this expected diagnostic separate; all other warnings fail.
-            if (!expectedMissingPreviewImage.isEmpty() && message.startsWith("qrc:/PreviewPane.qml:")
+            if (!expectedMissingPreviewImage.isEmpty() && message.startsWith("qrc:/VisualEditPane.qml:")
                     && message.endsWith("QML QQuickTextEdit: Cannot open: " + expectedMissingPreviewImage))
                 expectedImageWarnings.append(message);
             else qmlWarnings.append(message);

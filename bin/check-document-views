@@ -105,7 +105,7 @@ for name, actual in report.get('resourceSha256', {}).items():
     expected = hashlib.sha256((root / 'src' / name).read_bytes()).hexdigest()
     if actual != expected:
         failures.append(f'Embedded {name} differs from checkout')
-for name in ('PublishingPreview.qml', 'Main.qml', 'DocumentFooter.qml', 'WorkspaceLayout.qml', 'WorkspaceCommands.qml',
+for name in ('PublishingPreview.qml', 'VisualEditPane.qml', 'NativeMenuBar.qml', 'Main.qml', 'DocumentFooter.qml', 'WorkspaceLayout.qml', 'WorkspaceCommands.qml',
              'DocumentFindBar.qml', 'DocumentOutline.qml', 'PaneZoomState.qml',
              'PaneZoomControls.qml', 'WorkspaceHeader.qml', 'LibraryPane.qml', 'LinkEditor.qml', 'LinkSyntax.js', 'ExportHub.qml', 'SquareDialogButton.qml'):
     if name not in report.get('resourceSha256', {}):

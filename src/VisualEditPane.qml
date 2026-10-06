@@ -1,3 +1,6 @@
+// The LEFT Visual Edit surface (a bounded, formatted editing projection of
+// the Markdown source). The read-only RIGHT output pane is PublishingPreview.qml.
+// Renamed from PreviewPane.qml in Cycle 133; objectNames are unchanged.
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts

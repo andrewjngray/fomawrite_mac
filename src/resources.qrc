@@ -25,7 +25,8 @@
         <file>LineIcon.qml</file>
         <file>OrganizerPane.qml</file>
         <file>DocumentOutline.qml</file>
-        <file>PreviewPane.qml</file>
+        <file>VisualEditPane.qml</file>
+        <file>NativeMenuBar.qml</file>
         <file>PublishingPreview.qml</file>
         <file>ExportHub.qml</file>
         <file>StyleGallery.qml</file>
