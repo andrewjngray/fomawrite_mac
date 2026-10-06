@@ -384,6 +384,20 @@ private:
     bool m_requiresExplicitSave = false;
     bool m_hasKnownFileContents = false;
     bool m_requiresViewConflictCheck = false;
+    // Cycle131 byte-exact persistence. The document is edited as LF text, but
+    // the bytes written back reproduce the file's own byte-order mark and
+    // line-ending convention, so an untouched document round-trips exactly.
+    enum class LineEnding { Lf, CrLf, Cr };
+    LineEnding m_lineEnding = LineEnding::Lf;
+    bool m_hadByteOrderMark = false;
+    bool m_mixedLineEndings = false;
+    // Set when the opened bytes were not valid UTF-8 (or were UTF-16) and so
+    // could not be read losslessly. Saving over the original is refused;
+    // Save As writes a UTF-8 copy and clears the flag.
+    bool m_lossyDecode = false;
+    bool decodeDocumentBytes(const QByteArray &bytes, QString *text);
+    QByteArray encodeDocumentText(const QString &text) const;
+    void resetPersistenceState();
     QString m_recoveryPath;
     std::unique_ptr<QLockFile> m_recoveryLock;
 

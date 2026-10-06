@@ -16,6 +16,8 @@ Dialog {
 
     signal keepRequested()
     signal reloadRequested()
+    // Explicitly replace the on-disk version with this window's text.
+    signal overwriteRequested()
 
     modal: true
     focus: true
@@ -77,12 +79,32 @@ Dialog {
                 primary: root.deleted
                 activeColor: root.activeButtonColor
                 KeyNavigation.left: reloadButton
-                KeyNavigation.right: reloadButton
-                KeyNavigation.tab: reloadButton
+                KeyNavigation.right: overwriteButton
+                KeyNavigation.tab: overwriteButton
                 KeyNavigation.backtab: reloadButton
                 onClicked: {
                     root.close();
                     root.keepRequested();
+                }
+            }
+
+            SquareDialogButton {
+                id: overwriteButton
+                objectName: "externalChangeOverwrite"
+                text: "Save Anyway"
+                visible: !root.deleted && root.locallyModified
+                enabled: visible
+                darkMode: root.darkMode
+                textScale: root.textScale
+                labelColor: root.textColor
+                activeColor: root.activeButtonColor
+                KeyNavigation.left: keepButton
+                KeyNavigation.right: reloadButton
+                KeyNavigation.tab: reloadButton
+                KeyNavigation.backtab: keepButton
+                onClicked: {
+                    root.close();
+                    root.overwriteRequested();
                 }
             }
 
@@ -94,10 +116,10 @@ Dialog {
                 darkMode: root.darkMode
                 textScale: root.textScale
                 activeColor: root.activeButtonColor
-                KeyNavigation.left: keepButton
+                KeyNavigation.left: overwriteButton
                 KeyNavigation.right: keepButton
                 KeyNavigation.tab: keepButton
-                KeyNavigation.backtab: keepButton
+                KeyNavigation.backtab: overwriteButton
                 onClicked: {
                     root.close();
                     root.reloadRequested();

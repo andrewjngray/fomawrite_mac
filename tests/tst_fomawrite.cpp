@@ -59,6 +59,10 @@ private slots:
     void publishingPreviewCacheTracksAssetsAndConsumerLifetime();
     void manuscriptHeadingMarkersHangOutsideBodyColumn();
     void sourceCodeBackgroundAndAppearancePreserveSavedBytes();
+    void persistenceRoundTripsBytesExactly();
+    void persistenceRefusesLossyDecodeAndSaveAsWritesUtf8();
+    void crlfDocumentsKeepAutosaveRenameAndMove();
+    void manualSaveRespectsDiskBaseline();
     void codeIndentKeysAndQuotesKeepAtomicUndo();
     void syntaxColorsRespectLanguagesAndLiteralMarkdown();
     void sourceHangingIndentPreservesLiteralMarkdown();
@@ -1340,7 +1344,14 @@ private slots:
                 QCOMPARE(backend->authorshipRanges().size(), 1);
                 backend->autosave();
                 QFile disk(backend->fileUrl().toLocalFile()); QVERIFY(disk.open(QIODevice::ReadOnly));
-                if (name == "0") { QVERIFY(backend->modified()); QCOMPARE(disk.readAll(), QByteArray("external writer")); }
+                if (name == "0") {
+                    QVERIFY(backend->modified()); QCOMPARE(disk.readAll(), QByteArray("external writer")); disk.close();
+                    // Cycle131: a plain Save must also refuse to replace the newer external version.
+                    QSignalSpy failed(backend, &Backend::saveFailed); QSignalSpy external(backend, &Backend::externalChangeDetected);
+                    backend->save();
+                    QVERIFY(backend->modified()); QCOMPARE(failed.size(), 1); QVERIFY(external.size() >= 1);
+                    QVERIFY(disk.open(QIODevice::ReadOnly)); QCOMPARE(disk.readAll(), QByteArray("external writer"));
+                }
                 else { QVERIFY(!backend->modified()); QCOMPARE(disk.readAll(), QByteArray("recovered draft 1")); }
                 backend->discardRecovery();
             }
@@ -5539,6 +5550,7 @@ private:
 #include "cycle100-navigation.inc"
 #include "cycle99-integration.inc"
 #include "sourcevisualmapping-cycle99.inc"
+#include "cycle131-persistence.inc"
 
 int main(int argc, char **argv) {
     QtWebEngineQuick::initialize();

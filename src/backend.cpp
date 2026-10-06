@@ -24,6 +24,7 @@
 #include <QPdfSelection>
 #include <QBuffer>
 #include <QTextBoundaryFinder>
+#include <QStringDecoder>
 #include "backend.h"
 #include "sourcevisualmapping.h"
 #include <QClipboard>
@@ -1828,7 +1829,7 @@ void Backend::attachDocument(QObject *textDocument) {
 
     m_document = quickDocument->textDocument();
     invalidatePublishingDocument();
-    m_lastDocumentText = m_document->toPlainText();
+    m_lastDocumentText = currentDocumentText();
     m_highlighter = new MarkdownHighlighter(m_document);
     m_highlighter->setDarkMode(m_darkMode);
     m_highlighter->setShowMarkup(m_showMarkup);
@@ -1856,6 +1857,73 @@ void Backend::openDialog() {
     emit openDialogRequested();
 }
 
+void Backend::resetPersistenceState() {
+    m_lineEnding = LineEnding::Lf;
+    m_hadByteOrderMark = false;
+    m_mixedLineEndings = false;
+    m_lossyDecode = false;
+}
+
+// Decodes file bytes for editing. Returns false when the bytes could not be
+// represented exactly (invalid UTF-8, or UTF-16), in which case the readable
+// text is still produced but m_lossyDecode blocks writing it back in place.
+bool Backend::decodeDocumentBytes(const QByteArray &bytes, QString *text) {
+    resetPersistenceState();
+    QByteArray body = bytes;
+    QString decoded;
+    bool lossless = true;
+    if (body.startsWith("\xFF\xFE") || body.startsWith("\xFE\xFF")) {
+        // UTF-16 with a byte-order mark: show the text faithfully, but writing
+        // it back as UTF-8 would silently change the file's encoding.
+        QStringDecoder utf16(QStringDecoder::Utf16);
+        decoded = utf16.decode(body);
+        lossless = false;
+    } else {
+        if (body.startsWith("\xEF\xBB\xBF")) {
+            m_hadByteOrderMark = true;
+            body.remove(0, 3);
+        }
+        QStringDecoder utf8(QStringDecoder::Utf8, QStringConverter::Flag::Stateless);
+        decoded = utf8.decode(body);
+        if (utf8.hasError()) {
+            lossless = false;
+            decoded = QString::fromUtf8(body);
+        }
+    }
+
+    // Record the dominant line ending before normalizing to '\n' for editing.
+    int crlf = 0, cr = 0, lf = 0;
+    for (int i = 0; i < decoded.size(); ++i) {
+        const QChar c = decoded.at(i);
+        if (c == QLatin1Char('\r')) {
+            if (i + 1 < decoded.size() && decoded.at(i + 1) == QLatin1Char('\n')) { ++crlf; ++i; }
+            else ++cr;
+        } else if (c == QLatin1Char('\n')) {
+            ++lf;
+        }
+    }
+    if (crlf > lf && crlf >= cr) m_lineEnding = LineEnding::CrLf;
+    else if (cr > lf && cr > crlf) m_lineEnding = LineEnding::Cr;
+    else m_lineEnding = LineEnding::Lf;
+    m_mixedLineEndings = (crlf > 0 ? 1 : 0) + (cr > 0 ? 1 : 0) + (lf > 0 ? 1 : 0) > 1;
+    decoded.replace(QStringLiteral("\r\n"), QStringLiteral("\n"));
+    decoded.replace(QLatin1Char('\r'), QLatin1Char('\n'));
+
+    m_lossyDecode = !lossless;
+    *text = decoded;
+    return lossless;
+}
+
+// The inverse of decodeDocumentBytes for the current document conventions.
+QByteArray Backend::encodeDocumentText(const QString &text) const {
+    QString out = text;
+    if (m_lineEnding == LineEnding::CrLf) out.replace(QLatin1Char('\n'), QStringLiteral("\r\n"));
+    else if (m_lineEnding == LineEnding::Cr) out.replace(QLatin1Char('\n'), QLatin1Char('\r'));
+    QByteArray bytes = out.toUtf8();
+    if (m_hadByteOrderMark) bytes.prepend("\xEF\xBB\xBF");
+    return bytes;
+}
+
 bool Backend::open(const QUrl &url) {
     QUrl documentUrl = url;
     documentUrl.setFragment(QString());
@@ -1868,8 +1936,10 @@ bool Backend::open(const QUrl &url) {
     }
 
     const QString targetName = QFileInfo(documentUrl.toLocalFile()).fileName();
+    // Read raw bytes: QIODevice::Text would strip every '\r', collapsing
+    // CR-only files to one line and making CRLF files never match the disk.
     QFile file(documentUrl.toLocalFile());
-    if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+    if (!file.open(QIODevice::ReadOnly)) {
         setStatus(QStringLiteral("Could not open %1.").arg(targetName));
         return false;
     }
@@ -1879,7 +1949,9 @@ bool Backend::open(const QUrl &url) {
         setStatus(QStringLiteral("Could not finish reading the document."));
         return false;
     }
-    loadDocumentText(QString::fromUtf8(contents));
+    QString text;
+    const bool lossless = decodeDocumentBytes(contents, &text);
+    loadDocumentText(text);
     clearRecovery();
     m_lastKnownFileContents = contents;
     m_hasKnownFileContents = true;
@@ -1899,7 +1971,12 @@ bool Backend::open(const QUrl &url) {
     m_library.revealFile(documentUrl);
     watchCurrentFile();
     setModified(false);
-    setStatus(QStringLiteral("Opened %1").arg(fileName()));
+    if (!lossless)
+        setStatus(QStringLiteral("Opened %1 — not valid UTF-8, so it cannot be saved in place. Use Save As to write a UTF-8 copy.").arg(fileName()));
+    else if (m_mixedLineEndings)
+        setStatus(QStringLiteral("Opened %1 — mixed line endings; saving will use the file's dominant style.").arg(fileName()));
+    else
+        setStatus(QStringLiteral("Opened %1").arg(fileName()));
     if (!m_navigatingHistory && (m_historyIndex < 0 || m_history[m_historyIndex].first != documentUrl)) {
         while (m_history.size() > m_historyIndex + 1) m_history.removeLast();
         m_history.append({documentUrl, 0});
@@ -2064,6 +2141,7 @@ void Backend::newDocument() {
     m_lastKnownFileContents.clear();
     m_hasKnownFileContents = false;
     m_requiresViewConflictCheck = false;
+    resetPersistenceState();
     watchCurrentFile();
     setModified(false);
     setStatus(QStringLiteral("New untitled document"));
@@ -2099,7 +2177,7 @@ bool Backend::duplicateDocument(const QString &name) {
         setStatus(QStringLiteral("Could not create the copy. The name may already be in use."));
         return false;
     }
-    const QByteArray contents = currentDocumentText().toUtf8();
+    const QByteArray contents = encodeDocumentText(currentDocumentText());
     if (copy.write(contents) != contents.size() || !copy.flush()) {
         copy.close();
         copy.remove(); // Only the new file exclusively created by this operation.
@@ -2452,7 +2530,7 @@ void Backend::loadDocumentText(const QString &text) {
     m_codeIndentWidth = 0; m_codeIndentTabs = false;
     m_document->setPlainText(text);
     applyAuthorshipData({});
-    m_lastDocumentText = text;
+    m_lastDocumentText = currentDocumentText();
     m_loading = false;
 
     applyDocumentTypography();
@@ -2507,6 +2585,16 @@ void Backend::saveTo(const QUrl &url, bool protectExternalChanges) {
     }
 
     const QString targetName = QFileInfo(url.toLocalFile()).fileName();
+    if (sameDocument && m_lossyDecode) {
+        // The bytes on disk were not read exactly; writing our decoded text
+        // over them would destroy the original. Save As elsewhere is allowed.
+        m_closeAfterSave = false;
+        setStatus(QStringLiteral("Save paused: %1 is not valid UTF-8 and was not read exactly. Use Save As to write a UTF-8 copy.").arg(targetName));
+        emit saveFailed();
+        emit quitCanceled();
+        return;
+    }
+    const QByteArray contents = encodeDocumentText(currentDocumentText());
 #ifdef Q_OS_MACOS
     // Keep the previous saved bytes before replacing them. Failure blocks this
     // save rather than silently violating the requested history policy.
@@ -2518,7 +2606,7 @@ void Backend::saveTo(const QUrl &url, bool protectExternalChanges) {
         }
         const auto bytes = prior.readAll();
         if (prior.error() != QFile::NoError) { emit saveFailed(); emit quitCanceled(); return; }
-        if (bytes != currentDocumentText().toUtf8()) {
+        if (bytes != contents) {
             extern QString createMacVersion(const QString &);
             const auto error = createMacVersion(url.toLocalFile());
             if (!error.isEmpty()) {
@@ -2529,7 +2617,7 @@ void Backend::saveTo(const QUrl &url, bool protectExternalChanges) {
     }
 #endif
     QSaveFile file(url.toLocalFile());
-    if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
+    if (!file.open(QIODevice::WriteOnly)) {
         m_closeAfterSave = false;
         setStatus(QStringLiteral("Could not save %1.").arg(targetName));
         emit saveFailed();
@@ -2537,7 +2625,6 @@ void Backend::saveTo(const QUrl &url, bool protectExternalChanges) {
         return;
     }
 
-    const QByteArray contents = currentDocumentText().toUtf8();
     if (file.write(contents) != contents.size()) {
         file.cancelWriting(); m_closeAfterSave = false;
         setStatus("Could not write complete document; original file retained.");
@@ -2553,6 +2640,19 @@ void Backend::saveTo(const QUrl &url, bool protectExternalChanges) {
             m_closeAfterSave = false;
             setStatus(anotherView ? "Save paused: another view changed this file. Review the changes or use Save As."
                                   : "Autosave paused: file changed outside Fomawrite.");
+            emit saveFailed(); emit quitCanceled(); return;
+        }
+    } else if (sameDocument && m_hasKnownFileContents && QFileInfo::exists(url.toLocalFile())) {
+        // A manual Save must not silently replace edits another writer made
+        // while this window was not watching (crash recovery, missed events).
+        // Offer the usual Keep Mine / Reload choice instead of overwriting.
+        QFile current(url.toLocalFile());
+        if (current.open(QIODevice::ReadOnly) && current.readAll() != m_lastKnownFileContents
+                && current.error() == QFile::NoError) {
+            file.cancelWriting();
+            m_closeAfterSave = false;
+            setStatus(QStringLiteral("Save paused: %1 changed on disk. Reload it, or keep yours and save again.").arg(targetName));
+            emit externalChangeDetected(false, true);
             emit saveFailed(); emit quitCanceled(); return;
         }
     }
@@ -2578,6 +2678,7 @@ void Backend::saveTo(const QUrl &url, bool protectExternalChanges) {
     m_closeAfterSave = false;
     m_lastKnownFileContents = contents;
     m_hasKnownFileContents = true;
+    m_lossyDecode = false; // What is on disk is now exactly what we hold.
     setFileUrl(url);
     m_library.recordRecentFile(url);
     watchCurrentFile();
@@ -2619,6 +2720,9 @@ void Backend::writeRecovery() {
     const QJsonObject recovery{{QStringLiteral("fileUrl"), m_fileUrl.toString()},
                                {QStringLiteral("text"), currentDocumentText()}, {QStringLiteral("authorship"), authorshipData()},
                                {"requiresExplicitSave", m_requiresExplicitSave},
+                               {"lineEnding", int(m_lineEnding)},
+                               {"byteOrderMark", m_hadByteOrderMark},
+                               {"lossyDecode", m_lossyDecode},
                                {"knownDiskContents", m_hasKnownFileContents},
                                {"diskContents", QString::fromLatin1(m_lastKnownFileContents.toBase64())}};
     file.setPermissions(QFileDevice::ReadOwner | QFileDevice::WriteOwner);
@@ -2644,6 +2748,10 @@ void Backend::restoreRecovery() {
     m_lastKnownFileContents = m_hasKnownFileContents
         ? QByteArray::fromBase64(recovery.value("diskContents").toString().toLatin1()) : QByteArray();
     m_requiresExplicitSave = recovery.value("requiresExplicitSave").toBool(false);
+    resetPersistenceState();
+    m_lineEnding = LineEnding(qBound(0, recovery.value("lineEnding").toInt(0), 2));
+    m_hadByteOrderMark = recovery.value("byteOrderMark").toBool(false);
+    m_lossyDecode = recovery.value("lossyDecode").toBool(false);
     setFileUrl(recoveredUrl);
     setModified(true);
     setStatus(QStringLiteral("Recovered unsaved changes"));
@@ -2784,7 +2892,13 @@ QUrl Backend::suggestedSaveUrl() const {
 }
 
 QString Backend::currentDocumentText() const {
-    return m_document ? m_document->toPlainText() : QString();
+    if (!m_document) return QString();
+    // toPlainText() rewrites no-break spaces and Unicode line/paragraph
+    // separators. Keep every character the writer typed; only block
+    // boundaries become '\n'. The offsets match toPlainText() exactly.
+    QString text = m_document->toRawText();
+    text.replace(QChar(QChar::ParagraphSeparator), QLatin1Char('\n'));
+    return text;
 }
 
 int Backend::countWords(const QString &text) {
@@ -3535,7 +3649,10 @@ bool Backend::restoreVersion(const QUrl &url) {
     cursor.beginEditBlock();
     cursor.select(QTextCursor::Document);
     QTextCharFormat unlabelled;
-    cursor.insertText(QString::fromUtf8(bytes), unlabelled);
+    QString restored = QString::fromUtf8(bytes);
+    restored.replace(QStringLiteral("\r\n"), QStringLiteral("\n"));
+    restored.replace(QLatin1Char('\r'), QLatin1Char('\n'));
+    cursor.insertText(restored, unlabelled);
     cursor.endEditBlock();
     m_requiresExplicitSave = true;
     setModified(true);

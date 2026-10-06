@@ -2756,6 +2756,7 @@ ApplicationWindow {
 
         onKeepRequested: backend.keepExternalVersion()
         onReloadRequested: backend.reloadFromDisk()
+        onOverwriteRequested: { backend.keepExternalVersion(); backend.save(); }
     }
 
     Dialog {
