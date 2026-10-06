@@ -17,6 +17,8 @@ export interface Bridge {
   log(message: string): void;
   textReply(token: number, text: string): void;
   requestImage(token: number, src: string): void;
+  // Paste/drop of an image: the host writes the bytes next to the document and answers with imageSaved.
+  saveImage(token: number, name: string, mime: string, base64: string): void;
   // Vertical scroll position as a 0..1 fraction (debounced), for pane sync.
   scrolled(fraction: number): void;
   // C++ -> JS signals
@@ -31,6 +33,8 @@ export interface Bridge {
   undo: Signal<[]>;
   redo: Signal<[]>;
   imageReply: Signal<[number, string, string]>;
+  // Answer to saveImage: document-relative path on success (error ""), or a message on failure.
+  imageSaved: Signal<[number, string, string]>;
   // Host asks the editor to scroll to a 0..1 fraction (not echoed back as scrolled()).
   scrollToFraction: Signal<[number]>;
   // Host places the caret (UTF-16 offset) and scrolls it into view.
@@ -94,7 +98,7 @@ const MOCK_PNG =
 
 const SIGNALS = [
   "setDocument", "applyChanges", "setMode", "setTheme", "setAppearance",
-  "focusEditor", "requestText", "simulateUserChanges", "undo", "redo", "imageReply", "scrollToFraction", "setCursor", "command"
+  "focusEditor", "requestText", "simulateUserChanges", "undo", "redo", "imageReply", "imageSaved", "scrollToFraction", "setCursor", "command"
 ] as const;
 
 export type MockBridge = Bridge & {
@@ -120,6 +124,12 @@ export function createMockBridge(): MockBridge {
   mock.requestImage = (token: number, src: string) => {
     slot("requestImage")(token, src);
     setTimeout(() => mock.emit("imageReply", token, MOCK_PNG, ""), 50);
+  };
+  // Host stand-in: "save" every pasted/dropped image to assets/<name> after 50 ms.
+  mock.saveImage = (token: number, name: string, mime: string, base64: string) => {
+    calls.push({ name: "saveImage", args: [token, name, mime, base64] });
+    console.log("[bridge mock] saveImage", token, name, mime, `<${base64.length} base64 chars>`);
+    setTimeout(() => mock.emit("imageSaved", token, "assets/" + name, ""), 50);
   };
   mock.emit = (signal: string, ...args: unknown[]) => handlers[signal]?.forEach((f) => f(...args));
   return mock as MockBridge;
