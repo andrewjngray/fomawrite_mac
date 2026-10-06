@@ -70,6 +70,9 @@ private slots:
     void persistenceRoundTripsBytesExactly();
     void liveChangesApplyToDocumentByteExactly();
     void liveBridgeReplaysStateToLatePage();
+    void liveEditorPageMirrorsUserEditsByteExactly();
+    void liveEditorRoundTripsPersistenceFixturesThroughThePage();
+    void liveEditorLoadsLargeDocumentQuickly();
     void persistenceRefusesLossyDecodeAndSaveAsWritesUtf8();
     void crlfDocumentsKeepAutosaveRenameAndMove();
     void manualSaveRespectsDiskBaseline();

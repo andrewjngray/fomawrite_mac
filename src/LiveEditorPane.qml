@@ -17,7 +17,12 @@ Rectangle {
     color: backend.palette.editor
 
     WebChannel { id: channel }
-    Component.onCompleted: channel.registerObject("bridge", root.bridge)
+    // Register the bridge before the page starts loading: QWebChannel announces
+    // its objects when the page initialises the channel.
+    Component.onCompleted: {
+        channel.registerObject("bridge", root.bridge);
+        web.url = "qrc:/editor/index.html";
+    }
 
     function focusLive() {
         web.forceActiveFocus();
@@ -30,7 +35,6 @@ Rectangle {
         anchors.fill: parent
         anchors.bottomMargin: root.bottomInset
         webChannel: channel
-        url: "qrc:/editor/index.html"
         backgroundColor: root.color
         settings.javascriptEnabled: true
         settings.localContentCanAccessFileUrls: false
@@ -43,6 +47,12 @@ Rectangle {
                 request.action = WebEngineView.IgnoreRequest;
         }
         onContextMenuRequested: function(request) { request.accepted = true; }
+        onJavaScriptConsoleMessage: function(level, message, lineNumber, sourceID) {
+            console.warn("Live editor page: " + message + " (" + sourceID + ":" + lineNumber + ")");
+        }
+        onLoadingChanged: function(info) {
+            if (info.status === WebEngineView.LoadFailedStatus) console.warn("Live editor page failed to load: " + info.errorString);
+        }
         Keys.onPressed: root.writingActivity()
         Accessible.name: "Live Markdown editor"
     }

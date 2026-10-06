@@ -12,7 +12,9 @@
 // document, mode, theme and appearance are kept and replayed on ready().
 class EditorBridge : public QObject {
     Q_OBJECT
-    Q_PROPERTY(bool ready READ isReady NOTIFY readyChanged)
+    // Named `connected`, not `ready`: QWebChannel defines JS properties after
+    // methods, so a property called `ready` would shadow the ready() slot.
+    Q_PROPERTY(bool connected READ isReady NOTIFY readyChanged)
     Q_PROPERTY(int revision READ revision NOTIFY revisionChanged)
 public:
     explicit EditorBridge(QObject *parent = nullptr);
