@@ -160,7 +160,15 @@ ApplicationWindow {
             state.focusApplied = true;
             // Restore editing focus while caret-driven scrolling is suspended.
             // The saved viewport is reapplied after focus and deferred layout.
-            if (state.focusTarget === "visual" && visualEditorPane.visible)
+            // Never pull focus out of an auxiliary field (link editor, Find,
+            // library filter) the writer moved into while the view settled.
+            var auxiliaryFocused = activeFocusItem && typeof activeFocusItem.cut === "function"
+                && activeFocusItem !== editor && !isInside(activeFocusItem, editorPane) && !isInside(activeFocusItem, previewPane);
+            if (auxiliaryFocused) {
+                // keep the writer's focus
+            } else if (state.focusTarget === "live" && workspaceLayout.liveEditEnabled && liveEditorLoader.item)
+                liveEditorLoader.item.focusLive();
+            else if (state.focusTarget === "visual" && visualEditorPane.visible)
                 visualEditorPane.focusVisualEditor();
             else if (state.focusTarget === "source" && win.sourceEditorVisible)
                 editor.forceActiveFocus();

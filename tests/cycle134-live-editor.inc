@@ -454,3 +454,45 @@ void FomawriteTest::liveEditorCapturesEachPresentation() {
     qInfo("capture %s", qPrintable(QDir(captures).filePath("live-math.png")));
     page.backend.discardRecovery();
 }
+
+// The viewport transition that follows a mode switch used to restore editing
+// focus 16 ms later even if the writer had already moved into an auxiliary
+// field (the CI runner hit this in the link editor). Red on the old code.
+void FomawriteTest::viewportTransitionKeepsAuxiliaryFocus() {
+    Cycle103SettingsSnapshot settings;
+    Backend backend;
+    QQmlEngine engine; engine.rootContext()->setContextProperty("backend", &backend);
+    QQmlComponent component(&engine, QUrl(QStringLiteral("qrc:/Main.qml")));
+    QScopedPointer<QObject> window(component.create()); QVERIFY2(window, qPrintable(component.errorString()));
+    auto *quick = qobject_cast<QQuickWindow *>(window.data()); QVERIFY(quick);
+    auto *editor = window->findChild<QQuickItem *>("sourceEditor"); QVERIFY(editor);
+    auto *layout = window->findChild<QObject *>("workspaceLayout"); QVERIFY(layout);
+    quick->resize(1200, 800); quick->show(); QVERIFY(QTest::qWaitForWindowExposed(quick));
+    if (QGuiApplication::platformName() != "cocoa") { quick->requestActivate(); QTRY_VERIFY(quick->isActive()); }
+    editor->setProperty("text", QStringLiteral("# Focus\n\nalpha beta gamma\n"));
+    editor->forceActiveFocus();
+    QTRY_COMPARE(quick->activeFocusItem(), editor);
+    layout->setProperty("filesVisible", true);
+    auto *library = window->findChild<QObject *>("libraryPane"); QVERIFY(library);
+    library->setProperty("showFilterBar", true);
+    auto *filter = window->findChild<QQuickItem *>("libraryFilter"); QVERIFY(filter);
+    QTRY_VERIFY(filter->isVisible());
+    for (const char *mode : {"visual", "source"}) {
+        // Start a transition, then immediately move into the auxiliary field.
+        QVERIFY(QMetaObject::invokeMethod(window.data(), "selectWritingMode", Q_ARG(QVariant, QString::fromLatin1(mode))));
+        QVERIFY(window->property("changingDocumentView").toBool());
+        filter->forceActiveFocus();
+        QCOMPARE(quick->activeFocusItem(), filter);
+        QTRY_VERIFY_WITH_TIMEOUT(!window->property("changingDocumentView").toBool(), 5000);
+        QTest::qWait(60);
+        QVERIFY2(quick->activeFocusItem() == filter, mode);
+    }
+    // Without an auxiliary field, the transition still restores editing focus.
+    editor->forceActiveFocus();
+    QVERIFY(QMetaObject::invokeMethod(window.data(), "selectWritingMode", Q_ARG(QVariant, QStringLiteral("visual"))));
+    QTRY_VERIFY_WITH_TIMEOUT(!window->property("changingDocumentView").toBool(), 5000);
+    QVERIFY(QMetaObject::invokeMethod(window.data(), "selectWritingMode", Q_ARG(QVariant, QStringLiteral("source"))));
+    QTRY_VERIFY_WITH_TIMEOUT(!window->property("changingDocumentView").toBool(), 5000);
+    QTRY_COMPARE_WITH_TIMEOUT(quick->activeFocusItem(), editor, 2000);
+    backend.discardRecovery();
+}

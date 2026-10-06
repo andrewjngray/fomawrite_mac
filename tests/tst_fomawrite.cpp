@@ -78,6 +78,7 @@ private slots:
     void liveEditorFollowsHostEdits();
     void liveEditorAppliesFormatCommandsAtThePageSelection();
     void liveEditorRunsHostCommands();
+    void viewportTransitionKeepsAuxiliaryFocus();
     void liveEditorPlacesCursorAndRestylesWithoutReload();
     void liveEditorCapturesEachPresentation();
     void persistenceRefusesLossyDecodeAndSaveAsWritesUtf8();
