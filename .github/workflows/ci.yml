@@ -1,0 +1,88 @@
+# Continuous integration for Fomawrite.
+#
+# One macOS job (Apple Silicon runner) installs a pinned Qt 6 through
+# jurplel/install-qt-action (aqtinstall) and runs the same two scripts a
+# developer runs locally: ./bin/build and ./bin/test. The test run is
+# offscreen (bin/test sets QT_QPA_PLATFORM=offscreen itself).
+#
+# Qt choice: the development machine uses Homebrew Qt 6.11.2. This pins the
+# newest 6.11 patch release that aqtinstall offers for mac/desktop (6.11.3,
+# checked with `aqt list-qt mac desktop` on 2026-10-06; 6.12.0 also exists but
+# is a different minor series, so it is not used here). The macOS `clang_64`
+# packages are universal binaries that include arm64 slices, and the
+# qtwebengine / qtpdf / qtpositioning / qtwebchannel add-on modules are all
+# published for them, so the WebEngine-linked app and tests build without
+# falling back to an unpinned `brew install qt`. If a future Qt release stops
+# shipping WebEngine for this arch, replace the "Install Qt" step with
+# `brew install qtbase qtdeclarative qttools qtwebengine` and drop the QMAKE
+# override (bin/qt-env then discovers the Homebrew qmake).
+#
+# Modules: fomawrite.pro / tests/tests.pro link core gui widgets printsupport
+# qml quick quickcontrols2 quickdialogs2 concurrent network (qtbase +
+# qtdeclarative, always installed), pdf pdfquick (qtpdf), webenginecore
+# webenginequick (qtwebengine, which depends on qtpositioning and qtwebchannel)
+# and testlib (qtbase).
+
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    name: Build and test (macOS, Qt ${{ matrix.qt }})
+    runs-on: macos-15
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        qt: ["6.11.3"]
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+
+      - name: Install Qt ${{ matrix.qt }}
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: ${{ matrix.qt }}
+          host: mac
+          target: desktop
+          arch: clang_64
+          modules: qtwebengine qtpdf qtpositioning qtwebchannel
+          cache: true
+          cache-key-prefix: install-qt-action-${{ matrix.qt }}
+
+      - name: Show toolchain
+        run: |
+          "$QT_ROOT_DIR/bin/qmake" -v
+          xcodebuild -version
+          sw_vers
+
+      - name: Build app
+        env:
+          QMAKE: ${{ env.QT_ROOT_DIR }}/bin/qmake
+        run: ./bin/build
+
+      - name: Build and run tests (offscreen)
+        shell: bash
+        env:
+          QMAKE: ${{ env.QT_ROOT_DIR }}/bin/qmake
+        run: |
+          set -o pipefail
+          mkdir -p build-tests
+          ./bin/test 2>&1 | tee build-tests/test.log
+
+      - name: Upload test log
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-log-qt${{ matrix.qt }}
+          path: build-tests/test.log
+          if-no-files-found: ignore
+          retention-days: 14
