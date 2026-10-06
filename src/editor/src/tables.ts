@@ -27,6 +27,7 @@ import { Decoration, DecorationSet, EditorView, ViewPlugin, ViewUpdate, WidgetTy
 import { syntaxTree } from "@codemirror/language";
 import type { Tree } from "@lezer/common";
 import { liveExtension } from "./live";
+import { createInlineMathElement, inlineMathEndIn } from "./math";
 
 // ---------------------------------------------------------------- pure: table text -> cells
 export type Align = "left" | "center" | "right" | null;
@@ -140,6 +141,7 @@ export function parseTableText(text: string, base = 0): ParsedTable | null {
 export type Inline =
   | { k: "text"; v: string }
   | { k: "code"; v: string }
+  | { k: "math"; tex: string }
   | { k: "br" }
   | { k: "em" | "strong" | "del"; c: Inline[] }
   | { k: "link"; href: string; title: string; c: Inline[] };
@@ -178,6 +180,12 @@ function skipCode(s: string, i: number): number {
   return c < 0 ? i + n : c + n;
 }
 
+/** Index just past the inline math starting at the `$` at `i`, or `i + 1` when it is not math (math.ts has the rules). */
+function skipMath(s: string, i: number): number {
+  const e = inlineMathEndIn(s, i);
+  return e < 0 ? i + 1 : e;
+}
+
 /** Index of the matching `close` for the bracket at `i` (nesting, escapes and code spans respected), or -1. */
 function matchBracket(s: string, i: number, open: string, close: string): number {
   let depth = 0;
@@ -185,6 +193,7 @@ function matchBracket(s: string, i: number, open: string, close: string): number
     const c = s[j];
     if (c === "\\") j++;
     else if (c === "`") j = skipCode(s, j) - 1;
+    else if (c === "$") j = skipMath(s, j) - 1;
     else if (c === open) depth++;
     else if (c === close && --depth === 0) return j;
   }
@@ -198,6 +207,7 @@ function findClose(s: string, d: string, from: number): number {
     const c = s[j];
     if (c === "\\") j++;
     else if (c === "`") j = skipCode(s, j) - 1;
+    else if (c === "$") j = skipMath(s, j) - 1;
     else if (c === ch) {
       let r = 1;
       while (s[j + r] === ch) r++;
@@ -227,7 +237,7 @@ function parseLink(s: string, i: number, depth: number): { end: number; text: st
   return { end: rp + 1, text: s.slice(i + 1, rb), href: dest, title };
 }
 
-/** Parse the inline subset used in table cells: `**` `*` `_` `~~` `` ` `` `[text](url)`, `<br>`, backslash escapes. */
+/** Parse the inline subset used in table cells: `**` `*` `_` `~~` `` ` `` `$tex$` `[text](url)`, `<br>`, backslash escapes. */
 export function parseInline(s: string, depth = 0): Inline[] {
   const out: Inline[] = [];
   let buf = "";
@@ -259,6 +269,19 @@ export function parseInline(s: string, depth = 0): Inline[] {
         i += n;
       }
       continue;
+    }
+    if (ch === "$") {
+      const e = inlineMathEndIn(s, i);
+      if (e > 0) {
+        // `\|` is the table-level escape for a pipe (GFM unescapes it before the inline pass).
+        const tex = s.slice(i + 1, e - 1).replace(/\\\|/g, "|").trim();
+        if (tex) {
+          flush();
+          out.push({ k: "math", tex });
+          i = e;
+          continue;
+        }
+      }
     }
     if (ch === "<") {
       const br = /^<br\s*\/?>/i.exec(s.slice(i, i + 8));
@@ -384,6 +407,9 @@ function appendInline(parent: Node, nodes: Inline[], doc: Document) {
         break;
       case "br":
         parent.appendChild(doc.createElement("br"));
+        break;
+      case "math":
+        parent.appendChild(createInlineMathElement(n.tex, doc));
         break;
       case "code": {
         const e = doc.createElement("code");

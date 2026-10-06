@@ -25,32 +25,44 @@ const isSpace = (c: number) => c === 32 || c === 9 || c === 10 || c === 13;
 const isDigit = (c: number) => c >= 48 && c <= 57;
 
 /**
- * Inline math `$tex$`. Rules (Pandoc's, plus "no newline"):
+ * Where does inline math starting at the `$` at `pos` end? `char(i)` is the character code at `i` (-1 outside the
+ * text). Returns the exclusive end offset (just past the closing `$`) or -1 when the `$` is plain text.
+ * Shared by the Lezer parser below and by the table-cell renderer (tables.ts), so both agree on what is math.
+ * Rules (Pandoc's, plus "no newline"):
  *  - the opening `$` is not followed by whitespace, and neither side of it is another `$`;
  *  - the first unescaped `$` after it must close: it follows a non-space character and is not followed by a digit,
  *    otherwise the opening `$` is plain text (so "costs $5 and $10" stays text);
  *  - no line break inside; `\$` is an escape and never closes.
  */
-function parseInlineMath(cx: InlineContext, next: number, pos: number): number {
-  if (next !== DOLLAR) return -1;
-  const after = cx.char(pos + 1);
-  if (after < 0 || after === DOLLAR || isSpace(after) || cx.char(pos - 1) === DOLLAR) return -1;
+export function inlineMathEnd(char: (i: number) => number, pos: number): number {
+  if (char(pos) !== DOLLAR) return -1;
+  const after = char(pos + 1);
+  if (after < 0 || after === DOLLAR || isSpace(after) || char(pos - 1) === DOLLAR) return -1;
   for (let i = pos + 1; ; i++) {
-    const c = cx.char(i);
+    const c = char(i);
     if (c < 0 || c === NEWLINE) return -1;
     if (c === BACKSLASH) {
       i++; // skip the escaped character (it may be `$` or a line break; the loop re-checks the one after)
-      if (cx.char(i) === NEWLINE) return -1;
+      if (char(i) === NEWLINE) return -1;
       continue;
     }
     if (c !== DOLLAR) continue;
     // First unescaped `$`: closer or give up.
-    if (isSpace(cx.char(i - 1)) || isDigit(cx.char(i + 1))) return -1;
-    const end = i + 1;
-    return cx.addElement(
-      cx.elt("InlineMath", pos, end, [cx.elt("MathMark", pos, pos + 1), cx.elt("MathMark", i, end)]),
-    );
+    if (isSpace(char(i - 1)) || isDigit(char(i + 1))) return -1;
+    return i + 1;
   }
+}
+
+/** `inlineMathEnd` over a plain string (`s[pos]` must be the opening `$`). */
+export function inlineMathEndIn(s: string, pos: number): number {
+  return inlineMathEnd((i) => (i >= 0 && i < s.length ? s.charCodeAt(i) : -1), pos);
+}
+
+function parseInlineMath(cx: InlineContext, next: number, pos: number): number {
+  if (next !== DOLLAR) return -1;
+  const end = inlineMathEnd((i) => cx.char(i), pos);
+  if (end < 0) return -1;
+  return cx.addElement(cx.elt("InlineMath", pos, end, [cx.elt("MathMark", pos, pos + 1), cx.elt("MathMark", end - 1, end)]));
 }
 
 const OPEN_LINE = /^\$\$\s*$/;
@@ -171,6 +183,16 @@ function revealAt(dom: HTMLElement, e: Event, offset: number) {
   const pos = view.posAtDOM(dom) + offset;
   view.dispatch({ selection: { anchor: Math.min(pos, view.state.doc.length) }, scrollIntoView: true });
   view.focus();
+}
+
+/** Inline KaTeX element (no event handlers) for non-editor DOM such as table cells; uses the shared render cache. */
+export function createInlineMathElement(tex: string, doc: Document = document): HTMLElement {
+  const wrap = doc.createElement("span");
+  wrap.className = "fw-math-render fw-math-inline";
+  const r = renderMath(tex, false);
+  wrap.innerHTML = r.html;
+  if (r.error) wrap.classList.add("fw-math-failed");
+  return wrap;
 }
 
 export class MathWidget extends WidgetType {
