@@ -496,3 +496,43 @@ void FomawriteTest::viewportTransitionKeepsAuxiliaryFocus() {
     QTRY_COMPARE_WITH_TIMEOUT(quick->activeFocusItem(), editor, 2000);
     backend.discardRecovery();
 }
+
+// The whole window: switching to Live through the real command loads the page
+// inside Main.qml's Loader, hands it the document, checks the footer option,
+// routes an outline jump to the page and carries the caret back to Source.
+void FomawriteTest::liveModeInMainWindowLoadsPageAndNavigatesOutline() {
+    Cycle103SettingsSnapshot settings;
+    Backend backend;
+    QQmlEngine engine; engine.rootContext()->setContextProperty("backend", &backend);
+    QQmlComponent component(&engine, QUrl(QStringLiteral("qrc:/Main.qml")));
+    QScopedPointer<QObject> window(component.create()); QVERIFY2(window, qPrintable(component.errorString()));
+    auto *quick = qobject_cast<QQuickWindow *>(window.data()); QVERIFY(quick);
+    auto *editor = window->findChild<QQuickItem *>("sourceEditor"); QVERIFY(editor);
+    auto *layout = window->findChild<QObject *>("workspaceLayout"); QVERIFY(layout);
+    quick->resize(1200, 800); quick->show(); QVERIFY(QTest::qWaitForWindowExposed(quick));
+    const QString text = QString::fromUtf8("# One\n\nalpha\n\n## Two\n\nbeta\n");
+    editor->setProperty("text", text);
+    QVERIFY(QMetaObject::invokeMethod(window.data(), "selectWritingMode", Q_ARG(QVariant, QStringLiteral("live"))));
+    QVERIFY(layout->property("liveEditEnabled").toBool());
+    QVERIFY(!layout->property("visualEditEnabled").toBool());
+    auto *bridge = backend.editorBridge();
+    QTRY_VERIFY_WITH_TIMEOUT(bridge->isReady(), 20000);
+    QSignalSpy received(bridge, &EditorBridge::textReceived);
+    QTRY_VERIFY_WITH_TIMEOUT(([&] {
+        const int token = bridge->fetchText(); QTest::qWait(60);
+        for (const auto &args : received) if (args.at(0).toInt() == token && args.at(1).toString() == text) return true;
+        return false;
+    })(), 15000);
+    auto *liveToggle = window->findChild<QQuickItem *>("liveEditToggle"); QVERIFY(liveToggle);
+    QTRY_VERIFY(liveToggle->property("checked").toBool());
+    auto *outline = window->findChild<QObject *>("documentOutline"); QVERIFY(outline);
+    const int two = text.indexOf("## Two");
+    QVERIFY(QMetaObject::invokeMethod(outline, "jumpRequested", Q_ARG(int, two)));
+    QVERIFY(layout->property("liveEditEnabled").toBool());
+    QTRY_COMPARE_WITH_TIMEOUT(backend.liveCursor(), two, 5000);
+    QVERIFY(QMetaObject::invokeMethod(window.data(), "selectWritingMode", Q_ARG(QVariant, QStringLiteral("source"))));
+    QVERIFY(!layout->property("liveEditEnabled").toBool());
+    QCOMPARE(editor->property("cursorPosition").toInt(), two);
+    QVERIFY(!liveToggle->property("checked").toBool());
+    backend.discardRecovery();
+}

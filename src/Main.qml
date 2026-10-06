@@ -660,7 +660,8 @@ ApplicationWindow {
         preview: previewPane
         onOutlineRequested: {
             outlineDrawer.headings = backend.documentOutline(editor.text);
-            outlineDrawer.showFor(workspaceLayout.effectiveLayoutMode !== 2 && win.lastWritingSurface === "source" ? editor.cursorPosition : -1,
+            outlineDrawer.showFor(workspaceLayout.effectiveLayoutMode !== 2 && win.lastWritingSurface === "source" ? editor.cursorPosition
+                : workspaceLayout.effectiveLayoutMode !== 2 && workspaceLayout.liveEditEnabled ? backend.liveCursor() : -1,
                 win.isInside(win.activeFocusItem, editor) || win.isInside(win.activeFocusItem, visualEditorPane) || win.isInside(win.activeFocusItem, previewPane) ? win.activeFocusItem : null);
         }
         onStatisticsRequested: statisticsDialog.open()
@@ -838,6 +839,12 @@ ApplicationWindow {
             win.focusWritingSurface();
         }
         onJumpRequested: function(position) {
+            if (workspaceLayout.liveEditEnabled && liveEditorLoader.item) {
+                // Stay in Live: the page places and reveals its own caret.
+                backend.editorBridge.placeCursor(position);
+                liveEditorLoader.item.focusLive();
+                return;
+            }
             win.setEditingMode(false);
             win.cancelDocumentViewportTransition();
             win.lastWritingSurface = "source";
