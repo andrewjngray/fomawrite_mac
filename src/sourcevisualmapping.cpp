@@ -287,51 +287,65 @@ void SourceVisualMapping::appendMapped(int sourceStart, const QString &text) {
 }
 
 void SourceVisualMapping::appendInline(int sourceStart, const QString &text) {
+    // Patterns are matched at an offset into `text` (AnchorAtOffsetMatchOption)
+    // instead of on a copy of the remaining text, and runs of characters that
+    // cannot start a construct map in one span. The old per-character
+    // `text.mid(cursor)` made this O(n²): a 100 KB line took seconds (R2).
+    static const QRegularExpression link(QStringLiteral("\\[([^\\]]+)\\]\\(((?:\\\\.|[^)])+)\\)"));
+    static const QRegularExpression strong(QStringLiteral("(\\*\\*|__)([^\\n]+?)\\1"));
+    static const QRegularExpression emphasis(QStringLiteral("(\\*|_)([^\\n*_]+)\\1"));
+    const auto anchored = [&](const QRegularExpression &pattern, int offset) {
+        return pattern.match(text, offset, QRegularExpression::NormalMatch, QRegularExpression::AnchorAtOffsetMatchOption);
+    };
+    const auto startsConstruct = [](QChar c) {
+        return c == QLatin1Char('`') || c == QLatin1Char('[') || c == QLatin1Char('*') || c == QLatin1Char('_');
+    };
+    const int size = int(text.size());
     int cursor = 0;
-    while (cursor < int(text.size())) {
-        const QString tail = text.mid(cursor);
-        static const QRegularExpression link(QStringLiteral("^\\[([^\\]]+)\\]\\(((?:\\\\.|[^)])+)\\)"));
-        static const QRegularExpression strong(QStringLiteral("^(\\*\\*|__)([^\\n]+?)\\1"));
-        static const QRegularExpression emphasis(QStringLiteral("^(\\*|_)([^\\n*_]+)\\1"));
-        const auto linkMatch = link.match(tail);
-        const auto strongMatch = strong.match(tail);
-        const auto emphasisMatch = emphasis.match(tail);
-        if (tail.startsWith(QLatin1Char('`'))) {
+    while (cursor < size) {
+        if (!startsConstruct(text.at(cursor))) {
+            int end = cursor + 1;
+            while (end < size && !startsConstruct(text.at(end))) ++end;
+            appendMapped(sourceStart + cursor, text.mid(cursor, end - cursor));
+            cursor = end;
+            continue;
+        }
+        if (text.at(cursor) == QLatin1Char('`')) {
             int delimiterLength = 1;
-            while (delimiterLength < tail.size() && tail.at(delimiterLength) == QLatin1Char('`')) ++delimiterLength;
-            int closing = delimiterLength;
-            while (closing < tail.size()) {
-                closing = tail.indexOf(QLatin1Char('`'), closing);
+            while (cursor + delimiterLength < size && text.at(cursor + delimiterLength) == QLatin1Char('`')) ++delimiterLength;
+            int closing = cursor + delimiterLength;
+            while (closing < size) {
+                closing = text.indexOf(QLatin1Char('`'), closing);
                 if (closing < 0) break;
                 int run = 1;
-                while (closing + run < tail.size() && tail.at(closing + run) == QLatin1Char('`')) ++run;
+                while (closing + run < size && text.at(closing + run) == QLatin1Char('`')) ++run;
                 if (run == delimiterLength) break;
                 closing += run;
             }
-            if (closing > delimiterLength) {
+            if (closing > cursor + delimiterLength) {
                 const int visualStart = m_visual.size();
-                appendMapped(sourceStart + cursor + delimiterLength, tail.mid(delimiterLength, closing - delimiterLength));
+                appendMapped(sourceStart + cursor + delimiterLength, text.mid(cursor + delimiterLength, closing - cursor - delimiterLength));
                 appendVisualFormat(VisualFormatKind::InlineCode, visualStart);
-                cursor += closing + delimiterLength;
+                cursor = closing + delimiterLength;
                 continue;
             }
         }
+        const auto linkMatch = anchored(link, cursor);
+        const auto strongMatch = anchored(strong, cursor);
+        const auto emphasisMatch = anchored(emphasis, cursor);
         if (linkMatch.hasMatch()) {
-            const int labelStart = cursor + linkMatch.capturedStart(1);
             const int visualStart = m_visual.size();
-            appendInline(sourceStart + labelStart, linkMatch.captured(1));
+            appendInline(sourceStart + linkMatch.capturedStart(1), linkMatch.captured(1));
             appendVisualFormat(VisualFormatKind::LinkLabel, visualStart);
             cursor += linkMatch.capturedLength(0);
         } else if (strongMatch.hasMatch()) {
-            const int contentStart = cursor + strongMatch.capturedStart(2);
             const int visualStart = m_visual.size();
-            appendInline(sourceStart + contentStart, strongMatch.captured(2));
+            appendInline(sourceStart + strongMatch.capturedStart(2), strongMatch.captured(2));
             appendVisualFormat(VisualFormatKind::Strong, visualStart);
             cursor += strongMatch.capturedLength(0);
         } else if (emphasisMatch.hasMatch()) {
-            const int contentStart = cursor + emphasisMatch.capturedStart(2);
             const int visualStart = m_visual.size();
-            appendInline(sourceStart + contentStart, emphasisMatch.captured(2));
+            appendInline(sourceStart + emphasisMatch.capturedStart(2), emphasisMatch.captured(2));
             appendVisualFormat(VisualFormatKind::Emphasis, visualStart);
             cursor += emphasisMatch.capturedLength(0);
         } else {
