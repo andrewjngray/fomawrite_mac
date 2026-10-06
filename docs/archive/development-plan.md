@@ -2,7 +2,7 @@
 
 **Historical plan:** For post-Cycle-61 planning, see [the proposed Cycles 62–69](next-development-phases.md). This iA sequence remains an implementation record and does not represent the current next cycle.
 
-Proposed 17 September 2026 from Andrew’s seven menu screenshots and current source. The command-level acceptance log is [ia-menu-parity-2026-09-17.md](ia-menu-parity-2026-09-17.md). The standing functional backlog remains [ia-writer-inventory.md](ia-writer-inventory.md). Codex remains the visual reference.
+Proposed 17 September 2026 from Andrew’s seven menu screenshots and current source. The command-level acceptance log is [ia-menu-parity-2026-09-17.md](ia-menu-parity-2026-09-17.md). The standing functional backlog remains [ia-writer-inventory.md](../ia-writer-inventory.md). Codex remains the visual reference.
 
 This supersedes the old speculative cycle numbers in the inventory and “Upcoming cycles” table. Cycles 0–13 are historical; 14 onward below are proposed. Larger stages may be split into lettered increments (for example 16a/16b), each independently runnable. These are scope and dependency estimates, not delivery-date promises.
 
@@ -56,7 +56,7 @@ For every increment:
 2. Record intended behavior and mapped parity IDs in `docs/build-cycles.md`. QML owns UI/state; C++ owns document I/O and new formatting transformations. Keep macOS implementation separate from Linux.
 3. Implement one useful slice. Preserve UTF-8 Markdown, selection/cursor, undo, dirty prompts, recovery and external-change handling. Never add dead menu placeholders to simulate completion.
 4. Run `./bin/build` and `./bin/test`. Add behavior tests appropriate to the change, especially for text/file mutations and shared action states.
-5. Close QA app normally after preserving unsaved work, then run `./bin/prepare-dev-app`. Reuse `dist/Fomawrite Dev.app` and `io.github.andrewjngray.fomawrite.dev`; announce app attachment. Follow the existing [app-access procedure](development-app-approvals.md).
+5. Close QA app normally after preserving unsaved work, then run `./bin/prepare-dev-app`. Reuse `dist/Fomawrite Dev.app` and `io.github.andrewjngray.fomawrite.dev`; announce app attachment. Follow the existing [app-access procedure](../development-app-approvals.md).
 6. Verify affected native workflows with disposable fixtures; save sanitized screenshots/logs under `research/cycle-NN/` and an optional short exercise under `research/usability/cycle-NN.md`. Inspect exported artifacts when output changes.
 7. Record tests, native result, known gaps, runnable artifact and commit. Update the parity row only when its behavior is verified; partial coverage stays Partial. Never commit build/dist outputs or private screenshots. Incorporate Andrew’s feedback into the next increment.
 

@@ -86,4 +86,4 @@ Why View first: most of its useful behavior already exists. It improves discover
 
 For each row, choose **Keep**, **Add soon**, **Later**, or **Skip**. Before implementing a pass, finish the matching reference screenshots, select exact labels/shortcuts and agree on behavior. No new feature implementation has started in this audit.
 
-Evidence folder: [menu audit](../research/menu-audit-2026-09-12/README.md). Previous iA detail: [inventory](ia-writer-inventory.md).
+Evidence folder: [menu audit](../../research/menu-audit-2026-09-12/README.md). Previous iA detail: [inventory](../ia-writer-inventory.md).

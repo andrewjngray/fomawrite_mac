@@ -29,7 +29,7 @@ Menu availability in iA depends on selection and document state. Disabled comman
 | 23 Sep 15.50.04 | Go top-level menu |
 | 23 Sep 15.50.11–15.50.17 | Window → Move & Resize and Full Screen Tile |
 
-The screenshot folder does not contain the application, Authors or Help menus, several Edit and File children, or View → Preview → PDF. A [native accessibility follow-up on 24 September](../research/menu-audit-2026-09-24/native-submenus.md) captured those menu labels. A later [isolated sample-input check](../research/cycle-54/native-substitutions.txt) observed Smart Quotes typing and Undo. Post-authorship setup items, other substitution triggers, dynamic OS states and exact behavior remain unverified.
+The screenshot folder does not contain the application, Authors or Help menus, several Edit and File children, or View → Preview → PDF. A [native accessibility follow-up on 24 September](../../research/menu-audit-2026-09-24/native-submenus.md) captured those menu labels. A later [isolated sample-input check](../../research/cycle-54/native-substitutions.txt) observed Smart Quotes typing and Undo. Post-authorship setup items, other substitution triggers, dynamic OS states and exact behavior remain unverified.
 
 ## iA Writer menu tree from the screenshots
 
@@ -194,7 +194,7 @@ These menus were not opened in the screenshot folder. The 24 September native in
 |---|---|---|
 | Library/organizer/sort/filter visibility | **Match** | State is shared with toolbar/sidebar controls. |
 | Sort Files By | **Match** | Same four fields, direction and folders-first option. |
-| Show Date | **Match (Cycle 48)** | Native View → View Options → Show Date and library/context menus offer Date Modified, Date Created and None. A synthetic file displayed distinct dates; sorting remained independent. See [Cycle 48 evidence](../research/cycle-48/README.md). |
+| Show Date | **Match (Cycle 48)** | Native View → View Options → Show Date and library/context menus offer Date Modified, Date Created and None. A synthetic file displayed distinct dates; sorting remained independent. See [Cycle 48 evidence](../../research/cycle-48/README.md). |
 | Text excerpts | **Match** | Bounded source excerpts with a compact default. |
 | Tree/List navigation | **Partial (Cycle 51)** | Tree and current-folder List both reach nested files; List uses existing folder history and Show in Library. Tree expansion is session-only and resets on root changes. |
 | Text size | **Match** | Larger, smaller and reset equivalents. |

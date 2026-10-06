@@ -1,6 +1,6 @@
 # Cycle 44: file and folder context menus
 
-See docs/build-cycles.md for scope, safety semantics and limitations.
+See docs/archive/build-cycles.md for scope, safety semantics and limitations.
 
 Build and 73 tests pass. Native sample verification:
 - Both complete menus fit and show only the appropriate actions; submenus open individually.

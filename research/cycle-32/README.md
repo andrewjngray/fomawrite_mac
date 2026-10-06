@@ -8,4 +8,4 @@
 - Normal bounds/library restoration implemented; no claim of fullscreen/minimized/external-display fidelity. No injected crash/disk-full test in this cycle. Native Save As during Quit not separately exercised. Sequential Quit still closes earlier windows before later cancellation.
 - Stable Dev and ordinary bundles use the same source; generated bundles stay outside Git.
 
-See docs/remaining-cycles.md for ten subsequent planned cycles and the new themes scope.
+See docs/archive/remaining-cycles.md for ten subsequent planned cycles and the new themes scope.

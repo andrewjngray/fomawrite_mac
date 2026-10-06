@@ -22,4 +22,4 @@ Use `dist/Omawrite Dev.app` for QA or `dist/Omawrite.app` for the packaged build
 
 Use the new sample and report one concrete surprise at a time.
 
-Final handoff: Dev closed normally after sample-only QA; no user draft was discarded. Native spelling, writing review and share-picker open/cancel also passed. Sample version and authorship metadata remain with examples/Cycle28-QA.md. See docs/closeout-audit.md for the still-open scope.
+Final handoff: Dev closed normally after sample-only QA; no user draft was discarded. Native spelling, writing review and share-picker open/cancel also passed. Sample version and authorship metadata remain with examples/Cycle28-QA.md. See docs/archive/closeout-audit.md for the still-open scope.

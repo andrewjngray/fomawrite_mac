@@ -8,4 +8,4 @@ Keep references from other tools here as this becomes Andrew's daily writing wor
 
 For each reference, record the app, the behavior you want, why it helps, and the relevant build cycle. Screenshots of our own example documents can be committed. Keep private writing, account details and sensitive filenames out of shared screenshots. Do not copy proprietary source or bundled product assets.
 
-The standing development record is [docs/build-cycles.md](../docs/build-cycles.md).
+Each cycle records its scope, verification and limits in `cycle-NN/README.md`, with one line per cycle in [CHANGELOG.md](../CHANGELOG.md) and the current build in [STATUS.md](../STATUS.md). The frozen pre-133 log is [docs/archive/build-cycles.md](../docs/archive/build-cycles.md).

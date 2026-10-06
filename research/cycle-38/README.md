@@ -12,7 +12,7 @@
 - Two-page PDF output and portable HTML reviewed in ../cycle-37/output-final. Image-before-pagebreak defect fixed before final render.
 - Native QA discovered app-wide shortcut ambiguity with two tabs; routed document shortcuts to the active window. Final Command-S check recorded below.
 
-Screenshots were visually reviewed: synthetic writing only, Recents collapsed. No personal writing or generated app binaries included. Hardware, cross-app, full-parser and large-library limits remain in docs/remaining-cycles.md.
+Screenshots were visually reviewed: synthetic writing only, Recents collapsed. No personal writing or generated app binaries included. Hardware, cross-app, full-parser and large-library limits remain in docs/archive/remaining-cycles.md.
 
 Artifacts: dist/Omawrite Dev.app and dist/Omawrite.app, same source, local ad-hoc signing. Generated binaries excluded from Git.
 
