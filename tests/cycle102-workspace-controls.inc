@@ -37,30 +37,107 @@ void cycle111KeyClick(QQuickWindow *window, char key) {
     const QChar character = QChar::fromLatin1(key);
     cycle111KeyClick(window, Qt::Key(character.toUpper().unicode()), QString(character));
 }
+// Qt Quick's QQuickOverlay is always hit-testable (so childAt cannot answer
+// "would a press reach this item?"), but a visible modal popup swallows every
+// press outside itself. That is what a Dialog that is still opening or has not
+// finished closing does to a click on slower hardware, so wait for it to go.
+// Items that live inside a popup are never blocked by it, so they are exempt.
+QList<QPointer<QObject>> cycle102Popups(QQuickWindow *window) {
+    QList<QPointer<QObject>> popups;
+    for (QObject *object : window->findChildren<QObject *>())
+        if (object->inherits("QQuickPopup")) popups.append(object);
+    return popups;
+}
+QList<QObject *> cycle102ModalBlockers(const QList<QPointer<QObject>> &popups, QQuickItem *item) {
+    QList<QObject *> blockers;
+    for (QQuickItem *parent = item; parent; parent = parent->parentItem())
+        if (QByteArray(parent->metaObject()->className()).contains("PopupItem")) return blockers;
+    for (const QPointer<QObject> &popup : popups)
+        if (popup && popup->property("visible").toBool() && popup->property("modal").toBool()) blockers.append(popup);
+    return blockers;
+}
+// A user would scroll a clipped list (for example a long Menu) until the target
+// is visible. Do the same for every Flickable ancestor whose viewport hides it.
+void cycle102ScrollIntoView(QQuickItem *item) {
+    for (QQuickItem *parent = item->parentItem(); parent; parent = parent->parentItem()) {
+        // QQuickFlickable is private API; ListView, GridView and Flickable all derive from it.
+        if (!parent->inherits("QQuickFlickable")) continue;
+        QQuickItem *flick = parent;
+        const auto content = qvariant_cast<QQuickItem *>(flick->property("contentItem"));
+        if (!content) continue;
+        const QRectF box = item->mapRectToItem(content, item->boundingRect());
+        const auto scroll = [&](const char *position, const char *origin, const char *extent,
+                                qreal itemStart, qreal itemSize, qreal viewSize) {
+            const qreal current = flick->property(position).toReal();
+            if (itemStart >= current && itemStart + itemSize <= current + viewSize) return;
+            const qreal first = flick->property(origin).toReal();
+            const qreal last = first + qMax<qreal>(0, flick->property(extent).toReal() - viewSize);
+            flick->setProperty(position, qBound(first, itemStart + itemSize / 2 - viewSize / 2, last));
+        };
+        scroll("contentY", "originY", "contentHeight", box.top(), box.height(), flick->height());
+        scroll("contentX", "originX", "contentWidth", box.left(), box.width(), flick->width());
+    }
+}
 bool cycle102Click(QQuickWindow *window, QQuickItem *item) {
-    // Let Qt Quick polish geometry after the preceding visibility change.
-    QTest::qWait(30);
-    if (!item || !item->isVisible() || !item->isEnabled() || item->width() <= 0 || item->height() <= 0)
-        return false;
-    const QPointF point = item->mapToScene(QPointF(item->width() / 2, item->height() / 2));
-    if (!QRectF(0, 0, window->width(), window->height()).contains(point))
-        return false;
-    QSignalSpy clicked(item, SIGNAL(clicked()));
-    QTest::mouseClick(window, Qt::LeftButton, Qt::NoModifier, point.toPoint());
-    if (clicked.isValid() && clicked.isEmpty()) {
+    if (!item) return false;
+    // A window that is shown but not yet exposed has not been polished or rendered,
+    // and the platform may not route input to it yet.
+    if (!window->isExposed()) QTest::qWaitFor([&] { return window->isExposed(); }, 5000);
+    // Runner-independent: a slower machine (or different fonts) can leave layouts
+    // unpolished, popups still opening or closing and lists still scrolling when a
+    // test asks for a click. Wait (bounded) until the item is a genuine stationary
+    // click target, then require the click itself to activate it, retrying once.
+    enum Readiness { NotReady, Blocked, Ready };
+    const auto popups = cycle102Popups(window);
+    for (int attempt = 0; attempt < 2; ++attempt) {
+        QTest::qWait(attempt ? 150 : 30);
+        QPointF point, last(-1e9, -1e9);
+        Readiness state = NotReady;
+        int stable = 0;
+        QElapsedTimer timer;
+        timer.start();
+        for (;;) {
+            state = NotReady;
+            if (item->isVisible() && item->isEnabled() && item->width() > 0 && item->height() > 0) {
+                cycle102ScrollIntoView(item);
+                point = item->mapToScene(QPointF(item->width() / 2, item->height() / 2));
+                if (QRectF(0, 0, window->width(), window->height()).contains(point))
+                    state = cycle102ModalBlockers(popups, item).isEmpty() ? Ready : Blocked;
+            }
+            stable = (state != NotReady && QLineF(point, last).length() < 0.01) ? stable + 1 : 0;
+            last = state != NotReady ? point : QPointF(-1e9, -1e9);
+            if (state == Ready && stable >= 2) break;
+            if (timer.elapsed() > 2500) break;
+            QTest::qWait(25);
+        }
+        if (state == NotReady) continue;
+        QSignalSpy clicked(item, SIGNAL(clicked()));
+        QTest::mouseClick(window, Qt::LeftButton, Qt::NoModifier, point.toPoint());
+        if (!clicked.isValid() || !clicked.isEmpty()) return true;
+        if (attempt == 0) continue;
         qWarning() << "Pointer click did not activate" << item->objectName() << point
                    << "item bounds" << item->mapRectToScene(item->boundingRect())
                    << "window" << window->size() << "active" << window->isActive()
-                   << "mouse grabber" << window->mouseGrabberItem();
+                   << "mouse grabber" << window->mouseGrabberItem() << "blocked by modal popup" << (state == Blocked);
         QQuickItem *hit = window->contentItem();
         while (hit) {
             qWarning() << "Hit path:" << hit->metaObject()->className() << hit->objectName();
             const QPointF local = hit->mapFromScene(point);
             hit = hit->childAt(local.x(), local.y());
         }
+        for (QObject *popup : cycle102ModalBlockers(popups, item))
+            qWarning() << "Visible modal popup:" << popup->metaObject()->className() << popup->objectName();
+        if (auto *overlay = qvariant_cast<QQuickItem *>(window->property("overlay")))
+            for (auto *popup : overlay->childItems())
+                qWarning() << "Overlay child:" << popup->metaObject()->className() << popup->objectName()
+                           << "visible" << popup->isVisible()
+                           << "bounds" << popup->mapRectToScene(popup->boundingRect());
         return false;
     }
-    return true;
+    qWarning() << "Click target never became available:" << item->objectName() << "visible" << item->isVisible()
+               << "enabled" << item->isEnabled() << "size" << item->size()
+               << "bounds" << item->mapRectToScene(item->boundingRect()) << "window" << window->size();
+    return false;
 }
 
 bool cycle102Capture(QQuickWindow *window, const QString &name) {
@@ -105,6 +182,8 @@ void FomawriteTest::collapsedPaneButtonsRestoreEveryLayout() {
     layout->setProperty("organizerVisible", true);
     layout->setProperty("filesVisible", true);
     quick->show();
+    // Input is only routed to an exposed window; do not race the first click against it.
+    QVERIFY(QTest::qWaitForWindowExposed(quick));
     QTRY_VERIFY(hideOrganizer->isVisible() && hideFiles->isVisible());
     const QString source = QStringLiteral("# Pane controls\n\nA calm workspace keeps each column within reach.\n");
     editor->setProperty("text", source);

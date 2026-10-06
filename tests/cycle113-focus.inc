@@ -8,6 +8,16 @@ QObject *cycle113NativeFormatItem(QObject *window, const QString &text) {
     }
     return nullptr;
 }
+// A document-view transition (started by pane or layout changes and driven by a
+// 16 ms timer) restores editing focus to Source on its first tick. If one is still
+// pending when a test moves focus to an auxiliary control, the control silently
+// loses focus to Source during the next event-loop turn and every "formatting is
+// rejected" check then races it. Let deferred work and any transition finish
+// before focus is moved, so the focus under test cannot be taken afterwards.
+bool cycle113SettleViewport(QObject *window) {
+    QTest::qWait(40);
+    return QTest::qWaitFor([&] { return !window->property("changingDocumentView").toBool(); }, 5000);
+}
 bool cycle113TryEveryFormattingRoute(QObject *window, QQuickItem *editor, Backend &backend) {
     const auto text = editor->property("text").toString();
     const auto revision = backend.documentRevision();
@@ -39,11 +49,18 @@ bool cycle113TryEveryFormattingRoute(QObject *window, QQuickItem *editor, Backen
     if (QGuiApplication::platformName() != "cocoa") {
         for (auto key : {Qt::Key_B, Qt::Key_I, Qt::Key_K}) QTest::keyClick(quick, key, Qt::ControlModifier);
     }
-    if (linkDialog->property("opened").toBool() != linkWasOpen) return false;
-    return editor->property("text").toString() == text && backend.documentRevision() == revision
-        && editor->property("selectionStart") == first && editor->property("selectionEnd") == last
-        && editor->property("canUndo") == undo && editor->property("canRedo") == redo
-        && quick->activeFocusItem() == focus;
+    // Name the invariant that moved so a failure on another machine is diagnosable.
+    bool unchanged = true;
+    const auto check = [&](bool holds, const char *what) {
+        if (!holds) { qWarning() << "Formatting route changed" << what; unchanged = false; }
+    };
+    check(linkDialog->property("opened").toBool() == linkWasOpen, "the link editor's open state");
+    check(editor->property("text").toString() == text, "the Source text");
+    check(backend.documentRevision() == revision, "the document revision");
+    check(editor->property("selectionStart") == first && editor->property("selectionEnd") == last, "the Source selection");
+    check(editor->property("canUndo") == undo && editor->property("canRedo") == redo, "the undo/redo state");
+    check(quick->activeFocusItem() == focus, "the active focus item");
+    return unchanged;
 }
 }
 
@@ -79,6 +96,7 @@ void FomawriteTest::formattingRejectsAuxiliaryAndPreviewFocus() {
     QVERIFY(QMetaObject::invokeMethod(window.data(), "openSearch", Q_ARG(QVariant, true), Q_ARG(QVariant, false)));
     for (const auto *name : {"searchField", "replaceField"}) {
         auto *field = window->findChild<QQuickItem *>(name); QVERIFY(field && field->isVisible());
+        QVERIFY(cycle113SettleViewport(window.data()));
         field->forceActiveFocus(); QTRY_COMPARE(quick->activeFocusItem(), field);
         QTRY_VERIFY(!window->property("canFormatSource").toBool());
         QVERIFY2(cycle113TryEveryFormattingRoute(window.data(), editor, backend), name);
@@ -89,6 +107,7 @@ void FomawriteTest::formattingRejectsAuxiliaryAndPreviewFocus() {
     auto *outline = window->findChild<QObject *>("documentOutline");
     auto *outlineSearch = window->findChild<QQuickItem *>("documentOutlineSearch");
     QTRY_VERIFY(outline->property("opened").toBool());
+    QVERIFY(cycle113SettleViewport(window.data()));
     outlineSearch->forceActiveFocus(); QTRY_VERIFY(!window->property("canFormatSource").toBool());
     QVERIFY(cycle113TryEveryFormattingRoute(window.data(), editor, backend));
     QVERIFY(QMetaObject::invokeMethod(outline, "close")); QTRY_VERIFY(!outline->property("opened").toBool());
@@ -96,11 +115,14 @@ void FomawriteTest::formattingRejectsAuxiliaryAndPreviewFocus() {
     auto *library = window->findChild<QObject *>("libraryPane");
     library->setProperty("showFilterBar", true);
     auto *filter = window->findChild<QQuickItem *>("libraryFilter"); QVERIFY(filter);
-    QTRY_VERIFY(filter->isVisible()); filter->forceActiveFocus();
+    QTRY_VERIFY(filter->isVisible());
+    QVERIFY(cycle113SettleViewport(window.data()));
+    filter->forceActiveFocus();
     QTRY_VERIFY(!window->property("canFormatSource").toBool());
     QVERIFY(cycle113TryEveryFormattingRoute(window.data(), editor, backend));
     // A navigation control does not make a retained Source selection current.
     auto *folder = window->findChild<QQuickItem *>("workspaceFolderButton"); QVERIFY(folder);
+    QVERIFY(cycle113SettleViewport(window.data()));
     folder->forceActiveFocus(); QTRY_VERIFY(!window->property("canFormatSource").toBool());
     QVERIFY(cycle113TryEveryFormattingRoute(window.data(), editor, backend));
     editor->forceActiveFocus(); QTRY_VERIFY(window->property("canFormatSource").toBool());
@@ -109,6 +131,7 @@ void FomawriteTest::formattingRejectsAuxiliaryAndPreviewFocus() {
     QTRY_VERIFY(linkDialog->property("opened").toBool());
     for (const auto *name : {"linkEditorLabel", "linkEditorUrl", "linkEditorTitle"}) {
         auto *field = window->findChild<QQuickItem *>(name); QVERIFY(field);
+        QVERIFY(cycle113SettleViewport(window.data()));
         field->forceActiveFocus(); QTRY_VERIFY(!window->property("canFormatSource").toBool());
         QVERIFY2(cycle113TryEveryFormattingRoute(window.data(), editor, backend), name);
     }
@@ -119,6 +142,7 @@ void FomawriteTest::formattingRejectsAuxiliaryAndPreviewFocus() {
         QTRY_VERIFY(!window->property("changingDocumentView").toBool());
         QTRY_VERIFY(!preview->property("viewportRefreshPending").toBool());
         auto *field = window->findChild<QQuickItem *>(QString::fromLatin1(mode) == "visual" ? "visualEditor" : "renderedPreview");
+        QVERIFY(cycle113SettleViewport(window.data()));
         field->forceActiveFocus(); QTRY_VERIFY(!window->property("canFormatSource").toBool());
         QVERIFY(cycle113TryEveryFormattingRoute(window.data(), editor, backend));
     }
