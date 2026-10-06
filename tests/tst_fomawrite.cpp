@@ -17,6 +17,7 @@
 #include <QQuickTextDocument>
 #include <QQuickWindow>
 #include <QImage>
+#include <QPainter>
 #include <QDate>
 #include <QClipboard>
 #include <QMimeData>
@@ -74,6 +75,7 @@ private slots:
     void liveEditorPageMirrorsUserEditsByteExactly();
     void liveEditorRoundTripsPersistenceFixturesThroughThePage();
     void liveEditorLoadsLargeDocumentQuickly();
+    void liveEditorCapturesEachPresentation();
     void persistenceRefusesLossyDecodeAndSaveAsWritesUtf8();
     void crlfDocumentsKeepAutosaveRenameAndMove();
     void manualSaveRespectsDiskBaseline();
@@ -1040,6 +1042,13 @@ private slots:
             }
             return contents;
         };
+        // Wait for the draft's own recovery write to land before the baseline,
+        // instead of assuming the 750 ms timer has fired by a fixed delay (it
+        // has not on a loaded machine, e.g. while Chromium renderers wind down).
+        if (backend.modified()) {
+            const QByteArray needle = editor->property("text").toString().section('\n', 0, 0).toUtf8();
+            QTRY_VERIFY_WITH_TIMEOUT(([&] { for (const auto &contents : recoveryContents()) if (contents.contains(needle)) return true; return false; })(), 8000);
+        }
         const auto recoveryBefore = recoveryContents();
 
         QCOMPARE(helpAction->property("text").toString(), QStringLiteral("Fomawrite Help"));
@@ -3839,6 +3848,13 @@ QtObject {
             }
             return contents;
         };
+        // Wait for the draft's own recovery write to land before the baseline,
+        // instead of assuming the 750 ms timer has fired by a fixed delay (it
+        // has not on a loaded machine, e.g. while Chromium renderers wind down).
+        if (backend.modified()) {
+            const QByteArray needle = editor->property("text").toString().section('\n', 0, 0).toUtf8();
+            QTRY_VERIFY_WITH_TIMEOUT(([&] { for (const auto &contents : recoveryContents()) if (contents.contains(needle)) return true; return false; })(), 8000);
+        }
         const auto recoveryBefore = recoveryContents();
         QVERIFY(QMetaObject::invokeMethod(save, "clicked"));
         QTRY_VERIFY(!dialog->property("opened").toBool());

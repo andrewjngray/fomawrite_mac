@@ -253,3 +253,79 @@ void FomawriteTest::liveEditorLoadsLargeDocumentQuickly() {
     QVERIFY(page.canonical().startsWith("x## Section 0"));
     page.backend.discardRecovery();
 }
+
+// Visual captures: render a sample document in each presentation inside the
+// real WebEngineView and save PNGs under research/cycle-134/captures/ for
+// review. Not an assertion of pixels; the test only checks that frames were
+// produced and are not uniform (a blank or unpainted view).
+
+namespace {
+QString cycle134CapturesDirectory() {
+    const QString tests = QFileInfo(QFINDTESTDATA("tst_fomawrite.cpp")).absolutePath();
+    const QString directory = QDir(tests).filePath("../research/cycle-134/captures");
+    QDir().mkpath(directory);
+    return QDir(directory).canonicalPath();
+}
+bool cycle134SaveFrame(QQuickWindow *window, const QString &path, QString *why) {
+    QTest::qWait(900);
+    const QImage image = window->grabWindow();
+    if (image.isNull()) { *why = "grabWindow returned a null image"; return false; }
+    const QRgb first = image.pixel(2, 2);
+    bool uniform = true;
+    for (int y = 0; y < image.height() && uniform; y += 7)
+        for (int x = 0; x < image.width(); x += 7)
+            if (image.pixel(x, y) != first) { uniform = false; break; }
+    if (!image.save(path)) { *why = "could not save " + path; return false; }
+    if (uniform) { *why = "frame is a single colour: " + path; return false; }
+    return true;
+}
+}
+
+void FomawriteTest::liveEditorCapturesEachPresentation() {
+    Cycle103SettingsSnapshot settings;
+    QTemporaryDir directory; QVERIFY(directory.isValid());
+    QImage picture(320, 120, QImage::Format_RGB32); picture.fill(QColor("#4a7bd0"));
+    QPainter painter(&picture); painter.setPen(Qt::white); painter.setFont(QFont("Helvetica", 28)); painter.drawText(picture.rect(), Qt::AlignCenter, "Local image"); painter.end();
+    QVERIFY(picture.save(directory.filePath("picture.png")));
+    const QString sample = QString::fromUtf8(
+        "# Live editing in Fomawrite\n\n"
+        "The **Markdown** stays the source of truth; what you see is *painted on top*. Click into a heading and its `#` reappears.\n\n"
+        "## What renders\n\n"
+        "- Inline **bold**, *emphasis*, `code` and a [link](https://typora.io)\n"
+        "- [x] A finished task\n"
+        "- [ ] An open task\n\n"
+        "> Quotes keep their bar, nested quotes indent.\n\n"
+        "![A local image](picture.png)\n\n"
+        "| Feature | Status |\n|:--|--:|\n| Headings | done |\n| Tables | grid |\n\n"
+        "---\n\n"
+        "```python\ndef hello(name):\n    return f\"Hello, {name}\"\n```\n\n"
+        "Inline math $E = mc^2$ and a block:\n\n$$\\int_0^1 x^2\\,dx = \\frac{1}{3}$$\n\n"
+        "Caf\xC3\xA9, na\xC3\xAFve, \xF0\x9F\x91\xA9\xE2\x80\x8D\xF0\x9F\x92\xBB \xE4\xBD\xA0\xE5\xA5\xBD.\n");
+    QFile doc(directory.filePath("sample.md")); QVERIFY(doc.open(QIODevice::WriteOnly)); doc.write(sample.toUtf8()); doc.close();
+    Cycle134Page page; QVERIFY2(page.create(), qPrintable(page.error));
+    page.window->resize(960, 820);
+    QTRY_VERIFY_WITH_TIMEOUT(page.bridge()->isReady(), 15000);
+    QVERIFY(page.backend.open(QUrl::fromLocalFile(directory.filePath("sample.md"))));
+    const QString captures = cycle134CapturesDirectory();
+    QString why;
+    struct Shot { const char *file; const char *theme; const char *mode; const char *appearance; bool dark; };
+    const QList<Shot> shots = {
+        {"live-basic.png", "", "live", "manuscript", false},
+        {"live-claude-like.png", "claude-like", "live", "manuscript", false},
+        {"live-claude-like-dark.png", "claude-like", "live", "manuscript", true},
+        {"source-manuscript.png", "", "source", "manuscript", false},
+        {"source-editorial.png", "", "source", "editorial", false},
+        {"source-code.png", "", "source", "code", false},
+    };
+    for (const Shot &shot : shots) {
+        if (QString::fromLatin1(shot.theme).isEmpty()) page.backend.setOutputStyle(0);
+        else QVERIFY2(page.backend.selectPublishingTheme(shot.theme), qPrintable(page.backend.status()));
+        page.backend.syncLiveEditor();
+        page.bridge()->applyAppearance(QStringLiteral("{\"appearance\":\"%1\",\"dark\":%2,\"fontSize\":17}").arg(shot.appearance).arg(shot.dark ? "true" : "false"));
+        page.bridge()->selectMode(shot.mode);
+        QTRY_COMPARE_WITH_TIMEOUT(page.pageText(), page.canonical(), 10000);
+        QVERIFY2(cycle134SaveFrame(page.window, QDir(captures).filePath(shot.file), &why), qPrintable(why));
+        qInfo("capture %s", qPrintable(QDir(captures).filePath(shot.file)));
+    }
+    page.backend.discardRecovery();
+}

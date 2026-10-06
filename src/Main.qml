@@ -335,7 +335,7 @@ ApplicationWindow {
         else { win.revealDocumentChrome(); topChrome.focusWorkspaceControl(); }
     }
     function focusWritingSurface() {
-        if (editorPane.visible && workspaceLayout.liveEditEnabled) { liveEditorPane.focusLive(); return; }
+        if (editorPane.visible && workspaceLayout.liveEditEnabled) { if (liveEditorLoader.item) liveEditorLoader.item.focusLive(); return; }
         focusWorkspaceRegion(editorPane.visible ? "source" : "preview");
     }
     readonly property bool workspaceOwnsKeyboard: !navigationDrawer.visible && (!activeFocusItem
@@ -494,7 +494,7 @@ ApplicationWindow {
         lastWritingSurface = "live";
         sourceFormattingOwned = false;
         backend.syncLiveEditor();
-        liveEditorPane.focusLive();
+        if (liveEditorLoader.item) liveEditorLoader.item.focusLive();
     }
     function setEditingMode(visual) {
         if (visual && searchOpen) closeSearch(false);
@@ -3042,20 +3042,25 @@ ApplicationWindow {
             }
         }
 
-        LiveEditorPane {
-            id: liveEditorPane
+        // The Live editor page (and its Chromium renderer) exists only while
+        // Live editing is on; every other mode pays nothing for it.
+        Loader {
+            id: liveEditorLoader
             anchors.fill: parent
             anchors.topMargin: documentMeta.y + documentMeta.height
-            bottomInset: documentFooter.height
-            visible: workspaceLayout.liveEditEnabled
-            bridge: backend.editorBridge
-            appearance: workspaceSettings.writingAppearance
-            fontFamily: win.editorFontFamily
-            fontSize: win.editorFontPixelSize
-            typewriter: workspaceSettings.typewriter
-            focusMode: workspaceSettings.paragraphFocus || workspaceSettings.sentenceFocus
-            dark: win.darkMode
-            onWritingActivity: win.writingActivity()
+            active: workspaceLayout.liveEditEnabled
+            visible: active
+            sourceComponent: LiveEditorPane {
+                bottomInset: documentFooter.height
+                bridge: backend.editorBridge
+                appearance: workspaceSettings.writingAppearance
+                fontFamily: win.editorFontFamily
+                fontSize: win.editorFontPixelSize
+                typewriter: workspaceSettings.typewriter
+                focusMode: workspaceSettings.paragraphFocus || workspaceSettings.sentenceFocus
+                dark: win.darkMode
+                onWritingActivity: win.writingActivity()
+            }
         }
 
         DocumentFindBar {

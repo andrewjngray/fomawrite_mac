@@ -42,6 +42,9 @@ Rectangle {
         channel.registerObject("bridge", root.bridge);
         pushAppearance();
         web.url = "qrc:/editor/index.html";
+        // Created lazily when Live is switched on: push the document straight
+        // away (the bridge replays it once the page connects).
+        if (visible) backend.syncLiveEditor();
     }
 
     function focusLive() {
