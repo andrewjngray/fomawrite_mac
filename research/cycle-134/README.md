@@ -45,6 +45,8 @@ Offscreen Qt 6.11.2, Apple Silicon, release build; a real `WebEngineView` driven
 | 1 MiB document pushed over the channel and loaded | 54 ms wall |
 | One keystroke on the 1 MiB document mirrored | 79 ms (two hops + polling; a real keystroke is one hop) |
 | Live decoration rebuild (`decorate`) | 0.0–0.4 ms |
+| Editor page created, loaded (1.8 MB bundle) and connected — first page in the process | 355 ms; paid once per window (the page is kept after first use) |
+| Host-side edit (QTextCursor) reaching the page | mirrored; format-only changes filtered |
 
 For comparison, Cycle 133's measurements of the existing Visual Edit pane: one keystroke on a 1 MiB document ≈ 58 ms after the O(n) fix (≈ 1.5 s before). The bridge is not the bottleneck.
 

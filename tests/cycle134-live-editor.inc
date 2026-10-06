@@ -167,9 +167,11 @@ Window {
 
 void FomawriteTest::liveEditorPageMirrorsUserEditsByteExactly() {
     Cycle103SettingsSnapshot settings;
+    QElapsedTimer pageStart; pageStart.start();
     Cycle134Page page; QVERIFY2(page.create(), qPrintable(page.error));
     QSignalSpy metrics(page.bridge(), &EditorBridge::metricRecorded);
     QTRY_VERIFY_WITH_TIMEOUT(page.bridge()->isReady(), 15000);
+    qInfo("perf live: editor page created, loaded and connected in %lld ms (first page in this process)", static_cast<long long>(pageStart.elapsed()));
     const QString original = QString::fromUtf8("# Live\n\nh\xC3\xA9llo \xF0\x9F\x91\xA8\xE2\x80\x8D\xF0\x9F\x91\xA9 **bold** and `code`\n\n- item\n");
     page.editor->setProperty("text", original);
     page.backend.syncLiveEditor();
