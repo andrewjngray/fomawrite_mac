@@ -132,3 +132,43 @@
   background-size: 3px 100%, 3px 100%, 3px 100%;
   padding-left: 4em !important;
 }
+
+/* ---------------------------------------------------------------- tables (src/tables.ts)
+   The grid replaces the whole table (a block widget) while the caret is outside it. */
+:root {
+  --fw-table-border: #d0d7de;
+  --fw-table-head-bg: #f3f4f6;
+  --fw-table-stripe-bg: rgba(127, 127, 127, 0.05);
+}
+:root.dark {
+  --fw-table-border: #3d444d;
+  --fw-table-head-bg: #262b33;
+  --fw-table-stripe-bg: rgba(255, 255, 255, 0.04);
+}
+#write.fw-mode-live .fw-table-wrap { display: block; max-width: 100%; overflow-x: auto; margin: 0.4em 0; cursor: text; }
+#write.fw-mode-live .fw-table {
+  border-collapse: collapse;
+  border-spacing: 0;
+  min-width: 50%;
+  max-width: 100%;
+  line-height: 1.45;
+}
+#write.fw-mode-live .fw-table th,
+#write.fw-mode-live .fw-table td {
+  border: 1px solid var(--fw-table-border);
+  padding: 0.35em 0.8em;
+  vertical-align: top;
+  text-align: left;
+}
+#write.fw-mode-live .fw-table th { background: var(--fw-table-head-bg); font-weight: 600; }
+#write.fw-mode-live .fw-table tbody tr:nth-child(even) td { background: var(--fw-table-stripe-bg); }
+#write.fw-mode-live .fw-table .fw-align-center { text-align: center; }
+#write.fw-mode-live .fw-table .fw-align-right { text-align: right; }
+#write.fw-mode-live .fw-table code {
+  font-family: var(--fw-code-font, Menlo, Consolas, monospace);
+  font-size: 0.92em;
+  background: var(--fw-code-bg);
+  border-radius: 3px;
+  padding: 0.1em 0.3em;
+}
+#write.fw-mode-live .fw-table a { color: var(--fw-link, inherit); text-decoration: underline; }
