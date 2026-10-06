@@ -23,6 +23,8 @@ Rectangle {
     property int cursorOnEnter: -1
     signal writingActivity()
     signal scrollFractionChanged(real fraction)
+    // A page-side refusal the writer should see (e.g. an image that could not be saved).
+    signal noticeRequested(string message)
     // The app's Format commands apply to the page while it has keyboard focus.
     readonly property bool hasLiveFocus: web.activeFocus
 
@@ -97,5 +99,9 @@ Rectangle {
     Connections {
         target: root.bridge
         function onScrollFractionChanged(fraction) { root.scrollFractionChanged(fraction); }
+        function onMessageLogged(message) {
+            if (message.indexOf("image not saved: ") === 0) root.noticeRequested(message.substring(17));
+            else if (message.indexOf("image ignored") === 0) root.noticeRequested(message);
+        }
     }
 }

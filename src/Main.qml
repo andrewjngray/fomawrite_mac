@@ -3102,6 +3102,7 @@ ApplicationWindow {
                 focusMode: workspaceSettings.paragraphFocus || workspaceSettings.sentenceFocus
                 dark: win.darkMode
                 onWritingActivity: win.writingActivity()
+                onNoticeRequested: function(message) { win.showNavigationNotice(message); }
                 onScrollFractionChanged: function(fraction) {
                     if (!workspaceSettings.synchronizedScroll || win.synchronizingScroll || win.changingDocumentView || workspaceLayout.effectiveLayoutMode !== 1) return;
                     win.synchronizingScroll = true;

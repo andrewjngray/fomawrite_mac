@@ -82,6 +82,7 @@ private slots:
     void liveEditorRunsHostCommands();
     void viewportTransitionKeepsAuxiliaryFocus();
     void liveModeInMainWindowLoadsPageAndNavigatesOutline();
+    void liveModeShowsImageRefusalNotice();
     void liveEditorPlacesCursorAndRestylesWithoutReload();
     void liveEditorCapturesEachPresentation();
     void persistenceRefusesLossyDecodeAndSaveAsWritesUtf8();

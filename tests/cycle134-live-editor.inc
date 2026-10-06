@@ -615,3 +615,39 @@ void FomawriteTest::liveModeInMainWindowLoadsPageAndNavigatesOutline() {
     QVERIFY(!liveToggle->property("checked").toBool());
     backend.discardRecovery();
 }
+
+// An image pasted into an untitled document cannot be stored beside it; the
+// page's refusal reaches the writer as the window's notice banner.
+void FomawriteTest::liveModeShowsImageRefusalNotice() {
+    Cycle103SettingsSnapshot settings;
+    Backend backend;
+    QQmlEngine engine; engine.rootContext()->setContextProperty("backend", &backend);
+    QQmlComponent component(&engine, QUrl(QStringLiteral("qrc:/Main.qml")));
+    QScopedPointer<QObject> window(component.create()); QVERIFY2(window, qPrintable(component.errorString()));
+    auto *quick = qobject_cast<QQuickWindow *>(window.data()); QVERIFY(quick);
+    auto *editor = window->findChild<QQuickItem *>("sourceEditor"); QVERIFY(editor);
+    quick->resize(1200, 800); quick->show(); QVERIFY(QTest::qWaitForWindowExposed(quick));
+    editor->setProperty("text", QStringLiteral("untitled\n"));
+    QVERIFY(QMetaObject::invokeMethod(window.data(), "selectWritingMode", Q_ARG(QVariant, QStringLiteral("live"))));
+    auto *bridge = backend.editorBridge();
+    QTRY_VERIFY_WITH_TIMEOUT(bridge->isReady(), 20000);
+    auto *view = window->findChild<QObject *>("liveEditorView"); QVERIFY(view);
+    QTRY_VERIFY_WITH_TIMEOUT(!view->property("loading").toBool(), 15000);
+    QImage image(4, 4, QImage::Format_RGB32); image.fill(Qt::red);
+    QByteArray png; { QBuffer buffer(&png); buffer.open(QIODevice::WriteOnly); QVERIFY(image.save(&buffer, "PNG")); }
+    QSignalSpy saved(bridge, &EditorBridge::imageSaved);
+    const QString script = QStringLiteral(R"JS(
+        (function() {
+            const bytes = Uint8Array.from(atob("%1"), c => c.charCodeAt(0));
+            const dt = new DataTransfer(); dt.items.add(new File([bytes], "shot.png", { type: "image/png" }));
+            document.querySelector(".cm-content").dispatchEvent(new ClipboardEvent("paste", { clipboardData: dt, bubbles: true, cancelable: true }));
+        })())JS").arg(QString::fromLatin1(png.toBase64()));
+    QTRY_VERIFY_WITH_TIMEOUT(([&] {
+        QMetaObject::invokeMethod(view, "runJavaScript", Q_ARG(QString, script)); QTest::qWait(150);
+        return saved.count() > 0;
+    })(), 15000);
+    QVERIFY(!saved.at(0).at(2).toString().isEmpty());
+    QTRY_VERIFY_WITH_TIMEOUT(window->property("navigationNotice").toString().contains("Save the document first"), 5000);
+    QCOMPARE(editor->property("text").toString(), QStringLiteral("untitled\n"));
+    backend.discardRecovery();
+}
