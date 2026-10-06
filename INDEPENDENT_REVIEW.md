@@ -100,7 +100,7 @@ Every "stuck in Loading" path found is a callback that returns early with nobody
 
 ## 4. Architecture & maintainability — 5/10
 
-> **Status (Cycle 133):** CI added; docs consolidated; `Publisher` extracted behind `PublishingSource`; dead `closeAfterSave`/`wordCount`/review paths removed; `macbridge.h`; `NativeMenuBar.qml`; `VisualEditPane.qml`; mapper O(n²) (§2 P1) fixed and measured. Remaining `Backend` extractions, the static-library/test split and the QML state machine are open; the acceptance harness deliberately stays in the product (see [research/cycle-133/README.md](research/cycle-133/README.md)).
+> **Status (Cycle 133):** CI added; docs consolidated; `Publisher` extracted behind `PublishingSource`; dead `closeAfterSave`/`wordCount`/review paths removed; `macbridge.h`; `NativeMenuBar.qml`; `VisualEditPane.qml`; mapper O(n²) (§2 P1) fixed and measured; R3 fuzzing found no corruption and pinned two low-severity cursor defects. Remaining `Backend` extractions, the static-library/test split and the QML state machine are open; the acceptance harness deliberately stays in the product (see [research/cycle-133/README.md](research/cycle-133/README.md)).
 
 **Earns points:** careful data-safety core; "why" comments; descriptive names; `FileLibrary` and
 `WorkspaceCommands` are clean, correctly-factored modules; the acceptance harness verifies the shipped bundle's
