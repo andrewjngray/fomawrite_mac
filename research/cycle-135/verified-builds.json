@@ -1,0 +1,39 @@
+{
+  "version": "0.3.0-dev31",
+  "build": 135,
+  "verifiedAt": "2026-10-06T15:57:49.807596+00:00",
+  "sourceCommit": "08915350c75160f5481810b17b2012f7f8848d17",
+  "publicReleaseChanged": false,
+  "verification": {
+    "fullRegression": {
+      "passed": 207,
+      "failed": 0,
+      "skipped": 0,
+      "note": "down from 240: the Visual Edit and mapper suites left with the feature"
+    },
+    "editorPageTests": {
+      "passed": 176,
+      "failed": 0
+    },
+    "nativeChecks": "not rerun this cycle (bin/check-document-views, bin/check-publishing-startup)"
+  },
+  "bundles": {
+    "dist/Fomawrite.app": {
+      "build": 135,
+      "executableSha256": "ee0d20e19faa219021c2cdcd5ef1c35676f79c7da6afb5c02489cf6253dd906b"
+    },
+    "dist/Fomawrite Dev.app": {
+      "build": 135,
+      "executableSha256": "2e1b2890ff07fd1cc2a7b7593e04bd199a539996f8f18f3af0d5f6f4f95bf4ec"
+    },
+    "/Applications/Fomawrite.app": {
+      "build": 135,
+      "executableSha256": "ee0d20e19faa219021c2cdcd5ef1c35676f79c7da6afb5c02489cf6253dd906b"
+    }
+  },
+  "removed": [
+    "dist/Omawrite.app",
+    "dist/Omawrite Dev.app"
+  ],
+  "installedWith": "./bin/package-mac && ./bin/prepare-dev-app && ./bin/install-mac"
+}
