@@ -600,6 +600,9 @@ Backend::Backend(QObject *parent, bool outputOnly) : QObject(parent), m_library(
     // mirrored here so saving, recovery, publishing and the other panes agree.
     m_editorBridge = std::make_unique<EditorBridge>();
     connect(m_editorBridge.get(), &EditorBridge::changesReceived, this, &Backend::applyLiveChanges);
+    connect(m_editorBridge.get(), &EditorBridge::selectionReceived, this, [this](int token, int, int) {
+        if (token == m_liveSelectionToken) finishLiveSelection(m_editorBridge->lastSelectionStart(), m_editorBridge->lastSelectionEnd());
+    });
     connect(m_editorBridge.get(), &EditorBridge::imageRequested, this, &Backend::resolveLiveImage);
     connect(m_editorBridge.get(), &EditorBridge::imageSaveRequested, this, &Backend::saveLiveImage);
     connect(m_editorBridge.get(), &EditorBridge::messageLogged, this, [](const QString &message) { qWarning("Live editor: %s", qPrintable(message)); });
@@ -3462,37 +3465,86 @@ void Backend::syncLiveEditor(int cursor) {
 
 void Backend::pushLiveTheme() { m_editorBridge->applyTheme(m_publisher->currentCss()); }
 
+// Run `operation` on the page's current selection. With a ready page the
+// selection is fetched first (see backend.h) and the operation runs in the
+// reply; a page that does not answer within a second falls back to the last
+// reported selection so a command is never silently lost. Operations queue
+// and run one at a time, so a second command asks only after the first one's
+// edit and caret were sent (the channel keeps that order).
+void Backend::runAtLiveSelection(std::function<void(int, int)> operation) {
+    m_liveSelectionQueue.push_back(std::move(operation));
+    pumpLiveSelection();
+}
+
+void Backend::pumpLiveSelection() {
+    if (m_liveSelectionToken != 0 || m_liveSelectionQueue.empty()) return;
+    const int token = m_editorBridge->fetchSelection();
+    m_liveSelectionToken = token;
+    QTimer::singleShot(1000, this, [this, token] {
+        if (m_liveSelectionToken == token)
+            finishLiveSelection(m_editorBridge->lastSelectionStart(), m_editorBridge->lastSelectionEnd());
+    });
+}
+
+void Backend::finishLiveSelection(int start, int end) {
+    m_liveSelectionToken = 0;
+    if (m_liveSelectionQueue.empty()) return;
+    auto operation = std::move(m_liveSelectionQueue.front());
+    m_liveSelectionQueue.pop_front();
+    operation(start, end);
+    pumpLiveSelection();
+}
+
 bool Backend::liveWrapSelection(const QString &before, const QString &after) {
-    const int start = m_editorBridge->lastSelectionStart(), end = m_editorBridge->lastSelectionEnd();
-    if (!m_liveMirrorValid || start < 0) return false;
-    const auto result = wrapSelection(start, end, before, after);
-    if (!result.contains("end")) return false;
-    m_editorBridge->placeCursor(result.value("end").toInt());
+    const auto apply = [this, before, after](int start, int end) {
+        if (!m_liveMirrorValid || start < 0) return false;
+        const auto result = wrapSelection(start, end, before, after);
+        if (!result.contains("end")) return false;
+        m_editorBridge->placeCursor(result.value("end").toInt());
+        return true;
+    };
+    if (!m_editorBridge->isReady()) return apply(m_editorBridge->lastSelectionStart(), m_editorBridge->lastSelectionEnd());
+    if (!m_liveMirrorValid) return false;
+    runAtLiveSelection([apply](int start, int end) { apply(start, end); });
     return true;
 }
 
 bool Backend::liveCopySelection(const QString &format) {
-    const int start = m_editorBridge->lastSelectionStart(), end = m_editorBridge->lastSelectionEnd();
-    if (start < 0 || end <= start) return false;
-    return copySelection(start, end, format);
+    const auto apply = [this, format](int start, int end) {
+        if (start < 0 || end <= start) return false;
+        return copySelection(start, end, format);
+    };
+    if (!m_editorBridge->isReady()) return apply(m_editorBridge->lastSelectionStart(), m_editorBridge->lastSelectionEnd());
+    runAtLiveSelection([apply](int start, int end) { apply(start, end); });
+    return true;
 }
 
 bool Backend::liveReplaceSelection(const QString &replacement) {
-    const int start = m_editorBridge->lastSelectionStart(), end = m_editorBridge->lastSelectionEnd();
-    if (!m_liveMirrorValid || start < 0) return false;
-    const auto result = replaceText(start, end, replacement);
-    if (!result.contains("end")) return false;
-    m_editorBridge->placeCursor(result.value("end").toInt());
+    const auto apply = [this, replacement](int start, int end) {
+        if (!m_liveMirrorValid || start < 0) return false;
+        const auto result = replaceText(start, end, replacement);
+        if (!result.contains("end")) return false;
+        m_editorBridge->placeCursor(result.value("end").toInt());
+        return true;
+    };
+    if (!m_editorBridge->isReady()) return apply(m_editorBridge->lastSelectionStart(), m_editorBridge->lastSelectionEnd());
+    if (!m_liveMirrorValid) return false;
+    runAtLiveSelection([apply](int start, int end) { apply(start, end); });
     return true;
 }
 
 bool Backend::liveEditMarkdown(const QString &action) {
-    const int start = m_editorBridge->lastSelectionStart(), end = m_editorBridge->lastSelectionEnd();
-    if (!m_liveMirrorValid || start < 0) return false;
-    const auto result = editMarkdown(action, start, end);
-    if (result.contains("end")) m_editorBridge->placeCursor(result.value("end").toInt());
-    else if (result.contains("start")) m_editorBridge->placeCursor(result.value("start").toInt());
-    return !result.isEmpty();
+    const auto apply = [this, action](int start, int end) {
+        if (!m_liveMirrorValid || start < 0) return false;
+        const auto result = editMarkdown(action, start, end);
+        if (result.contains("end")) m_editorBridge->placeCursor(result.value("end").toInt());
+        else if (result.contains("start")) m_editorBridge->placeCursor(result.value("start").toInt());
+        return !result.isEmpty();
+    };
+    if (!m_editorBridge->isReady()) return apply(m_editorBridge->lastSelectionStart(), m_editorBridge->lastSelectionEnd());
+    if (!m_liveMirrorValid) return false;
+    runAtLiveSelection([apply](int start, int end) { apply(start, end); });
+    return true;
 }
 
 void Backend::forwardLiveChange(int position, int charsRemoved, int charsAdded) {

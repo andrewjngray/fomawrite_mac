@@ -14,6 +14,7 @@ import { imagesExtension } from "./images";
 import { linksExtension, openLinkPanel } from "./links";
 import { Session, applyModeClass, applyThemeDom, Appearance } from "./modes";
 import { appearanceExtension } from "./appearance";
+import { replySelection } from "./selection";
 
 declare global {
   interface Window {
@@ -125,6 +126,7 @@ async function main() {
   onSignal(bridge.setAppearance, guard("setAppearance", (json: string) => session.setAppearance(JSON.parse(json) as Appearance)));
   onSignal(bridge.focusEditor, guard("focusEditor", () => view.focus()));
   onSignal(bridge.requestText, guard("requestText", (token: number) => bridge.textReply(token, session.getText())));
+  onSignal(bridge.requestSelection, guard("requestSelection", (token: number) => replySelection(bridge, view, token)));
   onSignal(bridge.simulateUserChanges, guard("simulateUserChanges", (json: string) => session.simulateUserChanges(json)));
   onSignal(bridge.undo, guard("undo", () => void session.undo()));
   // Scroll sync with the host's other panes: report the editor's vertical

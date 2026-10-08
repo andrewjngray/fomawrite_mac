@@ -36,6 +36,12 @@ int EditorBridge::fetchText() {
     return token;
 }
 
+int EditorBridge::fetchSelection() {
+    const int token = ++m_nextToken;
+    if (m_ready) emit requestSelection(token);
+    return token;
+}
+
 void EditorBridge::injectUserChanges(const QString &changesJson) {
     if (m_ready) emit simulateUserChanges(changesJson);
 }
@@ -79,6 +85,11 @@ void EditorBridge::placeCursor(int position) {
 void EditorBridge::metric(const QString &name, double ms) { emit metricRecorded(name, ms); }
 void EditorBridge::log(const QString &message) { emit messageLogged(message); }
 void EditorBridge::textReply(int token, const QString &text) { emit textReceived(token, text); }
+void EditorBridge::selectionReply(int token, int anchor, int head) {
+    m_lastAnchor = anchor;
+    m_lastCursor = head;
+    emit selectionReceived(token, anchor, head);
+}
 void EditorBridge::requestImage(int token, const QString &src) { emit imageRequested(token, src); }
 void EditorBridge::replyImage(int token, const QString &dataUrl, const QString &error) { emit imageReply(token, dataUrl, error); }
 void EditorBridge::saveImage(int token, const QString &name, const QString &mime, const QString &base64) { emit imageSaveRequested(token, name, mime, base64); }

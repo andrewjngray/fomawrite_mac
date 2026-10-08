@@ -12,6 +12,7 @@
 #include <QPageLayout>
 #include <QJsonObject>
 #include <memory>
+#include <deque>
 #include <functional>
 #include <optional>
 #include "filelibrary.h"
@@ -72,8 +73,15 @@ public:
     // The Live editor's last caret position, for carrying it back to Source.
     Q_INVOKABLE int liveCursor() const { return m_editorBridge->lastCursor(); }
     // Format commands while the Live editor has focus: the existing edit
-    // helpers run on the canonical document at the page's reported selection
-    // and the host->page mirror delivers the result; the caret is then placed.
+    // helpers run on the canonical document at the page's selection and the
+    // host->page mirror delivers the result; the caret is then placed. While
+    // the page is ready each command first asks the page for its selection as
+    // it is right now (requestSelection/selectionReply), because the debounced
+    // cursorChanged report can lag a selection change by 30 ms, and applies
+    // the edit in the reply; the return value then means "accepted" (the
+    // command is queued, one at a time, in call order). Without a ready page
+    // the edit runs at once on the last reported selection and the return
+    // value says whether it changed anything.
     Q_INVOKABLE bool liveWrapSelection(const QString &before, const QString &after);
     Q_INVOKABLE bool liveReplaceSelection(const QString &replacement);
     Q_INVOKABLE bool liveEditMarkdown(const QString &action);
@@ -312,6 +320,12 @@ private:
     // version restore, replace) reach the page while Live is active.
     void forwardLiveChange(int position, int charsRemoved, int charsAdded);
     bool m_applyingLiveChanges = false;
+    // Live commands waiting for the page's selection (FIFO, one request in flight).
+    void runAtLiveSelection(std::function<void(int start, int end)> operation);
+    void pumpLiveSelection();
+    void finishLiveSelection(int start, int end);
+    std::deque<std::function<void(int, int)>> m_liveSelectionQueue;
+    int m_liveSelectionToken = 0;
     QString m_liveMirror;
     bool m_liveMirrorValid = false;
     std::unique_ptr<EditorBridge> m_editorBridge;

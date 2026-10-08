@@ -300,24 +300,72 @@ void FomawriteTest::liveEditorAppliesFormatCommandsAtThePageSelection() {
     QTRY_COMPARE_WITH_TIMEOUT(page.pageText(), text, 10000);
     QTRY_VERIFY_WITH_TIMEOUT(page.bridge()->lastCursor() == 12, 5000);
     // Wrap at a collapsed selection: markers inserted, caret between them, page follows.
-    QVERIFY(page.backend.liveWrapSelection("**", "**"));
+    QVERIFY(page.backend.liveWrapSelection("**", "**")); // accepted; the edit follows the page's reply
     const QString wrapped = QString::fromUtf8("Title line\n\n****alpha beta gamma\n");
-    QCOMPARE(page.canonical(), wrapped);
+    QTRY_COMPARE_WITH_TIMEOUT(page.canonical(), wrapped, 5000);
     QTRY_COMPARE_WITH_TIMEOUT(page.pageText(), wrapped, 10000);
     QTRY_VERIFY_WITH_TIMEOUT(page.bridge()->lastCursor() == 14, 5000);
     // A block command on the first line.
     page.bridge()->placeCursor(2);
     QTRY_VERIFY_WITH_TIMEOUT(page.bridge()->lastCursor() == 2, 5000);
     QVERIFY(page.backend.liveEditMarkdown("heading2"));
-    QVERIFY2(page.canonical().startsWith("## Title line"), qPrintable(page.canonical()));
+    QTRY_VERIFY_WITH_TIMEOUT(page.canonical().startsWith("## Title line"), 5000);
     QTRY_COMPARE_WITH_TIMEOUT(page.pageText(), page.canonical(), 10000);
     // Snippet replacement at the caret.
     QVERIFY(page.backend.liveReplaceSelection("[snippet]"));
+    QTRY_VERIFY_WITH_TIMEOUT(page.canonical().contains("[snippet]"), 5000);
     QTRY_COMPARE_WITH_TIMEOUT(page.pageText(), page.canonical(), 10000);
-    QVERIFY(page.canonical().contains("[snippet]"));
     // Without a known selection nothing happens.
     EditorBridge fresh; Q_UNUSED(fresh);
     page.backend.discardRecovery();
+}
+
+// The page reports its selection 30 ms after it changes; a Format command in
+// that window used to act on the previous selection. Now it asks the page.
+void FomawriteTest::liveFormatCommandUsesTheSelectionMadeJustBefore() {
+    Cycle103SettingsSnapshot settings;
+    Cycle134Page page; QVERIFY2(page.create(), qPrintable(page.error));
+    QTRY_VERIFY_WITH_TIMEOUT(page.bridge()->isReady(), 15000);
+    const QString text = QStringLiteral("one two three");
+    page.editor->setProperty("text", text);
+    page.backend.syncLiveEditor(0);
+    QTRY_COMPARE_WITH_TIMEOUT(page.pageText(), text, 10000);
+    QTest::qWait(200); // let the setDocument/setCursor reports settle on the caret at 0
+    QCOMPARE(page.bridge()->lastSelectionStart(), 0);
+    QCOMPARE(page.bridge()->lastSelectionEnd(), 0);
+    auto *view = page.root->findChild<QObject *>("liveEditorView"); QVERIFY(view);
+    QVERIFY(QMetaObject::invokeMethod(view, "runJavaScript", Q_ARG(QString, QStringLiteral(
+        "window.fomawriteEditor.view.dispatch({selection:{anchor:4,head:7}})"))));
+    // No wait: the page's debounced report has not reached the host yet.
+    QVERIFY(page.backend.liveWrapSelection("**", "**"));
+    const QString wrapped = QStringLiteral("one **two** three");
+    QTRY_COMPARE_WITH_TIMEOUT(page.canonical(), wrapped, 10000);
+    QTRY_COMPARE_WITH_TIMEOUT(page.pageText(), wrapped, 10000);
+    page.backend.discardRecovery();
+}
+
+// A page that never answers must not swallow the command: after a second the
+// last reported selection is used. (The page is stood in for by a bare bridge
+// that is ready but silent.)
+void FomawriteTest::liveSelectionRequestFallsBackWhenThePageDoesNotAnswer() {
+    Cycle103SettingsSnapshot settings;
+    Backend backend;
+    QQmlEngine engine;
+    QQmlComponent textComponent(&engine);
+    engine.rootContext()->setContextProperty("backend", &backend);
+    textComponent.setData("import QtQuick\nTextEdit { Component.onCompleted: backend.attachDocument(textDocument); onTextChanged: backend.editorTextChanged() }", QUrl());
+    QScopedPointer<QObject> editor(textComponent.create()); QVERIFY2(editor, qPrintable(textComponent.errorString()));
+    editor->setProperty("text", QStringLiteral("one two three"));
+    auto *bridge = backend.editorBridge();
+    QSignalSpy asked(bridge, &EditorBridge::requestSelection);
+    bridge->ready(); // connected, but nothing answers requestSelection
+    backend.syncLiveEditor(0);
+    bridge->cursorChanged(4, 7, true);
+    QVERIFY(backend.liveWrapSelection("**", "**"));
+    QCOMPARE(asked.count(), 1);
+    QCOMPARE(editor->property("text").toString(), QStringLiteral("one two three")); // not applied yet
+    QTRY_COMPARE_WITH_TIMEOUT(editor->property("text").toString(), QStringLiteral("one **two** three"), 3000);
+    backend.discardRecovery();
 }
 
 // Whole stack: a synthetic paste of a real PNG in the page goes to the host,
@@ -430,16 +478,19 @@ void FomawriteTest::liveEditorCopiesThePageSelection() {
     page.backend.syncLiveEditor(0);
     QTRY_COMPARE_WITH_TIMEOUT(page.pageText(), text, 10000);
     QGuiApplication::clipboard()->setText(QStringLiteral("untouched"));
-    QVERIFY(!page.backend.liveCopySelection("markdown"));
+    // The request is accepted and answered by the page; a collapsed selection copies nothing.
+    QSignalSpy replies(page.bridge(), &EditorBridge::selectionReceived);
+    QVERIFY(page.backend.liveCopySelection("markdown"));
+    QTRY_COMPARE_WITH_TIMEOUT(replies.count(), 1, 5000);
     QCOMPARE(QGuiApplication::clipboard()->text(), QStringLiteral("untouched"));
     page.bridge()->runCommand("selectAll");
     QTRY_VERIFY_WITH_TIMEOUT(page.bridge()->lastSelectionEnd() == text.size(), 5000);
     QVERIFY(page.backend.liveCopySelection("markdown"));
-    QCOMPARE(QGuiApplication::clipboard()->text(), text);
+    QTRY_COMPARE_WITH_TIMEOUT(QGuiApplication::clipboard()->text(), text, 5000);
     QVERIFY(page.backend.liveCopySelection("html"));
-    QVERIFY(QGuiApplication::clipboard()->text().contains("italic"));
+    QTRY_VERIFY_WITH_TIMEOUT(QGuiApplication::clipboard()->text().contains("italic"), 5000);
     QVERIFY(page.backend.liveCopySelection("formatted"));
-    QVERIFY(QGuiApplication::clipboard()->mimeData()->hasHtml());
+    QTRY_VERIFY_WITH_TIMEOUT(QGuiApplication::clipboard()->mimeData()->hasHtml(), 5000);
     QCOMPARE(QGuiApplication::clipboard()->mimeData()->text().trimmed(), QStringLiteral("Title\nsome words"));
     page.backend.discardRecovery();
 }

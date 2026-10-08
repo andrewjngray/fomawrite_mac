@@ -96,6 +96,8 @@ private slots:
     void liveEditorLoadsLargeDocumentQuickly();
     void liveEditorFollowsHostEdits();
     void liveEditorAppliesFormatCommandsAtThePageSelection();
+    void liveFormatCommandUsesTheSelectionMadeJustBefore();
+    void liveSelectionRequestFallsBackWhenThePageDoesNotAnswer();
     void liveEditorInsertsLinksThroughThePagePanel();
     void liveEditorRecoversFromOutOfRangeHostChanges();
     void liveEditorCopiesThePageSelection();
