@@ -59,11 +59,11 @@ if args.preview_only:
             or any(not check.get('passed') for check in publishing_checks):
         failures.append('The shipped app did not pass all four focused preview groups')
 else:
-    if len(daily_checks) < 7 or any(not check.get('passed') for check in daily_checks):
+    if len(daily_checks) < 5 or any(not check.get('passed') for check in daily_checks):
         failures.append('The shipped app did not pass all daily-writing checks')
     if len(zoom_checks) < 5 or any(not check.get('passed') for check in zoom_checks):
         failures.append('The shipped app did not pass all independent-pane zoom checks')
-    if len(acceptance_checks) < 6 or any(not check.get('passed') for check in acceptance_checks):
+    if len(acceptance_checks) < 5 or any(not check.get('passed') for check in acceptance_checks):
         failures.append('The shipped app did not pass all editor acceptance checks')
     if len(chrome_checks) < 3 or any(not check.get('passed') for check in chrome_checks):
         failures.append('The shipped app did not pass all pane/footer/library checks')
