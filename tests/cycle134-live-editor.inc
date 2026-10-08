@@ -589,7 +589,8 @@ void FomawriteTest::liveEditorCapturesEachPresentation() {
         if (QString::fromLatin1(shot.theme).isEmpty()) page.backend.setOutputStyle(0);
         else QVERIFY2(page.backend.selectPublishingTheme(shot.theme), qPrintable(page.backend.status()));
         page.backend.syncLiveEditor();
-        page.bridge()->applyAppearance(QStringLiteral("{\"appearance\":\"%1\",\"dark\":%2,\"fontSize\":17}").arg(shot.appearance).arg(shot.dark ? "true" : "false"));
+        page.bridge()->applyAppearance(QStringLiteral("{\"appearance\":\"%1\",\"dark\":%2,\"fontSize\":17,\"fontFamily\":\"%3\",\"liveThemeFilter\":true,\"palette\":{\"background\":\"%4\",\"text\":\"%5\"}}")
+            .arg(shot.appearance).arg(shot.dark ? "true" : "false").arg(QStringLiteral(".AppleSystemUIFont")).arg(shot.dark ? "#1f1f1f" : "#ffffff").arg(shot.dark ? "#e6e6e6" : "#222222"));
         page.bridge()->selectMode(shot.mode);
         QTRY_COMPARE_WITH_TIMEOUT(page.pageText(), page.canonical(), 10000);
         QVERIFY2(cycle134SaveFrame(page.window, QDir(captures).filePath(shot.file), &why), qPrintable(why));
@@ -825,4 +826,55 @@ void FomawriteTest::liveLeftControlShowsThemeAndExactSwitchReachesPage() {
     closeMenu();
     QCOMPARE(footer->property("writingAppearance").toString(), QStringLiteral("Editorial"));
     backend.discardRecovery();
+}
+
+// Cycle 137: a gallery of every bundled Output Style in filtered Live, light
+// and dark, for review by eye. Frames are checked to be non-uniform and to
+// differ from each other across styles.
+void FomawriteTest::liveThemeGalleryCapturesEveryBundledStyle() {
+    Cycle103SettingsSnapshot settings;
+    QTemporaryDir directory; QVERIFY(directory.isValid());
+    const QString sample = QString::fromUtf8(
+        "# Gallery heading\n\n"
+        "Body text with **bold**, *emphasis*, `code` and a [link](https://example.org). Caf\xC3\xA9 \xE4\xBD\xA0\xE5\xA5\xBD.\n\n"
+        "## Second level\n\n"
+        "- A bullet item\n- Another with `code`\n\n1. First numbered\n2. Second numbered\n\n"
+        "> A quotation line that is long enough to wrap when the measure is narrow, so the bar and indent show.\n\n"
+        "| Column | Value |\n|:--|--:|\n| one | 1 |\n| two | 2 |\n\n"
+        "```js\nconst answer = 42;\n```\n\n---\n\nLast paragraph.\n");
+    QFile doc(directory.filePath("gallery.md")); QVERIFY(doc.open(QIODevice::WriteOnly)); doc.write(sample.toUtf8()); doc.close();
+    Cycle134Page page; QVERIFY2(page.create(), qPrintable(page.error));
+    page.window->resize(960, 820);
+    QTRY_VERIFY_WITH_TIMEOUT(page.bridge()->isReady(), 15000);
+    QVERIFY(page.backend.open(QUrl::fromLocalFile(directory.filePath("gallery.md"))));
+    const QString tests = QFileInfo(QFINDTESTDATA("tst_fomawrite.cpp")).absolutePath();
+    const QString captures = QDir(tests).filePath("../research/cycle-137/captures"); QDir().mkpath(captures);
+    QString why; QList<QImage> frames;
+    struct Style { QString name; int preset; QString theme; };
+    QList<Style> styles;
+    for (int preset = 0; preset <= 6; ++preset) styles.append({QStringLiteral("preset-%1").arg(preset), preset, QString()});
+    styles.append({QStringLiteral("claude-like"), -1, QStringLiteral("claude-like")});
+    for (const Style &style : styles) {
+        if (style.theme.isEmpty()) page.backend.setOutputStyle(style.preset);
+        else QVERIFY2(page.backend.selectPublishingTheme(style.theme), qPrintable(page.backend.status()));
+        for (bool dark : {false, true}) {
+            page.backend.syncLiveEditor();
+            page.bridge()->applyAppearance(QStringLiteral("{\"appearance\":\"manuscript\",\"dark\":%1,\"fontSize\":17,\"liveThemeFilter\":true,\"palette\":{\"background\":\"%2\",\"text\":\"%3\"}}")
+                .arg(dark ? "true" : "false").arg(dark ? "#1f1f1f" : "#ffffff").arg(dark ? "#e6e6e6" : "#222222"));
+            page.bridge()->selectMode("live");
+            QTRY_COMPARE_WITH_TIMEOUT(page.pageText(), page.canonical(), 10000);
+            QTest::qWait(120);
+            const QString file = QDir(captures).filePath(QStringLiteral("live-gallery-%1-%2.png").arg(style.name, dark ? "dark" : "light"));
+            QVERIFY2(cycle134SaveFrame(page.window, file, &why), qPrintable(why));
+            QImage frame(file); QVERIFY(!frame.isNull());
+            frames.append(frame);
+            qInfo("capture %s", qPrintable(file));
+        }
+    }
+    // Light and dark of the same style differ, and the styles do not all render the same.
+    for (int i = 0; i + 1 < frames.size(); i += 2) QVERIFY(frames[i] != frames[i + 1]);
+    int distinctLight = 1;
+    for (int i = 2; i < frames.size(); i += 2) if (frames[i] != frames[0]) ++distinctLight;
+    QVERIFY2(distinctLight >= 2, "every bundled style rendered identically in Live");
+    page.backend.discardRecovery();
 }

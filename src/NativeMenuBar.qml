@@ -324,7 +324,8 @@ Platform.MenuBar {
             title: "Editing"
             NativeCommand { commandId: "sourceEditing" }
             NativeCommand { commandId: "liveEditing" }
-            NativeCommand { commandId: "liveThemeExact" }
+            Platform.MenuSeparator {}
+            NativeCommand { commandId: "liveThemeExact"; enabled: workspaceLayout.liveEditEnabled }
         }
         Platform.Menu {
             title: "Layout"
