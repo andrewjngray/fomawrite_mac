@@ -806,7 +806,7 @@ void FomawriteTest::liveLeftControlShowsThemeAndExactSwitchReachesPage() {
     QVERIFY(!manuscript->isVisible()); QVERIFY(codeItem->isVisible());
     closeMenu();
     QCOMPARE(footer->property("writingAppearance").toString(), backend.publishingThemeName());
-    QVERIFY(themeItem->property("text").toString().contains(backend.publishingThemeName()));
+    QCOMPARE(themeItem->property("text").toString(), QStringLiteral("Output style…"));
     // The exact-theme switch is a command that reaches the page's appearance JSON.
     QSignalSpy pushed(bridge, &EditorBridge::setAppearance);
     auto *commands = window->findChild<QObject *>("workspaceCommands"); QVERIFY(commands);
