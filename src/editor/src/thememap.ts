@@ -2,7 +2,7 @@
 //
 // Typora-style themes style real elements: `#write h1 { ... }`, `#write blockquote { ... }`, `#write code { ... }`.
 // Live text lines are `.cm-line` divs carrying classes (`fw-h1`, `fw-quote-line`, `fw-list-line`) with inline marks
-// as spans (`fw-code`, `fw-live-link`, `fw-strong`, `fw-em`, `fw-strike`), so those rules cannot match. This module
+// as spans (`fw-code`, `fw-live-link`, `fw-strong`, `fw-em`, `fw-strike`, `fw-highlight`), so those rules cannot match. This module
 // reads the theme text and emits a *mapped copy* of every rule that can be translated, scoped to Live
 // (`#write.fw-mode-live`, MAPPED_SCOPE: filtered AND exact, so "Live follows theme exactly" keeps the theme's
 // heading / quote / link typography on Live lines), keeping only typography-level properties. It is pure (no DOM)
@@ -12,7 +12,7 @@
 //   ul li -> .fw-list-line.fw-list-ul     ol li -> .fw-list-line.fw-list-ol     (bare li: both kinds)
 //   p -> .cm-line (not headings, list, code, table, front matter, math, footnote lines)
 //   code (not under pre) -> .fw-code     a -> .fw-live-link     strong, b -> .fw-strong
-//   em, i -> .fw-em     del, s, strike -> .fw-strike
+//   em, i -> .fw-em     del, s, strike -> .fw-strike     mark -> .fw-highlight (keeps background-color)
 //
 // Absolute font sizes (px, pt, ...) and `rem` become `em` relative to the theme's own `#write` size (its
 // `#write { font-size }`, else the root size it inherits: `html { font-size }`, else 16px); `rem` itself counts the
@@ -239,7 +239,7 @@ function splitCompounds(sel: string): { comb: string; raw: string }[] | null {
   return parts;
 }
 
-type Kind = "heading" | "quote" | "list" | "text" | "inline" | "code";
+type Kind = "heading" | "quote" | "list" | "text" | "inline" | "code" | "mark";
 
 const BLOCK_TAGS: Record<string, { cls: string; kind: Kind }> = {
   h1: { cls: "fw-h1", kind: "heading" },
@@ -262,6 +262,8 @@ const INLINE_TAGS: Record<string, { cls: string; kind: Kind }> = {
   del: { cls: "fw-strike", kind: "inline" },
   s: { cls: "fw-strike", kind: "inline" },
   strike: { cls: "fw-strike", kind: "inline" },
+  // `mark` keeps its background so the theme's own pair (background + colour) reaches Live together.
+  mark: { cls: "fw-highlight", kind: "mark" },
 };
 /** Lines `p` must not reach: they are not paragraph text in the rendered document. */
 const NOT_PARAGRAPH =
@@ -478,11 +480,14 @@ function mapDecl(d: Decl, kind: Kind, ctx: Ctx): string | null {
     // Whatever absolute length is left (inside a calc(), say) cannot follow the host size on body text: dropped.
     if ((kind === "text" || kind === "list") && ABSOLUTE_LENGTH.test(value)) return null;
   }
+  // A `mark` colour that says "no colour" (`inherit`, `currentcolor`, ...) is dropped: the editor's own readable text
+  // colour for the highlight stands, instead of the page's text colour on the theme's (often pale) ground.
+  if (kind === "mark" && name === "color" && /^(?:inherit|initial|unset|revert|revert-layer|currentcolor)$/i.test(value.trim().replace(/\s*!important$/i, ""))) return null;
   if (TYPOGRAPHY.test(name)) return emit(name, value);
   if (kind === "heading" && BORDER_SIDES.test(name)) return emit(name, value);
   if (kind === "quote" && BORDER_LEFT.test(name)) return emit(name, value);
   if (kind === "quote" && name === "margin-left" && leftLength(value, true)) return emit(name, value.trim());
-  if (kind === "code" || kind === "quote") {
+  if (kind === "code" || kind === "quote" || kind === "mark") {
     if (name === "background-color") return emit(name, value);
     // `background: <colour>` only (no position / size / repeat / images)
     if (name === "background" && !/gradient\(/i.test(value) && splitTop(value.replace(/\s+/g, " "), " ").length === 1 && !/^(?:none|inherit|initial|unset)$/i.test(value))
@@ -492,7 +497,7 @@ function mapDecl(d: Decl, kind: Kind, ctx: Ctx): string | null {
 }
 
 // ---------------------------------------------------------------- rules
-const KIND_ORDER: Kind[] = ["heading", "quote", "list", "text", "inline", "code"];
+const KIND_ORDER: Kind[] = ["heading", "quote", "list", "text", "inline", "code", "mark"];
 
 function mapRule(selectorList: string, body: string, ctx: Ctx): string[] {
   if (body.includes("{")) return []; // nested rules (CSS nesting) are not understood: skip

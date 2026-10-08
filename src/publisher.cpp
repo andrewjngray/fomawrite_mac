@@ -313,6 +313,9 @@ QString Publisher::html(QString *error, bool preview, QString *warning, QByteArr
         customCss = *custom;
         css += '\n' + customCss;
     }
+    // The theme's variables (memoised per theme) with the user's own output CSS on top, so a --highlight-color it sets counts.
+    QMap<QString, QString> variables = m_themeId.isEmpty() ? TyporaBase::themeVariables(css) : themeVariables();
+    if (!m_themeId.isEmpty() && !customCss.isEmpty()) variables.insert(TyporaBase::themeVariables(customCss));
     const QString styleAttribute = cssFile.isEmpty() ? QString() : " data-fomawrite-user-style";
     const QString titlePage = m_source.titlePageHtml();
     const QString title = m_source.documentTitle();
@@ -320,7 +323,7 @@ QString Publisher::html(QString *error, bool preview, QString *warning, QByteArr
     // A restrictive content policy also protects exported HTML opened elsewhere.
     QString html = "<!doctype html><html><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">"
         "<meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'none'; style-src 'unsafe-inline'; img-src data:; font-src data:; base-uri 'self'; form-action 'none'\">"
-        "<title>" + title.toHtmlEscaped() + "</title><style" + styleAttribute + ">" + foundations + '\n' + TyporaBase::css() + '\n' + css + printCss
+        "<title>" + title.toHtmlEscaped() + "</title><style" + styleAttribute + ">" + foundations + '\n' + TyporaBase::css() + '\n' + TyporaBase::highlightCss(variables) + css + printCss
         + "</style></head><body>" + titlePage + "<article id=\"write\">" + body + "</article></body></html>";
     QByteArray assets;
     html = PublishingHtml::embedImages(html, m_source.documentBaseUrl(), preview, error, warning, &m_imageCache, &assets);

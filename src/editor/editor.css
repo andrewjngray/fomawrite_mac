@@ -24,6 +24,11 @@
   --fw-linenum: #8c959f;
   --fw-dim-opacity: 0.38;
   --fw-danger: #cf222e;
+  /* ==highlight==: one pair for light and dark editors, so the text is dark on the yellow whatever the page is
+     (about 16:1). The host (src/typorabase.cpp) overrides --fw-highlight-fg when a theme's --highlight-color needs
+     another text colour; --fw-highlight-bg is the fallback behind the theme's --highlight-color. */
+  --fw-highlight-bg: #fff2a8;
+  --fw-highlight-fg: #1a1a1a;
 }
 :root.dark {
   --fw-fg: #e6edf3;
@@ -122,6 +127,7 @@ html.dark, html.dark body { color-scheme: dark; }
 #write.fw-mode-live .fw-em { font-style: italic; }
 #write.fw-mode-live .fw-strong { font-weight: 700; }
 #write.fw-mode-live .fw-strike { text-decoration: line-through; }
+#write.fw-mode-live .fw-highlight { background-color: var(--fw-highlight-bg); color: var(--fw-highlight-fg); border-radius: 2px; }
 #write.fw-mode-live .fw-code {
   font-family: var(--fw-code-font, Menlo, Consolas, monospace);
   font-size: 0.9em;

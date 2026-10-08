@@ -2,7 +2,7 @@
 //
 // The builder walks the Lezer markdown tree for the given ranges only and emits:
 //   - zero-width Decoration.replace({}) for syntax markers that are not "revealed"
-//   - mark decorations for inline styling (fw-em, fw-strong, fw-code, fw-strike, fw-live-link)
+//   - mark decorations for inline styling (fw-em, fw-strong, fw-code, fw-strike, fw-highlight, fw-live-link)
 //   - fw-revealed marks on nodes the selection touches (their markers stay visible)
 //   - line decorations for block context (fw-h1..6, fw-quote-line, fw-list-line + fw-list-ul / fw-list-ol, fw-code-line)
 import { EditorSelection, EditorState, Range } from "@codemirror/state";
@@ -29,6 +29,7 @@ const MARKS = {
   strong: mk("fw-strong"),
   code: mk("fw-code"),
   strike: mk("fw-strike"),
+  highlight: mk("fw-highlight"),
   link: mk("fw-live-link"),
   revealed: mk("fw-revealed"),
   listMark: mk("fw-list-mark"),
@@ -148,10 +149,20 @@ export function buildLive(
             case "Emphasis":
             case "StrongEmphasis":
             case "InlineCode":
-            case "Strikethrough": {
+            case "Strikethrough":
+            case "Highlight": {
               const deco =
-                name === "Emphasis" ? MARKS.em : name === "StrongEmphasis" ? MARKS.strong : name === "InlineCode" ? MARKS.code : MARKS.strike;
-              const markName = name === "InlineCode" ? "CodeMark" : name === "Strikethrough" ? "StrikethroughMark" : "EmphasisMark";
+                name === "Emphasis"
+                  ? MARKS.em
+                  : name === "StrongEmphasis"
+                    ? MARKS.strong
+                    : name === "InlineCode"
+                      ? MARKS.code
+                      : name === "Highlight"
+                        ? MARKS.highlight
+                        : MARKS.strike;
+              const markName =
+                name === "InlineCode" ? "CodeMark" : name === "Strikethrough" ? "StrikethroughMark" : name === "Highlight" ? "HighlightMark" : "EmphasisMark";
               mark(deco, nf, nt);
               if (touched(nf, nt)) {
                 mark(MARKS.revealed, nf, nt);

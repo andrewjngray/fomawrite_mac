@@ -1,9 +1,10 @@
-// Typora conventions in Live mode: footnotes, `[toc]` and YAML front matter.
+// Typora conventions in Live mode: footnotes, `[toc]`, YAML front matter and `==highlight==`.
 //
 // Three parts, all in this file (same shape as math.ts):
 //   1. `extrasMarkdown`  - a @lezer/markdown extension: FootnoteRef `[^id]` (inline), FootnoteDef `[^id]: text` with
 //                          indented continuation lines (block), TocBlock `[toc]` alone on a line (block) and
-//                          FrontMatter (a `---` ... `---` block at the very start of the document).
+//                          FrontMatter (a `---` ... `---` block at the very start of the document) and
+//                          Highlight (`==text==`, two `=` delimiters like GFM's `~~`; live.ts decorates it).
 //   2. `buildExtras`     - pure decoration builder. Reveal rule as everywhere: a selection range touching a node
 //                          (inclusive) shows its raw text; otherwise widgets replace it.
 //   3. `extrasExtension` - ViewPlugin + atomic ranges. Live mode only.
@@ -60,7 +61,26 @@ function blankThenIndented(cx: BlockContext, line: Line): boolean {
   return false;
 }
 
-/** `@lezer/markdown` extension: FootnoteRef, FootnoteDef (+ FootnoteLabel), TocBlock, FrontMatter (+ FrontMatterMark). */
+const EQUALS = 61;
+const HighlightDelim = { resolve: "Highlight", mark: "HighlightMark" };
+const PUNCTUATION = /[!-\/:-@\[-`{-~\u00a1-\u00bf\u2010-\u2027\u2030-\u205e]/;
+
+/** Inline `==text==`: exactly two `=` (not part of a longer run), flanked like GFM's `~~` so `a == b == c` stays text. */
+function parseHighlight(cx: InlineContext, next: number, pos: number): number {
+  if (next !== EQUALS || cx.char(pos + 1) !== EQUALS || cx.char(pos + 2) === EQUALS || cx.char(pos - 1) === EQUALS) return -1;
+  const before = cx.slice(pos - 1, pos), after = cx.slice(pos + 2, pos + 3);
+  const spaceBefore = /\s|^$/.test(before), spaceAfter = /\s|^$/.test(after);
+  const punctBefore = PUNCTUATION.test(before), punctAfter = PUNCTUATION.test(after);
+  return cx.addDelimiter(
+    HighlightDelim,
+    pos,
+    pos + 2,
+    !spaceAfter && (!punctAfter || spaceBefore || punctBefore),
+    !spaceBefore && (!punctBefore || spaceAfter || punctAfter),
+  );
+}
+
+/** `@lezer/markdown` extension: FootnoteRef, FootnoteDef (+ FootnoteLabel), TocBlock, FrontMatter (+ FrontMatterMark), Highlight (+ HighlightMark). */
 export const extrasMarkdown: MarkdownConfig = {
   defineNodes: [
     { name: "FootnoteRef" },
@@ -69,8 +89,13 @@ export const extrasMarkdown: MarkdownConfig = {
     { name: "TocBlock", block: true },
     { name: "FrontMatter", block: true },
     { name: "FrontMatterMark" },
+    { name: "Highlight" },
+    { name: "HighlightMark" },
   ],
-  parseInline: [{ name: "FootnoteRef", parse: parseFootnoteRef, before: "Link" }],
+  parseInline: [
+    { name: "FootnoteRef", parse: parseFootnoteRef, before: "Link" },
+    { name: "Highlight", parse: parseHighlight, after: "Emphasis" },
+  ],
   parseBlock: [
     {
       // Only at the very start of the document, and only when a closing `---` (or `...`) line exists.
