@@ -829,38 +829,40 @@ void FomawriteTest::liveLeftControlShowsThemeAndExactSwitchReachesPage() {
     auto *layout = window->findChild<QObject *>("workspaceLayout"); QVERIFY(layout);
     auto *prefs = window->findChild<QObject *>("workspaceSettings"); QVERIFY(prefs);
     auto *footer = window->findChild<QQuickItem *>("documentFooter"); QVERIFY(footer);
-    auto *manuscript = window->findChild<QQuickItem *>("sourceAppearanceManuscript");
-    auto *themeItem = window->findChild<QQuickItem *>("sourceAppearanceTheme");
-    auto *codeItem = window->findChild<QQuickItem *>("sourceAppearanceCode");
-    QVERIFY(manuscript && themeItem && codeItem);
+    auto *appearanceMenu = window->findChild<QObject *>("sourceAppearanceMenu"); QVERIFY(appearanceMenu);
+    auto *templateMenu = window->findChild<QObject *>("previewTemplateMenu"); QVERIFY(templateMenu);
+    auto *appearanceButton = footer->findChild<QQuickItem *>("sourceAppearanceButton"); QVERIFY(appearanceButton);
     quick->resize(1200, 800); quick->show(); QVERIFY(QTest::qWaitForWindowExposed(quick));
     editor->setProperty("text", QStringLiteral("# Theme\n\nbody\n"));
-    auto *menu = window->findChild<QObject *>("sourceAppearanceMenu"); QVERIFY(menu);
-    auto *appearanceButton = footer->findChild<QQuickItem *>("sourceAppearanceButton"); QVERIFY(appearanceButton);
-    // Item visibility is effective visibility, so look while the menu is open.
-    const auto openMenu = [&] {
-        QVERIFY(QMetaObject::invokeMethod(window.data(), "openAnchoredMenu", Q_ARG(QVariant, QVariant::fromValue(menu)), Q_ARG(QVariant, QVariant::fromValue<QObject *>(appearanceButton))));
-        QTRY_VERIFY(menu->property("opened").toBool());
+    const auto closeMenus = [&] {
+        for (QObject *m : {appearanceMenu, templateMenu}) { QMetaObject::invokeMethod(m, "close"); }
+        QTRY_VERIFY(!appearanceMenu->property("visible").toBool() && !templateMenu->property("visible").toBool());
     };
-    const auto closeMenu = [&] { QVERIFY(QMetaObject::invokeMethod(menu, "close")); QTRY_VERIFY(!menu->property("visible").toBool()); };
-    // Source: the appearances are offered, the theme item is not.
-    openMenu();
-    QVERIFY(manuscript->isVisible()); QVERIFY(!themeItem->isVisible()); QVERIFY(codeItem->isVisible());
-    closeMenu();
+    // Source: the control offers the writing appearances.
+    QVERIFY(QMetaObject::invokeMethod(footer, "appearanceMenuRequested", Q_ARG(QVariant, QVariant::fromValue<QObject *>(appearanceButton))));
+    QTRY_VERIFY(appearanceMenu->property("opened").toBool());
+    QVERIFY(!templateMenu->property("opened").toBool());
+    closeMenus();
     QVERIFY(QMetaObject::invokeMethod(window.data(), "selectWritingMode", Q_ARG(QVariant, QStringLiteral("live"))));
     QTRY_VERIFY(layout->property("liveEditEnabled").toBool());
     auto *bridge = backend.editorBridge();
     QTRY_VERIFY_WITH_TIMEOUT(bridge->isReady(), 20000);
-    // Live: the appearances give way to the Output Style; Code stays.
-    openMenu();
-    QTRY_VERIFY(themeItem->isVisible());
-    QVERIFY(!manuscript->isVisible()); QVERIFY(codeItem->isVisible());
-    closeMenu();
+    // Live: the control names the Output Style and opens the theme menu instead.
     QCOMPARE(footer->property("writingAppearance").toString(), backend.publishingThemeName());
-    QCOMPARE(themeItem->property("text").toString(), QStringLiteral("Output style…"));
+    QVERIFY(QMetaObject::invokeMethod(footer, "appearanceMenuRequested", Q_ARG(QVariant, QVariant::fromValue<QObject *>(appearanceButton))));
+    QTRY_VERIFY(templateMenu->property("opened").toBool());
+    QVERIFY(!appearanceMenu->property("opened").toBool());
+    closeMenus();
     // The exact-theme switch is a command that reaches the page's appearance JSON.
     QSignalSpy pushed(bridge, &EditorBridge::setAppearance);
     auto *commands = window->findChild<QObject *>("workspaceCommands"); QVERIFY(commands);
+    QVariant enabled;
+    QVERIFY(QMetaObject::invokeMethod(commands, "isEnabled", Q_RETURN_ARG(QVariant, enabled), Q_ARG(QVariant, QStringLiteral("liveThemeExact"))));
+    QVERIFY(enabled.toBool());
+    auto *codeItem = window->findChild<QQuickItem *>("sourceAppearanceCode"); QVERIFY(codeItem);
+    prefs->setProperty("writingAppearance", QStringLiteral("code"));
+    QVERIFY(!codeItem->property("checked").toBool()); // Code is never shown as the Live appearance
+    prefs->setProperty("writingAppearance", QStringLiteral("editorial"));
     QVERIFY(QMetaObject::invokeMethod(commands, "run", Q_ARG(QVariant, QStringLiteral("liveThemeExact"))));
     QVERIFY(prefs->property("liveThemeExact").toBool());
     QTRY_VERIFY(pushed.count() >= 1);
@@ -872,16 +874,46 @@ void FomawriteTest::liveLeftControlShowsThemeAndExactSwitchReachesPage() {
     // Back in Source the appearances return.
     QVERIFY(QMetaObject::invokeMethod(window.data(), "selectWritingMode", Q_ARG(QVariant, QStringLiteral("source"))));
     QTRY_VERIFY(!layout->property("liveEditEnabled").toBool());
-    openMenu();
-    QTRY_VERIFY(!themeItem->isVisible()); QVERIFY(manuscript->isVisible());
-    closeMenu();
+    QVERIFY(QMetaObject::invokeMethod(footer, "appearanceMenuRequested", Q_ARG(QVariant, QVariant::fromValue<QObject *>(appearanceButton))));
+    QTRY_VERIFY(appearanceMenu->property("opened").toBool());
+    closeMenus();
     QCOMPARE(footer->property("writingAppearance").toString(), QStringLiteral("Editorial"));
+    // In Source the exact-theme command is disabled and does nothing.
+    QVERIFY(QMetaObject::invokeMethod(commands, "isEnabled", Q_RETURN_ARG(QVariant, enabled), Q_ARG(QVariant, QStringLiteral("liveThemeExact"))));
+    QVERIFY(!enabled.toBool());
+    const bool exactBefore = prefs->property("liveThemeExact").toBool();
+    QVERIFY(QMetaObject::invokeMethod(commands, "run", Q_ARG(QVariant, QStringLiteral("liveThemeExact"))));
+    QCOMPARE(prefs->property("liveThemeExact").toBool(), exactBefore);
     backend.discardRecovery();
 }
 
+// WCAG contrast between the background and the text of a captured region: the
+// most common colour is the background; the text colour is the most contrasting
+// colour that covers at least 0.5% of the region.
+double cycle137TextContrast(const QImage &image, const QRect &region) {
+    const auto luminance = [](QRgb c) {
+        const auto channel = [](int v) { const double s = v / 255.0; return s <= 0.03928 ? s / 12.92 : std::pow((s + 0.055) / 1.055, 2.4); };
+        return 0.2126 * channel(qRed(c)) + 0.7152 * channel(qGreen(c)) + 0.0722 * channel(qBlue(c));
+    };
+    QHash<QRgb, int> counts;
+    const QRect r = region.intersected(image.rect());
+    for (int y = r.top(); y <= r.bottom(); ++y) for (int x = r.left(); x <= r.right(); ++x) ++counts[image.pixel(x, y) & 0xF0F0F0F0];
+    QRgb background = 0; int best = -1;
+    for (auto it = counts.cbegin(); it != counts.cend(); ++it) if (it.value() > best) { best = it.value(); background = it.key(); }
+    const double total = double(r.width()) * r.height(), bgL = luminance(background);
+    double contrast = 1.0;
+    for (auto it = counts.cbegin(); it != counts.cend(); ++it) {
+        if (it.value() < total * 0.005 || it.key() == background) continue;
+        const double l = luminance(it.key());
+        contrast = qMax(contrast, (qMax(l, bgL) + 0.05) / (qMin(l, bgL) + 0.05));
+    }
+    return contrast;
+}
+
 // Cycle 137: a gallery of every bundled Output Style in filtered Live, light
-// and dark, for review by eye. Frames are checked to be non-uniform and to
-// differ from each other across styles.
+// and dark, for review by eye. Every frame's heading and body region must
+// read at WCAG 3:1 or better (a dark-on-dark or light-on-light render fails),
+// light and dark differ, and the styles do not all render the same.
 void FomawriteTest::liveThemeGalleryCapturesEveryBundledStyle() {
     Cycle103SettingsSnapshot settings;
     QTemporaryDir directory; QVERIFY(directory.isValid());
@@ -919,7 +951,9 @@ void FomawriteTest::liveThemeGalleryCapturesEveryBundledStyle() {
             QVERIFY2(cycle134SaveFrame(page.window, file, &why), qPrintable(why));
             QImage frame(file); QVERIFY(!frame.isNull());
             frames.append(frame);
-            qInfo("capture %s", qPrintable(file));
+            const double heading = cycle137TextContrast(frame, QRect(130, 50, 700, 70)), body = cycle137TextContrast(frame, QRect(130, 120, 700, 60));
+            qInfo("capture %s heading contrast %.2f body contrast %.2f", qPrintable(file), heading, body);
+            QVERIFY2(heading >= 3.0 && body >= 3.0, qPrintable(QStringLiteral("%1: unreadable (heading %2, body %3)").arg(file).arg(heading).arg(body)));
         }
     }
     // Light and dark of the same style differ, and the styles do not all render the same.

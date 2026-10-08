@@ -985,12 +985,9 @@ ApplicationWindow {
         id: sourceAppearanceMenu
         objectName: "sourceAppearanceMenu"
         width: 220
-        // In Live the page follows the Output Style, so the Source appearances
-        // give way to the theme itself (the same menu as the publishing pane).
-        CompactMenuItem { objectName: "sourceAppearanceTheme"; visible: workspaceLayout.liveEditEnabled; implicitHeight: visible ? 28 : 0; height: visible ? 28 : 0; text: "Output style…"; onTriggered: Qt.callLater(function() { win.openAnchoredMenu(previewTemplateMenu, documentFooter.appearanceAnchor); }) }
-        CompactMenuItem { objectName: "sourceAppearanceManuscript"; visible: !workspaceLayout.liveEditEnabled; implicitHeight: visible ? 28 : 0; height: visible ? 28 : 0; text: "Manuscript"; checkable: true; autoExclusive: true; checked: win.activeWritingAppearance === "manuscript"; onTriggered: workspaceCommands.run("writingManuscript") }
-        CompactMenuItem { objectName: "sourceAppearanceEditorial"; visible: !workspaceLayout.liveEditEnabled; implicitHeight: visible ? 28 : 0; height: visible ? 28 : 0; text: "Editorial"; checkable: true; autoExclusive: true; checked: win.activeWritingAppearance === "editorial"; onTriggered: workspaceCommands.run("writingEditorial") }
-        CompactMenuItem { objectName: "sourceAppearanceBook"; visible: !workspaceLayout.liveEditEnabled; implicitHeight: visible ? 28 : 0; height: visible ? 28 : 0; text: "Book"; checkable: true; autoExclusive: true; checked: win.activeWritingAppearance === "book"; onTriggered: workspaceCommands.run("writingBook") }
+        CompactMenuItem { objectName: "sourceAppearanceManuscript"; text: "Manuscript"; checkable: true; autoExclusive: true; checked: win.activeWritingAppearance === "manuscript"; onTriggered: workspaceCommands.run("writingManuscript") }
+        CompactMenuItem { objectName: "sourceAppearanceEditorial"; text: "Editorial"; checkable: true; autoExclusive: true; checked: win.activeWritingAppearance === "editorial"; onTriggered: workspaceCommands.run("writingEditorial") }
+        CompactMenuItem { objectName: "sourceAppearanceBook"; text: "Book"; checkable: true; autoExclusive: true; checked: win.activeWritingAppearance === "book"; onTriggered: workspaceCommands.run("writingBook") }
         CompactMenuItem { objectName: "sourceAppearanceCode"; text: "Code"; checkable: true; autoExclusive: true; checked: !workspaceLayout.liveEditEnabled && win.activeWritingAppearance === "code"; onTriggered: workspaceCommands.run("writingCode") }
         MenuSeparator {}
         CompactMenuItem { objectName: "sourceAppearanceLarger"; text: "Larger text"; enabled: paneZoom.sourceZoom < paneZoom.maximumZoom; onTriggered: paneZoom.adjustZoom("source", 10) }
@@ -3233,7 +3230,8 @@ ApplicationWindow {
         onLayoutRequested: function(mode) { win.setDocumentView(mode); }
         onSourceEditingRequested: win.setSourceEditing()
         onLiveEditingRequested: win.setLiveEditing(true)
-        onAppearanceMenuRequested: function(anchor) { win.openAnchoredMenu(sourceAppearanceMenu, anchor); }
+        // In Live the left control names the Output Style, so it opens that menu (the same one as the publishing pane).
+        onAppearanceMenuRequested: function(anchor) { win.openAnchoredMenu(workspaceLayout.liveEditEnabled ? previewTemplateMenu : sourceAppearanceMenu, anchor); }
         onTemplateMenuRequested: function(anchor) { win.openAnchoredMenu(previewTemplateMenu, anchor); }
         onStatisticsRequested: workspaceCommands.run("statistics")
     }

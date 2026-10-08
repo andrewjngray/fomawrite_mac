@@ -129,6 +129,7 @@ QtObject {
         if (["quickOpen", "refreshTags"].indexOf(id) >= 0) return library.rootFolder.toString() !== "";
         if (id === "spelling") return window.isMac && editor.length > 0;
         if (id === "organizer") return true;
+        if (id === "liveThemeExact") return layoutState.liveEditEnabled;
         if (id === "split") return layoutState.availableWidth >= 800;
         if (id === "larger") return zoomController.activeZoom < zoomController.maximumZoom;
         if (id === "smaller") return zoomController.activeZoom > zoomController.minimumZoom;
@@ -255,7 +256,7 @@ QtObject {
         case "sentence": settings.sentenceFocus = !settings.sentenceFocus; if (settings.sentenceFocus) settings.paragraphFocus = false; break;
         case "paragraph": settings.paragraphFocus = !settings.paragraphFocus; if (settings.paragraphFocus) settings.sentenceFocus = false; break;
         case "typewriter": settings.typewriter = !settings.typewriter; typewriterChanged(); break;
-        case "liveThemeExact": settings.liveThemeExact = !settings.liveThemeExact; break;
+        case "liveThemeExact": if (layoutState.liveEditEnabled) settings.liveThemeExact = !settings.liveThemeExact; break;
         case "fillersStyleCheck": settings.styleCheckFillers = !settings.styleCheckFillers; break;
         case "customStyleCheck": settings.styleCheckCustom = !settings.styleCheckCustom; break;
         case "strike": window.tryWrapSelection("~~", "~~"); break;
