@@ -6,6 +6,8 @@ What Andrew finds while using Live as the daily editor. This list is the input t
 | --- | --- | --- | --- |
 | 9 Oct 2026 | A document opened in **Preview Only** shows no way into Source or Live: the editing capsule is hidden in that layout and nothing hints that it exists. | Footer, Preview Only | Fixed in source (option 1): the layout capsule is **Single \| Split \| Preview**; one click each way. Test `footerLayoutCapsuleNamesPreviewOnly`. |
 | 9 Oct 2026 | From Single or Split there is no visible way back to Preview Only; it exists only in **View → Preview Only**. | Footer | Fixed in source with the item above. |
+| 9 Oct 2026 | **Lapis Dark** showed pale text on a white page in Live (and in Web/PDF): Typora themes set their colours as `:root` variables and rely on Typora's base stylesheet to paint the page. | Live, Web/PDF | Fixed in source (Cycle 140): a Typora base shim paints the page from the theme's variables ahead of the theme CSS. |
+| 9 Oct 2026 | In Typora a dark theme darkens the whole app; Fomawrite's chrome stayed light. | Window chrome | Fixed in source (Cycle 140): Appearance Follows Output Style, default on. |
 | 9 Oct 2026 | After opening in Preview Only and choosing Split, **View → Editing** showed neither Source nor Live checked until Live was toggled once. | Native View menu | Fixed in source, not yet installed: the QML state was right all along (test `nativeEditingMenuChecksFollowTheLayoutFromTheStart`), the native Cocoa item showed a stale tick; the Editing and Layout submenus now re-assert their ticks when they open. Needs Andrew's confirmation on the next build. |
 
 ## Design options for the Preview Only routes (for Andrew to choose)

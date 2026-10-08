@@ -1,6 +1,16 @@
-# Cycle 140 — Typora base shim (9 October 2026)
+# Cycle 140 — Live friction fixes: Preview in the footer, Typora theme colours, appearance follows the Output Style (9 October 2026)
 
-**Build:** none yet (source change on a worktree branch; bundles stay at 139).
+**Build:** `0.3.0-dev36` / macOS `0.3.0 (140)`. Three pieces from Andrew's first day with Live (see [docs/live-friction.md](../../docs/live-friction.md)): the footer's layout capsule names Preview (option 1 of the three he was offered); dark Typora themes paint the page in Web/PDF and Live (the shim below, built by a page/Qt agent); and the app's own chrome follows the theme's page colours (his Yes to "appearance follows the Output Style", the Typora-like whole-window dark).
+
+## Footer: Single | Split | Preview
+
+The right-hand capsule gained a **Preview** button (Preview Only was menu-only before). Constant button widths (48 / 38 / 58 px, 4 px padding) so the capsule never moves between layouts and a 320 px preview pane keeps the 34 px the Output Style control needs; a first attempt with widths bound to the footer's compact state made the layout chase itself (the capsule's position fed the state that set its width) and hung the offscreen harness. Test `footerLayoutCapsuleNamesPreviewOnly`; the native check knows the third button; the footer anchor helper now says which condition failed.
+
+## Appearance follows the Output Style
+
+`Backend::appearanceFollowsOutputStyle` (QSettings `appearance/followOutputStyle`, default on; View → Appearance Follows Output Style). When the selected theme defines `--bg-color`, `loadOmarchyTheme` takes it as the window background, `--text-color` (alpha dropped) as the foreground, `--primary-color` as the accent, and the background's luminance decides dark mode; themes without a page colour, basic presets, or the setting off, leave the Theme preset in charge. Re-derived on every `publishingCssChanged`. Test `appearanceFollowsTheOutputStylesPageColours` with the Lapis Dark fixture (`#1e222a` page, `#e4e4e4` text, back to Studio's `#F6F3EE` on a basic preset or with the setting off).
+
+## Typora base shim
 
 ## What changed
 
