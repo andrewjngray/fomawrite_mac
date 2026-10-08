@@ -14,7 +14,7 @@ bool cycle118FooterRenderBarrier(QQuickWindow *window) {
 }
 QMap<QString, QRectF> cycle107ViewBounds(QQuickItem *footer) {
     QMap<QString, QRectF> result;
-    for (const char *name : {"sourceModeButton", "liveEditToggle", "singleModeButton", "previewSplitButton"}) {
+    for (const char *name : {"sourceModeButton", "liveEditToggle", "singleModeButton", "previewSplitButton", "previewOnlyButton"}) {
         auto *button = footer->findChild<QQuickItem *>(name);
         if (!button) return {};
         result.insert(QString::fromLatin1(name), cycle103SceneBounds(button));
@@ -25,7 +25,7 @@ bool cycle107SameBounds(const QMap<QString, QRectF> &actual, const QMap<QString,
     if (actual.isEmpty() || actual.size() != expected.size()) return false;
     for (auto it = expected.cbegin(); it != expected.cend(); ++it) {
         const auto found = actual.value(it.key());
-        const bool fixedAtWindowEdge = it.key() == "singleModeButton" || it.key() == "previewSplitButton";
+        const bool fixedAtWindowEdge = it.key() == "singleModeButton" || it.key() == "previewSplitButton" || it.key() == "previewOnlyButton";
         if ((fixedAtWindowEdge && qAbs(found.left() - it.value().left()) > 0.1) || qAbs(found.top() - it.value().top()) > 0.1
                 || qAbs(found.width() - it.value().width()) > 0.1 || qAbs(found.height() - it.value().height()) > 0.1) {
             return false;
@@ -45,39 +45,44 @@ bool cycle117PaneFooterAnchors(QObject *window) {
     auto *output = footer ? footer->findChild<QQuickItem *>("previewTemplateButton") : nullptr;
     auto *editing = footer ? footer->findChild<QQuickItem *>("documentEditingControls") : nullptr;
     auto *modes = footer ? footer->findChild<QQuickItem *>("documentViewControls") : nullptr;
-    if (!sourcePane || !previewPane || !appearance || !output || !editing || !modes) return false;
-    if (appearance->isVisible() != sourcePane->isVisible() || output->isVisible() != previewPane->isVisible()) return false;
+    const auto fail = [&](const char *why) { qWarning() << "Pane footer anchors:" << why; return false; };
+    if (!sourcePane || !previewPane || !appearance || !output || !editing || !modes) return fail("missing items");
+    if (appearance->isVisible() != sourcePane->isVisible() || output->isVisible() != previewPane->isVisible()) {
+        qWarning() << "appearance" << appearance->isVisible() << "sourcePane" << sourcePane->isVisible() << "output" << output->isVisible() << "previewPane" << previewPane->isVisible()
+                   << "footer" << footer->width() << "appearanceRoom" << footer->property("appearanceRoom").toReal() << "templateRoom" << footer->property("templateRoom").toReal() << "layoutMode" << footer->property("layoutMode").toInt();
+        return fail("pane control visibility");
+    }
     for (const auto &[button, pane] : {std::pair{appearance, sourcePane}, std::pair{output, previewPane}}) {
         if (!button->isVisible()) continue;
         const auto control = cycle103SceneBounds(button), region = cycle103SceneBounds(pane);
         if (qAbs(control.left() - region.left() - 12) > 0.5 || control.right() > region.right() - 11.5
-            || control.width() < 34 || control.height() < 32) return false;
+            || control.width() < 34 || control.height() < 32) { qWarning() << button->objectName() << control << region; return fail("pane control geometry"); }
     }
     auto *publishing = footer->findChild<QQuickItem *>("documentPublishingControls");
     if (!publishing || editing->isVisible() != sourcePane->isVisible()
-        || publishing->isVisible() != previewPane->isVisible()) return false;
+        || publishing->isVisible() != previewPane->isVisible()) return fail("group visibility");
     const auto modeBounds = cycle103SceneBounds(modes);
-    if (qAbs(modeBounds.right() - cycle103SceneBounds(footer).right() + 12) > 0.5) return false;
+    if (qAbs(modeBounds.right() - cycle103SceneBounds(footer).right() + 12) > 0.5) return fail("layout capsule not at the footer edge");
     if (editing->isVisible()) {
         const auto editingBounds = cycle103SceneBounds(editing);
         const qreal ownerEnd = previewPane->isVisible() ? cycle103SceneBounds(sourcePane).right() : modeBounds.left();
         if (qAbs(editingBounds.right() - ownerEnd + 12) > 1.5
-            || editingBounds.left() < cycle103SceneBounds(appearance).right() + 7.5) return false;
+            || editingBounds.left() < cycle103SceneBounds(appearance).right() + 7.5) { qWarning() << editingBounds << ownerEnd << cycle103SceneBounds(appearance); return fail("editing capsule placement"); }
     }
     if (publishing->isVisible()) {
         const auto outputBounds = cycle103SceneBounds(output), publishBounds = cycle103SceneBounds(publishing);
         if (outputBounds.right() + 7.5 > publishBounds.left()
             || publishBounds.right() + 7.5 > modeBounds.left()
-            || publishBounds.left() < cycle103SceneBounds(previewPane).left() + 11.5) return false;
+            || publishBounds.left() < cycle103SceneBounds(previewPane).left() + 11.5) { qWarning() << outputBounds << publishBounds << modeBounds << cycle103SceneBounds(previewPane); return fail("publishing group placement"); }
     }
-    return cycle106FooterControlsFit(window);
+    return cycle106FooterControlsFit(window) ? true : fail("controls do not fit");
 }
 bool cycle107ViewLabelsReadable(QQuickItem *footer) {
-    for (const char *name : {"liveEditToggle", "sourceModeButton", "previewSplitButton", "singleModeButton"}) {
+    for (const char *name : {"liveEditToggle", "sourceModeButton", "previewSplitButton", "singleModeButton", "previewOnlyButton"}) {
         auto *button = footer->findChild<QQuickItem *>(name);
         if (!button || !button->isVisible()) continue;
         auto *label = button->findChild<QQuickItem *>("footerButtonLabel");
-        if (!label || label->property("truncated").toBool()) return false;
+        if (!label || label->property("truncated").toBool()) { qWarning() << "Truncated footer label:" << name << "label implicit" << (label ? label->implicitWidth() : -1) << "button width" << button->width(); return false; }
     }
     return true;
 }
@@ -86,7 +91,7 @@ bool cycle107ViewChecked(QQuickItem *footer, QObject *layout) {
     const bool live = layout->property("liveEditEnabled").toBool();
     for (const auto &[name, expected] : {std::pair{"sourceModeButton", mode != 2 && !live},
              std::pair{"liveEditToggle", mode != 2 && live},
-             std::pair{"singleModeButton", mode == 0}, std::pair{"previewSplitButton", mode == 1}}) {
+             std::pair{"singleModeButton", mode == 0}, std::pair{"previewSplitButton", mode == 1}, std::pair{"previewOnlyButton", mode == 2}}) {
         auto *button = footer->findChild<QQuickItem *>(name);
         if (!button || button->property("checked").toBool() != expected) return false;
     }
@@ -133,11 +138,11 @@ void FomawriteTest::footerViewControlsStayStationaryAcrossModes() {
             QVERIFY(cycle118FooterRenderBarrier(quick));
             QTRY_VERIFY(cycle106FooterControlsFit(window.data()));
             const auto initial = cycle107ViewBounds(footer);
-            QCOMPARE(initial.size(), 4);
+            QCOMPARE(initial.size(), 5);
             const QRectF initialFooter = cycle103SceneBounds(footer);
             auto *viewGroup = footer->findChild<QQuickItem *>("documentViewControls"); QVERIFY(viewGroup);
             QVERIFY(qAbs(cycle103SceneBounds(viewGroup).right() - (width - 12)) < 0.1);
-            QVERIFY(qAbs(initial.value("previewSplitButton").right() - (width - 13)) < 0.1);
+            QVERIFY(qAbs(initial.value("previewOnlyButton").right() - (width - 13)) < 0.1);
             QCOMPARE(split->isEnabled(), width >= 803);
             // Direct Source remains available in every mode; there is no second
             // source-only menu or swapped return button to search for.

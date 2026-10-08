@@ -184,8 +184,8 @@ WorkspaceFooter {
             enabled: root.chromeVisible
             objectName: "singleModeButton"
             text: "Single"; hint: "Single — show the chosen editor alone"
-            leftPadding: 6; rightPadding: 6
-            grouped: true; width: 56
+            leftPadding: 4; rightPadding: 4
+            grouped: true; width: 48
             checked: root.layoutMode === 0
             Accessible.checkable: true; Accessible.checked: checked
             onClicked: root.layoutRequested(0)
@@ -194,12 +194,25 @@ WorkspaceFooter {
             objectName: "previewSplitButton"
             text: "Split"
             hint: root.canSplit ? "Split — show the chosen editor beside output Preview" : "Widen the window to use Split layout"
-            leftPadding: 6; rightPadding: 6
-            grouped: true; width: 44
+            leftPadding: 4; rightPadding: 4
+            grouped: true; width: 38
             enabled: root.chromeVisible && root.canSplit
             checked: root.layoutMode === 1
             Accessible.checkable: true; Accessible.checked: checked
             onClicked: root.layoutRequested(1)
+        }
+        // Preview Only is the third layout. Naming it here gives one click into
+        // it and one click back (Single / Split), instead of a menu-only route.
+        FooterButton {
+            enabled: root.chromeVisible
+            objectName: "previewOnlyButton"
+            text: "Preview"
+            hint: "Preview — read the published output on its own"
+            leftPadding: 4; rightPadding: 4
+            grouped: true; width: 58
+            checked: root.layoutMode === 2
+            Accessible.checkable: true; Accessible.checked: checked
+            onClicked: root.layoutRequested(2)
         }
     }
 }

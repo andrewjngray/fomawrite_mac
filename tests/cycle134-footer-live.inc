@@ -93,3 +93,42 @@ void FomawriteTest::footerLiveOptionJoinsEditingCapsule() {
     QVERIFY(!capsule->isVisible());
     QVERIFY(!source->property("checked").toBool() && !live->property("checked").toBool());
 }
+
+// Andrew, 9 Oct (friction list): Preview Only had no visible route in or out.
+// The layout capsule now names all three layouts: Single | Split | Preview.
+void FomawriteTest::footerLayoutCapsuleNamesPreviewOnly() {
+    Cycle103SettingsSnapshot isolatedSettings;
+    Cycle117Window f; QVERIFY2(f.start(1100), qPrintable(f.error));
+    auto *single = f.item("singleModeButton"), *split = f.item("previewSplitButton"), *preview = f.item("previewOnlyButton");
+    auto *source = f.item("sourceModeButton"), *capsule = f.item("documentEditingControls");
+    QVERIFY(single && split && preview && source && capsule);
+    auto *settings = f.window->findChild<QObject *>("workspaceSettings"); QVERIFY(settings);
+    settings->setProperty("autoHideChrome", false); // keep the footer buttons enabled for pointer clicks
+    QCOMPARE(preview->property("text").toString(), QStringLiteral("Preview"));
+    QCOMPARE(preview->parentItem(), single->parentItem());
+    QVERIFY(f.mode(1)); QTRY_COMPARE(f.layout->property("effectiveLayoutMode").toInt(), 1);
+    QVERIFY(!preview->property("checked").toBool()); QVERIFY(split->property("checked").toBool());
+    // One click into Preview Only: the editing capsule hides, Preview is checked.
+    QVERIFY(cycle102Click(f.quick, preview));
+    QTRY_COMPARE(f.layout->property("effectiveLayoutMode").toInt(), 2);
+    QTRY_VERIFY(preview->property("checked").toBool());
+    QVERIFY(!split->property("checked").toBool() && !single->property("checked").toBool());
+    QTRY_VERIFY(!capsule->isVisible());
+    QVERIFY(preview->isVisible() && single->isVisible() && split->isVisible());
+    // One click back: Single restores the editor and the editing capsule.
+    QVERIFY(cycle102Click(f.quick, single));
+    QTRY_COMPARE(f.layout->property("effectiveLayoutMode").toInt(), 0);
+    QTRY_VERIFY(capsule->isVisible());
+    QVERIFY(single->property("checked").toBool() && !preview->property("checked").toBool());
+    QVERIFY(source->property("checked").toBool());
+    // The capsule stays at the window edge, in order, at wide and narrow widths.
+    for (int width : {1100, 720}) {
+        f.quick->resize(width, 720); QTRY_COMPARE(f.quick->size(), QSize(width, 720));
+        QVERIFY(cycle118FooterRenderBarrier(f.quick));
+        QTRY_VERIFY2(qAbs(cycle103SceneBounds(preview).right() - (width - 13)) < 0.1, qPrintable(QStringLiteral("preview right %1 at width %2").arg(cycle103SceneBounds(preview).right()).arg(width)));
+        QVERIFY(cycle103SceneBounds(single).right() <= cycle103SceneBounds(split).left() + 0.5);
+        QVERIFY(cycle103SceneBounds(split).right() <= cycle103SceneBounds(preview).left() + 0.5);
+        QTRY_VERIFY(cycle107ViewLabelsReadable(f.footer));
+        QTRY_VERIFY(cycle106FooterControlsFit(f.window.data()));
+    }
+}

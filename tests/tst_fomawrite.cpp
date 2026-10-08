@@ -143,6 +143,7 @@ private slots:
     void footerCompactStylesRemainReachableAcrossModes();
     void footerViewControlsStayStationaryAcrossModes();
     void footerLiveOptionJoinsEditingCapsule();
+    void footerLayoutCapsuleNamesPreviewOnly();
     void footerViewCyclesPreserveDraftSelectionAndWidths();
     void footerModesAndTemplatesPreserveDraftAndUndo();
     void footerAppearanceAndStatisticsWorkByClick();

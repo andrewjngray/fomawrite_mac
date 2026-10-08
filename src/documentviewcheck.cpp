@@ -49,8 +49,8 @@ void applyMacWindowTheme(QWindow *window, bool followSystem, bool dark);
 #endif
 
 namespace {
-const QStringList viewNames{QStringLiteral("sourceModeButton"), QStringLiteral("liveEditToggle"), QStringLiteral("singleModeButton"), QStringLiteral("previewSplitButton")};
-const QStringList stationaryNames{QStringLiteral("singleModeButton"), QStringLiteral("previewSplitButton")};
+const QStringList viewNames{QStringLiteral("sourceModeButton"), QStringLiteral("liveEditToggle"), QStringLiteral("singleModeButton"), QStringLiteral("previewSplitButton"), QStringLiteral("previewOnlyButton")};
+const QStringList stationaryNames{QStringLiteral("singleModeButton"), QStringLiteral("previewSplitButton"), QStringLiteral("previewOnlyButton")};
 const QStringList controlNames = viewNames + QStringList{QStringLiteral("sourceAppearanceButton"), QStringLiteral("previewTemplateButton"),
     QStringLiteral("webPublishingButton"), QStringLiteral("pdfPublishingButton")};
 
@@ -479,7 +479,7 @@ int runDocumentViewCheck(QApplication &app, const QString &outputDirectory) {
             }
             if (!viewNames.contains(name)) continue;
             const bool checked = name == "liveEditToggle" ? mode != 2 && live
-                : name == "sourceModeButton" ? mode != 2 && !live : name == "previewSplitButton" ? mode == 1 : mode == 0;
+                : name == "sourceModeButton" ? mode != 2 && !live : name == "previewSplitButton" ? mode == 1 : name == "previewOnlyButton" ? mode == 2 : mode == 0;
             check(button->property("checked").toBool() == checked, step + ": incorrect checked state: " + name);
         }
         for (int first = 0; first < controlNames.size(); ++first) {
