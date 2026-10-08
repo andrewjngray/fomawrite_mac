@@ -15,7 +15,10 @@
       "failed": 0
     },
     "review": "independent reviewer agent: ship with fixes; fixes applied before this build (see research/cycle-140/README.md)",
-    "nativeChecks": "not rerun for 140"
+    "nativeChecks": {
+      "check-document-views": "PASS against dist/Fomawrite.app (9 Oct 07:34): 124 footer states, 5 daily-writing, 5 pane-zoom, 5 editor acceptance, 12 publishing theme checks; embedded UI matches checkout; signature verified",
+      "check-publishing-startup": "passed: cold and restored (9 Oct 07:34)"
+    }
   },
   "bundles": {
     "dist/Fomawrite.app": {
