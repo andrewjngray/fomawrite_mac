@@ -33,3 +33,6 @@ Makefile
 # Editor web bundle (src/editor)
 /src/editor/node_modules/
 /src/editor/dist/*.map
+
+# Agent worktrees and local Claude state
+.claude/
