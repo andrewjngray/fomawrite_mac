@@ -8,9 +8,13 @@
 // tolerant: anything it does not understand is skipped, never thrown on.
 //
 //   h1..h6 -> .cm-line.fw-h1..6      blockquote -> .cm-line.fw-quote-line     li -> .cm-line.fw-list-line
+//   ul li -> .fw-list-line.fw-list-ul     ol li -> .fw-list-line.fw-list-ol     (bare li: both kinds)
 //   p -> .cm-line (not headings, list, code, table, front matter, math, footnote lines)
 //   code (not under pre) -> .fw-code     a -> .fw-live-link     strong, b -> .fw-strong
 //   em, i -> .fw-em     del, s, strike -> .fw-strike
+//
+// Absolute font sizes (px, pt, ...) become `em` relative to the theme's own `#write` size (16px when it sets none),
+// so the theme's scale follows the host text size. `blockquote::before/::after` glyphs are deliberately not mapped.
 //
 // Left alone (the real elements already exist in Live widgets, so the theme reaches them directly): pre, table, img,
 // hr, and anything with classes, ids, attributes or structural pseudo-classes on a mapped element.
@@ -265,6 +269,8 @@ interface Mapped {
   css: string;
   /** Quote lines only: the same selector restricted to depth-1 quotes (for padding-left, see mapRule). */
   cssDepth1?: string;
+  /** Quote lines only: the selector restricted to depth 1, 2, 3 and 4 quotes (`.fw-quote-d1` .. `d4`). */
+  cssDepths?: string[];
 }
 
 /** Map one complex selector to its Live equivalent, or null when it cannot (or should not) be mapped. */
@@ -296,6 +302,7 @@ export function mapSelector(selector: string): Mapped | null {
   const inline: { cls: string; kind: Kind }[] = [];
   let subjectKind: Kind = "text";
   let subjectPseudos: string[] = [];
+  let listType = ""; // "ul" | "ol": the nearest list ancestor named before an `li`
 
   for (let k = 0; k < rest.length; k++) {
     const c = rest[k];
@@ -310,6 +317,7 @@ export function mapSelector(selector: string): Mapped | null {
     }
     if (c.tag === "ul" || c.tag === "ol") {
       if (last || sawBlock || inline.length || keep.length) return null;
+      listType = c.tag;
       continue;
     }
     const block = BLOCK_TAGS[c.tag];
@@ -318,6 +326,7 @@ export function mapSelector(selector: string): Mapped | null {
       if (inline.length) return null; // a block inside an inline element
       sawBlock = true;
       if (block.cls) { if (!blockClasses.includes(block.cls)) blockClasses.push(block.cls); } else sawP = true;
+      if (c.tag === "li" && listType && !blockClasses.includes("fw-list-" + listType)) blockClasses.push("fw-list-" + listType);
       if (last) { subjectKind = block.kind; subjectPseudos = keep; }
     } else if (inl) {
       inline.push(inl);
@@ -342,30 +351,109 @@ export function mapSelector(selector: string): Mapped | null {
     return out;
   };
   const mapped: Mapped = { kind: subjectKind, css: build("") };
-  if (subjectKind === "quote") mapped.cssDepth1 = build(".fw-quote-d1");
+  if (subjectKind === "quote") {
+    mapped.cssDepths = [1, 2, 3, 4].map((n) => build(".fw-quote-d" + n));
+    mapped.cssDepth1 = mapped.cssDepths[0];
+  }
   return mapped;
 }
 
 // ---------------------------------------------------------------- declaration filter
 const TYPOGRAPHY = /^(?:font(?:-[a-z-]+)?|color|line-height|letter-spacing|word-spacing|text-decoration(?:-[a-z-]+)?|text-transform|text-underline-offset|text-underline-position)$/;
+const BORDER_LEFT = /^border-left(?:-(?:width|style|color))?$/;
 const BORDER_SIDES = /^border-(?:left|bottom)(?:-(?:width|style|color))?$/;
 const ABSOLUTE_LENGTH = /\d\s*(?:px|pt|pc|cm|mm|in|q)\b/i;
+const ABS_UNITS = "px|pt|pc|in|cm|mm|q";
+const SIMPLE_ABSOLUTE = new RegExp(`^(\\d*\\.?\\d+)(${ABS_UNITS})$`, "i");
+const PX_PER: Record<string, number> = { px: 1, pt: 4 / 3, pc: 16, in: 96, cm: 96 / 2.54, mm: 96 / 25.4, q: 96 / 101.6 };
+/** The size the theme's absolute lengths are relative to when its `#write` sets none (a browser's default). */
+export const DEFAULT_BASE_PX = 16;
+
+const toPx = (num: string, unit: string) => parseFloat(num) * (PX_PER[unit.toLowerCase()] ?? 1);
+const fmtEm = (n: number) => `${parseFloat(n.toFixed(4))}em`;
+
+/** Per-theme facts the declaration filter needs. */
+interface Ctx {
+  /** The theme's own `#write` font size in px (16 when it sets none or not in absolute units). */
+  basePx: number;
+}
+
+/** The theme's `#write { font-size }` in px when it is absolute (last declaration wins), else the default. */
+function themeBasePx(nodes: Node[]): number {
+  let base = DEFAULT_BASE_PX;
+  for (const n of nodes) {
+    if (n.kind !== "rule" || !splitTop(n.selector, ",").some((s) => s.trim() === "#write")) continue;
+    for (const d of parseDecls(n.body)) {
+      if (d.name !== "font-size") continue;
+      const m = SIMPLE_ABSOLUTE.exec(d.value.trim());
+      const px = m ? toPx(m[1], m[2]) : 0;
+      base = px > 0 ? px : DEFAULT_BASE_PX;
+    }
+  }
+  return base;
+}
+
+/** `font-size` / `font` value with `rem` -> `em` and the absolute size (px, pt, ...) -> `em` against the base. */
+function relativeFontSize(name: string, value: string, basePx: number): string {
+  value = value.replace(/(-?\d*\.?\d+)rem\b/gi, "$1em");
+  if (name === "font-size") {
+    const m = SIMPLE_ABSOLUTE.exec(value.trim());
+    return m ? fmtEm(toPx(m[1], m[2]) / basePx) : value;
+  }
+  // `font` shorthand: the first absolute length is the size (weights are unitless; line-height comes after `/`)
+  return value.replace(new RegExp(`(^|\\s)(\\d*\\.?\\d+)(${ABS_UNITS})(?=\\/|\\s|$)`, "i"), (_all, pre, n, u) => pre + fmtEm(toPx(n, u) / basePx));
+}
+
+/** A non-negative length (or a calc / min / max / clamp of them) usable as a left spacing value. */
+function leftLength(v: string, allowVar: boolean): boolean {
+  v = v.trim();
+  if (/^\+?(?:\d*\.?\d+(?:[a-z]+|%)|0)$/i.test(v)) return true;
+  if (/^(?:calc|min|max|clamp)\(.*\)$/i.test(v)) return !/url\(/i.test(v);
+  return allowVar && /^var\(.*\)$/i.test(v);
+}
+
+/** The left value of a `padding` shorthand (1-4 values, `var()` not understood), or null. */
+function paddingShorthandLeft(value: string): string | null {
+  if (/var\(/i.test(value)) return null;
+  const t = splitTop(value.trim().replace(/\s+/g, " "), " ").filter(Boolean);
+  if (!t.length || t.length > 4) return null;
+  const left = t.length === 4 ? t[3] : t.length === 1 ? t[0] : t[1];
+  return leftLength(left, false) ? left : null;
+}
+
+/** `v` plus `n`em, as a CSS value (a zero stays a plain `Nem`). */
+function plusEm(v: string, n: number): string {
+  return /^\+?0*\.?0*[a-z%]*$/i.test(v.trim()) && parseFloat(v) === 0 ? `${n}em` : `calc(${v} + ${n}em)`;
+}
+
+/** The padding-left a quote rule asks for (`padding`, `padding-left`; the last valid declaration wins), or null. */
+function quotePaddingLeft(decls: Decl[]): string | null {
+  let left: string | null = null;
+  for (const d of decls) {
+    if (/url\(|image-set\(|expression\(/i.test(d.value)) continue;
+    const v = d.name === "padding-left" ? (leftLength(d.value, true) ? d.value.trim() : null) : d.name === "padding" ? paddingShorthandLeft(d.value) : null;
+    if (v !== null) left = v;
+  }
+  return left;
+}
 
 /** The declaration as emitted in a mapped copy (`name: value[ !important]`), or null when it is dropped. */
-function mapDecl(d: Decl, kind: Kind, quotePadding: boolean): string | null {
+function mapDecl(d: Decl, kind: Kind, ctx: Ctx): string | null {
   let { name, value } = d;
   if (/url\(|image-set\(|expression\(/i.test(value)) return null;
   const emit = (n: string, v: string) => `${n}: ${v}${d.important ? " !important" : ""}`;
   if (name === "font-size" || name === "font") {
-    // Relative sizes keep following the host base size: rem would not, so it becomes em.
-    value = value.replace(/(-?\d*\.?\d+)rem\b/gi, "$1em");
-    // Body text keeps the host's size: an absolute size on p / li is dropped.
+    // Relative sizes keep following the host base size: rem would not, so it becomes em, and an absolute size
+    // becomes em against the theme's own base size.
+    value = relativeFontSize(name, value, ctx.basePx);
+    // Whatever absolute length is left (inside a calc(), say) cannot follow the host size on body text: dropped.
     if ((kind === "text" || kind === "list") && ABSOLUTE_LENGTH.test(value)) return null;
   }
   if (TYPOGRAPHY.test(name)) return emit(name, value);
-  if ((kind === "heading" || kind === "quote") && BORDER_SIDES.test(name)) return emit(name, value);
-  if (kind === "quote" && quotePadding && name === "padding-left") return emit(name, value);
-  if (kind === "code") {
+  if (kind === "heading" && BORDER_SIDES.test(name)) return emit(name, value);
+  if (kind === "quote" && BORDER_LEFT.test(name)) return emit(name, value);
+  if (kind === "quote" && name === "margin-left" && leftLength(value, true)) return emit(name, value.trim());
+  if (kind === "code" || kind === "quote") {
     if (name === "background-color") return emit(name, value);
     // `background: <colour>` only (no position / size / repeat / images)
     if (name === "background" && !/gradient\(/i.test(value) && splitTop(value.replace(/\s+/g, " "), " ").length === 1 && !/^(?:none|inherit|initial|unset)$/i.test(value))
@@ -377,7 +465,7 @@ function mapDecl(d: Decl, kind: Kind, quotePadding: boolean): string | null {
 // ---------------------------------------------------------------- rules
 const KIND_ORDER: Kind[] = ["heading", "quote", "list", "text", "inline", "code"];
 
-function mapRule(selectorList: string, body: string): string[] {
+function mapRule(selectorList: string, body: string, ctx: Ctx): string[] {
   if (body.includes("{")) return []; // nested rules (CSS nesting) are not understood: skip
   const mapped: Mapped[] = [];
   for (const sel of splitTop(selectorList, ",")) {
@@ -390,30 +478,35 @@ function mapRule(selectorList: string, body: string): string[] {
   for (const kind of KIND_ORDER) {
     const group = mapped.filter((m) => m.kind === kind);
     if (!group.length) continue;
-    const props = decls.map((d) => mapDecl(d, kind, false)).filter((x): x is string => x !== null);
+    const props = decls.map((d) => mapDecl(d, kind, ctx)).filter((x): x is string => x !== null);
     const selectors = [...new Set(group.map((m) => m.css))];
     if (props.length) out.push(`${selectors.join(", ")} { ${props.join("; ")}; }`);
     if (kind === "quote") {
-      // The editor indents quote lines with padding-left !important (and deeper levels by depth), so a theme's
-      // padding-left is applied to depth-1 quotes only, with !important.
-      const pad = decls.filter((d) => d.name === "padding-left")
-        .map((d) => mapDecl({ ...d, important: true }, kind, true)).filter((x): x is string => x !== null);
-      const sel1 = [...new Set(group.map((m) => m.cssDepth1!))];
-      if (pad.length) out.push(`${sel1.join(", ")} { ${pad.join("; ")}; }`);
+      // The editor indents quote lines with padding-left !important (and deeper levels by depth), so a theme's left
+      // padding (`padding-left`, or the left value of `padding`) is applied with !important: as is at depth 1 and
+      // one em more per deeper level, which keeps nested quotes indented past their parent. Top, right and bottom
+      // padding are never taken.
+      const left = quotePaddingLeft(decls);
+      if (left !== null) {
+        for (let depth = 1; depth <= 4; depth++) {
+          const sels = [...new Set(group.map((m) => m.cssDepths![depth - 1]))];
+          out.push(`${sels.join(", ")} { padding-left: ${depth === 1 ? left : plusEm(left, depth - 1)} !important; }`);
+        }
+      }
     }
   }
   return out;
 }
 
-function mapNodes(nodes: Node[]): string[] {
+function mapNodes(nodes: Node[], ctx: Ctx): string[] {
   const out: string[] = [];
   for (const n of nodes) {
     if (n.kind === "rule") {
-      out.push(...mapRule(n.selector, n.body));
+      out.push(...mapRule(n.selector, n.body, ctx));
     } else if (n.name === "font-face" || n.name === "keyframes" || n.name === "-webkit-keyframes") {
       out.push(n.raw.trim()); // passed through untouched
     } else if ((n.name === "media" || n.name === "supports") && n.body !== null) {
-      const inner = mapNodes(splitNodes(n.body));
+      const inner = mapNodes(splitNodes(n.body), ctx);
       if (inner.length) out.push(`@${n.name} ${n.prelude.slice(n.name.length + 1).trim()} {\n${inner.map((r) => "  " + r).join("\n")}\n}`);
     }
     // @import, @charset, @page, @layer, @namespace, ... : dropped
@@ -429,7 +522,8 @@ function mapNodes(nodes: Node[]): string[] {
 export function mapThemeCss(css: string): string {
   if (!css || typeof css !== "string") return "";
   try {
-    return mapNodes(splitNodes(stripComments(css))).join("\n");
+    const nodes = splitNodes(stripComments(css));
+    return mapNodes(nodes, { basePx: themeBasePx(nodes) }).join("\n");
   } catch {
     return "";
   }

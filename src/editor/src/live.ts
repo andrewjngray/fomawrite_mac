@@ -4,7 +4,7 @@
 //   - zero-width Decoration.replace({}) for syntax markers that are not "revealed"
 //   - mark decorations for inline styling (fw-em, fw-strong, fw-code, fw-strike, fw-live-link)
 //   - fw-revealed marks on nodes the selection touches (their markers stay visible)
-//   - line decorations for block context (fw-h1..6, fw-quote-line, fw-list-line, fw-code-line)
+//   - line decorations for block context (fw-h1..6, fw-quote-line, fw-list-line + fw-list-ul / fw-list-ol, fw-code-line)
 import { EditorSelection, EditorState, Range } from "@codemirror/state";
 import { Decoration, DecorationSet, EditorView, ViewPlugin, ViewUpdate } from "@codemirror/view";
 import { ensureSyntaxTree, syntaxTree } from "@codemirror/language";
@@ -95,6 +95,19 @@ export function buildLive(
     }
   };
 
+  // Line start -> "ul" | "ol" for list lines. A ListItem covers its nested items' lines too; the walk is pre-order, so
+  // the deepest (nearest) list's item writes last and wins.
+  const listKind = new Map<number, string>();
+  const listLines = (from: number, to: number, kind: string, clipFrom: number, clipTo: number) => {
+    let pos = Math.max(from, clipFrom);
+    const end = Math.min(to, clipTo);
+    while (pos <= end && pos <= doc.length) {
+      const l = doc.lineAt(pos);
+      listKind.set(l.from, kind);
+      pos = l.to + 1;
+    }
+  };
+
   let maxTo = 0;
   for (const r of vis) maxTo = Math.max(maxTo, r.to);
   const tree = ensureSyntaxTree(state, Math.min(doc.length, maxTo), 50) ?? syntaxTree(state);
@@ -175,9 +188,13 @@ export function buildLive(
               }
               break;
             }
-            case "ListItem":
+            case "ListItem": {
               lines(nf, nt, "fw-list-line", cFrom, cTo);
+              const parent = node.node.parent?.name;
+              if (parent === "BulletList") listLines(nf, nt, "ul", cFrom, cTo);
+              else if (parent === "OrderedList") listLines(nf, nt, "ol", cFrom, cTo);
               break;
+            }
             case "ListMark":
               mark(MARKS.listMark, nf, nt);
               break;
@@ -191,6 +208,8 @@ export function buildLive(
       },
     });
   }
+
+  for (const [from, kind] of listKind) decos.push(line("fw-list-" + kind).range(from));
 
   return { decorations: Decoration.set(decos, true), hidden: Decoration.set(hiddenList, true) };
 }

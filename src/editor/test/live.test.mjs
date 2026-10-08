@@ -163,3 +163,66 @@ test("hidden ranges never span line breaks", () => {
   const { hidden } = collect(stateAt(d, d.length));
   for (const [f, t] of hidden) assert.ok(!d.slice(f, t).includes("\n"));
 });
+
+// ---------------------------------------------------------------- list kinds (fw-list-ul / fw-list-ol)
+test("list lines carry fw-list-ul or fw-list-ol from the nearest list", () => {
+  const lines = [
+    "- bullet one",         // 0 ul
+    "- bullet two",         // 1 ul
+    "",
+    "1. first",             // 3 ol
+    "2. second",            // 4 ol
+    "",
+    "- outer bullet",       // 6 ul
+    "  1. inner number",    // 7 ol (nested in a bullet)
+    "  2. inner two",       // 8 ol
+    "     - deep bullet",   // 9 ul (bullet in a number in a bullet)
+    "  3. back at number",  // 10 ol
+    "- outer again",        // 11 ul
+    "",
+    "1. numbered outer",    // 13 ol
+    "   - inner bullet",    // 14 ul
+    "   - inner bullet 2",  // 15 ul
+    "2. numbered again",    // 16 ol
+    "",
+    "plain paragraph",      // 18 none
+    "- [ ] task",           // 19 ul
+    "1. [x] done",          // 20 ol
+    "",
+    "* star bullet",        // 22 ul
+    "+ plus bullet",        // 23 ul
+    "",
+    "3) paren number",      // 25 ol
+  ];
+  const doc = lines.join("\n");
+  const state = stateAt(doc, doc.length);
+  const { lines: decos } = collect(state);
+  const starts = [];
+  let at = 0;
+  for (const l of lines) { starts.push(at); at += l.length + 1; }
+  const classesOf = (n) => decos.filter(([f]) => f === starts[n]).map(([, c]) => c).sort();
+  const expect = { 0: "ul", 1: "ul", 3: "ol", 4: "ol", 6: "ul", 7: "ol", 8: "ol", 9: "ul", 10: "ol", 11: "ul", 13: "ol", 14: "ul", 15: "ul", 16: "ol", 19: "ul", 20: "ol", 22: "ul", 23: "ul", 25: "ol" };
+  for (const [n, kind] of Object.entries(expect)) {
+    assert.deepEqual(classesOf(+n), ["fw-list-line", "fw-list-" + kind].sort(), `line ${n} ${JSON.stringify(lines[n])}`);
+  }
+  for (const n of [2, 5, 12, 17, 18, 21, 24]) assert.ok(!classesOf(n).some((c) => c.startsWith("fw-list")), `line ${n} is not a list line`);
+  // never both kinds on one line
+  for (let n = 0; n < lines.length; n++) assert.ok(!(classesOf(n).includes("fw-list-ul") && classesOf(n).includes("fw-list-ol")), `line ${n}`);
+});
+
+test("list kinds survive a caret inside the list and a partial visible range", () => {
+  const doc = "- a\n  1. b\n  2. c\n- d";
+  for (const caret of [0, 6, doc.length]) {
+    const { lines } = collect(stateAt(doc, caret));
+    const kind = (from) => lines.filter(([f, c]) => f === from && /^fw-list-(?:ul|ol)$/.test(c)).map(([, c]) => c);
+    assert.deepEqual(kind(0), ["fw-list-ul"]);
+    assert.deepEqual(kind(4), ["fw-list-ol"]);
+    assert.deepEqual(kind(11), ["fw-list-ol"]);
+    assert.deepEqual(kind(18), ["fw-list-ul"]);
+  }
+  // only the nested lines are in range: the outer ListItem is still walked first, the nested one wins
+  const set = buildLiveDecorations(stateAt(doc, 0), [{ from: 4, to: 17 }]);
+  const got = [];
+  set.between(0, doc.length, (from, to, d) => { if (from === to && /^fw-list-(?:ul|ol)$/.test(d.spec.class ?? "")) got.push([from, d.spec.class]); });
+  assert.deepEqual(got.sort((a, b) => a[0] - b[0]), [[4, "fw-list-ol"], [11, "fw-list-ol"]]);
+});
