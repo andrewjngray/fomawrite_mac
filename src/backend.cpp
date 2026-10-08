@@ -3453,6 +3453,7 @@ void Backend::cancelPublishingPreview(QObject *consumer) { m_publisher->cancelPr
 void Backend::invalidatePublishingDocument() { m_publisher->invalidateDocument(); }
 
 void Backend::syncLiveEditor(int cursor) {
+    ++m_liveDocumentGeneration; // commands issued for the previous text must not run on this one
     // Appearance (fonts, focus, typewriter, dark) is pushed by LiveEditorPane,
     // which binds the same preferences the Source editor uses.
     m_editorBridge->applyTheme(m_publisher->currentCss());
@@ -3472,7 +3473,7 @@ void Backend::pushLiveTheme() { m_editorBridge->applyTheme(m_publisher->currentC
 // and run one at a time, so a second command asks only after the first one's
 // edit and caret were sent (the channel keeps that order).
 void Backend::runAtLiveSelection(std::function<void(int, int)> operation) {
-    m_liveSelectionQueue.push_back(std::move(operation));
+    m_liveSelectionQueue.push_back({m_liveDocumentGeneration, std::move(operation)});
     pumpLiveSelection();
 }
 
@@ -3481,8 +3482,9 @@ void Backend::pumpLiveSelection() {
     const int token = m_editorBridge->fetchSelection();
     m_liveSelectionToken = token;
     QTimer::singleShot(1000, this, [this, token] {
-        if (m_liveSelectionToken == token)
-            finishLiveSelection(m_editorBridge->lastSelectionStart(), m_editorBridge->lastSelectionEnd());
+        if (m_liveSelectionToken != token) return;
+        m_editorBridge->cancelSelectionRequest(token);
+        finishLiveSelection(m_editorBridge->lastSelectionStart(), m_editorBridge->lastSelectionEnd());
     });
 }
 
@@ -3491,7 +3493,7 @@ void Backend::finishLiveSelection(int start, int end) {
     if (m_liveSelectionQueue.empty()) return;
     auto operation = std::move(m_liveSelectionQueue.front());
     m_liveSelectionQueue.pop_front();
-    operation(start, end);
+    if (operation.generation == m_liveDocumentGeneration) operation.run(start, end);
     pumpLiveSelection();
 }
 
@@ -3548,7 +3550,7 @@ bool Backend::liveEditMarkdown(const QString &action) {
 }
 
 void Backend::forwardLiveChange(int position, int charsRemoved, int charsAdded) {
-    if (m_loading) { m_liveMirrorValid = false; return; }
+    if (m_loading) { m_liveMirrorValid = false; ++m_liveDocumentGeneration; return; }
     if (!m_liveMirrorValid || m_applyingLiveChanges || !m_editorBridge->isReady()) return;
     const QString now = currentDocumentText();
     // QTextDocument reports replacing an empty document as removing its final

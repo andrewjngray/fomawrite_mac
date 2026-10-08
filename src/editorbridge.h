@@ -34,6 +34,9 @@ public:
     // back through selectionReply() and the selectionReceived signal. Nothing
     // is sent (and no answer will come) while the page is not ready.
     Q_INVOKABLE int fetchSelection();
+    // Forget an outstanding selection request (the host gave up waiting); a
+    // late reply then no longer updates the last-known selection.
+    Q_INVOKABLE void cancelSelectionRequest(int token);
     // Test support: edits that the page applies as ordinary user input.
     Q_INVOKABLE void injectUserChanges(const QString &changesJson);
     Q_INVOKABLE void requestUndo();
@@ -115,6 +118,7 @@ private:
     int m_lastCursor = -1;
     bool m_caretMovedByUser = false;
     int m_lastAnchor = -1;
+    int m_selectionRequestInFlight = 0;
     bool m_hasDocument = false;
     QString m_text;
     QString m_mode = QStringLiteral("live");

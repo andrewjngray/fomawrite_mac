@@ -324,8 +324,12 @@ private:
     void runAtLiveSelection(std::function<void(int start, int end)> operation);
     void pumpLiveSelection();
     void finishLiveSelection(int start, int end);
-    std::deque<std::function<void(int, int)>> m_liveSelectionQueue;
+    // Each queued operation remembers the document generation it was issued
+    // for; a reply that arrives after the document was swapped drops it.
+    struct LiveSelectionOperation { int generation; std::function<void(int, int)> run; };
+    std::deque<LiveSelectionOperation> m_liveSelectionQueue;
     int m_liveSelectionToken = 0;
+    int m_liveDocumentGeneration = 0;
     QString m_liveMirror;
     bool m_liveMirrorValid = false;
     std::unique_ptr<EditorBridge> m_editorBridge;

@@ -101,6 +101,7 @@ private slots:
     void liveEditorInsertsLinksThroughThePagePanel();
     void liveEditorRecoversFromOutOfRangeHostChanges();
     void liveEditorCopiesThePageSelection();
+    void liveQueuedCommandsDropOnDocumentSwapAndIgnoreLateReplies();
     void liveEditorRunsHostCommands();
     void viewportTransitionKeepsAuxiliaryFocus();
     void liveModeInMainWindowLoadsPageAndNavigatesOutline();

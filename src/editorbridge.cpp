@@ -38,9 +38,12 @@ int EditorBridge::fetchText() {
 
 int EditorBridge::fetchSelection() {
     const int token = ++m_nextToken;
+    m_selectionRequestInFlight = token;
     if (m_ready) emit requestSelection(token);
     return token;
 }
+
+void EditorBridge::cancelSelectionRequest(int token) { if (m_selectionRequestInFlight == token) m_selectionRequestInFlight = 0; }
 
 void EditorBridge::injectUserChanges(const QString &changesJson) {
     if (m_ready) emit simulateUserChanges(changesJson);
@@ -86,6 +89,10 @@ void EditorBridge::metric(const QString &name, double ms) { emit metricRecorded(
 void EditorBridge::log(const QString &message) { emit messageLogged(message); }
 void EditorBridge::textReply(int token, const QString &text) { emit textReceived(token, text); }
 void EditorBridge::selectionReply(int token, int anchor, int head) {
+    // Only the request still in flight may refresh the last-known selection;
+    // a reply that arrives after the host fell back is stale.
+    if (token != m_selectionRequestInFlight) return;
+    m_selectionRequestInFlight = 0;
     m_lastAnchor = anchor;
     m_lastCursor = head;
     emit selectionReceived(token, anchor, head);

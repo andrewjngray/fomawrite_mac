@@ -495,6 +495,45 @@ void FomawriteTest::liveEditorCopiesThePageSelection() {
     page.backend.discardRecovery();
 }
 
+// Cycle 138 review: a Format command queued for one document must not run on
+// the next one, and a reply that arrives after the host gave up must not
+// overwrite the last-known selection. Bare bridge, no page.
+void FomawriteTest::liveQueuedCommandsDropOnDocumentSwapAndIgnoreLateReplies() {
+    Cycle103SettingsSnapshot settings;
+    Backend backend;
+    QQmlEngine engine; engine.rootContext()->setContextProperty("backend", &backend);
+    QQmlComponent component(&engine);
+    component.setData("import QtQuick\nTextEdit { Component.onCompleted: backend.attachDocument(textDocument); onTextChanged: backend.editorTextChanged() }", QUrl());
+    QScopedPointer<QObject> editor(component.create()); QVERIFY2(editor, qPrintable(component.errorString()));
+    auto *bridge = backend.editorBridge();
+    QVERIFY(QMetaObject::invokeMethod(bridge, "ready")); // a page that never answers requests
+    editor->setProperty("text", QStringLiteral("one two three"));
+    backend.syncLiveEditor(0);
+    QVERIFY(QMetaObject::invokeMethod(bridge, "cursorChanged", Q_ARG(int, 4), Q_ARG(int, 7), Q_ARG(bool, true)));
+    QSignalSpy requests(bridge, &EditorBridge::requestSelection);
+    QVERIFY(backend.liveWrapSelection("**", "**"));
+    QCOMPARE(requests.count(), 1);
+    const int token = requests.at(0).at(0).toInt();
+    // The document is swapped while the request is pending: the command is dropped.
+    editor->setProperty("text", QStringLiteral("alpha beta"));
+    backend.syncLiveEditor(0);
+    QVERIFY(QMetaObject::invokeMethod(bridge, "selectionReply", Q_ARG(int, token), Q_ARG(int, 4), Q_ARG(int, 7)));
+    QTest::qWait(50);
+    QCOMPARE(editor->property("text").toString(), QStringLiteral("alpha beta"));
+    // A new command on the new document: the host gives up after a second and
+    // applies at the last reported selection; a reply arriving later is ignored.
+    QVERIFY(QMetaObject::invokeMethod(bridge, "cursorChanged", Q_ARG(int, 0), Q_ARG(int, 5), Q_ARG(bool, true)));
+    QVERIFY(backend.liveWrapSelection("_", "_"));
+    QCOMPARE(requests.count(), 2);
+    const int late = requests.at(1).at(0).toInt();
+    QTRY_COMPARE_WITH_TIMEOUT(editor->property("text").toString(), QStringLiteral("_alpha_ beta"), 3000);
+    const int cursorAfter = bridge->lastCursor();
+    QVERIFY(QMetaObject::invokeMethod(bridge, "selectionReply", Q_ARG(int, late), Q_ARG(int, 0), Q_ARG(int, 5)));
+    QCOMPARE(bridge->lastCursor(), cursorAfter);
+    QCOMPARE(editor->property("text").toString(), QStringLiteral("_alpha_ beta"));
+    backend.discardRecovery();
+}
+
 void FomawriteTest::liveEditorRunsHostCommands() {
     Cycle103SettingsSnapshot settings;
     Cycle134Page page; QVERIFY2(page.create(), qPrintable(page.error));
