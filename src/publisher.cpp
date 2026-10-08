@@ -4,6 +4,7 @@
 #include "publishinghtml.h"
 #include "publishingpdf.h"
 #include "publishingthemes.h"
+#include "typorabase.h"
 
 #include <QBuffer>
 #include <QCryptographicHash>
@@ -135,6 +136,17 @@ bool Publisher::importTheme(const QUrl &file) {
 QString Publisher::currentCss() const {
     if (m_themeId.isEmpty()) return m_source.basicStyleCss();
     return selectedCss(nullptr).value_or(QString());
+}
+QMap<QString, QString> Publisher::themeVariables() const {
+    const QString css = currentCss();
+    if (css != m_variablesCss) {
+        m_variables = TyporaBase::themeVariables(css);
+        m_variablesCss = css;
+    }
+    return m_variables;
+}
+QString Publisher::themeVariable(const QString &name) const {
+    return themeVariables().value(name.startsWith(QLatin1String("--")) ? name : QStringLiteral("--") + name);
 }
 void Publisher::clearTheme() {
     m_themeId.clear();
@@ -308,7 +320,7 @@ QString Publisher::html(QString *error, bool preview, QString *warning, QByteArr
     // A restrictive content policy also protects exported HTML opened elsewhere.
     QString html = "<!doctype html><html><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">"
         "<meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'none'; style-src 'unsafe-inline'; img-src data:; font-src data:; base-uri 'self'; form-action 'none'\">"
-        "<title>" + title.toHtmlEscaped() + "</title><style" + styleAttribute + ">" + foundations + '\n' + css + printCss
+        "<title>" + title.toHtmlEscaped() + "</title><style" + styleAttribute + ">" + foundations + '\n' + TyporaBase::css() + '\n' + css + printCss
         + "</style></head><body>" + titlePage + "<article id=\"write\">" + body + "</article></body></html>";
     QByteArray assets;
     html = PublishingHtml::embedImages(html, m_source.documentBaseUrl(), preview, error, warning, &m_imageCache, &assets);

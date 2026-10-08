@@ -727,6 +727,14 @@ test("measureTheme: an opaque body decides; html is never consulted past it", ()
   assert.equal(measure(own).bg, "rgb(10, 10, 10)");
 });
 
+test("measureTheme: a body painted by the host's Typora base shim (--bg-color / --text-color) counts as the theme's: nothing is filled", () => {
+  // Lapis Dark in a light editor: the shim paints <html> and <body> #1e222a and the text #e4e4e4 (inherited by #write).
+  const lapis = fakeDoc({ body: { backgroundColor: "rgb(30, 34, 42)" }, html: { backgroundColor: "rgb(30, 34, 42)" }, computed: { color: "rgba(228, 228, 228, 0.89)" } });
+  assert.deepEqual(measure(lapis), { bg: "rgb(30, 34, 42)", fg: "rgba(228, 228, 228, 0.89)" });
+  applyLiveTheme({ mode: "live", filter: true, palette: { background: "#ffffff", text: "#222222" } }, lapis);
+  assert.deepEqual(fillOf(lapis), { bg: null, fg: null }, "no #111 column on a dark page");
+});
+
 test("measureTheme: `html { color }` alone never reaches #write (the editor's body colour overrides it): unset", () => {
   // the browser computes #write's colour from body's `color: var(--fw-fg)`, so it equals the editor default
   const doc = fakeDoc({ html: { color: "rgb(120, 40, 40)" }, computed: { color: "rgb(36, 41, 47)" } });
