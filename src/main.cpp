@@ -381,7 +381,7 @@ int main(int argc, char *argv[]) {
         configureMacWindowChrome(session->window);
         const auto applyWindowTheme = [session] {
             if (session->window && session->backend)
-                applyMacWindowTheme(session->window, session->backend->themePreset() == "system", session->backend->darkMode());
+                applyMacWindowTheme(session->window, session->backend->themePreset() == "system" && !session->backend->appearanceOverridden(), session->backend->darkMode());
         };
         QObject::connect(backend, &Backend::themeColorsChanged, session->window, applyWindowTheme);
         applyWindowTheme();

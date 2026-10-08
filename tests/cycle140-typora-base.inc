@@ -67,6 +67,19 @@ void FomawriteTest::typoraBaseReadsThemeVariables() {
     QCOMPARE(TyporaBase::themeVariable(css, "bg-color"), QStringLiteral("#1e222a")); // with or without the dashes
     QCOMPARE(TyporaBase::themeVariable(css, "--bg-color"), QStringLiteral("#1e222a"));
     QCOMPARE(TyporaBase::themeVariable(css, "--absent"), QString());
+    // Review fixes: the shim's body colour inherits (no final fallback) so a theme
+    // that colours html alone keeps it; a fan-out of var() references resolves in
+    // linear time and over-long values are dropped rather than expanded.
+    QVERIFY(TyporaBase::css().contains("body { background: var(--bg-color, var(--fw-bg, transparent)); color: var(--text-color, var(--fw-fg)); }"));
+    QVERIFY(!TyporaBase::css().contains("html, body"));
+    QString fanOut = QStringLiteral(":root { --v17: x; ");
+    for (int n = 16; n >= 1; --n) { fanOut += QStringLiteral("--v%1: ").arg(n); for (int k = 0; k < 10; ++k) fanOut += QStringLiteral("var(--v%1) ").arg(n + 1); fanOut += QLatin1String("; "); }
+    fanOut += QLatin1String("}");
+    QElapsedTimer fast; fast.start();
+    const auto fanned = TyporaBase::themeVariables(fanOut);
+    QVERIFY2(fast.elapsed() < 1000, "fan-out resolution must be linear");
+    QCOMPARE(fanned.value("--v17"), QStringLiteral("x"));
+    QVERIFY(!fanned.contains("--v1")); // 10^16 characters: dropped, not expanded
     QVERIFY(TyporaBase::themeVariables(QString()).isEmpty());
     QVERIFY(TyporaBase::themeVariables(QStringLiteral(":root { --a: 1")).isEmpty()); // an unterminated block is ignored
 
@@ -138,7 +151,7 @@ void FomawriteTest::publishedOutputPaintsThePageFromThemeVariables() {
     QVERIFY2(shim >= 0, "the Typora base shim is missing from the published HTML");
     QVERIFY(themeRoot >= 0 && themeRule >= 0);
     // The page rule that reads the variables comes before every theme rule, so the theme can override it.
-    const qsizetype paint = html.indexOf("html, body { background: var(--bg-color");
+    const qsizetype paint = html.indexOf("html { background: var(--bg-color");
     QVERIFY(paint >= 0);
     QVERIFY(paint < themeRoot); QVERIFY(paint < themeRule);
     QCOMPARE(html.count(TyporaBase::css()), 1);
@@ -259,4 +272,27 @@ void FomawriteTest::appearanceFollowsTheOutputStylesPageColours() {
     backend.setOutputStyle(0);
     QTRY_VERIFY(!backend.darkMode());
     QCOMPARE(backend.palette().value("page").toString().toUpper(), QStringLiteral("#F6F3EE"));
+    QVERIFY(!backend.appearanceOverridden());
+    // Colour forms: rgb() counts; transparent does not drive the chrome.
+    const auto writeProbe = [&](const QString &id, const QByteArray &css) {
+        QSaveFile file(lapis.folder + '/' + id + ".css"); lapis.files.append(lapis.folder + '/' + id + ".css");
+        return file.open(QIODevice::WriteOnly) && file.write(css) == css.size() && file.commit();
+    };
+    QVERIFY(writeProbe("probe-rgb", ":root { --bg-color: rgb(30, 34, 42); --text-color: hsl(0, 0%, 90%); }\n"));
+    QVERIFY(writeProbe("probe-clear", ":root { --bg-color: transparent; --text-color: #e4e4e4; }\n"));
+    Backend probe;
+    probe.setThemePreset("studio");
+    QVERIFY2(probe.selectPublishingTheme("probe-rgb"), qPrintable(probe.status()));
+    QTRY_VERIFY(probe.darkMode());
+    QCOMPARE(probe.palette().value("page").toString().toLower(), QStringLiteral("#1e222a"));
+    QVERIFY(probe.appearanceOverridden());
+    QVERIFY2(probe.selectPublishingTheme("probe-clear"), qPrintable(probe.status()));
+    QTRY_VERIFY(!probe.darkMode());
+    QCOMPARE(probe.palette().value("page").toString().toUpper(), QStringLiteral("#F6F3EE"));
+    QVERIFY(!probe.appearanceOverridden());
+    // The palette is announced only when a colour moved: a CSS change that
+    // leaves the colours alone does not re-announce.
+    QSignalSpy announced(&probe, &Backend::themeColorsChanged);
+    emit probe.publishingCssChanged();
+    QCOMPARE(announced.count(), 0);
 }

@@ -12,7 +12,9 @@ namespace {
 // browser's default colours.
 const char *const shim = R"CSS(/* Typora base shim (Fomawrite). It precedes the theme, so every explicit theme rule wins. */
 /* Typora paints the page (<body>, the whole window) with --bg-color and the text with --text-color. */
-html, body { background: var(--bg-color, var(--fw-bg, transparent)); color: var(--text-color, var(--fw-fg, CanvasText)); }
+html { background: var(--bg-color, var(--fw-bg, transparent)); color: var(--text-color, var(--fw-fg, CanvasText)); }
+/* body carries no final colour fallback: with neither variable defined the declaration is invalid at computed-value time and `color` inherits from html, so a theme (or basic preset) that colours html alone keeps its colour. */
+body { background: var(--bg-color, var(--fw-bg, transparent)); color: var(--text-color, var(--fw-fg)); }
 /* Typora's #write sits on that page and inherits both colours, so it needs no rule. */
 /* Typora colours the selection with --select-text-bg-color. */
 ::selection { background: var(--select-text-bg-color, Highlight); }
@@ -113,7 +115,11 @@ bool selectsRoot(const QString &selectors) {
 }
 
 // Substitutes var() references in `value`; false when one cannot be resolved.
-bool substitute(const QString &value, const QMap<QString, QString> &raw, int depth, QSet<QString> &active, QString *out) {
+// Resolved values are memoised per variable name and capped in length, so a
+// theme that fans out (each variable referencing the next many times) costs
+// linear work instead of exponential; imported theme CSS is untrusted input.
+constexpr qsizetype MaxResolvedLength = 4096;
+bool substitute(const QString &value, const QMap<QString, QString> &raw, int depth, QSet<QString> &active, QHash<QString, QString> &memo, QString *out) {
     if (depth > 16) return false;
     static const QRegularExpression start(QStringLiteral("\\bvar\\s*\\("));
     QString result;
@@ -129,13 +135,16 @@ bool substitute(const QString &value, const QMap<QString, QString> &raw, int dep
         const QString name = (comma < 0 ? inner : inner.left(comma)).trimmed();
         QString resolved;
         bool found = false;
-        if (raw.contains(name) && !active.contains(name)) {
+        if (memo.contains(name)) { resolved = memo.value(name); found = true; }
+        else if (raw.contains(name) && !active.contains(name)) {
             active.insert(name);
-            found = substitute(raw.value(name), raw, depth + 1, active, &resolved);
+            found = substitute(raw.value(name), raw, depth + 1, active, memo, &resolved);
             active.remove(name);
+            if (found && active.isEmpty()) memo.insert(name, resolved);
         }
-        if (!found && (comma < 0 || !substitute(inner.mid(comma + 1).trimmed(), raw, depth + 1, active, &resolved))) return false;
+        if (!found && (comma < 0 || !substitute(inner.mid(comma + 1).trimmed(), raw, depth + 1, active, memo, &resolved))) return false;
         result += resolved.trimmed();
+        if (result.size() > MaxResolvedLength) return false;
         pos = close + 1;
     }
     *out = result;
@@ -181,10 +190,11 @@ QMap<QString, QString> themeVariables(const QString &source) {
         i = close + 1;
     }
     QMap<QString, QString> resolved;
+    QHash<QString, QString> memo;
     for (auto it = raw.cbegin(); it != raw.cend(); ++it) {
         QSet<QString> active{it.key()};
         QString value;
-        if (substitute(it.value(), raw, 0, active, &value) && !value.trimmed().isEmpty()) resolved.insert(it.key(), value.trimmed());
+        if (substitute(it.value(), raw, 0, active, memo, &value) && !value.trimmed().isEmpty()) resolved.insert(it.key(), value.trimmed());
     }
     return resolved;
 }

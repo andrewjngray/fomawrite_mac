@@ -116,6 +116,8 @@ public:
     void setDarkMode(bool darkMode);
     bool appearanceFollowsOutputStyle() const { return m_appearanceFollowsOutputStyle; }
     void setAppearanceFollowsOutputStyle(bool follow);
+    // True while the selected Output Style's page colour is driving the chrome.
+    Q_INVOKABLE bool appearanceOverridden() const { return m_appearanceOverridden; }
     qreal textScale() const { return m_textScale; }
     void setTextScale(qreal textScale);
     QString themeBackground() const { return m_themeBackground; }
@@ -392,6 +394,8 @@ private:
     bool m_systemDarkMode = true;
     QString m_themePreset = "studio";
     bool m_appearanceFollowsOutputStyle = true;
+    bool m_appearanceOverridden = false;
+    bool m_themeColorsAnnounced = false;
     bool m_darkMode = true;
     qreal m_textScale = 1.0;
     bool m_loading = false;

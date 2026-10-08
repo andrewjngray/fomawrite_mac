@@ -687,9 +687,33 @@ void Backend::setAppearanceFollowsOutputStyle(bool follow) {
 // dropped: the chrome is opaque) or a named colour. Invalid -> QColor().
 static QColor cssColour(QString value) {
     value = value.trimmed();
-    if (value.startsWith('#') && (value.size() == 9 || value.size() == 5)) value = value.left(value.size() == 9 ? 7 : 4);
+    const QString lower = value.toLower();
+    if (lower == QLatin1String("transparent") || lower == QLatin1String("inherit") || lower == QLatin1String("initial")) return QColor();
+    static const QRegularExpression functional(QStringLiteral("^(rgba?|hsla?)\\(\\s*([^)]*)\\)$"), QRegularExpression::CaseInsensitiveOption);
+    if (const auto match = functional.match(value); match.hasMatch()) {
+        const QStringList parts = match.captured(2).split(QRegularExpression(QStringLiteral("[\\s,/]+")), Qt::SkipEmptyParts);
+        if (parts.size() < 3) return QColor();
+        const auto channel = [](const QString &part, double scale) {
+            bool ok = false; QString p = part.trimmed();
+            const bool percent = p.endsWith('%'); if (percent) p.chop(1);
+            const double v = p.toDouble(&ok); if (!ok) return -1.0;
+            return percent ? v / 100.0 : v / scale;
+        };
+        double alpha = 1.0;
+        if (parts.size() >= 4) { alpha = channel(parts.at(3), 1.0); if (alpha <= 0.0) return QColor(); }
+        const bool hsl = match.captured(1).toLower().startsWith("hsl");
+        const double a = channel(parts.at(0), hsl ? 360.0 : 255.0), b = channel(parts.at(1), hsl ? 1.0 : 255.0), c = channel(parts.at(2), hsl ? 1.0 : 255.0);
+        if (a < 0 || b < 0 || c < 0) return QColor();
+        return hsl ? QColor::fromHslF(qBound(0.0, a, 1.0), qBound(0.0, b, 1.0), qBound(0.0, c, 1.0)) : QColor::fromRgbF(qBound(0.0, a, 1.0), qBound(0.0, b, 1.0), qBound(0.0, c, 1.0));
+    }
+    if (value.startsWith('#') && (value.size() == 9 || value.size() == 5)) {
+        bool ok = false;
+        const int alpha = value.right(value.size() == 9 ? 2 : 1).toInt(&ok, 16);
+        if (ok && alpha == 0) return QColor(); // fully transparent: not a page colour
+        value = value.left(value.size() == 9 ? 7 : 4);
+    }
     const QColor colour = QColor::fromString(value);
-    return colour.isValid() ? colour : QColor();
+    return colour.isValid() && colour.alpha() > 0 ? colour : QColor();
 }
 
 void Backend::setThemePreset(const QString &preset) {
@@ -2597,6 +2621,9 @@ void Backend::watchCurrentFile() {
 
 void Backend::loadOmarchyTheme() {
     const bool oldDark = m_darkMode;
+    const QString wasBackground = m_themeBackground, wasForeground = m_themeForeground, wasAccent = m_themeAccent, wasSelection = m_themeSelection;
+    const bool wasOverridden = m_appearanceOverridden;
+    m_appearanceOverridden = false;
     m_darkMode = m_themePreset == "dark" || (m_themePreset == "system" && m_systemDarkMode);
     m_themeBackground = m_darkMode ? QStringLiteral("#15181D") : QStringLiteral("#FFFFFF");
     m_themeForeground = m_darkMode ? QStringLiteral("#ECEEF2") : QStringLiteral("#34363A");
@@ -2682,6 +2709,7 @@ void Backend::loadOmarchyTheme() {
     if (m_appearanceFollowsOutputStyle && m_publisher) {
         const QColor pageBackground = cssColour(themeBackgroundColor());
         if (pageBackground.isValid()) {
+            m_appearanceOverridden = true;
             const double luminance = 0.299 * pageBackground.redF() + 0.587 * pageBackground.greenF() + 0.114 * pageBackground.blueF();
             m_darkMode = luminance < 0.5;
             m_themeBackground = pageBackground.name(QColor::HexRgb);
@@ -2696,8 +2724,13 @@ void Backend::loadOmarchyTheme() {
         m_highlighter->setDarkMode(m_darkMode);
         m_highlighter->setColors(palette().value("editor").toString(), m_themeForeground, m_themeAccent);
     }
-
-    emit themeColorsChanged();
+    // publishingCssChanged re-runs this on every CSS change; only tell the UI
+    // (palette bindings, the macOS window appearance) when a colour moved.
+    if (!m_themeColorsAnnounced || oldDark != m_darkMode || wasOverridden != m_appearanceOverridden
+        || wasBackground != m_themeBackground || wasForeground != m_themeForeground || wasAccent != m_themeAccent || wasSelection != m_themeSelection) {
+        m_themeColorsAnnounced = true;
+        emit themeColorsChanged();
+    }
 }
 
 void Backend::watchOmarchyTheme() {
