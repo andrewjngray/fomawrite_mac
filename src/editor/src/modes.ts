@@ -16,7 +16,7 @@ import { appearanceEffect, parseAppearancePatch, AppearanceState } from "./appea
 import { fenceLanguages } from "./blocks";
 import { mathMarkdown } from "./math";
 import { extrasMarkdown } from "./extras";
-import { LIVE_OVERLAY_ID, LiveThemeState, applyLiveTheme, parseLiveThemePatch } from "./livetheme";
+import { HOST_SIZE_CLASS, LIVE_OVERLAY_ID, MAPPED_ID, THEME_ID, LiveThemeState, applyLiveTheme, parseLiveThemePatch } from "./livetheme";
 
 export type Mode = "source" | "live";
 
@@ -137,7 +137,10 @@ export function applyAppearanceDom(a: Appearance, doc: Document | undefined = ty
     const set = (name: string, v: string | null) =>
       v === null ? write.style.removeProperty(name) : write.style.setProperty(name, v);
     if (a.fontFamily !== undefined) set("--fw-font", a.fontFamily || null);
-    if (typeof a.fontSize === "number") set("--fw-font-size", a.fontSize + "px");
+    if (typeof a.fontSize === "number") {
+      set("--fw-font-size", a.fontSize + "px");
+      write.classList.add(HOST_SIZE_CLASS); // lets the host size beat a theme's `#write { font-size }` in filtered Live
+    }
     if (typeof a.lineHeight === "number") set("--fw-line-height", String(a.lineHeight));
   }
   if (a.dark !== undefined) doc.documentElement.classList.toggle("dark", !!a.dark);
@@ -145,17 +148,17 @@ export function applyAppearanceDom(a: Appearance, doc: Document | undefined = ty
 
 export function applyThemeDom(css: string, doc: Document | undefined = typeof document !== "undefined" ? document : undefined) {
   if (!doc) return;
-  let el = doc.getElementById("fomawrite-theme");
+  let el = doc.getElementById(THEME_ID);
   if (!css) {
     el?.remove();
     return;
   }
   if (!el) {
     el = doc.createElement("style");
-    el.id = "fomawrite-theme";
-    // The live overlay must stay after the theme element to win on precedence.
-    const overlay = doc.getElementById(LIVE_OVERLAY_ID);
-    if (overlay) doc.head.insertBefore(el, overlay);
+    el.id = THEME_ID;
+    // Order in <head>: theme, mapped theme, live overlay (later wins on precedence).
+    const after = doc.getElementById(MAPPED_ID) ?? doc.getElementById(LIVE_OVERLAY_ID);
+    if (after) doc.head.insertBefore(el, after);
     else doc.head.appendChild(el);
   }
   el.textContent = css;

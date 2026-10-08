@@ -5,7 +5,17 @@
 // the theme element so it wins on precedence. It neutralises the theme's page layout and keeps its typography.
 // Everything here is DOM-free at import time; the DOM helpers take a Document so tests can pass a tiny fake.
 
+import { LIVE_SCOPE, mapThemeCss } from "./thememap";
+
+/** The theme element written by `applyThemeDom` (modes.ts). */
+export const THEME_ID = "fomawrite-theme";
+/** Mapped copy of the theme's element rules for Live text lines (thememap.ts); sits between the theme and the overlay. */
+export const MAPPED_ID = "fomawrite-theme-mapped";
 export const LIVE_OVERLAY_ID = "fomawrite-live-overlay";
+/** Class on <html> while Live is active with the filter on (the overlay's `html.fw-live-filtered body` rule keys on it). */
+export const LIVE_HTML_CLASS = "fw-live-filtered";
+/** Class on #write once the host has sent a numeric `fontSize` (the overlay lets it beat the theme's `#write { font-size }`). */
+export const HOST_SIZE_CLASS = "fw-host-size";
 /** Class on #write when the overlay is switched off (`liveThemeFilter: false`, "Live follows theme exactly"). */
 export const LIVE_EXACT_CLASS = "fw-live-exact";
 export const FILL_BG_CLASS = "fw-live-fill-bg";
@@ -30,12 +40,18 @@ export const FILL_FG_CLASS = "fw-live-fill-fg";
  *     furniture (pre, table, figure, img, hr, section, article, aside, header, footer, nav, main, details) but NOT on
  *     li, blockquote, headings or paragraphs, whose ::before/::after are often list markers or quote glyphs
  *     positioned against them.
+ * HOST SIZE: once the host has sent `fontSize` (class fw-host-size on #write), `--fw-font-size` beats a theme's
+ *   `#write { font-size }`; the theme's heading sizes stay in em, so its scale still follows. Without a host size the
+ *   theme's size stands.
+ * <body>: `html.fw-live-filtered body` (the class is on <html> only in filtered Live) resets margin, padding,
+ *   background-image and columns; colours are left alone.
  * GUARANTEES: the caret follows the text colour; when the theme sets no background and/or text colour on #write,
  *   the host palette fills the missing one through --fw-live-bg / --fw-live-fg (see applyLiveTheme).
  *
- * Not covered: rules on html/body outside #write (a theme that pads or paints `body`); use the exact switch then.
+ * Not covered: rules on html/body other than the reset above; use the exact switch then. Element selectors
+ *   (`#write h1`, `blockquote`, `code`, `a`, ...) are mapped onto Live's line / mark classes by thememap.ts.
  */
-const S = "#write.fw-mode-live:not(.fw-live-exact)";
+const S = LIVE_SCOPE;
 const BLOCKS = "p, ul, ol, blockquote, pre, table, figure, section, article, aside, header, footer, nav, main, details";
 const POSITIONED = "pre, table, figure, img, hr, section, article, aside, header, footer, nav, main, details";
 
@@ -79,6 +95,14 @@ ${S} :is(${BLOCKS}) {
 }
 ${S} :is(${POSITIONED}) { position: static !important; }
 ${S} img { float: none !important; max-width: 100% !important; }
+${S}.${HOST_SIZE_CLASS} { font-size: var(--fw-font-size) !important; }
+html.${LIVE_HTML_CLASS} body {
+  margin: 0 !important;
+  padding: 0 !important;
+  background-image: none !important;
+  columns: auto !important;
+  column-count: auto !important;
+}
 ${S}.${FILL_BG_CLASS} { background-color: var(--fw-live-bg) !important; }
 ${S}.${FILL_FG_CLASS} { color: var(--fw-live-fg) !important; }
 ${S} .cm-content { caret-color: currentColor; }
@@ -171,6 +195,34 @@ export function applyLiveOverlay(enabled: boolean, doc: Document | undefined): v
   if (doc.head.lastChild !== el) doc.head.appendChild(el);
 }
 
+const mappedSource = new WeakMap<object, string>();
+
+/**
+ * Keep `<style id="fomawrite-theme-mapped">` in step with the theme element: present (between the theme and the
+ * overlay) iff the filter is on and the theme maps to something; its text is `mapThemeCss(theme text)`.
+ */
+export function applyThemeMapped(enabled: boolean, doc: Document | undefined): void {
+  if (!doc) return;
+  const existing = doc.getElementById(MAPPED_ID);
+  const theme = doc.getElementById(THEME_ID);
+  const source = enabled && theme ? theme.textContent ?? "" : "";
+  if (existing && mappedSource.get(existing) === source && source) return;
+  const css = source ? mapThemeCss(source) : "";
+  if (!css) {
+    existing?.remove();
+    return;
+  }
+  const el = existing ?? doc.createElement("style");
+  if (!existing) {
+    el.id = MAPPED_ID;
+    const overlay = doc.getElementById(LIVE_OVERLAY_ID);
+    if (overlay) doc.head.insertBefore(el, overlay);
+    else doc.head.appendChild(el);
+  }
+  el.textContent = css;
+  mappedSource.set(el, source);
+}
+
 export interface LiveThemeState {
   mode: "source" | "live";
   /** `liveThemeFilter`, default true. */
@@ -179,7 +231,8 @@ export interface LiveThemeState {
 }
 
 /**
- * Bring the page in line with the state: overlay element present iff the filter is on; `fw-live-exact` on #write iff
+ * Bring the page in line with the state: overlay element (and the mapped-theme element) present iff the filter is on;
+ * `fw-live-filtered` on <html> iff Live and the filter is on; `fw-live-exact` on #write iff
  * it is off; and, in live mode with the filter on, measure the theme's own background / text colour on #write
  * (fill classes removed first so the measurement is the theme alone) and fill what is missing from the palette
  * through `--fw-live-bg` / `--fw-live-fg` + the `fw-live-fill-bg|fg` classes the overlay keys on.
@@ -188,6 +241,8 @@ export interface LiveThemeState {
 export function applyLiveTheme(s: LiveThemeState, doc: Document | undefined): void {
   if (!doc) return;
   applyLiveOverlay(s.filter, doc);
+  applyThemeMapped(s.filter, doc);
+  doc.documentElement.classList.toggle(LIVE_HTML_CLASS, s.mode === "live" && s.filter);
   const write = doc.getElementById("write");
   if (!write) return;
   write.classList.toggle(LIVE_EXACT_CLASS, !s.filter);
