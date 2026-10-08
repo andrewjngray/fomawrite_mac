@@ -4,8 +4,8 @@ This is the only place the current review build is recorded. Update it at the en
 
 | | |
 | --- | --- |
-| **Current review build** | `0.3.0-dev36` / macOS `0.3.0 (140)` |
-| **Last completed cycle** | 140 — Live friction fixes: Preview in the footer, Typora theme colours, appearance follows the Output Style ([record](research/cycle-140/README.md)); 138 — Live selection race and native theme-folder checks ([record](research/cycle-138/README.md)); 137 — Live theme fidelity ([record](research/cycle-137/README.md)); both overnight 8 October 2026 |
+| **Current review build** | `0.3.0-dev37` / macOS `0.3.0 (141)` |
+| **Last completed cycle** | 141 — highlighted text readable under any theme (record in [cycle-140](research/cycle-140/README.md)); 140 — Live friction fixes: Preview in the footer, Typora theme colours, appearance follows the Output Style ([record](research/cycle-140/README.md)); 138 — Live selection race and native theme-folder checks ([record](research/cycle-138/README.md)); 137 — Live theme fidelity ([record](research/cycle-137/README.md)); both overnight 8 October 2026 |
 | **Regression suite** | **218 passed, 0 failed, 0 skipped** (`./bin/test`, offscreen Qt 6.11.2, Apple Silicon); editor page **249 passed** (`cd src/editor && npm test`). Two known Qt Material `SplitView` null-parent warnings in `savesAndOpensFromFooterMenu`. |
 | **Packaged bundles** | `dist/Fomawrite.app`, `dist/Fomawrite Dev.app` and `/Applications/Fomawrite.app` are all at build **140** ([manifest](research/cycle-140/verified-builds.json)); the stale Omawrite bundles were removed from `dist/`. **Refresh with the app closed:** `./bin/package-mac && ./bin/prepare-dev-app && ./bin/install-mac`. |
 | **CI** | [`.github/workflows/ci.yml`](.github/workflows/ci.yml): macOS, pinned Qt 6.11.3, `./bin/build && ./bin/test`. First run proved the pipeline but was red on four runner-only UI-click tests; Cycle 134 root-caused one (a viewport-transition timer stealing focus) and hardened the click helper for the other three — see the Actions tab for the run after `e07f727`. |
