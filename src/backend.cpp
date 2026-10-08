@@ -3537,7 +3537,10 @@ void Backend::syncLiveEditor(int cursor) {
 
 // The page gets the Typora base shim (see typorabase.h) ahead of the theme, so
 // the theme's colour variables paint the page and any explicit theme rule wins.
-QString Backend::liveThemeCss() const { return TyporaBase::liveCss() + QLatin1Char('\n') + m_publisher->currentCss(); }
+QString Backend::liveThemeCss() const {
+    const QString theme = m_publisher->currentCss();
+    return TyporaBase::liveCss() + QLatin1Char('\n') + TyporaBase::highlightCss(m_publisher->themeVariables()) + theme;
+}
 void Backend::pushLiveTheme() { m_editorBridge->applyTheme(liveThemeCss()); }
 
 // Run `operation` on the page's current selection. With a ready page the

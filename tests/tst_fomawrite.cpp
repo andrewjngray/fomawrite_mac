@@ -114,6 +114,9 @@ private slots:
     void typoraBaseReadsThemeVariables();
     void publishedOutputPaintsThePageFromThemeVariables();
     void liveEditorPaintsThePageFromThemeVariables();
+    void typoraBaseChoosesReadableHighlightText();
+    void publishedHighlightStaysReadableOnDarkThemes();
+    void liveHighlightStaysReadableOnDarkThemes();
     void appearanceFollowsTheOutputStylesPageColours();
     void persistenceRefusesLossyDecodeAndSaveAsWritesUtf8();
     void crlfDocumentsKeepAutosaveRenameAndMove();

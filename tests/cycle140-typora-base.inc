@@ -296,3 +296,229 @@ void FomawriteTest::appearanceFollowsTheOutputStylesPageColours() {
     emit probe.publishingCssChanged();
     QCOMPARE(announced.count(), 0);
 }
+
+// Highlighted text (`==text==`) must stay readable under any theme. Typora's
+// own base paints <mark> from --highlight-color; Fomawrite's shim does the
+// same and picks the text colour (--fw-highlight-fg) for contrast. Before the
+// fix Web/PDF kept the page's light text on the pale yellow of a dark theme,
+// and Live did not render `==text==` at all.
+namespace {
+// "rgb(r, g, b)" / "rgba(r, g, b, a)" as computed by the page; transparent / unparseable -> alpha 0.
+QColor cycle140Computed(const QString &css) {
+    static const QRegularExpression pattern(QStringLiteral("^rgba?\\(\\s*([0-9.]+)[,\\s]+([0-9.]+)[,\\s]+([0-9.]+)(?:[,\\s/]+([0-9.]+%?))?\\s*\\)$"));
+    const auto match = pattern.match(css.trimmed());
+    if (!match.hasMatch()) return QColor(0, 0, 0, 0);
+    QString alphaText = match.captured(4);
+    double alpha = 1.0;
+    if (!alphaText.isEmpty()) { const bool percent = alphaText.endsWith('%'); if (percent) alphaText.chop(1); alpha = alphaText.toDouble() / (percent ? 100.0 : 1.0); }
+    QColor colour(match.captured(1).toInt(), match.captured(2).toInt(), match.captured(3).toInt());
+    colour.setAlphaF(qBound(0.0, alpha, 1.0));
+    return colour;
+}
+QColor cycle140Over(const QColor &top, const QColor &under) {
+    const double a = top.alphaF();
+    return QColor::fromRgbF(top.redF() * a + under.redF() * (1 - a), top.greenF() * a + under.greenF() * (1 - a), top.blueF() * a + under.blueF() * (1 - a));
+}
+double cycle140Luminance(const QColor &c) {
+    const auto channel = [](double v) { return v <= 0.03928 ? v / 12.92 : std::pow((v + 0.055) / 1.055, 2.4); };
+    return 0.2126 * channel(c.redF()) + 0.7152 * channel(c.greenF()) + 0.0722 * channel(c.blueF());
+}
+// WCAG contrast of `text` on `ground`, where the ground (possibly translucent) sits on `page` (transparent = white paper).
+double cycle140PairContrast(const QColor &text, const QColor &ground, const QColor &page) {
+    const QColor paper = page.alpha() == 0 ? QColor(Qt::white) : cycle140Over(page, Qt::white);
+    const QColor seen = cycle140Over(ground, paper);
+    const double a = cycle140Luminance(text), b = cycle140Luminance(seen);
+    return (qMax(a, b) + 0.05) / (qMin(a, b) + 0.05);
+}
+// color | background-color | body background | highlight count | text of the first highlight
+const char *const cycle140HighlightScript = R"JS((function() {
+    const all = document.querySelectorAll('.fw-highlight, .highlight, mark');
+    const e = all[0];
+    const cs = e ? getComputedStyle(e) : null;
+    return [cs ? cs.color : '', cs ? cs.backgroundColor : '', getComputedStyle(document.body).backgroundColor, all.length, e ? e.textContent : ''].join('|');
+})())JS";
+
+QStringList cycle140HighlightInPage(QWebEnginePage &page) {
+    QEventLoop loop; QString answer; bool answered = false;
+    QTimer::singleShot(10000, &loop, &QEventLoop::quit);
+    page.runJavaScript(QString::fromLatin1(cycle140HighlightScript), [&](const QVariant &value) { answer = value.toString(); answered = true; loop.quit(); });
+    if (!answered) loop.exec();
+    return answer.split('|');
+}
+
+// What the page painted for the first highlight must read at 4.5:1 (WCAG AA).
+void cycle140CheckHighlightFields(const QStringList &fields, const QString &where, double minimum = 4.5, double *out = nullptr) {
+    QVERIFY2(fields.size() == 5, qPrintable(where + ": the probe did not report"));
+    QVERIFY2(fields[3].toInt() >= 1, qPrintable(where + ": the page has no highlight element"));
+    const QColor text = cycle140Computed(fields[0]), ground = cycle140Computed(fields[1]), page = cycle140Computed(fields[2]);
+    QVERIFY2(text.alpha() > 0, qPrintable(where + ": text colour " + fields[0]));
+    QVERIFY2(ground.alpha() > 0, qPrintable(where + ": the highlight has no background " + fields[1]));
+    const double ratio = cycle140PairContrast(text, ground, page);
+    if (out) *out = ratio;
+    QVERIFY2(ratio >= minimum, qPrintable(QStringLiteral("%1: text %2 on %3 over %4 is %5:1").arg(where, fields[0], fields[1], fields[2]).arg(ratio, 0, 'f', 2)));
+}
+}
+
+// The text-colour rule on its own, and the text of the shim that carries it.
+void FomawriteTest::typoraBaseChoosesReadableHighlightText() {
+    Cycle103SettingsSnapshot settings;
+    Cycle140Lapis lapis; QVERIFY(lapis.install());
+    // No highlight colour: the editor's pale yellow, dark text.
+    QCOMPARE(TyporaBase::highlightText(QString()), QStringLiteral("#1a1a1a"));
+    QCOMPARE(TyporaBase::highlightText(":root { --bg-color: #1e222a; --text-color: #e4e4e4 }"), QStringLiteral("#1a1a1a"));
+    // Lapis Dark: #ffffb5c2 (76% pale yellow) over #1e222a is still light, so dark text.
+    QString error;
+    const auto resolved = PublishingThemes::css(QStringLiteral("lapis-dark"), &error);
+    QVERIFY2(resolved, qPrintable(error));
+    QCOMPARE(TyporaBase::themeVariable(*resolved, "--highlight-color"), QStringLiteral("#ffffb5c2"));
+    QCOMPARE(TyporaBase::highlightText(*resolved), QStringLiteral("#1a1a1a"));
+    // A dark highlight needs light text: opaque, translucent over a dark page, and in the other colour forms.
+    QCOMPARE(TyporaBase::highlightText(":root { --highlight-color: #2a4d8f }"), QStringLiteral("#ffffff"));
+    QCOMPARE(TyporaBase::highlightText(":root { --bg-color: #101418; --highlight-color: #2a4d8fcc }"), QStringLiteral("#ffffff"));
+    QCOMPARE(TyporaBase::highlightText(":root { --highlight-color: rgb(40, 60, 90) }"), QStringLiteral("#ffffff"));
+    QCOMPARE(TyporaBase::highlightText(":root { --highlight-color: hsl(220, 50%, 25%) }"), QStringLiteral("#ffffff"));
+    QCOMPARE(TyporaBase::highlightText(":root { --highlight-color: #04f }"), QStringLiteral("#ffffff"));
+    // The page colour is part of the rule: a translucent blue is light over white paper, dark over a dark page.
+    QCOMPARE(TyporaBase::highlightText(":root { --highlight-color: #2a4d8f33 }"), QStringLiteral("#1a1a1a"));
+    QCOMPARE(TyporaBase::highlightText(":root { --bg-color: #101418; --highlight-color: #2a4d8f66 }"), QStringLiteral("#ffffff"));
+    // Light highlights, an unusable value and a transparent one all keep the dark text.
+    QCOMPARE(TyporaBase::highlightText(":root { --highlight-color: yellow }"), QStringLiteral("#1a1a1a"));
+    QCOMPARE(TyporaBase::highlightText(":root { --highlight-color: oklch(0.2 0.1 250) }"), QStringLiteral("#1a1a1a"));
+    QCOMPARE(TyporaBase::highlightText(":root { --highlight-color: transparent }"), QStringLiteral("#1a1a1a"));
+    // The shim: <mark> and the published span read the theme's colour, the text colour is never inherited, the
+    // editor-only rule is only in the Live text, and the per-theme variable follows the shim.
+    const QString shim = TyporaBase::css();
+    QVERIFY(shim.contains("mark, .highlight { background: var(--highlight-color, var(--fw-highlight-bg, #fff2a8)); color: var(--fw-highlight-fg, #1a1a1a); }"));
+    QVERIFY(!shim.contains(".fw-highlight"));
+    QVERIFY(TyporaBase::liveCss().contains("#write.fw-mode-live .fw-highlight { background-color: var(--highlight-color, var(--fw-highlight-bg)); color: var(--fw-highlight-fg); }"));
+    QCOMPARE(TyporaBase::highlightCss(":root { --highlight-color: #2a4d8f }"),
+        QStringLiteral("/* Typora base shim: text colour for ==highlight==, chosen from the theme's --highlight-color. */\n:root { --fw-highlight-fg: #ffffff; }\n"));
+    Backend backend;
+    QVERIFY2(backend.selectPublishingTheme("lapis-dark"), qPrintable(backend.status()));
+    const QString live = backend.liveThemeCss();
+    QVERIFY(live.indexOf(TyporaBase::liveCss()) == 0);
+    const qsizetype variable = live.indexOf(":root { --fw-highlight-fg: #1a1a1a; }");
+    QVERIFY(variable > live.indexOf(".fw-highlight"));
+    QVERIFY(variable < live.indexOf("--highlight-color: #ffffb5c2")); // before the theme text, so the theme can still override it
+    backend.discardRecovery();
+}
+
+// Web (and PDF, which prints the same page): the computed colours of the highlight in a real Chromium page.
+// Red on the old code: the span kept the theme's light text on the pale yellow (about 1.2:1).
+void FomawriteTest::publishedHighlightStaysReadableOnDarkThemes() {
+    Cycle103SettingsSnapshot settings;
+    Cycle140Lapis lapis; QVERIFY(lapis.install());
+    const QString folder = PublishingThemes::directory(); QVERIFY(QDir().mkpath(folder));
+    const QStringList custom{"cycle140-hl-vars", "cycle140-hl-blue", "cycle140-hl-own"};
+    const auto cleanup = qScopeGuard([&] { for (const QString &id : custom) QFile::remove(folder + '/' + id + ".css"); });
+    // Dark page with no highlight colour; dark page with a dark-blue one; a theme that styles mark itself, pair and all.
+    QVERIFY(cycle132Write(folder + "/cycle140-hl-vars.css", ":root { --bg-color: #1e222a; --text-color: #e4e4e4 }"));
+    QVERIFY(cycle132Write(folder + "/cycle140-hl-blue.css", ":root { --bg-color: #1e222a; --text-color: #e4e4e4; --highlight-color: #2a4d8f }"));
+    QVERIFY(cycle132Write(folder + "/cycle140-hl-own.css", ":root { --bg-color: #1e222a; --text-color: #e4e4e4; --highlight-color: #2a4d8f }\nmark, .highlight { background: #ffd54a; color: #000 }"));
+    Cycle132Editor fixture; QVERIFY(fixture.create());
+    fixture.editor->setProperty("text", "# Highlight\n\nSome ==marked words== in a dark page.\n");
+    QTest::qWait(300);
+    QWebEngineProfile profile;
+    QWebEnginePage page(&profile);
+    const QStringList themes{"lapis-dark", "cycle140-hl-vars", "cycle140-hl-blue", "cycle140-hl-own", "lapis"};
+    for (const QString &id : themes) {
+        QVERIFY2(fixture.backend.selectPublishingTheme(id), qPrintable(id + ": " + fixture.backend.status()));
+        const auto web = fixture.backend.publishingPreview("html");
+        QVERIFY2(web["ok"].toBool(), qPrintable(web["error"].toString()));
+        const QString html = cycle140Html(web["url"].toUrl());
+        QVERIFY2(html.contains("<span class=\"highlight\">marked words</span>"), qPrintable(id + ": the span is missing"));
+        QVERIFY2(html.contains("mark, .highlight { background: var(--highlight-color"), qPrintable(id + ": the shim rule is missing"));
+        QVERIFY2(html.indexOf(":root { --fw-highlight-fg:") > html.indexOf("mark, .highlight {"), "the colour variable follows the shim");
+        bool loaded = false; perfLoadInPage(page, web["url"].toUrl(), &loaded); QVERIFY(loaded);
+        const QStringList fields = cycle140HighlightInPage(page);
+        double ratio = 0;
+        cycle140CheckHighlightFields(fields, "Web " + id, 4.5, &ratio);
+        if (QTest::currentTestFailed()) return;
+        qInfo("highlight contrast Web %s: %s on %s over %s = %.2f:1", qPrintable(id), qPrintable(fields[0]), qPrintable(fields[1]), qPrintable(fields[2]), ratio);
+        if (id == "cycle140-hl-blue") QVERIFY2(cycle140Computed(fields[0]).red() > 200, "a dark highlight takes light text"); // the rule, not luck
+        if (id == "lapis-dark") QVERIFY2(cycle140Computed(fields[0]).red() < 60, "a pale highlight keeps dark text on a dark page");
+    }
+    // A basic preset (no variables, light text colours of its own): the editor's pale yellow with dark text.
+    fixture.backend.setOutputStyle(0);
+    const auto basic = fixture.backend.publishingPreview("html");
+    QVERIFY2(basic["ok"].toBool(), qPrintable(basic["error"].toString()));
+    bool loaded = false; perfLoadInPage(page, basic["url"].toUrl(), &loaded); QVERIFY(loaded);
+    cycle140CheckHighlightFields(cycle140HighlightInPage(page), "Web basic preset");
+    fixture.backend.discardRecovery();
+}
+
+// Live: `==text==` renders as a highlight and stays readable (filtered, exact, dark editor, no variable, basic preset).
+// Red on the old code: the page had no highlight at all, only the raw `==marked words==` text.
+void FomawriteTest::liveHighlightStaysReadableOnDarkThemes() {
+    Cycle103SettingsSnapshot settings;
+    Cycle140Lapis lapis; QVERIFY(lapis.install());
+    const QString folder = PublishingThemes::directory(); QVERIFY(QDir().mkpath(folder));
+    const QStringList custom{"cycle140-live-vars", "cycle140-live-blue", "cycle140-live-inherit"};
+    const auto cleanup = qScopeGuard([&] { for (const QString &id : custom) QFile::remove(folder + '/' + id + ".css"); });
+    QVERIFY(cycle132Write(folder + "/cycle140-live-vars.css", ":root { --bg-color: #1e222a; --text-color: #e4e4e4 }"));
+    QVERIFY(cycle132Write(folder + "/cycle140-live-blue.css", ":root { --bg-color: #1e222a; --text-color: #e4e4e4; --highlight-color: #2a4d8f }"));
+    // Lapis (light) writes `mark { color: inherit }`: on a dark page that would put the page's light text on the pale yellow.
+    QVERIFY(cycle132Write(folder + "/cycle140-live-inherit.css", ":root { --bg-color: #1e222a; --text-color: #e4e4e4; --highlight-color: #ffffb5c2 }\nmark { background: var(--highlight-color); color: inherit }"));
+    Cycle134Page page; QVERIFY2(page.create(), qPrintable(page.error));
+    page.window->resize(960, 700);
+    QTRY_VERIFY_WITH_TIMEOUT(page.bridge()->isReady(), 15000);
+    page.editor->setProperty("text", QStringLiteral("# Dark Lapis\n\nSome ==marked words== and `code` here.\n"));
+    QVERIFY2(page.backend.selectPublishingTheme("lapis-dark"), qPrintable(page.backend.status()));
+    page.backend.syncLiveEditor(0);
+    const auto appearance = [&](bool filter, bool dark) {
+        page.bridge()->applyAppearance(QStringLiteral("{\"appearance\":\"manuscript\",\"dark\":%1,\"fontSize\":17,\"liveThemeFilter\":%2,\"palette\":{\"background\":\"%3\",\"text\":\"%4\"}}")
+            .arg(dark ? "true" : "false").arg(filter ? "true" : "false").arg(dark ? "#1f1f1f" : "#ffffff").arg(dark ? "#e6e6e6" : "#222222"));
+    };
+    appearance(true, false);
+    page.bridge()->selectMode("live");
+    QTRY_COMPARE_WITH_TIMEOUT(page.pageText(), page.canonical(), 10000);
+    auto *view = page.root->findChild<QObject *>("liveEditorView"); QVERIFY(view);
+    // Parks the caret at the end of the document (no highlight is revealed), reads the highlight, checks its contrast.
+    const auto probe = [&](const QString &where, double *ratio = nullptr) -> QStringList {
+        bool ok = false;
+        const QString script = QStringLiteral(
+            "(function(){ const v = window.fomawriteEditor.view; v.dispatch({selection: {anchor: v.state.doc.length}});"
+            " const r = %1; window.fomawriteEditor.simulateUserChanges(JSON.stringify([{from: 0, to: 0, insert: '@@' + r + '@@'}])); })()")
+            .arg(QString::fromLatin1(cycle140HighlightScript));
+        QTest::qWait(300);
+        const QStringList fields = cycle140Probe(page, view, script, &ok).split('|');
+        if (!ok) { QTest::qFail(qPrintable(where + ": the probe did not report"), __FILE__, __LINE__); return {}; }
+        cycle140CheckHighlightFields(fields, where, 4.5, ratio);
+        return fields;
+    };
+    double ratio = 0;
+    QStringList fields = probe("Live lapis-dark, filtered", &ratio);
+    if (QTest::currentTestFailed()) return;
+    qInfo("highlight contrast Live lapis-dark filtered: %s on %s over %s = %.2f:1", qPrintable(fields[0]), qPrintable(fields[1]), qPrintable(fields[2]), ratio);
+    QVERIFY2(cycle140Computed(fields[0]).red() < 60, qPrintable("dark text on the pale highlight, got " + fields[0]));
+    QCOMPARE(fields[4], QStringLiteral("marked words")); // the == markers are hidden: only the words are in the element
+    appearance(false, false);
+    probe("Live lapis-dark, exact");
+    if (QTest::currentTestFailed()) return;
+    appearance(true, true);
+    probe("Live lapis-dark, dark editor");
+    if (QTest::currentTestFailed()) return;
+    // A dark highlight colour takes light text (the ground is the theme's; the text follows the rule); no colour: pale yellow, dark text.
+    for (const QString &id : {QStringLiteral("cycle140-live-blue"), QStringLiteral("cycle140-live-vars"), QStringLiteral("cycle140-live-inherit")}) {
+        QVERIFY2(page.backend.selectPublishingTheme(id), qPrintable(page.backend.status()));
+        page.backend.pushLiveTheme();
+        appearance(true, false);
+        fields = probe("Live " + id, &ratio);
+        if (QTest::currentTestFailed()) return;
+        qInfo("highlight contrast Live %s: %s on %s over %s = %.2f:1", qPrintable(id), qPrintable(fields[0]), qPrintable(fields[1]), qPrintable(fields[2]), ratio);
+        if (id == "cycle140-live-blue") QVERIFY2(cycle140Computed(fields[0]).red() > 200, qPrintable("light text on the dark highlight, got " + fields[0]));
+        else QVERIFY2(cycle140Computed(fields[0]).red() < 60, qPrintable("no highlight colour, or a theme `mark` that inherits the text colour: dark text on pale yellow, got " + fields[0]));
+        appearance(true, true);
+        probe("Live " + id + ", dark editor");
+        if (QTest::currentTestFailed()) return;
+    }
+    // A basic preset (no variables at all), light and dark editor.
+    page.backend.setOutputStyle(0);
+    page.backend.pushLiveTheme();
+    for (const bool dark : {false, true}) {
+        appearance(true, dark);
+        probe(dark ? "Live basic preset, dark editor" : "Live basic preset");
+        if (QTest::currentTestFailed()) return;
+    }
+    page.backend.discardRecovery();
+}

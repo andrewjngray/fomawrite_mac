@@ -14,12 +14,26 @@
 //              theme rule of equal or higher specificity wins.
 //   liveCss()  css() plus the rules that only make sense on the editor page
 //              (CodeMirror's own selection layer, caret, Live code lines).
+//   highlightText() / highlightCss()
+//              the text colour for ==highlight== (a dark one unless the theme's
+//              --highlight-color, laid over its page colour, needs a light one):
+//              highlightCss() is the one-rule stylesheet that publishes it as
+//              --fw-highlight-fg, emitted after css() ahead of the theme's text.
 //   themeVariables() / themeVariable()
 //              the :root custom properties a theme defines, parsed so the host
 //              can read them (for example the page background colour).
 namespace TyporaBase {
 QString css();
 QString liveCss();
+// "#1a1a1a" or "#ffffff": whichever the theme's highlight ground needs for 4.5:1
+// (WCAG) contrast. Dark text is kept whenever it reads, and when the theme defines
+// no usable --highlight-color. The ground is --highlight-color composited over
+// --bg-color (white when the theme defines none).
+QString highlightText(const QString &themeCss);
+QString highlightCss(const QString &themeCss);
+// The same from variables the caller already parsed (Publisher memoises them per theme).
+QString highlightText(const QMap<QString, QString> &variables);
+QString highlightCss(const QMap<QString, QString> &variables);
 // Custom properties declared by top-level `:root { }` / `html { }` rules (rules
 // inside @media, @supports ... are ignored; the last declaration wins; the
 // cascade's !important and specificity are not modelled). Values are resolved:
