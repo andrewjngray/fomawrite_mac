@@ -1,37 +1,33 @@
 {
-  "version": "0.3.0-dev36",
-  "build": 140,
-  "verifiedAt": "2026-10-08T16:56:13.240445+00:00",
-  "sourceCommit": "8645c87 plus this manifest commit",
+  "version": "0.3.0-dev37",
+  "build": 141,
+  "verifiedAt": "2026-10-08T18:49:53.476419+00:00",
+  "sourceCommit": "11e4024",
   "publicReleaseChanged": false,
   "verification": {
     "fullRegression": {
-      "passed": 218,
+      "passed": 221,
       "failed": 0,
       "skipped": 0
     },
     "editorPageTests": {
-      "passed": 249,
+      "passed": 256,
       "failed": 0
     },
-    "review": "independent reviewer agent: ship with fixes; fixes applied before this build (see research/cycle-140/README.md)",
-    "nativeChecks": {
-      "check-document-views": "PASS against dist/Fomawrite.app (9 Oct 07:34): 124 footer states, 5 daily-writing, 5 pane-zoom, 5 editor acceptance, 12 publishing theme checks; embedded UI matches checkout; signature verified",
-      "check-publishing-startup": "passed: cold and restored (9 Oct 07:34)"
-    }
+    "nativeChecks": "both harnesses passed against build 140 (9 Oct 07:34); not rerun for 141"
   },
   "bundles": {
     "dist/Fomawrite.app": {
-      "build": 140,
-      "executableSha256": "3a06ed9c1425016b386f8c8db735cad667c5eb6c49e691600d66957cea264765"
+      "build": 141,
+      "executableSha256": "c2ecee5e62e3ee9511c9aac13e951b065517081bbf636b9021e8047a13169380"
     },
     "dist/Fomawrite Dev.app": {
-      "build": 140,
-      "executableSha256": "124840a0ed3d84ddccd27167ba1f7eabf8da6a3f7accf3ee04afba18e51f42a0"
+      "build": 141,
+      "executableSha256": "f8fef406e4f4a565514db3927a31ab7cbbced48392aadb5afad1782038953fa3"
     },
     "/Applications/Fomawrite.app": {
-      "build": 140,
-      "executableSha256": "3a06ed9c1425016b386f8c8db735cad667c5eb6c49e691600d66957cea264765"
+      "build": 141,
+      "executableSha256": "c2ecee5e62e3ee9511c9aac13e951b065517081bbf636b9021e8047a13169380"
     }
   },
   "installedWith": "./bin/package-mac && ./bin/prepare-dev-app && ./bin/install-mac"
