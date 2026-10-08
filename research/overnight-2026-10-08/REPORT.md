@@ -4,7 +4,7 @@ Brief: run the next cycles we discussed; Fable plans, cheaper subagents build, a
 
 ## Outcome in one paragraph
 
-Three cycles landed and one build is installed: **build 138** (`0.3.0-dev34`) in `/Applications`, `dist/Fomawrite.app` and `dist/Fomawrite Dev.app`, all identical. Cycle 136 (Live follows the publishing theme, lighter) was built, reviewed, found wanting in two important ways, and fixed in Cycle 137; Cycle 138 fixed the Live selection race and the native theme-folder acceptance failures. The Qt suite is at 212, the page suite at 248, the native document-views harness passes in full for the first time since build 130, and CI is CI_STATUS. The Grammarly experiment and the Roam harness were not built: the first needs you at the keyboard, the second is still a Maybe and needs a token decision; both have notes ready.
+Three cycles landed and one build is installed: **build 138** (`0.3.0-dev34`) in `/Applications`, `dist/Fomawrite.app` and `dist/Fomawrite Dev.app`, all identical. Cycle 136 (Live follows the publishing theme, lighter) was built, reviewed, found wanting in two important ways, and fixed in Cycle 137; Cycle 138 fixed the Live selection race and the native theme-folder acceptance failures. The Qt suite is at 212, the page suite at 248, the native document-views harness passes in full for the first time since build 130, and CI is green on the final commit (`8a4f435`). The Grammarly experiment and the Roam harness were not built: the first needs you at the keyboard, the second is still a Maybe and needs a token decision; both have notes ready.
 
 ## What to try this morning (build 138 is installed)
 

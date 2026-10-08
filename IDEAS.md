@@ -22,6 +22,8 @@ Source mode uses the native Qt text editor and its spell check; the Live page is
 ### Grammarly in the editor
 Yes [ ]  No [ ]  Maybe [x]
 
+Ten-minute experiment script for Andrew: [research/overnight-2026-10-08/grammarly-experiment.md](research/overnight-2026-10-08/grammarly-experiment.md).
+
 Requirement from Andrew: it must be switchable on and off. The Grammarly overlay (the small moving icon) is distracting when writing and creating; the purity of the editor and the clean panes are a feature, not a bug. Andrew will supply screenshots of how it behaves on his other devices.
 
 Andrew has a Grammarly account and finds its grammar checking good when it appears over text fields in Chrome. Three routes, in order of likelihood:
@@ -62,6 +64,7 @@ Bigger ideas where Fomawrite is the human side of a larger system. Each gets its
 Yes [ ]  No [ ]  Maybe [x]
 
 Andrew uses Roam for his most considered, distilled notes and for daily notes, while Markdown files and AI tools generate far more material than that. The concept: Fomawrite is the human-to-machine interface for writing; Roam is where the small, precious, settled things live; the project becomes a harness between them. Worked out in [roam_concept.md](roam_concept.md).
+Feasibility of the first shape (needs an API token decision; no local Roam CLI exists): [research/overnight-2026-10-08/roam-feasibility.md](research/overnight-2026-10-08/roam-feasibility.md).
 
 ### An AI workbench pane
 Yes [ ]  No [ ]  Maybe [x]
