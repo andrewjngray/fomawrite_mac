@@ -2,10 +2,10 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   FILL_BG_CLASS, FILL_FG_CLASS, LIVE_EXACT_CLASS, LIVE_OVERLAY_CSS, LIVE_OVERLAY_ID,
-  applyLiveOverlay, applyLiveTheme, isUnsetColour, parseLiveThemePatch, parsePalette, pickReadableColours,
+  HOST_SIZE_CLASS, LIVE_HTML_CLASS, MAPPED_ID, THEME_ID, applyLiveOverlay, applyLiveTheme, applyThemeMapped, isUnsetColour, parseLiveThemePatch, parsePalette, pickReadableColours,
 } from "../src/livetheme.ts";
 import { INITIAL_APPEARANCE, effectiveAppearanceClasses, parseAppearancePatch, reduceAppearance } from "../src/appearance.ts";
-import { Session, applyThemeDom } from "../src/modes.ts";
+import { Session, applyAppearanceDom, applyThemeDom } from "../src/modes.ts";
 
 // ---------------------------------------------------------------- tiny fake Document
 function fakeDoc({ computed = {} } = {}) {
@@ -61,13 +61,17 @@ test("overlay css neutralises layout and is scoped to live + not exact", () => {
     .map((chunk) => chunk.split("}").pop().trim()).filter(Boolean);
   assert.ok(selectors.length > 5);
   for (const sel of selectors) for (const part of sel.replace(/:is\([^)]*\)/g, ":is()").split(",")) {
-    assert.ok(part.trim().startsWith("#write.fw-mode-live:not(.fw-live-exact)"), part);
+    // the one exception is the <body> reset, which keys on the class set on <html> only in filtered Live
+    assert.ok(part.trim().startsWith("#write.fw-mode-live:not(.fw-live-exact)") || part.trim() === "html.fw-live-filtered body", part);
   }
 });
 
 test("overlay css never touches typography except through the readability variables", () => {
   const css = LIVE_OVERLAY_CSS.replace(/\/\*[\s\S]*?\*\//g, "");
-  for (const prop of ["font-family", "font-size", "font-weight", "font-style", "line-height", "letter-spacing", "text-decoration", "list-style"])
+  // the only font-size is the host's base size, and only once the host has sent one
+  assert.ok(/#write\.fw-mode-live:not\(\.fw-live-exact\)\.fw-host-size\s*\{\s*font-size:\s*var\(--fw-font-size\)\s*!important;\s*\}/.test(css));
+  assert.equal(css.match(/(?<![-\w])font-size\s*:/g).length, 1);
+  for (const prop of ["font-family", "font-weight", "font-style", "line-height", "letter-spacing", "text-decoration", "list-style"])
     assert.ok(!css.includes(prop), prop);
   const decls = [...css.matchAll(/(?:^|[;{\s])(color|background-color|background)\s*:\s*([^;}]*)/g)];
   for (const [, prop, value] of decls) {
@@ -215,4 +219,134 @@ test("Session.setAppearance reads liveThemeFilter and palette; mode switches re-
     session.setMode("source");
     assert.ok(!doc.write.classList.has(FILL_BG_CLASS));
   });
+});
+
+// ---------------------------------------------------------------- selector mapping element (thememap.ts)
+const ids = (doc) => doc.head.children.map((c) => c.id);
+const THEME = "#write h1 { color: crimson; font-family: Georgia } #write blockquote { color: gray } #write code { color: purple } #write { font-size: 30px }";
+
+test("mapped theme element sits between the theme and the overlay, whatever the arrival order", () => {
+  const a = fakeDoc();
+  applyThemeDom(THEME, a);
+  applyLiveTheme({ mode: "live", filter: true }, a);
+  assert.deepEqual(ids(a), [THEME_ID, MAPPED_ID, LIVE_OVERLAY_ID]);
+  assert.ok(a.getElementById(MAPPED_ID).textContent.includes(".cm-line.fw-h1 { color: crimson; font-family: Georgia; }"));
+  assert.ok(a.getElementById(MAPPED_ID).textContent.includes(".fw-code { color: purple; }"));
+
+  const b = fakeDoc(); // overlay exists first, the theme arrives later
+  applyLiveTheme({ mode: "live", filter: true }, b);
+  assert.deepEqual(ids(b), [LIVE_OVERLAY_ID], "no theme, nothing to map");
+  applyThemeDom(THEME, b);
+  applyLiveTheme({ mode: "live", filter: true }, b);
+  assert.deepEqual(ids(b), [THEME_ID, MAPPED_ID, LIVE_OVERLAY_ID]);
+
+  const c = fakeDoc(); // the theme element is removed and re-created while a mapped element exists
+  applyThemeDom(THEME, c);
+  applyLiveTheme({ mode: "live", filter: true }, c);
+  applyThemeDom("", c);
+  applyThemeDom("#write h2 { color: red }", c);
+  assert.deepEqual(ids(c), [THEME_ID, MAPPED_ID, LIVE_OVERLAY_ID]);
+});
+
+test("mapped theme element follows the theme text and the filter switch", () => {
+  const doc = fakeDoc();
+  applyThemeDom(THEME, doc);
+  applyLiveTheme({ mode: "live", filter: true }, doc);
+  applyThemeDom("#write h2 { color: red }", doc);
+  applyLiveTheme({ mode: "live", filter: true }, doc);
+  assert.equal(ids(doc).filter((i) => i === MAPPED_ID).length, 1);
+  assert.ok(doc.getElementById(MAPPED_ID).textContent.includes("fw-h2 { color: red; }"));
+  assert.ok(!doc.getElementById(MAPPED_ID).textContent.includes("fw-h1"));
+  // a theme with nothing mappable has no mapped element
+  applyThemeDom("#write table { color: red }", doc);
+  applyLiveTheme({ mode: "live", filter: true }, doc);
+  assert.ok(!has(doc, MAPPED_ID));
+  // exact mode removes it with the overlay; the theme element itself is untouched
+  applyThemeDom(THEME, doc);
+  applyLiveTheme({ mode: "live", filter: true }, doc);
+  assert.ok(has(doc, MAPPED_ID));
+  applyLiveTheme({ mode: "live", filter: false }, doc);
+  assert.deepEqual(ids(doc), [THEME_ID]);
+  assert.equal(doc.getElementById(THEME_ID).textContent, THEME);
+  applyLiveTheme({ mode: "live", filter: true }, doc);
+  assert.deepEqual(ids(doc), [THEME_ID, MAPPED_ID, LIVE_OVERLAY_ID]);
+  applyThemeDom("", doc); // theme removed
+  applyThemeMapped(true, doc);
+  assert.deepEqual(ids(doc), [LIVE_OVERLAY_ID]);
+});
+
+test("Session.setMode / setAppearance keep the mapped element and the html class in step", () => {
+  const doc = fakeDoc();
+  withDocument(doc, () => {
+    const session = new Session();
+    fakeView(session);
+    applyThemeDom(THEME, doc);
+    session.syncLiveTheme();
+    assert.ok(has(doc, MAPPED_ID), "present in source too (its rules are scoped to live)");
+    assert.ok(!doc.documentElement.classList.has(LIVE_HTML_CLASS));
+    session.setMode("live");
+    assert.ok(doc.documentElement.classList.has(LIVE_HTML_CLASS));
+    session.setAppearance({ liveThemeFilter: false });
+    assert.ok(!has(doc, MAPPED_ID) && !doc.documentElement.classList.has(LIVE_HTML_CLASS));
+    session.setAppearance({ liveThemeFilter: true });
+    assert.ok(has(doc, MAPPED_ID) && doc.documentElement.classList.has(LIVE_HTML_CLASS));
+    session.setMode("source");
+    assert.ok(!doc.documentElement.classList.has(LIVE_HTML_CLASS));
+  });
+});
+
+// ---------------------------------------------------------------- host text size beats the theme's #write size
+test("host fontSize marks #write; the overlay lets --fw-font-size beat the theme's #write font-size", () => {
+  assert.ok(LIVE_OVERLAY_CSS.includes("#write.fw-mode-live:not(.fw-live-exact).fw-host-size { font-size: var(--fw-font-size) !important; }"));
+  const doc = fakeDoc();
+  applyAppearanceDom({}, doc);
+  assert.ok(!doc.write.classList.has(HOST_SIZE_CLASS), "no host size yet: the theme's size stands");
+  applyAppearanceDom({ fontFamily: "Georgia" }, doc);
+  assert.ok(!doc.write.classList.has(HOST_SIZE_CLASS));
+  applyAppearanceDom({ fontSize: 17 }, doc);
+  assert.equal(doc.write.style.get("--fw-font-size"), "17px");
+  assert.ok(doc.write.classList.has(HOST_SIZE_CLASS));
+  applyAppearanceDom({ fontSize: 19 }, doc); // Larger / Smaller / Reset keep sending numbers
+  assert.equal(doc.write.style.get("--fw-font-size"), "19px");
+  applyAppearanceDom({ dark: true }, doc); // other keys leave it alone
+  assert.ok(doc.write.classList.has(HOST_SIZE_CLASS));
+});
+
+test("mapped headings stay relative so the theme's scale follows the host size", () => {
+  const doc = fakeDoc();
+  applyThemeDom("#write { font-size: 30px } #write h1 { font-size: 2.2rem } #write h2 { font-size: 1.5em }", doc);
+  applyLiveTheme({ mode: "live", filter: true }, doc);
+  const mapped = doc.getElementById(MAPPED_ID).textContent;
+  assert.ok(mapped.includes("font-size: 2.2em") && mapped.includes("font-size: 1.5em"));
+  assert.ok(!mapped.includes("30px") && !mapped.includes("rem"));
+});
+
+// ---------------------------------------------------------------- html / body rules
+test("fw-live-filtered is on <html> only in live mode with the filter on", () => {
+  const doc = fakeDoc();
+  const on = () => doc.documentElement.classList.has(LIVE_HTML_CLASS);
+  applyLiveTheme({ mode: "source", filter: true }, doc);
+  assert.ok(!on());
+  applyLiveTheme({ mode: "live", filter: true }, doc);
+  assert.ok(on());
+  applyLiveTheme({ mode: "live", filter: false }, doc);
+  assert.ok(!on(), "exact mode");
+  applyLiveTheme({ mode: "live", filter: true, palette: PALETTE }, doc);
+  assert.ok(on());
+  applyLiveTheme({ mode: "source", filter: true, palette: PALETTE }, doc);
+  assert.ok(!on());
+  applyLiveTheme({ mode: "source", filter: false }, doc);
+  assert.ok(!on());
+  assert.equal(LIVE_HTML_CLASS, "fw-live-filtered");
+});
+
+test("body rule resets geometry only: no colour, and it keys on the html class", () => {
+  const m = /html\.fw-live-filtered body \{([^}]*)\}/.exec(LIVE_OVERLAY_CSS);
+  assert.ok(m, "rule present");
+  const decls = m[1].split(";").map((d) => d.trim()).filter(Boolean).sort();
+  assert.deepEqual(decls, [
+    "background-image: none !important", "column-count: auto !important", "columns: auto !important",
+    "margin: 0 !important", "padding: 0 !important",
+  ]);
+  assert.ok(!/background-color|background:|\bcolor\b/.test(m[1]));
 });
