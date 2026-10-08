@@ -36,6 +36,9 @@ class Backend : public QObject, public PublishingSource {
     Q_PROPERTY(QString outputTemplateName READ outputTemplateName NOTIFY outputStyleChanged)
     Q_PROPERTY(QString publishingThemeId READ publishingThemeId NOTIFY publishingThemesChanged)
     Q_PROPERTY(QString publishingThemeName READ publishingThemeName NOTIFY publishingThemesChanged)
+    // The selected theme's resolved `--bg-color` (for example "#1e222a"), or
+    // empty when it defines none. Lets the app chrome follow a dark theme.
+    Q_PROPERTY(QString themeBackgroundColor READ themeBackgroundColor NOTIFY publishingCssChanged)
     Q_PROPERTY(QVariantList publishingThemes READ publishingThemes NOTIFY publishingThemesChanged)
     Q_PROPERTY(QString publishingThemeError READ publishingThemeError NOTIFY publishingThemesChanged)
     Q_PROPERTY(QObject *library READ library CONSTANT)
@@ -170,6 +173,9 @@ public:
     QString publishingDocumentIdentity() const { return m_publisher->documentIdentity(); }
     QString publishingThemeId() const { return m_publisher->themeId(); }
     QString publishingThemeName() const;
+    QString themeBackgroundColor() const;
+    // The Live page's theme text: the Typora base shim, then the current theme CSS.
+    QString liveThemeCss() const;
     QVariantList publishingThemes() const;
     QString publishingThemeError() const { return m_publisher->themeError(); }
     Q_INVOKABLE bool selectPublishingTheme(const QString &id);

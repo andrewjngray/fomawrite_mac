@@ -3,6 +3,7 @@
 #include <QByteArray>
 #include <QFileSystemWatcher>
 #include <QHash>
+#include <QMap>
 #include <QObject>
 #include <QPageLayout>
 #include <QPointer>
@@ -72,6 +73,13 @@ public:
     // The stylesheet published output uses right now: the selected theme's
     // sanitized CSS, or the basic style's inline CSS when no theme is selected.
     QString currentCss() const;
+    // The custom properties (`--bg-color`, `--text-color`, ...) the current CSS
+    // declares on :root, resolved (see TyporaBase::themeVariables); last
+    // declaration wins. Parsed once per distinct CSS text.
+    QMap<QString, QString> themeVariables() const;
+    // One of them by name, with or without the leading `--`; empty when the
+    // theme does not define it.
+    Q_INVOKABLE QString themeVariable(const QString &name) const;
     PublishingHtml::ImageCache &imageCache() const { return m_imageCache; }
 
     QString documentIdentity() const { return QString::number(m_documentGeneration); }
@@ -115,6 +123,8 @@ private:
     QHash<QString, QPair<QByteArray, QByteArray>> m_fileHashes;
     struct CssMemo { QString themeId; QByteArray snapshot; QString css; QByteArray hash; QString error; bool valid = false; };
     mutable CssMemo m_cssMemo;
+    mutable QString m_variablesCss;
+    mutable QMap<QString, QString> m_variables;
     QByteArray m_cssSnapshot;
     QByteArray m_catalogSnapshot;
     mutable PublishingHtml::ImageCache m_imageCache;

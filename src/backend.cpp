@@ -18,6 +18,7 @@
 #include "markdownextensions.h"
 #include "outputcss.h"
 #include "publishingthemes.h"
+#include "typorabase.h"
 #include "publishinghtml.h"
 #include "publishingpdf.h"
 #include <QPdfDocument>
@@ -3195,7 +3196,10 @@ bool Backend::deleteUserOutputStyle(const QString &id) {
 
 void Backend::setOutputStyle(int style) {
     if (style < 0 || style > 7) return;
+    const QString previousBackground = themeBackgroundColor();
     m_publisher->clearTheme();
+    // A basic preset replacing a theme that defined --bg-color changes the property without a cssChanged.
+    if (themeBackgroundColor() != previousBackground) emit publishingCssChanged();
     if (style != 3 && !m_selectedUserOutputStyleId.isEmpty()) {
         m_selectedUserOutputStyleId.clear();
         QSettings().remove(QStringLiteral("output/userStyleId"));
@@ -3439,6 +3443,7 @@ QString Backend::printCss() const {
 }
 
 QString Backend::publishingThemeName() const { return m_publisher->themeName(); }
+QString Backend::themeBackgroundColor() const { return m_publisher->themeVariable(QStringLiteral("--bg-color")); }
 QVariantList Backend::publishingThemes() const { return m_publisher->themes(); }
 bool Backend::selectPublishingTheme(const QString &id) { return m_publisher->selectTheme(id); }
 bool Backend::importPublishingTheme(const QUrl &file) { return m_publisher->importTheme(file); }
@@ -3456,7 +3461,7 @@ void Backend::syncLiveEditor(int cursor) {
     ++m_liveDocumentGeneration; // commands issued for the previous text must not run on this one
     // Appearance (fonts, focus, typewriter, dark) is pushed by LiveEditorPane,
     // which binds the same preferences the Source editor uses.
-    m_editorBridge->applyTheme(m_publisher->currentCss());
+    pushLiveTheme();
     m_liveMirror = currentDocumentText();
     m_liveMirrorValid = true;
     m_editorBridge->loadDocument(m_liveMirror);
@@ -3464,7 +3469,10 @@ void Backend::syncLiveEditor(int cursor) {
     if (cursor >= 0) m_editorBridge->placeCursor(qMin(cursor, int(m_liveMirror.size())));
 }
 
-void Backend::pushLiveTheme() { m_editorBridge->applyTheme(m_publisher->currentCss()); }
+// The page gets the Typora base shim (see typorabase.h) ahead of the theme, so
+// the theme's colour variables paint the page and any explicit theme rule wins.
+QString Backend::liveThemeCss() const { return TyporaBase::liveCss() + QLatin1Char('\n') + m_publisher->currentCss(); }
+void Backend::pushLiveTheme() { m_editorBridge->applyTheme(liveThemeCss()); }
 
 // Run `operation` on the page's current selection. With a ready page the
 // selection is fetched first (see backend.h) and the operation runs in the

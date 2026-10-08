@@ -726,6 +726,24 @@ void FomawriteTest::liveEditorCapturesEachPresentation() {
     QVERIFY(!filtered.isNull() && !exact.isNull());
     QVERIFY(filtered != exact);
     qInfo("capture %s", qPrintable(QDir(captures).filePath("live-heavy-theme-filtered.png")));
+    // Cycle 140: a Lapis-Dark-like theme that only sets colour variables. The Typora base shim paints the page, so
+    // the frame is dark out to the margins in both the filtered and the exact presentation (white before).
+    Cycle140Lapis lapis; QVERIFY(lapis.install());
+    QVERIFY2(page.backend.selectPublishingTheme("lapis-dark"), qPrintable(page.backend.status()));
+    QVERIFY(page.backend.open(QUrl::fromLocalFile(directory.filePath("sample.md"))));
+    page.backend.syncLiveEditor();
+    for (const bool filtered : {true, false}) {
+        page.bridge()->applyAppearance(QStringLiteral("{\"appearance\":\"manuscript\",\"dark\":false,\"fontSize\":17,\"liveThemeFilter\":%1,\"palette\":{\"background\":\"#ffffff\",\"text\":\"#222222\"}}").arg(filtered ? "true" : "false"));
+        page.bridge()->selectMode("live");
+        QTRY_COMPARE_WITH_TIMEOUT(page.pageText(), page.canonical(), 10000);
+        const QString file = QDir(captures).filePath(filtered ? "live-dark-variables.png" : "live-dark-variables-exact.png");
+        QVERIFY2(cycle134SaveFrame(page.window, file, &why), qPrintable(why));
+        const QImage frame(file); QVERIFY(!frame.isNull());
+        // Margins (outside the text column) and corners: the page itself, not the column fill.
+        for (const QPoint &p : {QPoint(2, 2), QPoint(2, frame.height() / 2), QPoint(frame.width() / 2, 2), QPoint(2, frame.height() - 3)})
+            QVERIFY2(cycle140Luma(frame.pixelColor(p)) < 80, qPrintable(QStringLiteral("%1 frame is %2 at %3,%4").arg(filtered ? "filtered" : "exact", frame.pixelColor(p).name()).arg(p.x()).arg(p.y())));
+        qInfo("capture %s", qPrintable(file));
+    }
     page.backend.discardRecovery();
 }
 

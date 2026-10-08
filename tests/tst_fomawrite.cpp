@@ -111,6 +111,9 @@ private slots:
     void nativeEditingMenuChecksFollowTheLayoutFromTheStart();
     void liveEditorPlacesCursorAndRestylesWithoutReload();
     void liveEditorCapturesEachPresentation();
+    void typoraBaseReadsThemeVariables();
+    void publishedOutputPaintsThePageFromThemeVariables();
+    void liveEditorPaintsThePageFromThemeVariables();
     void persistenceRefusesLossyDecodeAndSaveAsWritesUtf8();
     void crlfDocumentsKeepAutosaveRenameAndMove();
     void manualSaveRespectsDiskBaseline();
@@ -5212,9 +5215,11 @@ private:
 #include "cycle100-navigation.inc"
 #include "cycle131-persistence.inc"
 #include "cycle132-publishing.inc"
+#include "cycle140-typora-fixtures.inc"
 #include "perf-profile.inc"
 #include "cycle134-live-editor.inc"
 #include "cycle134-footer-live.inc"
+#include "cycle140-typora-base.inc"
 
 int main(int argc, char **argv) {
     QtWebEngineQuick::initialize();

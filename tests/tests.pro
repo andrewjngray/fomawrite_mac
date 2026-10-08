@@ -38,6 +38,6 @@ RESOURCES += ../src/resources.qrc
 QT += pdf pdfquick webenginequick
 
 QT += webenginecore pdf
-HEADERS += ../src/publishingthemes.h ../src/publishinghtml.h ../src/publishingpdf.h ../src/publisher.h ../src/macbridge.h ../src/editorbridge.h
+HEADERS += ../src/typorabase.h ../src/publishingthemes.h ../src/publishinghtml.h ../src/publishingpdf.h ../src/publisher.h ../src/macbridge.h ../src/editorbridge.h
 QT += webchannel
-SOURCES += ../src/publishingthemes.cpp ../src/publishinghtml.cpp ../src/publishingpdf.cpp ../src/publisher.cpp ../src/editorbridge.cpp ../src/vendor/md4c/md4c.c
+SOURCES += ../src/typorabase.cpp ../src/publishingthemes.cpp ../src/publishinghtml.cpp ../src/publishingpdf.cpp ../src/publisher.cpp ../src/editorbridge.cpp ../src/vendor/md4c/md4c.c
