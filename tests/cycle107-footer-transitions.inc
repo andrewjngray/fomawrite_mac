@@ -416,8 +416,19 @@ void FomawriteTest::footerCompactStylesRemainReachableAcrossModes() {
                 QVERIFY(cycle102Click(quick, appearance)); QTRY_VERIFY(appearanceMenu->property("opened").toBool());
                 QVERIFY(cycle106MenuFits(quick, appearanceMenu, appearance));
                 const int outputBefore = backend.outputStyle();
-                QVERIFY(cycle102Click(quick, window->findChild<QQuickItem *>("sourceAppearanceBook")));
-                QTRY_COMPARE(settings->property("writingAppearance").toString(), QStringLiteral("book"));
+                if (layout->property("liveEditEnabled").toBool()) {
+                    // Cycle 136: in Live the menu offers the Output Style instead of
+                    // the Source appearances; choosing it opens the theme menu.
+                    const auto appearanceBefore = settings->property("writingAppearance");
+                    QVERIFY(cycle102Click(quick, window->findChild<QQuickItem *>("sourceAppearanceTheme")));
+                    QTRY_VERIFY(templateMenu->property("opened").toBool());
+                    QVERIFY(QMetaObject::invokeMethod(templateMenu, "close"));
+                    QTRY_VERIFY(!templateMenu->property("visible").toBool());
+                    QCOMPARE(settings->property("writingAppearance"), appearanceBefore);
+                } else {
+                    QVERIFY(cycle102Click(quick, window->findChild<QQuickItem *>("sourceAppearanceBook")));
+                    QTRY_COMPARE(settings->property("writingAppearance").toString(), QStringLiteral("book"));
+                }
                 QCOMPARE(backend.outputStyle(), outputBefore);
             }
             if (output->isVisible()) {

@@ -1,0 +1,34 @@
+{
+  "version": "0.3.0-dev32",
+  "build": 136,
+  "verifiedAt": "2026-10-08T08:52:25.069892+00:00",
+  "sourceCommit": "the commit that adds this manifest's parent (see git log)",
+  "publicReleaseChanged": false,
+  "verification": {
+    "fullRegression": {
+      "passed": 208,
+      "failed": 0,
+      "skipped": 0
+    },
+    "editorPageTests": {
+      "passed": 202,
+      "failed": 0
+    },
+    "nativeChecks": "not rerun for 136 (planned for Cycle 138 together with the theme-folder fixture fix)"
+  },
+  "bundles": {
+    "dist/Fomawrite.app": {
+      "build": 136,
+      "executableSha256": "e0786614e56940b79c88ea8c8ff0556a121707ed195e8cc7983d98c8ff95af44"
+    },
+    "dist/Fomawrite Dev.app": {
+      "build": 136,
+      "executableSha256": "d0978856531f3e04cbd02461f23be997b790e3fde1bf749d187507d6a5406370"
+    },
+    "/Applications/Fomawrite.app": {
+      "build": 136,
+      "executableSha256": "e0786614e56940b79c88ea8c8ff0556a121707ed195e8cc7983d98c8ff95af44"
+    }
+  },
+  "installedWith": "./bin/package-mac && ./bin/prepare-dev-app && ./bin/install-mac"
+}
