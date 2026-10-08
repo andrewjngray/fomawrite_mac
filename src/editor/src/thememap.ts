@@ -3,9 +3,10 @@
 // Typora-style themes style real elements: `#write h1 { ... }`, `#write blockquote { ... }`, `#write code { ... }`.
 // Live text lines are `.cm-line` divs carrying classes (`fw-h1`, `fw-quote-line`, `fw-list-line`) with inline marks
 // as spans (`fw-code`, `fw-live-link`, `fw-strong`, `fw-em`, `fw-strike`), so those rules cannot match. This module
-// reads the theme text and emits a *mapped copy* of every rule that can be translated, scoped to filtered Live
-// (`#write.fw-mode-live:not(.fw-live-exact)`), keeping only typography-level properties. It is pure (no DOM) and
-// tolerant: anything it does not understand is skipped, never thrown on.
+// reads the theme text and emits a *mapped copy* of every rule that can be translated, scoped to Live
+// (`#write.fw-mode-live`, MAPPED_SCOPE: filtered AND exact, so "Live follows theme exactly" keeps the theme's
+// heading / quote / link typography on Live lines), keeping only typography-level properties. It is pure (no DOM)
+// and tolerant: anything it does not understand is skipped, never thrown on.
 //
 //   h1..h6 -> .cm-line.fw-h1..6      blockquote -> .cm-line.fw-quote-line     li -> .cm-line.fw-list-line
 //   ul li -> .fw-list-line.fw-list-ul     ol li -> .fw-list-line.fw-list-ol     (bare li: both kinds)
@@ -19,7 +20,10 @@
 // Left alone (the real elements already exist in Live widgets, so the theme reaches them directly): pre, table, img,
 // hr, and anything with classes, ids, attributes or structural pseudo-classes on a mapped element.
 
+/** Scope of the editing overlay (livetheme.ts): filtered Live only. */
 export const LIVE_SCOPE = "#write.fw-mode-live:not(.fw-live-exact)";
+/** Scope of the mapped theme copy: every Live, filtered or exact. */
+export const MAPPED_SCOPE = "#write.fw-mode-live";
 
 // ---------------------------------------------------------------- CSS rule splitter
 type Node =
@@ -286,7 +290,7 @@ export function mapSelector(selector: string): Mapped | null {
   // Only descendant / child combinators survive; a child step to a mapped element is looser as a descendant.
   if (parts.some((p) => p.comb === "+" || p.comb === "~")) return null;
 
-  let scope = LIVE_SCOPE;
+  let scope = MAPPED_SCOPE;
   let first = 0;
   const head = compounds[0];
   if (head.tag === "" && head.ids.length === 1 && head.ids[0] === "write") {
