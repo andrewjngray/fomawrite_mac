@@ -1,0 +1,41 @@
+{
+  "version": "0.3.0-dev34",
+  "build": 138,
+  "cycles": [
+    137,
+    138
+  ],
+  "verifiedAt": "2026-10-08T09:41:39.746381+00:00",
+  "sourceCommit": "the commit that adds this manifest (see git log)",
+  "publicReleaseChanged": false,
+  "verification": {
+    "fullRegression": {
+      "passed": 212,
+      "failed": 0,
+      "skipped": 0
+    },
+    "editorPageTests": {
+      "passed": 248,
+      "failed": 0
+    },
+    "nativeChecks": {
+      "check-document-views": "PASS against dist/Fomawrite.app: 124 footer states, 5 daily-writing, 5 pane-zoom, 5 editor acceptance, 3 pane/footer/library, 5 editing/layout, 12 publishing theme checks; embedded UI matches checkout; signature verified",
+      "check-publishing-startup": "passed 7 Oct (cold and restored), not rerun"
+    }
+  },
+  "bundles": {
+    "dist/Fomawrite.app": {
+      "build": 138,
+      "executableSha256": "39048d4b2fbfca97fd0d079e768dc85f7c3f0d79edaf8290a7a33f18fbf26353"
+    },
+    "dist/Fomawrite Dev.app": {
+      "build": 138,
+      "executableSha256": "d37664943838e3e19c69e154a3b3a24a4a1f6877e26b79ddac6b16fd16ff8fae"
+    },
+    "/Applications/Fomawrite.app": {
+      "build": 138,
+      "executableSha256": "39048d4b2fbfca97fd0d079e768dc85f7c3f0d79edaf8290a7a33f18fbf26353"
+    }
+  },
+  "installedWith": "./bin/package-mac && ./bin/prepare-dev-app && ./bin/install-mac"
+}

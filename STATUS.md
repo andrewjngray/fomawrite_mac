@@ -4,10 +4,10 @@ This is the only place the current review build is recorded. Update it at the en
 
 | | |
 | --- | --- |
-| **Current review build** | `0.3.0-dev32` / macOS `0.3.0 (136)` |
-| **Last completed cycle** | 136 — Live follows the publishing theme, lighter ([record](research/cycle-136/README.md)), 8 October 2026 |
-| **Regression suite** | **208 passed, 0 failed, 0 skipped** (`./bin/test`, offscreen Qt 6.11.2, Apple Silicon); editor page **202 passed** (`cd src/editor && npm test`). Two known Qt Material `SplitView` null-parent warnings in `savesAndOpensFromFooterMenu`. |
-| **Packaged bundles** | `dist/Fomawrite.app`, `dist/Fomawrite Dev.app` and `/Applications/Fomawrite.app` are all at build **136** ([manifest](research/cycle-136/verified-builds.json)); the stale Omawrite bundles were removed from `dist/`. **Refresh with the app closed:** `./bin/package-mac && ./bin/prepare-dev-app && ./bin/install-mac`. |
+| **Current review build** | `0.3.0-dev34` / macOS `0.3.0 (138)` |
+| **Last completed cycle** | 138 — Live selection race and native theme-folder checks ([record](research/cycle-138/README.md)); 137 — Live theme fidelity ([record](research/cycle-137/README.md)); both overnight 8 October 2026 |
+| **Regression suite** | **212 passed, 0 failed, 0 skipped** (`./bin/test`, offscreen Qt 6.11.2, Apple Silicon); editor page **248 passed** (`cd src/editor && npm test`). Two known Qt Material `SplitView` null-parent warnings in `savesAndOpensFromFooterMenu`. |
+| **Packaged bundles** | `dist/Fomawrite.app`, `dist/Fomawrite Dev.app` and `/Applications/Fomawrite.app` are all at build **138** ([manifest](research/cycle-138/verified-builds.json)); the stale Omawrite bundles were removed from `dist/`. **Refresh with the app closed:** `./bin/package-mac && ./bin/prepare-dev-app && ./bin/install-mac`. |
 | **CI** | [`.github/workflows/ci.yml`](.github/workflows/ci.yml): macOS, pinned Qt 6.11.3, `./bin/build && ./bin/test`. First run proved the pipeline but was red on four runner-only UI-click tests; Cycle 134 root-caused one (a viewport-transition timer stealing focus) and hardened the click helper for the other three — see the Actions tab for the run after `e07f727`. |
 | **Baseline reviewed** | [INDEPENDENT_REVIEW.md](INDEPENDENT_REVIEW.md) (6 October 2026). C1–C6 closed by Cycle 131; A1–A8/E4 by Cycle 132; P1 and part of §4 by Cycle 133; the §6 direction question answered by Cycle 134. |
 
@@ -29,7 +29,7 @@ Measured: 1 MiB document loads in ~55 ms; one keystroke on it mirrors in ~75 ms 
 
 ## Open
 
-- **Native acceptance**: `bin/check-document-views` ran against the build-135 release bundle on 7 October (first run since build 130; it had been broken since Cycle 133 by a stale `PreviewPane.qml` entry in its resource list). All footer, daily-writing, pane-zoom, editor, editing-layout and pane-chrome checks passed, including the steps that now drive Live. Three of twelve publishing-theme checks failed in the theme-folder fixture family ("Cannot create disposable folder themes"); not Live related, open. `bin/check-publishing-startup` passed (cold and restored) on 7 October. The Live editor has still not been driven by physical input.
+- **Native acceptance**: `bin/check-document-views` passes in full against the build-138 release bundle (8 October): 124 footer states, 5 daily-writing, 5 pane-zoom, 5 editor, 12 publishing-theme checks, the three theme-folder checks included (Cycle 138 fixed the fixture; the wrapper's stale thresholds and resource list were aligned). `bin/check-publishing-startup` passed (cold and restored) on 7 October. The Live editor has still not been driven by physical input.
 - **Live editor limits**: no Mermaid; pasted images go to `images/` beside a *saved* document (an untitled document refuses with a notice); authorship marks invisible in Live; Live links use the page's own panel (label/URL/title, edit/remove), not the Source dialog; images and footnote references inside table cells show as text; `plaintext`/unknown fences unhighlighted by design; the page's selection is reported with a 30 ms debounce, so a Format command issued within 30 ms of a selection change may use the previous selection.
 - **App bug found by the CI work**: a viewport-transition timer can steal focus from an auxiliary field (e.g. the link editor label) right after it opens — fixed in the test's sequencing, now fixed in the app as well (`viewportTransitionKeepsAuxiliaryFocus`, red/green).
 - **Decisions for Andrew**: Mermaid (+2.5 MB)? Drop C/C++/PHP/Rust grammars (−280 KB)? Spell check in Live (WebEngine dictionaries)?
