@@ -1002,3 +1002,32 @@ void FomawriteTest::liveThemeGalleryCapturesEveryBundledStyle() {
     QVERIFY2(distinctLight >= 2, "every bundled style rendered identically in Live");
     page.backend.discardRecovery();
 }
+
+// Andrew, 9 Oct: opening a document in Preview Only, then choosing Split in
+// the footer, showed View > Editing with neither Source nor Live checked
+// until Live was toggled once. The native item's checked state must follow
+// the layout from the start.
+void FomawriteTest::nativeEditingMenuChecksFollowTheLayoutFromTheStart() {
+    Cycle103SettingsSnapshot settings;
+    Backend backend;
+    QQmlEngine engine; engine.rootContext()->setContextProperty("backend", &backend);
+    QQmlComponent component(&engine, QUrl(QStringLiteral("qrc:/Main.qml")));
+    QScopedPointer<QObject> window(component.create()); QVERIFY2(window, qPrintable(component.errorString()));
+    auto *layout = window->findChild<QObject *>("workspaceLayout"); QVERIFY(layout);
+    auto *source = window->findChild<QObject *>("native_sourceEditing"); QVERIFY(source);
+    auto *live = window->findChild<QObject *>("native_liveEditing"); QVERIFY(live);
+    auto *preview = window->findChild<QObject *>("native_preview"); QVERIFY(preview);
+    QVERIFY(QMetaObject::invokeMethod(window.data(), "selectWritingMode", Q_ARG(QVariant, QStringLiteral("preview"))));
+    QTRY_COMPARE(layout->property("effectiveLayoutMode").toInt(), 2);
+    QVERIFY(!source->property("checked").toBool()); QVERIFY(!live->property("checked").toBool()); QVERIFY(preview->property("checked").toBool());
+    QVERIFY(QMetaObject::invokeMethod(window.data(), "setDocumentView", Q_ARG(QVariant, 1)));
+    QTRY_COMPARE(layout->property("effectiveLayoutMode").toInt(), 1);
+    QTRY_VERIFY(source->property("checked").toBool());
+    QVERIFY(!live->property("checked").toBool()); QVERIFY(!preview->property("checked").toBool());
+    // The native tick is re-asserted when the submenu opens; the value and the binding survive.
+    for (QObject *item : {source, live, preview}) QVERIFY(QMetaObject::invokeMethod(item, "resync"));
+    QVERIFY(source->property("checked").toBool()); QVERIFY(!live->property("checked").toBool()); QVERIFY(!preview->property("checked").toBool());
+    QVERIFY(QMetaObject::invokeMethod(window.data(), "selectWritingMode", Q_ARG(QVariant, QStringLiteral("live"))));
+    QTRY_VERIFY(live->property("checked").toBool()); QVERIFY(!source->property("checked").toBool());
+    backend.discardRecovery();
+}

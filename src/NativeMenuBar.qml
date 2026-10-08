@@ -213,6 +213,7 @@ Platform.MenuBar {
     Platform.Menu {
         objectName: "nativeViewMenu"
         title: "View"
+        onAboutToShow: layoutPreview.resync()
         NativeCommand { commandId: "library" }
         NativeCommand { commandId: "organizer" }
         Platform.MenuSeparator {}
@@ -321,19 +322,23 @@ Platform.MenuBar {
         }
         Platform.MenuSeparator { objectName: "nativeAfterTemplate" }
         Platform.Menu {
+            id: nativeEditingMenu
             title: "Editing"
-            NativeCommand { commandId: "sourceEditing" }
-            NativeCommand { commandId: "liveEditing" }
+            onAboutToShow: { editingSource.resync(); editingLive.resync(); editingExact.resync(); }
+            NativeCommand { id: editingSource; commandId: "sourceEditing" }
+            NativeCommand { id: editingLive; commandId: "liveEditing" }
             Platform.MenuSeparator {}
-            NativeCommand { commandId: "liveThemeExact" }
+            NativeCommand { id: editingExact; commandId: "liveThemeExact" }
         }
         Platform.Menu {
+            id: nativeLayoutMenu
             title: "Layout"
-            NativeCommand { commandId: "editor" }
-            NativeCommand { commandId: "split" }
+            onAboutToShow: { layoutSingle.resync(); layoutSplit.resync(); }
+            NativeCommand { id: layoutSingle; commandId: "editor" }
+            NativeCommand { id: layoutSplit; commandId: "split" }
         }
         Platform.MenuSeparator {}
-        NativeCommand { commandId: "preview" }
+        NativeCommand { id: layoutPreview; commandId: "preview" }
         NativeCommand { commandId: "webPreview"; text: "Web Preview" }
         NativeCommand { commandId: "reloadPreview" }
         Platform.MenuItem { objectName: "native_pdfPreview"; text: "Paginated Preview…"; onTriggered: backend.printPreview() }

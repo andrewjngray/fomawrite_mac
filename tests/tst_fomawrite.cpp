@@ -108,6 +108,7 @@ private slots:
     void liveModeShowsImageRefusalNotice();
     void liveLeftControlShowsThemeAndExactSwitchReachesPage();
     void liveThemeGalleryCapturesEveryBundledStyle();
+    void nativeEditingMenuChecksFollowTheLayoutFromTheStart();
     void liveEditorPlacesCursorAndRestylesWithoutReload();
     void liveEditorCapturesEachPresentation();
     void persistenceRefusesLossyDecodeAndSaveAsWritesUtf8();

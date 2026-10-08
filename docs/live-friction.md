@@ -6,7 +6,7 @@ What Andrew finds while using Live as the daily editor. This list is the input t
 | --- | --- | --- | --- |
 | 9 Oct 2026 | A document opened in **Preview Only** shows no way into Source or Live: the editing capsule is hidden in that layout and nothing hints that it exists. | Footer, Preview Only | Open — design options below |
 | 9 Oct 2026 | From Single or Split there is no visible way back to Preview Only; it exists only in **View → Preview Only**. | Footer | Open — design options below |
-| 9 Oct 2026 | After opening in Preview Only and choosing Split, **View → Editing** showed neither Source nor Live checked until Live was toggled once. | Native View menu | Bug; test `nativeEditingMenuChecksFollowTheLayoutFromTheStart` |
+| 9 Oct 2026 | After opening in Preview Only and choosing Split, **View → Editing** showed neither Source nor Live checked until Live was toggled once. | Native View menu | Fixed in source, not yet installed: the QML state was right all along (test `nativeEditingMenuChecksFollowTheLayoutFromTheStart`), the native Cocoa item showed a stale tick; the Editing and Layout submenus now re-assert their ticks when they open. Needs Andrew's confirmation on the next build. |
 
 ## Design options for the Preview Only routes (for Andrew to choose)
 
