@@ -4,8 +4,8 @@ This is the only place the current review build is recorded. Update it at the en
 
 | | |
 | --- | --- |
-| **Current review build** | `0.3.0-dev31` / macOS `0.3.0 (135)` |
-| **Last completed cycle** | 135 — Visual Edit retired, builds aligned ([record](research/cycle-135/README.md)), 7 October 2026 |
+| **Current review build** | `0.3.0-dev32` / macOS `0.3.0 (136)` |
+| **Last completed cycle** | 136 — Live follows the publishing theme, lighter ([record](research/cycle-136/README.md)), 8 October 2026 |
 | **Regression suite** | **207 passed, 0 failed, 0 skipped** (`./bin/test`, offscreen Qt 6.11.2, Apple Silicon; down from 240 because the Visual Edit and mapper suites left with the feature — see the record); editor page **176 passed** (`cd src/editor && npm test`). Two known Qt Material `SplitView` null-parent warnings in `savesAndOpensFromFooterMenu`. |
 | **Packaged bundles** | `dist/Fomawrite.app`, `dist/Fomawrite Dev.app` and `/Applications/Fomawrite.app` are all at build **135** ([manifest](research/cycle-135/verified-builds.json)); the stale Omawrite bundles were removed from `dist/`. **Refresh with the app closed:** `./bin/package-mac && ./bin/prepare-dev-app && ./bin/install-mac`. |
 | **CI** | [`.github/workflows/ci.yml`](.github/workflows/ci.yml): macOS, pinned Qt 6.11.3, `./bin/build && ./bin/test`. First run proved the pipeline but was red on four runner-only UI-click tests; Cycle 134 root-caused one (a viewport-transition timer stealing focus) and hardened the click helper for the other three — see the Actions tab for the run after `e07f727`. |
@@ -15,8 +15,8 @@ This is the only place the current review build is recorded. Update it at the en
 
 One CodeMirror 6 editor page (`src/editor/`, TypeScript, built to the committed `dist/editor.js`, 1.4 MB) hosted in the app's Chromium `WebEngineView` and connected to the C++ document over QWebChannel (`EditorBridge`, `LiveEditorPane.qml`). The Markdown text stays canonical in C++: page edits mirror into the `QTextDocument` byte-exactly and C++-side edits mirror back. Presentation modes over the same text:
 
-- **Live** — markers hide until the caret enters them; images (resolved by the host), task checkboxes, rules, syntax-highlighted fences (curated language set), table grids, KaTeX math, footnotes, `[toc]`, front matter; styled by the same `#write` theme CSS as published output (Typora-style themes apply).
-- **Source** — Manuscript (bundled iA Writer Mono, hanging markers), Editorial, Book; **Code** (line numbers, indent guides, no wrap); focus and typewriter modes.
+- **Live** — follows the Output Style with its layout filtered out (View → Live Follows Theme Exactly turns the filter off); markers hide until the caret enters them; images (resolved by the host), task checkboxes, rules, syntax-highlighted fences (curated language set), table grids, KaTeX math, footnotes, `[toc]`, front matter; styled by the same `#write` theme CSS as published output (Typora-style themes apply).
+- **Source** — Manuscript (bundled iA Writer Mono, hanging markers), Editorial, Book (Source only; in Live the left control names the Output Style); **Code** (line numbers, indent guides, no wrap); focus and typewriter modes.
 - App integration: footer capsule **Source / Live** and View menu; Format menu/toolbar/shortcuts act on the page while it has focus; Undo/Redo and Find route to the page; scroll sync with the publishing pane both ways; caret carried across mode switches; outline jumps land in the page; pasted/dropped images saved beside the document; an in-page link editor (Ctrl+K); the whole Edit menu (Cut/Copy/Paste/Select All, Copy Formatted/HTML/Markdown, Paste As) acts on the page; theme changes re-style without reloading; the page is created on first use and kept.
 
 Measured: 1 MiB document loads in ~55 ms; one keystroke on it mirrors in ~75 ms (two channel hops); first page ready in ~360 ms. Screenshots: [research/cycle-134/captures](research/cycle-134/captures/).

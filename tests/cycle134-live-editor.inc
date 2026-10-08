@@ -611,6 +611,30 @@ void FomawriteTest::liveEditorCapturesEachPresentation() {
     QTRY_COMPARE_WITH_TIMEOUT(page.pageText(), page.canonical(), 10000);
     QVERIFY2(cycle134SaveFrame(page.window, QDir(captures).filePath("live-math.png"), &why), qPrintable(why));
     qInfo("capture %s", qPrintable(QDir(captures).filePath("live-math.png")));
+    // Cycle 136: a deliberately layout-heavy theme. Filtered Live keeps its
+    // type (face, colours, heading rule) and drops its geometry; the exact
+    // switch brings the geometry back. Reviewed by eye from the two captures.
+    QVERIFY(page.backend.open(QUrl::fromLocalFile(directory.filePath("sample.md"))));
+    const QString heavy = QStringLiteral(
+        "#write { max-width: 420px; margin: 40px auto; padding: 60px 90px; font-family: Georgia, serif; color: #3b2a1a; background: #f6efe3;"
+        " background-image: linear-gradient(135deg, #f6efe3, #e6d3b3); box-shadow: 0 12px 40px rgba(0,0,0,.35); columns: 2; transform: rotate(-1deg); }"
+        " #write::before { content: 'DRAFT'; position: absolute; top: 8px; left: 8px; font-size: 40px; color: rgba(200,0,0,.4); }"
+        " #write h1, #write h2 { color: #8b1a1a; font-family: 'Palatino', serif; border-bottom: 2px solid #8b1a1a; }"
+        " #write blockquote { color: #6a5a4a; font-style: italic; } #write code { color: #5b2d8e; } #write a { color: #0b6e4f; }");
+    page.backend.syncLiveEditor();
+    page.bridge()->applyTheme(heavy);
+    page.bridge()->applyAppearance(QStringLiteral("{\"appearance\":\"manuscript\",\"dark\":false,\"fontSize\":17,\"liveThemeFilter\":true,\"palette\":{\"background\":\"#ffffff\",\"text\":\"#222222\"}}"));
+    page.bridge()->selectMode("live");
+    QTRY_COMPARE_WITH_TIMEOUT(page.pageText(), page.canonical(), 10000);
+    QVERIFY2(cycle134SaveFrame(page.window, QDir(captures).filePath("live-heavy-theme-filtered.png"), &why), qPrintable(why));
+    page.bridge()->applyAppearance(QStringLiteral("{\"appearance\":\"manuscript\",\"dark\":false,\"fontSize\":17,\"liveThemeFilter\":false,\"palette\":{\"background\":\"#ffffff\",\"text\":\"#222222\"}}"));
+    QTest::qWait(150);
+    QVERIFY2(cycle134SaveFrame(page.window, QDir(captures).filePath("live-heavy-theme-exact.png"), &why), qPrintable(why));
+    // The two frames must differ (the geometry came back) and neither is blank.
+    const QImage filtered(QDir(captures).filePath("live-heavy-theme-filtered.png")), exact(QDir(captures).filePath("live-heavy-theme-exact.png"));
+    QVERIFY(!filtered.isNull() && !exact.isNull());
+    QVERIFY(filtered != exact);
+    qInfo("capture %s", qPrintable(QDir(captures).filePath("live-heavy-theme-filtered.png")));
     page.backend.discardRecovery();
 }
 
