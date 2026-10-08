@@ -84,6 +84,7 @@ async function main() {
   const view = new EditorView({ state: session.createState(""), parent });
   session.attach(view);
   applyModeClass(session.mode);
+  session.syncLiveTheme();
 
   for (const ev of ["keydown", "beforeinput", "input", "compositionupdate"])
     view.dom.addEventListener(ev, markInput, { capture: true, passive: true });
@@ -120,7 +121,7 @@ async function main() {
   }));
   onSignal(bridge.applyChanges, guard("applyChanges", (json: string, revision: number) => session.applyChanges(json, revision)));
   onSignal(bridge.setMode, guard("setMode", (mode: string) => session.setMode(mode)));
-  onSignal(bridge.setTheme, guard("setTheme", (css: string) => applyThemeDom(css)));
+  onSignal(bridge.setTheme, guard("setTheme", (css: string) => { applyThemeDom(css); session.syncLiveTheme(); }));
   onSignal(bridge.setAppearance, guard("setAppearance", (json: string) => session.setAppearance(JSON.parse(json) as Appearance)));
   onSignal(bridge.focusEditor, guard("focusEditor", () => view.focus()));
   onSignal(bridge.requestText, guard("requestText", (token: number) => bridge.textReply(token, session.getText())));

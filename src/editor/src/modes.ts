@@ -16,6 +16,7 @@ import { appearanceEffect, parseAppearancePatch, AppearanceState } from "./appea
 import { fenceLanguages } from "./blocks";
 import { mathMarkdown } from "./math";
 import { extrasMarkdown } from "./extras";
+import { LIVE_OVERLAY_ID, LiveThemeState, applyLiveTheme, parseLiveThemePatch } from "./livetheme";
 
 export type Mode = "source" | "live";
 
@@ -28,6 +29,10 @@ export interface Appearance {
   focus?: boolean;
   /** "manuscript" | "editorial" | "book" | "code" - see appearance.ts */
   appearance?: string;
+  /** Live mode only: apply the editing overlay over the theme (default true). false = theme exactly. */
+  liveThemeFilter?: boolean;
+  /** Live mode only: host colours used when the theme sets no background / text colour on #write. */
+  palette?: { background: string; text: string };
 }
 
 /** Marks transactions that come from the host (setDocument/applyChanges/mode) so they are not echoed back. */
@@ -148,7 +153,10 @@ export function applyThemeDom(css: string, doc: Document | undefined = typeof do
   if (!el) {
     el = doc.createElement("style");
     el.id = "fomawrite-theme";
-    doc.head.appendChild(el);
+    // The live overlay must stay after the theme element to win on precedence.
+    const overlay = doc.getElementById(LIVE_OVERLAY_ID);
+    if (overlay) doc.head.insertBefore(el, overlay);
+    else doc.head.appendChild(el);
   }
   el.textContent = css;
 }
@@ -168,6 +176,8 @@ export class Session {
    *  (so `appearance.typewriter` is never set here; `presentation` holds the merged patch). */
   appearance: Appearance = {};
   private presentation: Partial<AppearanceState> = {};
+  /** Live-theme filter state (livetheme.ts); the overlay is on unless the host sends `liveThemeFilter: false`. */
+  private liveTheme: Omit<LiveThemeState, "mode"> = { filter: true };
   /** Called for every user (non-External) doc-changing transaction. */
   onDocChanged: ((changesJson: string, revision: number) => void) | null = null;
   private view!: ViewLike;
@@ -239,12 +249,22 @@ export class Session {
       annotations: External.of(true),
     });
     applyModeClass(mode);
+    this.syncLiveTheme();
+  }
+
+  /** Re-apply the live overlay / readability fill; call after the theme or mode changes. No-op without a DOM. */
+  syncLiveTheme(doc: Document | undefined = typeof document !== "undefined" ? document : undefined) {
+    applyLiveTheme({ ...this.liveTheme, mode: this.mode }, doc);
   }
 
   setAppearance(a: Appearance) {
-    const { focus: _f, typewriter: _t, appearance: _a, ...legacy } = a;
+    const { focus: _f, typewriter: _t, appearance: _a, liveThemeFilter: _l, palette: _p, ...legacy } = a;
     this.appearance = { ...this.appearance, ...legacy };
     applyAppearanceDom(a);
+    const live = parseLiveThemePatch(a);
+    if (live.liveThemeFilter !== undefined) this.liveTheme.filter = live.liveThemeFilter;
+    if (live.palette) this.liveTheme.palette = live.palette;
+    this.syncLiveTheme();
     const patch = parseAppearancePatch(a);
     this.presentation = { ...this.presentation, ...patch };
     if (Object.keys(patch).length)

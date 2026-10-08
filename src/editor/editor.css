@@ -106,9 +106,10 @@ html.dark, html.dark body { color-scheme: dark; }
 .fw-mark { color: var(--fw-muted); }
 
 /* ---------------------------------------------------------------- live mode (proportional) */
-#write.fw-mode-live .cm-content {
-  font-family: var(--fw-live-font, Georgia, serif);
-}
+/* The base face sits on #write at zero specificity (:where) so a theme's `#write { font-family }` wins; the content
+   inherits it. Host fontFamily (--fw-font) is the base face, then --fw-live-font, then Georgia. */
+:where(#write.fw-mode-live) { font-family: var(--fw-font, var(--fw-live-font, Georgia, serif)); }
+#write.fw-mode-live .cm-content { font-family: inherit; }
 #write.fw-mode-live .fw-em { font-style: italic; }
 #write.fw-mode-live .fw-strong { font-weight: 700; }
 #write.fw-mode-live .fw-strike { text-decoration: line-through; }
