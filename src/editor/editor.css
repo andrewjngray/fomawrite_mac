@@ -132,10 +132,22 @@ html.dark, html.dark body { color-scheme: dark; }
 #write.fw-mode-live .fw-live-link { color: var(--fw-accent); text-decoration: underline; text-underline-offset: 2px; }
 #write.fw-mode-live .fw-list-mark { color: var(--fw-muted); }
 /* Revealed markers: the node's source is visible, dim it slightly so it reads as editing chrome. */
-/* `#write#write` raises these above the mapped theme copy (`#write.fw-mode-live .fw-live-link:hover` etc., which
+/* `.fw-revealed` is a SEPARATE span from the mark span (`.fw-live-link`, `.fw-strong`, ...): live.ts adds both
+   decorations and CodeMirror nests them, `.fw-revealed` OUTSIDE the mark (`<span class="fw-revealed">[<span
+   class="fw-live-link">l</span>](u)</span>`, `<span class="fw-revealed"><span class="fw-strong">**b**</span></span>`;
+   checked in the DOM). So a compound `.fw-revealed.fw-live-link` can never match; the rules are descendant-based.
+   `#write#write` raises them above the mapped theme copy (`#write.fw-mode-live .fw-live-link:hover` etc., which
    comes later in <head>), so a theme's `a` / `strong` colour and underline never leak onto revealed source. */
 #write#write.fw-mode-live .fw-revealed { color: inherit; }
-#write#write.fw-mode-live .fw-revealed.fw-live-link { text-decoration: none; }
+#write#write.fw-mode-live .fw-revealed .fw-live-link { text-decoration: none; color: inherit; }
+#write#write.fw-mode-live .fw-revealed .fw-strong,
+#write#write.fw-mode-live .fw-revealed .fw-em,
+#write#write.fw-mode-live .fw-revealed .fw-strike,
+#write#write.fw-mode-live .fw-revealed .fw-code { color: inherit; }
+/* The palette fills the text colour only when the theme set none. A mapped inline-code background (a bundled
+   preset's light grey) would then sit under that palette text, so the editor's own translucent code background
+   takes over while the fill is active. */
+#write#write.fw-mode-live.fw-live-fill-fg .fw-code { background-color: var(--fw-code-bg) !important; }
 
 #write.fw-mode-live .fw-h1,
 #write.fw-mode-live .fw-h2,

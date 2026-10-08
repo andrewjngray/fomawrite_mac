@@ -338,10 +338,14 @@ const sameColour = (a: string | null | undefined, b: string | null | undefined):
 };
 
 /**
- * What the THEME paints: `bg` is #write's computed background if it has one, else <body>'s, else <html>'s (the editor's
- * own `html, body { background: var(--fw-bg) }` does not count: a body / html background equal to --fw-bg is the
- * editor default, so unset); `fg` is #write's computed colour unless it equals the editor default `--fw-fg`, which also
- * covers a colour inherited from a theme's `body { color }` or `html { color }`. null = the theme set nothing.
+ * What the THEME paints. `bg` is the first non-transparent background among #write, <body> and <html> (in that order;
+ * the search never looks past an opaque <body>, because the editor's own `html, body { background: var(--fw-bg) }`
+ * makes <body> the surface behind #write and <html>'s colour never shows). That painted colour counts as UNSET (null)
+ * when it equals the editor's own `--fw-bg`: the theme painted nothing, the editor did. This is why a bundled preset
+ * (`html { background: white; color: ... }`, nothing on body) reads as "nothing painted" in dark Live: the opaque dark
+ * <body> is the first hit and equals --fw-bg. `fg` is #write's computed colour unless it equals the editor default
+ * `--fw-fg`, which also covers a colour inherited from a theme's `body { color }`; a colour set only on `html` is
+ * overridden by the editor's `body { color: var(--fw-fg) }` and so never reaches #write (unset). null = nothing set.
  */
 export function measureTheme(doc: Document, write: Element): { bg: string | null; fg: string | null } | null {
   const win = doc.defaultView;
@@ -352,13 +356,11 @@ export function measureTheme(doc: Document, write: Element): { bg: string | null
   const editorBg = editorVar("--fw-bg"), editorFg = editorVar("--fw-fg");
 
   let bg: string | null = null;
-  const own = css(write)?.backgroundColor;
-  if (own && !isUnsetColour(own)) bg = own;
-  else {
-    for (const el of [doc.body, doc.documentElement]) {
-      const c = css(el)?.backgroundColor;
-      if (c && !isUnsetColour(c) && !(editorBg && sameColour(c, editorBg))) { bg = c; break; }
-    }
+  for (const el of [write, doc.body, doc.documentElement]) {
+    const c = css(el)?.backgroundColor;
+    if (!c || isUnsetColour(c)) continue;
+    if (!(editorBg && sameColour(c, editorBg))) bg = c;
+    break; // the first painted surface decides; an opaque body hides html
   }
 
   const fgNow = css(write)?.color;

@@ -137,12 +137,12 @@
    The grid replaces the whole table (a block widget) while the caret is outside it. */
 :root {
   --fw-table-border: #d0d7de;
-  --fw-table-head-bg: #f3f4f6;
+  --fw-table-head-bg: rgba(127, 127, 127, 0.12);
   --fw-table-stripe-bg: rgba(127, 127, 127, 0.05);
 }
 :root.dark {
   --fw-table-border: #3d444d;
-  --fw-table-head-bg: #262b33;
+  --fw-table-head-bg: rgba(127, 127, 127, 0.12);
   --fw-table-stripe-bg: rgba(255, 255, 255, 0.04);
 }
 #write.fw-mode-live .fw-table-wrap { display: block; max-width: 100%; overflow-x: auto; margin: 0.4em 0; cursor: text; }
@@ -160,8 +160,17 @@
   vertical-align: top;
   text-align: left;
 }
+/* The header band is a translucent neutral tint, not a fixed light / dark colour, so it reads on whatever page the
+   theme paints and the theme's own text colour stays legible on it (a light theme under a dark editor, or the
+   reverse). */
 #write.fw-mode-live .fw-table th { background: var(--fw-table-head-bg); font-weight: 600; }
 #write.fw-mode-live .fw-table tbody tr:nth-child(even) td { background: var(--fw-table-stripe-bg); }
+/* The palette filled the text colour (the theme set none): a row / cell background the theme gave the real table
+   (a preset's `tr:nth-child(even) { background: #f8f9fa }`) would sit under that palette text, so the theme's row
+   and cell backgrounds are dropped and the editor's own stripe and header tint stand. */
+#write#write.fw-mode-live.fw-live-fill-fg .fw-table tr,
+#write#write.fw-mode-live.fw-live-fill-fg .fw-table td { background-color: transparent !important; }
+#write#write.fw-mode-live.fw-live-fill-fg .fw-table tbody tr:nth-child(even) td { background-color: var(--fw-table-stripe-bg) !important; }
 #write.fw-mode-live .fw-table .fw-align-center { text-align: center; }
 #write.fw-mode-live .fw-table .fw-align-right { text-align: right; }
 #write.fw-mode-live .fw-table code {
