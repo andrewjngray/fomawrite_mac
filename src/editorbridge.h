@@ -29,6 +29,11 @@ public:
     Q_INVOKABLE void applyAppearance(const QString &json);
     Q_INVOKABLE void focus();
     Q_INVOKABLE int fetchText();
+    // Ask the page for its selection as it is right now (the debounced
+    // cursorChanged report can lag 30 ms). Returns the token; the answer comes
+    // back through selectionReply() and the selectionReceived signal. Nothing
+    // is sent (and no answer will come) while the page is not ready.
+    Q_INVOKABLE int fetchSelection();
     // Test support: edits that the page applies as ordinary user input.
     Q_INVOKABLE void injectUserChanges(const QString &changesJson);
     Q_INVOKABLE void requestUndo();
@@ -58,6 +63,10 @@ public slots:
     void metric(const QString &name, double ms);
     void log(const QString &message);
     void textReply(int token, const QString &text);
+    // Answer to requestSelection: the page's selection at the moment it was
+    // asked. Also refreshes lastCursor()/lastSelection*() without marking the
+    // caret as moved by the writer.
+    void selectionReply(int token, int anchor, int head);
     // The page cannot read local files; it asks the host for a data: URL.
     void requestImage(int token, const QString &src);
     // Called by the host with the answer (emits imageReply to the page).
@@ -77,6 +86,7 @@ signals:
     void setAppearance(const QString &json);
     void focusEditor();
     void requestText(int token);
+    void requestSelection(int token);
     void simulateUserChanges(const QString &changesJson);
     void undo();
     void redo();
@@ -95,6 +105,7 @@ signals:
     void cursorMoved(int anchor, int head);
     void metricRecorded(const QString &name, double ms);
     void textReceived(int token, const QString &text);
+    void selectionReceived(int token, int anchor, int head);
     void messageLogged(const QString &message);
 
 private:

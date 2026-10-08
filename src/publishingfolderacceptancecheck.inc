@@ -2,6 +2,10 @@
             const QString folder = PublishingThemes::directory();
             const QString firstId = "cycle125-a", secondId = "cycle125-b", badId = "cycle125-bad";
             const auto writeTheme = [&](const QString &id, const QByteArray &css) {
+                // The app never creates the themes folder on its own (a refresh must not
+                // replace a folder the writer moved aside; only Open Themes Folder and
+                // Import make it), and this harness runs in a fresh, empty data directory.
+                if (!QDir().mkpath(folder)) return false;
                 QSaveFile file(folder + '/' + id + ".css");
                 return file.open(QIODevice::WriteOnly) && file.write(css) == css.size() && file.commit();
             };

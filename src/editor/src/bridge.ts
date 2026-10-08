@@ -16,6 +16,8 @@ export interface Bridge {
   metric(name: string, ms: number): void;
   log(message: string): void;
   textReply(token: number, text: string): void;
+  // Answer to requestSelection: the main selection at the moment of the request (UTF-16 offsets).
+  selectionReply(token: number, anchor: number, head: number): void;
   requestImage(token: number, src: string): void;
   // Paste/drop of an image: the host writes the bytes next to the document and answers with imageSaved.
   saveImage(token: number, name: string, mime: string, base64: string): void;
@@ -29,6 +31,8 @@ export interface Bridge {
   setAppearance: Signal<[string]>;
   focusEditor: Signal<[]>;
   requestText: Signal<[number]>;
+  // Host asks for the current selection; answer with selectionReply(token, anchor, head).
+  requestSelection: Signal<[number]>;
   simulateUserChanges: Signal<[string]>;
   undo: Signal<[]>;
   redo: Signal<[]>;
@@ -98,7 +102,7 @@ const MOCK_PNG =
 
 const SIGNALS = [
   "setDocument", "applyChanges", "setMode", "setTheme", "setAppearance",
-  "focusEditor", "requestText", "simulateUserChanges", "undo", "redo", "imageReply", "imageSaved", "scrollToFraction", "setCursor", "command"
+  "focusEditor", "requestText", "requestSelection", "simulateUserChanges", "undo", "redo", "imageReply", "imageSaved", "scrollToFraction", "setCursor", "command"
 ] as const;
 
 export type MockBridge = Bridge & {
@@ -115,7 +119,7 @@ export function createMockBridge(): MockBridge {
     calls.push({ name, args });
     console.log("[bridge mock]", name, ...args);
   };
-  for (const s of ["ready", "documentChanged", "cursorChanged", "metric", "log", "textReply", "scrolled"]) mock[s] = slot(s);
+  for (const s of ["ready", "documentChanged", "cursorChanged", "metric", "log", "textReply", "selectionReply", "scrolled"]) mock[s] = slot(s);
   for (const s of SIGNALS) {
     handlers[s] = [];
     mock[s] = { connect: (fn: (...a: any[]) => void) => handlers[s].push(fn) };
