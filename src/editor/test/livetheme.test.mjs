@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import {
   FILL_BG_CLASS, FILL_FG_CLASS, LIVE_EXACT_CLASS, LIVE_OVERLAY_CSS, LIVE_OVERLAY_ID,
   HOST_SIZE_CLASS, LIVE_HTML_CLASS, LIVE_ROOT_CLASS, MAPPED_ID, THEME_ID, applyLiveOverlay, applyLiveTheme, applyThemeMapped,
-  contrastRatio, isUnsetColour, parseColour, parseLiveThemePatch, parsePalette, pickReadableColours, relativeLuminance,
+  contrastRatio, isUnsetColour, measureTheme, parseColour, parseLiveThemePatch, parsePalette, pickReadableColours, relativeLuminance,
 } from "../src/livetheme.ts";
 import { INITIAL_APPEARANCE, effectiveAppearanceClasses, parseAppearancePatch, reduceAppearance } from "../src/appearance.ts";
 import { Session, applyAppearanceDom, applyThemeDom } from "../src/modes.ts";
@@ -395,7 +395,8 @@ test("mapped headings stay relative so the theme's scale follows the host size",
   applyThemeDom("#write { font-size: 30px } #write h1 { font-size: 2.2rem } #write h2 { font-size: 1.5em }", doc);
   applyLiveTheme({ mode: "live", filter: true }, doc);
   const mapped = doc.getElementById(MAPPED_ID).textContent;
-  assert.ok(mapped.includes("font-size: 2.2em") && mapped.includes("font-size: 1.5em"));
+  assert.ok(mapped.includes("font-size: 1.1733em"), "2.2rem = 35.2px over the theme's 30px #write");
+  assert.ok(mapped.includes("font-size: 1.5em"));
   assert.ok(!mapped.includes("30px") && !mapped.includes("rem"));
 });
 
@@ -599,35 +600,211 @@ test("fw-live-root is on <html> in Live, filtered or exact, and off in Source", 
   assert.ok(!/(^|\n)#write\.fw-mode-live[^{]*\{[^}]*font-family:\s*var\(--fw-font/.test(EDITOR_CSS.replace(/\.cm-content/g, "")), "no host face directly on #write in Live");
 });
 
-// ---------------------------------------------------------------- revealed links beat the mapped theme copy
-test("revealed links stay un-underlined and un-tinted whatever the theme says about `a` (filtered and exact)", () => {
-  const theme = "a { color: #bc6a3a; text-decoration: underline } a:hover { color: red; text-decoration: underline } strong { color: crimson }";
+// ---------------------------------------------------------------- revealed marks beat the mapped theme copy
+// The nesting comes from the real decoration builder (src/live.ts), ordered the way CodeMirror nests mark spans:
+// outer = earlier start, then later end, then (equal ranges) LATER in the decoration set. The last rule was checked
+// in the real DOM (dev server): `<span class="fw-revealed"><span class="fw-strong">**b**</span></span>`, for strong,
+// em, code and strike alike, and `<span class="fw-revealed">[<span class="fw-live-link">l</span>](u)</span>`.
+import { EditorSelection, EditorState } from "@codemirror/state";
+import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
+import { buildLiveDecorations } from "../src/live.ts";
+
+/** Mark classes (outer -> inner) wrapping the character at `pos` when the caret is at `caret`. */
+function spanChain(doc, caret, pos) {
+  const state = EditorState.create({ doc, selection: EditorSelection.single(caret), extensions: [markdown({ base: markdownLanguage })] });
+  const found = [];
+  let n = 0;
+  buildLiveDecorations(state).between(0, doc.length, (from, to, d) => {
+    if (d.spec.class && from < to && from <= pos && pos < to) found.push({ from, to, cls: d.spec.class, n: n++ });
+  });
+  return found.sort((a, b) => a.from - b.from || b.to - a.to || b.n - a.n).map((f) => f.cls);
+}
+
+const REVEAL_DOC = "x **b** *i* `c` ~~s~~ [l](u) y";
+const REVEAL_CASES = [
+  { name: "link", caret: 25, pos: 23, mark: "fw-live-link" },
+  { name: "strong", caret: 4, pos: 4, mark: "fw-strong" },
+  { name: "em", caret: 10, pos: 9, mark: "fw-em" },
+  { name: "strike", caret: 19, pos: 18, mark: "fw-strike" },
+  { name: "code", caret: 14, pos: 13, mark: "fw-code" },
+];
+
+test("live.ts really emits separate revealed and mark spans (the structure the CSS has to match)", () => {
+  for (const c of REVEAL_CASES) {
+    const chain = spanChain(REVEAL_DOC, c.caret, c.pos);
+    assert.ok(chain.includes("fw-revealed") && chain.includes(c.mark), `${c.name}: ${chain}`);
+    assert.equal(chain.filter((x) => x === c.mark || x === "fw-revealed").length, 2, "two distinct spans, never one compound span");
+  }
+  // a link's mark covers only the label, so the revealed span wraps it
+  assert.deepEqual(spanChain(REVEAL_DOC, 25, 23), ["fw-revealed", "fw-live-link"]);
+});
+
+test("revealed marks stay un-underlined and un-tinted whatever the theme says (filtered and exact, real nesting)", () => {
+  const theme = "#write { color: #333 } a { color: #bc6a3a; text-decoration: underline } a:hover { color: red; text-decoration: underline } " +
+    "strong { color: crimson } em { color: teal } del { color: gray } code { color: purple; background: #eee }";
   const mapped = mapThemeCss(theme);
-  assert.ok(mapped.includes("fw-live-link"));
-  for (const exact of [false, true]) {
+  for (const c of ["fw-live-link", "fw-strong", "fw-em", "fw-strike", "fw-code"]) assert.ok(mapped.includes(c), c);
+  const rules = [...parseRules(EDITOR_CSS), ...parseRules(BLOCKS_CSS, 5000), ...parseRules(theme, 10000), ...parseRules(mapped, 20000)];
+  for (const exact of [false, true]) for (const c of REVEAL_CASES) {
     const html = celem("html", { classes: [LIVE_ROOT_CLASS] });
     const write = celem("div", { id: "write", parent: celem("body", { parent: html }), classes: ["fw-mode-live"].concat(exact ? ["fw-live-exact"] : []) });
     const line = celem("div", { parent: write, classes: ["cm-line"] });
-    const rev = celem("span", { parent: line, classes: ["fw-revealed", "fw-live-link"] });
-    const plain = celem("span", { parent: line, classes: ["fw-live-link"] });
-    // the order in <head>: editor.css, blocks.css, theme, mapped copy, overlay
-    const rules = [...parseRules(EDITOR_CSS), ...parseRules(BLOCKS_CSS, 5000), ...parseRules(theme, 10000), ...parseRules(mapped, 20000)];
+    let node = line;
+    const spans = spanChain(REVEAL_DOC, c.caret, c.pos).filter((k) => k === "fw-revealed" || k === c.mark);
+    for (const k of spans) node = celem("span", { parent: node, classes: [k] });
+    const plain = celem("span", { parent: line, classes: [c.mark] });
     for (const state of [new Set(), new Set(["hover"])]) {
-      assert.equal(cascade("text-decoration", rev, rules, { state, inherited: false }), "none", `revealed, exact=${exact}, ${[...state]}`);
-      assert.equal(cascade("color", rev, rules, { state }), cascade("color", line, rules, { state }), "revealed text takes the line colour");
+      const where = `${c.name}, exact=${exact}, ${[...state]}`;
+      const lineColour = cascade("color", line, rules, { state });
+      if (c.mark === "fw-live-link") assert.equal(cascade("text-decoration", node, rules, { state, inherited: false }), "none", where);
+      // every span in the chain (outer mark and revealed alike) reads the line colour
+      for (let n = node; n !== line; n = n.parent) assert.equal(cascade("color", n, rules, { state }), lineColour, "chain: " + where);
     }
-    assert.equal(cascade("text-decoration", plain, rules, { inherited: false }), "underline", "an unrevealed link keeps the theme's decoration");
-    assert.equal(cascade("color", plain, rules), "#bc6a3a");
+    assert.notEqual(cascade("color", plain, rules), cascade("color", line, rules), "an unrevealed " + c.name + " keeps the theme colour");
+    if (c.mark === "fw-live-link") assert.equal(cascade("text-decoration", plain, rules, { inherited: false }), "underline");
+    if (c.mark === "fw-code") assert.ok(/monospace|Menlo/.test(cascade("font-family", node, rules) ?? ""), "revealed code keeps its monospace face");
   }
 });
 
+test("the old compound-selector rule (`.fw-revealed.fw-live-link`) is gone: no span carries both classes", () => {
+  assert.ok(!/\.fw-revealed\.fw-/.test(EDITOR_CSS.replace(/\/\*[\s\S]*?\*\//g, "")));
+});
+
 test("the revealed rules out-specify any mapped selector", () => {
-  const revealed = "#write#write.fw-mode-live .fw-revealed.fw-live-link";
-  assert.ok(EDITOR_CSS.includes(revealed + " { text-decoration: none; }"));
+  const revealed = [
+    "#write#write.fw-mode-live .fw-revealed .fw-live-link",
+    "#write#write.fw-mode-live .fw-revealed .fw-strong",
+    "#write#write.fw-mode-live .fw-revealed .fw-em",
+    "#write#write.fw-mode-live .fw-revealed .fw-code",
+  ];
+  for (const r of revealed) assert.ok(EDITOR_CSS.includes(r), r);
   assert.ok(EDITOR_CSS.includes("#write#write.fw-mode-live .fw-revealed { color: inherit; }"));
-  for (const sel of ["#write a", "#write a:hover", "#write a:focus", "#write.x h1 a:active", "#write li strong"]) {
+  for (const r of revealed) for (const sel of ["#write a", "#write a:hover", "#write a:focus", "#write.x h1 a:active", "#write li strong", "#write blockquote em", "#write > h2 code"]) {
     const m = mapThemeCss(`${sel} { color: red }`).split("{")[0].trim();
     assert.ok(m, sel);
-    assert.ok(higher(revealed, m), `${revealed} vs ${m}: ${specificity(revealed)} vs ${specificity(m)}`);
+    assert.ok(higher(r, m), `${r} vs ${m}: ${specificity(r)} vs ${specificity(m)}`);
   }
+});
+
+// ---------------------------------------------------------------- measureTheme on a fake DOM (H1)
+const CREAM_RGB = "rgb(250, 245, 235)", DARK_BG = "rgb(30, 31, 34)", DARK_FG = "rgb(230, 237, 243)", WHITE_RGB = "rgb(255, 255, 255)";
+const DARK_VARS = { "--fw-bg": "#1e1f22", "--fw-fg": "#e6edf3" };
+const measure = (doc) => measureTheme(doc, doc.write);
+
+test("measureTheme: a bundled preset in dark Live paints nothing (white <html> hides behind the editor's dark <body>)", () => {
+  const doc = fakeDoc({ vars: DARK_VARS, body: { backgroundColor: DARK_BG, color: DARK_FG }, html: { backgroundColor: WHITE_RGB, color: "rgb(36, 41, 47)" }, computed: { color: DARK_FG } });
+  assert.deepEqual(measure(doc), { bg: null, fg: null });
+  applyLiveTheme({ mode: "live", filter: true, palette: DARK }, doc);
+  assert.deepEqual(fillOf(doc), { bg: DARK.background, fg: DARK.text }, "the palette pair: light text on a dark page, never #111 on dark");
+});
+
+test("measureTheme: a bundled preset in light Live is also unset", () => {
+  const doc = fakeDoc({ html: { backgroundColor: WHITE_RGB, color: "rgb(36, 41, 47)" } });
+  assert.deepEqual(measure(doc), { bg: null, fg: null });
+});
+
+test("measureTheme: claude-like (cream body, text set) reports a background; dark editor too", () => {
+  const light = fakeDoc({ body: { backgroundColor: CREAM_RGB }, html: { backgroundColor: CREAM_RGB }, computed: { color: "rgb(61, 57, 41)" } });
+  assert.deepEqual(measure(light), { bg: CREAM_RGB, fg: "rgb(61, 57, 41)" });
+  const dark = fakeDoc({ vars: DARK_VARS, body: { backgroundColor: CREAM_RGB }, html: { backgroundColor: DARK_BG }, computed: { color: "rgb(61, 57, 41)" } });
+  assert.deepEqual(measure(dark), { bg: CREAM_RGB, fg: "rgb(61, 57, 41)" });
+  applyLiveTheme({ mode: "live", filter: true, palette: DARK }, dark);
+  assert.deepEqual(fillOf(dark), { bg: null, fg: null }, "both set: nothing filled");
+});
+
+test("measureTheme: an opaque body decides; html is never consulted past it", () => {
+  // body painted dark (the theme's own dark), html white: white never shows
+  const bodyDark = fakeDoc({ body: { backgroundColor: "rgb(20, 20, 30)" }, html: { backgroundColor: WHITE_RGB }, computed: { color: "rgb(220, 220, 220)" } });
+  assert.deepEqual(measure(bodyDark), { bg: "rgb(20, 20, 30)", fg: "rgb(220, 220, 220)" });
+  // body is the editor's own colour, html is cream: still unset (html is not looked at)
+  const bodyEditor = fakeDoc({ vars: DARK_VARS, body: { backgroundColor: DARK_BG }, html: { backgroundColor: CREAM_RGB } });
+  assert.equal(measure(bodyEditor).bg, null);
+  // a transparent body lets html through
+  const bodyClear = fakeDoc({ body: { backgroundColor: "rgba(0, 0, 0, 0)" }, html: { backgroundColor: CREAM_RGB } });
+  assert.equal(measure(bodyClear).bg, CREAM_RGB);
+  // #write's own background wins over both
+  const own = fakeDoc({ computed: { backgroundColor: "rgb(10, 10, 10)" }, body: { backgroundColor: CREAM_RGB } });
+  assert.equal(measure(own).bg, "rgb(10, 10, 10)");
+});
+
+test("measureTheme: `html { color }` alone never reaches #write (the editor's body colour overrides it): unset", () => {
+  // the browser computes #write's colour from body's `color: var(--fw-fg)`, so it equals the editor default
+  const doc = fakeDoc({ html: { color: "rgb(120, 40, 40)" }, computed: { color: "rgb(36, 41, 47)" } });
+  assert.deepEqual(measure(doc), { bg: null, fg: null });
+  // a colour on body or #write does reach it
+  const body = fakeDoc({ computed: { color: "rgb(120, 40, 40)" } });
+  assert.deepEqual(measure(body), { bg: null, fg: "rgb(120, 40, 40)" });
+  applyLiveTheme({ mode: "live", filter: true, palette: LIGHT }, body);
+  assert.equal(fillOf(body).fg, null);
+  assert.ok(fillOf(body).bg, "text set, background unset: palette background chosen for contrast with the text");
+});
+
+test("measureTheme: no window gives null", () => {
+  const doc = fakeDoc();
+  doc.defaultView = null;
+  assert.equal(measure(doc), null);
+});
+
+// ---------------------------------------------------------------- follow-ons: inline code and table under the palette fill
+test("the palette text fill drops a mapped inline-code background; the rule is inert otherwise", () => {
+  const rule = "#write#write.fw-mode-live.fw-live-fill-fg .fw-code { background-color: var(--fw-code-bg) !important; }";
+  assert.ok(EDITOR_CSS.includes(rule));
+  assert.equal(FILL_FG_CLASS, "fw-live-fill-fg");
+  const theme = "code { background: #f3f4f6 }";
+  const rules = [...parseRules(EDITOR_CSS), ...parseRules(BLOCKS_CSS, 5000), ...parseRules(theme, 10000), ...parseRules(mapThemeCss(theme), 20000)];
+  const page = (fill) => {
+    const write = celem("div", { id: "write", parent: celem("body", { parent: celem("html", { vars: { "--fw-code-bg": "rgba(110, 118, 129, 0.3)" } }) }), classes: ["fw-mode-live", ...(fill ? [FILL_FG_CLASS] : [])] });
+    return celem("span", { parent: celem("div", { parent: write, classes: ["cm-line"] }), classes: ["fw-code"] });
+  };
+  assert.equal(cascade("background-color", page(false), rules, { inherited: false }), "#f3f4f6");
+  assert.equal(cascade("background-color", page(true), rules, { inherited: false }), "rgba(110, 118, 129, 0.3)");
+});
+
+test("the real table: header band is a translucent tint; theme row / cell backgrounds are dropped under the text fill", () => {
+  // M2: the head background no longer depends on the editor's dark / light colour scheme
+  const heads = [...BLOCKS_CSS.matchAll(/--fw-table-head-bg:\s*([^;]+);/g)].map((m) => m[1]);
+  assert.equal(heads.length, 2);
+  for (const h of heads) assert.ok(/^rgba\(\s*127,\s*127,\s*127,\s*0?\.\d+\)$/.test(h), h);
+  assert.ok(BLOCKS_CSS.includes(".fw-table th { background: var(--fw-table-head-bg); font-weight: 600; }"));
+  // presets: `tr:nth-child(even) { background: #f8f9fa }` stays light under light palette text unless dropped
+  assert.ok(BLOCKS_CSS.includes("#write#write.fw-mode-live.fw-live-fill-fg .fw-table tr"));
+  assert.ok(/fw-live-fill-fg \.fw-table td \{ background-color: transparent !important; \}/.test(BLOCKS_CSS));
+  assert.ok(BLOCKS_CSS.includes("fw-live-fill-fg .fw-table tbody tr:nth-child(even) td { background-color: var(--fw-table-stripe-bg) !important; }"));
+});
+
+test("the header band reads under a light theme in a dark editor (dark-claude-like): theme text over a neutral tint", () => {
+  // The header's text is the theme's own colour (inherited); the band is rgba(127,127,127,.12) over the cream page.
+  const tint = 0.12, cream = [250, 245, 235], grey = 127;
+  const band = cream.map((c) => Math.round(c * (1 - tint) + grey * tint));
+  assert.ok(contrastRatio(`rgb(${band.join(",")})`, "rgb(61, 57, 41)") >= 4.5, "theme text on the tinted band");
+});
+
+// ---------------------------------------------------------------- the cascade helper is loud about what it cannot model
+import { matches } from "./cascade.mjs";
+
+test("cascade.mjs: child combinators are evaluated (a `#write > *` rule really matches), unknown selectors throw", () => {
+  const write = celem("div", { id: "write" });
+  const editor = celem("div", { parent: write, id: "editor" });
+  const line = celem("div", { parent: editor, classes: ["cm-line"] });
+  assert.ok(matches("#write > *", editor));
+  assert.ok(!matches("#write > *", line), "a grandchild is not a child");
+  assert.ok(matches("#write > #editor > .cm-line", line));
+  assert.ok(matches("#write .cm-line", line));
+  assert.ok(!matches("#write > .cm-line", line));
+  assert.ok(matches(".cm-line:not(#editor)", line));
+  assert.ok(!matches(".cm-line::before", line), "pseudo-elements never match an element");
+  for (const bad of [".a + .b", ".a ~ .b", "#write > ", "li:nth-child(2)", "a[href]"]) assert.throws(() => matches(bad, line), /cascade:/, bad);
+});
+
+test("cascade.mjs: an overlay `#write > *` rule is evaluated, not silently skipped", () => {
+  // With the old silent catch this rule never matched, so `margin` fell through to the theme's value.
+  const rules = parseRules(LIVE_OVERLAY_CSS);
+  const html = celem("html");
+  const write = celem("div", { id: "write", parent: celem("body", { parent: html }), classes: ["fw-mode-live"] });
+  const wrapper = celem("div", { parent: write, id: "editor" });
+  const theme = parseRules("#write > #editor { margin: 40px auto }", 10000);
+  assert.equal(cascade("margin", wrapper, [...theme, ...rules], { inherited: false }), "0");
+  // and a rule it cannot model that declares the asked property is a loud failure, not a quiet non-match
+  assert.throws(() => cascade("margin", wrapper, parseRules("#write + p { margin: 1px }"), { inherited: false }), /cascade: sibling/);
+  assert.equal(cascade("color", wrapper, parseRules("#write + p { margin: 1px }"), { inherited: false }), undefined, "unrelated property: ignored");
 });

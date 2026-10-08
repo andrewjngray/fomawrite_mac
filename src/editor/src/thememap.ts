@@ -14,8 +14,10 @@
 //   code (not under pre) -> .fw-code     a -> .fw-live-link     strong, b -> .fw-strong
 //   em, i -> .fw-em     del, s, strike -> .fw-strike
 //
-// Absolute font sizes (px, pt, ...) become `em` relative to the theme's own `#write` size (16px when it sets none),
-// so the theme's scale follows the host text size. `blockquote::before/::after` glyphs are deliberately not mapped.
+// Absolute font sizes (px, pt, ...) and `rem` become `em` relative to the theme's own `#write` size (its
+// `#write { font-size }`, else the root size it inherits: `html { font-size }`, else 16px); `rem` itself counts the
+// ROOT size per unit, not #write's. In a `font` shorthand an absolute line-height becomes em of the font size. So the
+// theme's scale follows the host text size. `blockquote::before/::after` glyphs are deliberately not mapped.
 //
 // Left alone (the real elements already exist in Live widgets, so the theme reaches them directly): pre, table, img,
 // hr, and anything with classes, ids, attributes or structural pseudo-classes on a mapped element.
@@ -373,39 +375,62 @@ const PX_PER: Record<string, number> = { px: 1, pt: 4 / 3, pc: 16, in: 96, cm: 9
 /** The size the theme's absolute lengths are relative to when its `#write` sets none (a browser's default). */
 export const DEFAULT_BASE_PX = 16;
 
-const toPx = (num: string, unit: string) => parseFloat(num) * (PX_PER[unit.toLowerCase()] ?? 1);
+/** `num` `unit` in px; `rem` counts `rootPx` per unit (the ROOT element's size, never #write's). */
+const toPx = (num: string, unit: string, rootPx = DEFAULT_BASE_PX) =>
+  parseFloat(num) * (unit.toLowerCase() === "rem" ? rootPx : (PX_PER[unit.toLowerCase()] ?? 1));
 const fmtEm = (n: number) => `${parseFloat(n.toFixed(4))}em`;
+/** A size resolvable to px: absolute units and `rem`. */
+const SIZE_UNITS = ABS_UNITS + "|rem";
+const SIMPLE_SIZE = new RegExp(`^(\\d*\\.?\\d+)(${SIZE_UNITS})$`, "i");
 
 /** Per-theme facts the declaration filter needs. */
 interface Ctx {
-  /** The theme's own `#write` font size in px (16 when it sets none or not in absolute units). */
+  /** The root element's font size in px: the theme's `html` / `:root` `font-size` when absolute, else 16. */
+  rootPx: number;
+  /** The theme's own `#write` font size in px: its `#write { font-size }` when absolute, else what it inherits (the root size). */
   basePx: number;
 }
 
-/** The theme's `#write { font-size }` in px when it is absolute (last declaration wins), else the default. */
-function themeBasePx(nodes: Node[]): number {
-  let base = DEFAULT_BASE_PX;
+/** The last absolute `font-size` (px) that a top-level rule for one of `selectors` declares; a later relative one
+ *  (`%`, `em`, a keyword, calc) means unknown (`fallback`). */
+function themeFontPx(nodes: Node[], selectors: string[], fallback: number): number {
+  let size = fallback;
   for (const n of nodes) {
-    if (n.kind !== "rule" || !splitTop(n.selector, ",").some((s) => s.trim() === "#write")) continue;
+    if (n.kind !== "rule" || !splitTop(n.selector, ",").some((s) => selectors.includes(s.trim()))) continue;
     for (const d of parseDecls(n.body)) {
       if (d.name !== "font-size") continue;
-      const m = SIMPLE_ABSOLUTE.exec(d.value.trim());
-      const px = m ? toPx(m[1], m[2]) : 0;
-      base = px > 0 ? px : DEFAULT_BASE_PX;
+      const v = d.value.trim();
+      const m = SIMPLE_ABSOLUTE.exec(v);
+      // on the root a `%` / `em` size is relative to the browser default (`html { font-size: 62.5% }` is 10px)
+      const rel = selectors.includes("html") ? /^(\d*\.?\d+)(%|em)$/i.exec(v) : null;
+      const px = m ? toPx(m[1], m[2]) : rel ? (parseFloat(rel[1]) / (rel[2] === "%" ? 100 : 1)) * DEFAULT_BASE_PX : 0;
+      size = px > 0 ? px : fallback;
     }
   }
-  return base;
+  return size;
 }
 
-/** `font-size` / `font` value with `rem` -> `em` and the absolute size (px, pt, ...) -> `em` against the base. */
-function relativeFontSize(name: string, value: string, basePx: number): string {
-  value = value.replace(/(-?\d*\.?\d+)rem\b/gi, "$1em");
+/**
+ * `font-size` / `font` value with `rem` and absolute sizes (px, pt, ...) -> `em` against the theme's `#write` size.
+ * `rem` is first resolved against the ROOT size (`html { font-size }`, 16px by default), so a theme with a 20px
+ * `#write` and `h1 { font-size: 2rem }` gives 32px = 1.6em, not 2em. In a `font` shorthand an absolute line-height
+ * after the size becomes em of that size (`14px/20px` -> `0.875em/1.4286em`), so the declaration survives.
+ */
+function relativeFontSize(name: string, value: string, ctx: Ctx): string {
+  const { rootPx, basePx } = ctx;
+  const remEm = (n: string) => fmtEm((parseFloat(n) * rootPx) / basePx);
+  const restRem = (v: string) => v.replace(/(-?\d*\.?\d+)rem\b/gi, (_all, n: string) => remEm(n));
   if (name === "font-size") {
-    const m = SIMPLE_ABSOLUTE.exec(value.trim());
-    return m ? fmtEm(toPx(m[1], m[2]) / basePx) : value;
+    const m = SIMPLE_SIZE.exec(value.trim());
+    return m ? fmtEm(toPx(m[1], m[2], rootPx) / basePx) : restRem(value);
   }
-  // `font` shorthand: the first absolute length is the size (weights are unitless; line-height comes after `/`)
-  return value.replace(new RegExp(`(^|\\s)(\\d*\\.?\\d+)(${ABS_UNITS})(?=\\/|\\s|$)`, "i"), (_all, pre, n, u) => pre + fmtEm(toPx(n, u) / basePx));
+  const m = new RegExp(`(^|\\s)(\\d*\\.?\\d+)(${SIZE_UNITS})(?=\\/|\\s|$)`, "i").exec(value);
+  if (!m) return restRem(value);
+  const sizePx = toPx(m[2], m[3], rootPx);
+  let tail = value.slice(m.index + m[0].length);
+  const lh = new RegExp(`^\\s*\\/\\s*(\\d*\\.?\\d+)(${SIZE_UNITS})(?=\\s|$)`, "i").exec(tail);
+  if (lh && sizePx > 0) tail = "/" + fmtEm(toPx(lh[1], lh[2], rootPx) / sizePx) + tail.slice(lh[0].length);
+  return restRem(value.slice(0, m.index) + m[1] + fmtEm(sizePx / basePx) + tail);
 }
 
 /** A non-negative length (or a calc / min / max / clamp of them) usable as a left spacing value. */
@@ -449,7 +474,7 @@ function mapDecl(d: Decl, kind: Kind, ctx: Ctx): string | null {
   if (name === "font-size" || name === "font") {
     // Relative sizes keep following the host base size: rem would not, so it becomes em, and an absolute size
     // becomes em against the theme's own base size.
-    value = relativeFontSize(name, value, ctx.basePx);
+    value = relativeFontSize(name, value, ctx);
     // Whatever absolute length is left (inside a calc(), say) cannot follow the host size on body text: dropped.
     if ((kind === "text" || kind === "list") && ABSOLUTE_LENGTH.test(value)) return null;
   }
@@ -527,7 +552,8 @@ export function mapThemeCss(css: string): string {
   if (!css || typeof css !== "string") return "";
   try {
     const nodes = splitNodes(stripComments(css));
-    return mapNodes(nodes, { basePx: themeBasePx(nodes) }).join("\n");
+    const rootPx = themeFontPx(nodes, ["html", ":root"], DEFAULT_BASE_PX);
+    return mapNodes(nodes, { rootPx, basePx: themeFontPx(nodes, ["#write"], rootPx) }).join("\n");
   } catch {
     return "";
   }

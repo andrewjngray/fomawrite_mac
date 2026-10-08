@@ -62,7 +62,7 @@ test("realistic theme: mapped selectors and kept properties", () => {
   // headings: typography + border-bottom/left only, !important kept, rem -> em
   const h1 = all.filter((r) => r.selectors?.includes(`${S} .cm-line.fw-h1`));
   assert.equal(h1.length, 2, "both `#write > h1` and `#write h1` map");
-  assert.deepEqual(props(h1[0]), ["color: crimson", "font-family: Georgia", "border-bottom: 2px solid #ccc", "font-size: 2em !important"]);
+  assert.deepEqual(props(h1[0]), ["color: crimson", "font-family: Georgia", "border-bottom: 2px solid #ccc", "font-size: 1.0667em !important"]);
   assert.deepEqual(props(h1[1]), ["font-weight: 700"]);
 
   // selector list `h2, h3` (no #write at all) -> both lines, layout dropped
@@ -97,7 +97,7 @@ test("realistic theme: mapped selectors and kept properties", () => {
   const p = all.find((r) => r.selectors?.[0].includes(":not(:where("));
   assert.ok(p.selectors[0].startsWith(`${S} .cm-line:not(:where(.fw-h1,`));
   for (const c of [".fw-h6", ".fw-list-line", ".fw-code-line", ".fw-table-line", ".fw-front-matter-line"]) assert.ok(p.selectors[0].includes(c), c);
-  assert.deepEqual(props(p), ["line-height: 1.7", "font-size: 1em", "text-transform: none"]);
+  assert.deepEqual(props(p), ["line-height: 1.7", "font-size: 0.5333em", "text-transform: none"]); // 1rem = 16px over the theme's 30px #write
 
   // real elements stay with the theme: nothing is emitted for pre/code, hr, table, img, body
   for (const bad of [" pre", " hr", " table", " img", " body", " td", "fw-code { color: red"]) assert.ok(!css.includes(bad), bad);
@@ -173,18 +173,41 @@ test("absolute heading sizes follow the host size: em against the theme's #write
   // `%`, `em`, `rem` and keywords stay as they are (rem -> em)
   assert.equal(one("#write { font-size: 20px } #write h1 { font-size: 200% }"), "font-size: 200%");
   assert.equal(one("#write { font-size: 20px } #write h1 { font-size: 1.5em }"), "font-size: 1.5em");
-  assert.equal(one("#write { font-size: 20px } #write h1 { font-size: 2rem }"), "font-size: 2em");
+  assert.equal(one("#write { font-size: 20px } #write h1 { font-size: 2rem }"), "font-size: 1.6em", "2rem = 32px over a 20px #write");
+  assert.equal(one("#write h1 { font-size: 2rem }"), "font-size: 2em", "root 16px = #write 16px");
   assert.equal(one("#write { font-size: 20px } #write h1 { font-size: xx-large }"), "font-size: xx-large");
   // every size-bearing kind converts; the font shorthand converts its size token only
   const css = mapThemeCss("#write { font-size: 20px } #write h3 { font: 700 30px/36px Georgia } #write blockquote { font-size: 10px } #write code { font-size: 15px } #write li { font-size: 25px } #write p { font-size: 20px } #write strong { font-size: 40px }");
-  for (const x of ["font: 700 1.5em/36px Georgia", "font-size: 0.5em", "font-size: 0.75em", "font-size: 1.25em", "font-size: 1em", "font-size: 2em"]) assert.ok(css.includes(x), x);
-  assert.ok(!/\dpx; |\dpx }/.test(css.replace("36px", "")), css);
+  for (const x of ["font: 700 1.5em/1.2em Georgia", "font-size: 0.5em", "font-size: 0.75em", "font-size: 1.25em", "font-size: 1em", "font-size: 2em"]) assert.ok(css.includes(x), x);
+  assert.ok(!/\dpx; |\dpx }/.test(css), css);
   // inside a media block the base is still the theme's top-level one; an @media base does not count
   const media = mapThemeCss("#write { font-size: 20px } @media print { #write { font-size: 10px } #write h1 { font-size: 40px } }");
   assert.ok(media.includes("font-size: 2em"), media);
   // a calc() with an absolute length stays on headings, is dropped on body text
   assert.ok(mapThemeCss("#write h1 { font-size: calc(10px + 1em) }").includes("calc(10px + 1em)"));
   assert.equal(mapThemeCss("#write p { font-size: calc(10px + 1em) }"), "");
+});
+
+test("rem resolves against the root size (html font-size), not #write's", () => {
+  const one = (theme) => mapThemeCss(theme).replace(/^.*\{ /, "").replace(/; \}.*$/s, "");
+  assert.equal(one("html { font-size: 20px } #write h1 { font-size: 2rem }"), "font-size: 2em", "root 20px, #write inherits it: 40 / 20");
+  assert.equal(one("html { font-size: 20px } #write { font-size: 40px } #write h1 { font-size: 2rem }"), "font-size: 1em", "40px root-relative over a 40px #write");
+  assert.equal(one(":root { font-size: 10px } #write { font-size: 20px } #write h1 { font-size: 3rem }"), "font-size: 1.5em", "30px over 20px");
+  assert.equal(one("html { font-size: 62.5% } #write h1 { font-size: 3.2rem }"), "font-size: 3.2em", "62.5% of 16 = 10px root; #write inherits 10px");
+  assert.equal(one("html { font-size: 12pt } #write h1 { font-size: 24px }"), "font-size: 1.5em", "12pt = 16px, #write inherits it");
+  assert.equal(one("html { font-size: 10px } #write { font-size: 20px } #write h1 { font: 700 1.5rem Georgia }"), "font: 700 0.75em Georgia", "shorthand sizes too");
+  assert.equal(one("#write { font-size: 20px } #write h1 { font-size: calc(1rem + 1em) }"), "font-size: calc(0.8em + 1em)", "inside calc()");
+});
+
+test("`font: 14px/20px Georgia` keeps the declaration: size and absolute line-height both become em", () => {
+  const one = (theme) => mapThemeCss(theme).replace(/^.*\{ /, "").replace(/; \}.*$/s, "");
+  assert.equal(one("#write p { font: 14px/20px Georgia }"), "font: 0.875em/1.4286em Georgia", "body text used to be dropped whole");
+  assert.equal(one("#write p { font: italic 700 14px / 21px Georgia, serif }"), "font: italic 700 0.875em/1.5em Georgia, serif");
+  assert.equal(one("#write h2 { font: 700 1.5rem/2rem Georgia }"), "font: 700 1.5em/1.3333em Georgia", "rem line-height against its own size");
+  assert.equal(one("#write p { font: 14px/1.5 Georgia }"), "font: 0.875em/1.5 Georgia", "a unitless line-height is untouched");
+  assert.equal(one("#write p { font: 14px Georgia }"), "font: 0.875em Georgia");
+  assert.equal(one("#write p { font: 14px/20px Georgia !important }"), "font: 0.875em/1.4286em Georgia !important");
+  assert.equal(one("#write { font-size: 20px } #write p { font: 20px/30px Georgia }"), "font: 1em/1.5em Georgia");
 });
 
 test("mapSelector: accepted forms", () => {
