@@ -1,0 +1,35 @@
+{
+  "version": "0.3.0-dev36",
+  "build": 140,
+  "verifiedAt": "2026-10-08T16:56:13.240445+00:00",
+  "sourceCommit": "8645c87 plus this manifest commit",
+  "publicReleaseChanged": false,
+  "verification": {
+    "fullRegression": {
+      "passed": 218,
+      "failed": 0,
+      "skipped": 0
+    },
+    "editorPageTests": {
+      "passed": 249,
+      "failed": 0
+    },
+    "review": "independent reviewer agent: ship with fixes; fixes applied before this build (see research/cycle-140/README.md)",
+    "nativeChecks": "not rerun for 140"
+  },
+  "bundles": {
+    "dist/Fomawrite.app": {
+      "build": 140,
+      "executableSha256": "3a06ed9c1425016b386f8c8db735cad667c5eb6c49e691600d66957cea264765"
+    },
+    "dist/Fomawrite Dev.app": {
+      "build": 140,
+      "executableSha256": "124840a0ed3d84ddccd27167ba1f7eabf8da6a3f7accf3ee04afba18e51f42a0"
+    },
+    "/Applications/Fomawrite.app": {
+      "build": 140,
+      "executableSha256": "3a06ed9c1425016b386f8c8db735cad667c5eb6c49e691600d66957cea264765"
+    }
+  },
+  "installedWith": "./bin/package-mac && ./bin/prepare-dev-app && ./bin/install-mac"
+}
