@@ -596,6 +596,9 @@ ApplicationWindow {
         property bool autosaveEnabled: false
         property bool synchronizedScroll: false
         property bool typewriter: false
+        // Live follows the Output Style with its layout filtered out; this
+        // switch applies the theme exactly instead (docs/live-appearance-design.md).
+        property bool liveThemeExact: false
         property bool sentenceFocus: false
         onSentenceFocusChanged: backend.setFocusPosition(editor.cursorPosition, paragraphFocus, sentenceFocus)
         property bool paragraphFocus: false
@@ -982,9 +985,12 @@ ApplicationWindow {
         id: sourceAppearanceMenu
         objectName: "sourceAppearanceMenu"
         width: 220
-        CompactMenuItem { objectName: "sourceAppearanceManuscript"; text: "Manuscript"; checkable: true; autoExclusive: true; checked: win.activeWritingAppearance === "manuscript"; onTriggered: workspaceCommands.run("writingManuscript") }
-        CompactMenuItem { objectName: "sourceAppearanceEditorial"; text: "Editorial"; checkable: true; autoExclusive: true; checked: win.activeWritingAppearance === "editorial"; onTriggered: workspaceCommands.run("writingEditorial") }
-        CompactMenuItem { objectName: "sourceAppearanceBook"; text: "Book"; checkable: true; autoExclusive: true; checked: win.activeWritingAppearance === "book"; onTriggered: workspaceCommands.run("writingBook") }
+        // In Live the page follows the Output Style, so the Source appearances
+        // give way to the theme itself (the same menu as the publishing pane).
+        CompactMenuItem { objectName: "sourceAppearanceTheme"; visible: workspaceLayout.liveEditEnabled; height: visible ? implicitHeight : 0; text: "Output style: " + backend.publishingThemeName + "…"; onTriggered: Qt.callLater(function() { win.openAnchoredMenu(previewTemplateMenu, documentFooter.appearanceAnchor); }) }
+        CompactMenuItem { objectName: "sourceAppearanceManuscript"; visible: !workspaceLayout.liveEditEnabled; height: visible ? implicitHeight : 0; text: "Manuscript"; checkable: true; autoExclusive: true; checked: win.activeWritingAppearance === "manuscript"; onTriggered: workspaceCommands.run("writingManuscript") }
+        CompactMenuItem { objectName: "sourceAppearanceEditorial"; visible: !workspaceLayout.liveEditEnabled; height: visible ? implicitHeight : 0; text: "Editorial"; checkable: true; autoExclusive: true; checked: win.activeWritingAppearance === "editorial"; onTriggered: workspaceCommands.run("writingEditorial") }
+        CompactMenuItem { objectName: "sourceAppearanceBook"; visible: !workspaceLayout.liveEditEnabled; height: visible ? implicitHeight : 0; text: "Book"; checkable: true; autoExclusive: true; checked: win.activeWritingAppearance === "book"; onTriggered: workspaceCommands.run("writingBook") }
         CompactMenuItem { objectName: "sourceAppearanceCode"; text: "Code"; checkable: true; autoExclusive: true; checked: win.activeWritingAppearance === "code"; onTriggered: workspaceCommands.run("writingCode") }
         MenuSeparator {}
         CompactMenuItem { objectName: "sourceAppearanceLarger"; text: "Larger text"; enabled: paneZoom.sourceZoom < paneZoom.maximumZoom; onTriggered: paneZoom.adjustZoom("source", 10) }
@@ -3045,6 +3051,9 @@ ApplicationWindow {
                 bottomInset: documentFooter.height
                 bridge: backend.editorBridge
                 appearance: workspaceSettings.writingAppearance
+                themeFilter: !workspaceSettings.liveThemeExact
+                paletteBackground: backend.palette.editor
+                paletteText: backend.palette.text
                 fontFamily: win.editorFontFamily
                 fontSize: win.editorFontPixelSize
                 typewriter: workspaceSettings.typewriter
@@ -3213,7 +3222,7 @@ ApplicationWindow {
         canSplit: workspaceLayout.availableWidth >= 800
         sourcePaneWidth: editorPane.visible ? editorPane.width : 0
         previewPaneStart: previewPane.visible ? previewPane.x - x : width
-        writingAppearance: win.codeAppearance ? "Code" : win.activeWritingAppearance === "editorial" ? "Editorial" : win.activeWritingAppearance === "book" ? "Book" : "Manuscript"
+        writingAppearance: workspaceLayout.liveEditEnabled ? backend.publishingThemeName : win.codeAppearance ? "Code" : win.activeWritingAppearance === "editorial" ? "Editorial" : win.activeWritingAppearance === "book" ? "Book" : "Manuscript"
         previewTemplate: backend.publishingThemeName
         statusText: backend.status
         showStatus: !workspaceLayout.effectiveOrganizerVisible

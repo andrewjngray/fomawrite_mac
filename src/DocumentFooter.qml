@@ -23,6 +23,8 @@ WorkspaceFooter {
     property real sourcePaneWidth: layoutMode === 1 ? width / 2 : width
     property real previewPaneStart: layoutMode === 1 ? sourcePaneWidth : 0
     property string writingAppearance: "Manuscript"
+    // The appearance control doubles as the anchor for the Output Style menu in Live.
+    readonly property Item appearanceAnchor: appearanceButton
     property string previewTemplate: "Modern (Sans)"
     property string statusText: ""
     property bool showStatus: false
@@ -74,7 +76,7 @@ WorkspaceFooter {
         leftPadding: width < 70 ? 6 : 12
         rightPadding: leftPadding
         alignLeft: width >= 110
-        hint: "Choose editor writing appearance: " + root.writingAppearance
+        hint: root.liveEditing ? "Live follows the output style: " + root.writingAppearance : "Choose editor writing appearance: " + root.writingAppearance
         onClicked: root.appearanceMenuRequested(this)
     }
     FooterButton {

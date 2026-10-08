@@ -739,3 +739,66 @@ void FomawriteTest::liveModeShowsImageRefusalNotice() {
     QCOMPARE(editor->property("text").toString(), QStringLiteral("untitled\n"));
     backend.discardRecovery();
 }
+
+// Cycle 136: in Live the left control shows the Output Style instead of the
+// Source appearances, and View > Live Follows Theme Exactly reaches the page.
+void FomawriteTest::liveLeftControlShowsThemeAndExactSwitchReachesPage() {
+    Cycle103SettingsSnapshot settings;
+    Backend backend;
+    QQmlEngine engine; engine.rootContext()->setContextProperty("backend", &backend);
+    QQmlComponent component(&engine, QUrl(QStringLiteral("qrc:/Main.qml")));
+    QScopedPointer<QObject> window(component.create()); QVERIFY2(window, qPrintable(component.errorString()));
+    auto *quick = qobject_cast<QQuickWindow *>(window.data()); QVERIFY(quick);
+    auto *editor = window->findChild<QQuickItem *>("sourceEditor"); QVERIFY(editor);
+    auto *layout = window->findChild<QObject *>("workspaceLayout"); QVERIFY(layout);
+    auto *prefs = window->findChild<QObject *>("workspaceSettings"); QVERIFY(prefs);
+    auto *footer = window->findChild<QQuickItem *>("documentFooter"); QVERIFY(footer);
+    auto *manuscript = window->findChild<QQuickItem *>("sourceAppearanceManuscript");
+    auto *themeItem = window->findChild<QQuickItem *>("sourceAppearanceTheme");
+    auto *codeItem = window->findChild<QQuickItem *>("sourceAppearanceCode");
+    QVERIFY(manuscript && themeItem && codeItem);
+    quick->resize(1200, 800); quick->show(); QVERIFY(QTest::qWaitForWindowExposed(quick));
+    editor->setProperty("text", QStringLiteral("# Theme\n\nbody\n"));
+    auto *menu = window->findChild<QObject *>("sourceAppearanceMenu"); QVERIFY(menu);
+    auto *appearanceButton = footer->findChild<QQuickItem *>("sourceAppearanceButton"); QVERIFY(appearanceButton);
+    // Item visibility is effective visibility, so look while the menu is open.
+    const auto openMenu = [&] {
+        QVERIFY(QMetaObject::invokeMethod(window.data(), "openAnchoredMenu", Q_ARG(QVariant, QVariant::fromValue(menu)), Q_ARG(QVariant, QVariant::fromValue<QObject *>(appearanceButton))));
+        QTRY_VERIFY(menu->property("opened").toBool());
+    };
+    const auto closeMenu = [&] { QVERIFY(QMetaObject::invokeMethod(menu, "close")); QTRY_VERIFY(!menu->property("visible").toBool()); };
+    // Source: the appearances are offered, the theme item is not.
+    openMenu();
+    QVERIFY(manuscript->isVisible()); QVERIFY(!themeItem->isVisible()); QVERIFY(codeItem->isVisible());
+    closeMenu();
+    QVERIFY(QMetaObject::invokeMethod(window.data(), "selectWritingMode", Q_ARG(QVariant, QStringLiteral("live"))));
+    QTRY_VERIFY(layout->property("liveEditEnabled").toBool());
+    auto *bridge = backend.editorBridge();
+    QTRY_VERIFY_WITH_TIMEOUT(bridge->isReady(), 20000);
+    // Live: the appearances give way to the Output Style; Code stays.
+    openMenu();
+    QTRY_VERIFY(themeItem->isVisible());
+    QVERIFY(!manuscript->isVisible()); QVERIFY(codeItem->isVisible());
+    closeMenu();
+    QCOMPARE(footer->property("writingAppearance").toString(), backend.publishingThemeName());
+    QVERIFY(themeItem->property("text").toString().contains(backend.publishingThemeName()));
+    // The exact-theme switch is a command that reaches the page's appearance JSON.
+    QSignalSpy pushed(bridge, &EditorBridge::setAppearance);
+    auto *commands = window->findChild<QObject *>("workspaceCommands"); QVERIFY(commands);
+    QVERIFY(QMetaObject::invokeMethod(commands, "run", Q_ARG(QVariant, QStringLiteral("liveThemeExact"))));
+    QVERIFY(prefs->property("liveThemeExact").toBool());
+    QTRY_VERIFY(pushed.count() >= 1);
+    const QString json = pushed.last().at(0).toString();
+    QVERIFY2(json.contains("\"liveThemeFilter\":false"), qPrintable(json));
+    QVERIFY2(json.contains("\"palette\":{\"background\":\"") && json.contains("\"text\":\""), qPrintable(json));
+    QVERIFY(QMetaObject::invokeMethod(commands, "run", Q_ARG(QVariant, QStringLiteral("liveThemeExact"))));
+    QTRY_VERIFY(pushed.last().at(0).toString().contains("\"liveThemeFilter\":true"));
+    // Back in Source the appearances return.
+    QVERIFY(QMetaObject::invokeMethod(window.data(), "selectWritingMode", Q_ARG(QVariant, QStringLiteral("source"))));
+    QTRY_VERIFY(!layout->property("liveEditEnabled").toBool());
+    openMenu();
+    QTRY_VERIFY(!themeItem->isVisible()); QVERIFY(manuscript->isVisible());
+    closeMenu();
+    QCOMPARE(footer->property("writingAppearance").toString(), QStringLiteral("Editorial"));
+    backend.discardRecovery();
+}

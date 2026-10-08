@@ -19,6 +19,11 @@ Rectangle {
     property bool typewriter: false
     property bool focusMode: false
     property bool dark: false
+    // Live follows the publishing theme with its layout filtered out unless the
+    // writer asks for the exact theme (View > Live Follows Theme Exactly).
+    property bool themeFilter: true
+    property string paletteBackground: ""
+    property string paletteText: ""
     // Caret to place when the pane becomes visible (carried over from Source).
     property int cursorOnEnter: -1
     signal writingActivity()
@@ -33,9 +38,13 @@ Rectangle {
     function pushAppearance() {
         if (!root.bridge) return;
         root.bridge.applyAppearance(JSON.stringify({ appearance: root.appearance, fontFamily: root.fontFamily,
-            fontSize: root.fontSize, typewriter: root.typewriter, focus: root.focusMode, dark: root.dark }));
+            fontSize: root.fontSize, typewriter: root.typewriter, focus: root.focusMode, dark: root.dark,
+            liveThemeFilter: root.themeFilter, palette: { background: root.paletteBackground, text: root.paletteText } }));
     }
     onAppearanceChanged: pushAppearance()
+    onThemeFilterChanged: pushAppearance()
+    onPaletteBackgroundChanged: pushAppearance()
+    onPaletteTextChanged: pushAppearance()
     onFontFamilyChanged: pushAppearance()
     onFontSizeChanged: pushAppearance()
     onTypewriterChanged: pushAppearance()
