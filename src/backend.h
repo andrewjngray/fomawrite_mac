@@ -53,6 +53,10 @@ class Backend : public QObject, public PublishingSource {
     Q_PROPERTY(QString themePreset READ themePreset WRITE setThemePreset NOTIFY themePresetChanged)
     Q_PROPERTY(QVariantMap palette READ palette NOTIFY themeColorsChanged)
     Q_PROPERTY(bool darkMode READ darkMode WRITE setDarkMode NOTIFY darkModeChanged)
+    // The app's own chrome takes the selected Output Style's page colours (Typora's
+    // --bg-color / --text-color) when the theme defines them, so a dark theme darkens
+    // the whole window as it does in Typora. Off: the Theme preset alone decides.
+    Q_PROPERTY(bool appearanceFollowsOutputStyle READ appearanceFollowsOutputStyle WRITE setAppearanceFollowsOutputStyle NOTIFY appearanceFollowsOutputStyleChanged)
     Q_PROPERTY(qreal textScale READ textScale WRITE setTextScale NOTIFY textScaleChanged)
     Q_PROPERTY(QString themeBackground READ themeBackground NOTIFY themeColorsChanged)
     Q_PROPERTY(QString themeForeground READ themeForeground NOTIFY themeColorsChanged)
@@ -110,6 +114,8 @@ public:
     QVariantMap palette() const;
     bool darkMode() const { return m_darkMode; }
     void setDarkMode(bool darkMode);
+    bool appearanceFollowsOutputStyle() const { return m_appearanceFollowsOutputStyle; }
+    void setAppearanceFollowsOutputStyle(bool follow);
     qreal textScale() const { return m_textScale; }
     void setTextScale(qreal textScale);
     QString themeBackground() const { return m_themeBackground; }
@@ -283,6 +289,7 @@ signals:
     void publishingDocumentIdentityChanged();
     void themePresetChanged();
     void darkModeChanged();
+    void appearanceFollowsOutputStyleChanged();
     void textScaleChanged();
     void themeColorsChanged();
     void openDialogRequested();
@@ -384,6 +391,7 @@ private:
     QString m_status;
     bool m_systemDarkMode = true;
     QString m_themePreset = "studio";
+    bool m_appearanceFollowsOutputStyle = true;
     bool m_darkMode = true;
     qreal m_textScale = 1.0;
     bool m_loading = false;

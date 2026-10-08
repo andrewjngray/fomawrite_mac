@@ -71,6 +71,7 @@ QtObject {
         { id: "sourceEditing", title: "Source", toggle: true },
         { id: "liveEditing", title: "Live", toggle: true },
         { id: "liveThemeExact", title: "Live Follows Theme Exactly", toggle: true },
+        { id: "appearanceFollowsOutputStyle", title: "Appearance Follows Output Style", toggle: true },
         { id: "editor", title: "Single", toggle: true },
         { id: "split", title: "Split", toggle: true },
         { id: "preview", title: "Preview Only", toggle: true },
@@ -189,6 +190,7 @@ QtObject {
         case "paragraph": return settings.paragraphFocus;
         case "typewriter": return settings.typewriter;
         case "liveThemeExact": return settings.liveThemeExact;
+        case "appearanceFollowsOutputStyle": return backend.appearanceFollowsOutputStyle;
         case "fillersStyleCheck": return settings.styleCheckFillers;
         case "customStyleCheck": return settings.styleCheckCustom;
         default: return false;
@@ -257,6 +259,7 @@ QtObject {
         case "paragraph": settings.paragraphFocus = !settings.paragraphFocus; if (settings.paragraphFocus) settings.sentenceFocus = false; break;
         case "typewriter": settings.typewriter = !settings.typewriter; typewriterChanged(); break;
         case "liveThemeExact": if (layoutState.liveEditEnabled) settings.liveThemeExact = !settings.liveThemeExact; break;
+        case "appearanceFollowsOutputStyle": backend.appearanceFollowsOutputStyle = !backend.appearanceFollowsOutputStyle; break;
         case "fillersStyleCheck": settings.styleCheckFillers = !settings.styleCheckFillers; break;
         case "customStyleCheck": settings.styleCheckCustom = !settings.styleCheckCustom; break;
         case "strike": window.tryWrapSelection("~~", "~~"); break;

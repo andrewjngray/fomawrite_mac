@@ -591,6 +591,7 @@ Backend::Backend(QObject *parent, bool outputOnly) : QObject(parent), m_library(
     m_publisher = std::make_unique<Publisher>(*this);
     connect(m_publisher.get(), &Publisher::themesChanged, this, &Backend::publishingThemesChanged);
     connect(m_publisher.get(), &Publisher::cssChanged, this, &Backend::publishingCssChanged);
+    connect(this, &Backend::publishingCssChanged, this, &Backend::loadOmarchyTheme);
     connect(m_publisher.get(), &Publisher::previewReady, this, &Backend::publishingPreviewReady);
     connect(m_publisher.get(), &Publisher::documentIdentityChanged, this, &Backend::publishingDocumentIdentityChanged);
     connect(m_publisher.get(), &Publisher::statusMessage, this, &Backend::setStatus);
@@ -610,6 +611,7 @@ Backend::Backend(QObject *parent, bool outputOnly) : QObject(parent), m_library(
     // New installations start with the composed writing palette; a stored
     // choice, including System, always takes precedence.
     const auto preset = QSettings().value("appearance/theme", "studio").toString();
+    m_appearanceFollowsOutputStyle = QSettings().value("appearance/followOutputStyle", true).toBool();
     if (QStringList{"system", "light", "dark", "paper", "studio"}.contains(preset)) m_themePreset = preset;
     loadOmarchyTheme();
     watchOmarchyTheme();
@@ -671,6 +673,23 @@ QString Backend::fileName() const {
 void Backend::setDarkMode(bool darkMode) {
     m_systemDarkMode = darkMode;
     loadOmarchyTheme();
+}
+
+void Backend::setAppearanceFollowsOutputStyle(bool follow) {
+    if (m_appearanceFollowsOutputStyle == follow) return;
+    m_appearanceFollowsOutputStyle = follow;
+    QSettings().setValue("appearance/followOutputStyle", follow);
+    loadOmarchyTheme();
+    emit appearanceFollowsOutputStyleChanged();
+}
+
+// A CSS colour as Typora themes write them: #rgb, #rrggbb, #rrggbbaa (alpha
+// dropped: the chrome is opaque) or a named colour. Invalid -> QColor().
+static QColor cssColour(QString value) {
+    value = value.trimmed();
+    if (value.startsWith('#') && (value.size() == 9 || value.size() == 5)) value = value.left(value.size() == 9 ? 7 : 4);
+    const QColor colour = QColor::fromString(value);
+    return colour.isValid() ? colour : QColor();
 }
 
 void Backend::setThemePreset(const QString &preset) {
@@ -2657,6 +2676,20 @@ void Backend::loadOmarchyTheme() {
         m_themeForeground = "#34363A";
         m_themeAccent = "#28669d";
         m_themeSelection = "#355f88";
+    }
+    // Appearance follows the Output Style: a theme that paints its page (Typora's
+    // --bg-color) also paints the window, and its luminance decides dark mode.
+    if (m_appearanceFollowsOutputStyle && m_publisher) {
+        const QColor pageBackground = cssColour(themeBackgroundColor());
+        if (pageBackground.isValid()) {
+            const double luminance = 0.299 * pageBackground.redF() + 0.587 * pageBackground.greenF() + 0.114 * pageBackground.blueF();
+            m_darkMode = luminance < 0.5;
+            m_themeBackground = pageBackground.name(QColor::HexRgb);
+            const QColor pageText = cssColour(m_publisher->themeVariable(QStringLiteral("--text-color")));
+            m_themeForeground = pageText.isValid() ? pageText.name(QColor::HexRgb) : (m_darkMode ? QStringLiteral("#ECEEF2") : QStringLiteral("#34363A"));
+            const QColor accent = cssColour(m_publisher->themeVariable(QStringLiteral("--primary-color")));
+            if (accent.isValid()) m_themeAccent = accent.name(QColor::HexRgb);
+        }
     }
     if (oldDark != m_darkMode) emit darkModeChanged();
     if (m_highlighter) {

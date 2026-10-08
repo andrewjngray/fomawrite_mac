@@ -625,14 +625,20 @@ QString cycle134CapturesDirectory() {
     return QDir(directory).canonicalPath();
 }
 bool cycle134SaveFrame(QQuickWindow *window, const QString &path, QString *why) {
-    QTest::qWait(900);
-    const QImage image = window->grabWindow();
-    if (image.isNull()) { *why = "grabWindow returned a null image"; return false; }
-    const QRgb first = image.pixel(2, 2);
-    bool uniform = true;
-    for (int y = 0; y < image.height() && uniform; y += 7)
-        for (int x = 0; x < image.width(); x += 7)
-            if (image.pixel(x, y) != first) { uniform = false; break; }
+    // The page's first paint after a theme push can lag under load; wait for
+    // a frame that is not a single colour before judging it.
+    QImage image; bool uniform = true;
+    QElapsedTimer timer; timer.start();
+    do {
+        QTest::qWait(timer.elapsed() == 0 ? 900 : 300);
+        image = window->grabWindow();
+        if (image.isNull()) { *why = "grabWindow returned a null image"; return false; }
+        const QRgb first = image.pixel(2, 2);
+        uniform = true;
+        for (int y = 0; y < image.height() && uniform; y += 7)
+            for (int x = 0; x < image.width(); x += 7)
+                if (image.pixel(x, y) != first) { uniform = false; break; }
+    } while (uniform && timer.elapsed() < 5000);
     if (!image.save(path)) { *why = "could not save " + path; return false; }
     if (uniform) { *why = "frame is a single colour: " + path; return false; }
     return true;

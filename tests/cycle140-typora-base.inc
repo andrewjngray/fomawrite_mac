@@ -224,3 +224,39 @@ void FomawriteTest::liveEditorPaintsThePageFromThemeVariables() {
     QCOMPARE(fields[2], QStringLiteral("rgb(230, 237, 243)"));
     page.backend.discardRecovery();
 }
+
+// Andrew, 9 Oct: Typora's dark themes darken the whole app. With Appearance
+// Follows Output Style (default on) the window takes the theme's page colours
+// and its luminance decides dark mode; the Theme preset returns when the theme
+// defines no page colour or the setting is off.
+void FomawriteTest::appearanceFollowsTheOutputStylesPageColours() {
+    Cycle103SettingsSnapshot settings;
+    Cycle140Lapis lapis; QVERIFY(lapis.install());
+    Backend backend;
+    backend.setThemePreset("studio");
+    QVERIFY(backend.appearanceFollowsOutputStyle());
+    QVERIFY(!backend.darkMode());
+    QSignalSpy colours(&backend, &Backend::themeColorsChanged);
+    QVERIFY2(backend.selectPublishingTheme("lapis-dark"), qPrintable(backend.status()));
+    QTRY_VERIFY(backend.darkMode());
+    QCOMPARE(backend.palette().value("page").toString().toLower(), QStringLiteral("#1e222a"));
+    QCOMPARE(backend.palette().value("text").toString().toLower(), QStringLiteral("#e4e4e4")); // alpha dropped
+    QVERIFY(colours.count() >= 1);
+    // A light theme from the same family: light chrome, white page.
+    QVERIFY2(backend.selectPublishingTheme("lapis"), qPrintable(backend.status()));
+    QTRY_VERIFY(!backend.darkMode());
+    QCOMPARE(backend.palette().value("page").toString().toLower(), QStringLiteral("#ffffff"));
+    // Switching the setting off restores the preset while a dark theme is selected.
+    QVERIFY2(backend.selectPublishingTheme("lapis-dark"), qPrintable(backend.status()));
+    QTRY_VERIFY(backend.darkMode());
+    backend.setAppearanceFollowsOutputStyle(false);
+    QVERIFY(!backend.darkMode());
+    QCOMPARE(backend.palette().value("page").toString().toUpper(), QStringLiteral("#F6F3EE"));
+    QCOMPARE(QSettings().value("appearance/followOutputStyle").toBool(), false);
+    backend.setAppearanceFollowsOutputStyle(true);
+    QVERIFY(backend.darkMode());
+    // A basic preset defines no --bg-color: the Theme preset decides again.
+    backend.setOutputStyle(0);
+    QTRY_VERIFY(!backend.darkMode());
+    QCOMPARE(backend.palette().value("page").toString().toUpper(), QStringLiteral("#F6F3EE"));
+}

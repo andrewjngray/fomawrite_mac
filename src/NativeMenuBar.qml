@@ -320,6 +320,7 @@ Platform.MenuBar {
             Platform.MenuItem { objectName: "nativeThemesFolder"; text: "Open Themes Folder"; onTriggered: win.openPublishingThemesFolder() }
             Platform.MenuItem { objectName: "nativeThemesReload"; text: "Reload Themes"; onTriggered: win.reloadPublishingThemes() }
         }
+        NativeCommand { commandId: "appearanceFollowsOutputStyle" }
         Platform.MenuSeparator { objectName: "nativeAfterTemplate" }
         Platform.Menu {
             id: nativeEditingMenu
