@@ -54,8 +54,11 @@ html.dark, html.dark body { color-scheme: dark; }
   margin: 0 auto;
   padding: 48px 40px 40vh;
   font-size: var(--fw-font-size, 16px);
-  line-height: var(--fw-line-height, 1.6);
 }
+/* Line height: the host's value sits directly on #write only outside Live (zero specificity, so a theme's
+   `#write { line-height }` still wins there). In Live it is a fallback on <html> (see "live mode" below), so a
+   theme's `body { line-height }` is not shadowed by a declaration on #write itself. */
+:where(#write:not(.fw-mode-live)) { line-height: var(--fw-line-height, 1.6); }
 
 #editor .cm-editor { background: transparent; color: inherit; }
 #editor .cm-editor.cm-focused { outline: none; }
@@ -106,9 +109,15 @@ html.dark, html.dark body { color-scheme: dark; }
 .fw-mark { color: var(--fw-muted); }
 
 /* ---------------------------------------------------------------- live mode (proportional) */
-/* The base face sits on #write at zero specificity (:where) so a theme's `#write { font-family }` wins; the content
-   inherits it. Host fontFamily (--fw-font) is the base face, then --fw-live-font, then Georgia. */
-:where(#write.fw-mode-live) { font-family: var(--fw-font, var(--fw-live-font, Georgia, serif)); }
+/* The host face and line height are FALLBACKS, declared on <html> at zero specificity (html.fw-live-root is set
+   while Live is active; --fw-font / --fw-line-height are mirrored onto <html> by applyAppearanceDom). Anything the
+   theme sets on html, body or #write beats them, because a declaration on a nearer ancestor always beats
+   inheritance, and a rule on <html> itself beats :where(). The host's fontFamily is therefore used only when the
+   theme sets no face (then --fw-live-font, then Georgia). Source keeps the host face on .cm-content (above). */
+:where(html.fw-live-root) {
+  font-family: var(--fw-font, var(--fw-live-font, Georgia, serif));
+  line-height: var(--fw-line-height, 1.6);
+}
 #write.fw-mode-live .cm-content { font-family: inherit; }
 #write.fw-mode-live .fw-em { font-style: italic; }
 #write.fw-mode-live .fw-strong { font-weight: 700; }
@@ -123,8 +132,10 @@ html.dark, html.dark body { color-scheme: dark; }
 #write.fw-mode-live .fw-live-link { color: var(--fw-accent); text-decoration: underline; text-underline-offset: 2px; }
 #write.fw-mode-live .fw-list-mark { color: var(--fw-muted); }
 /* Revealed markers: the node's source is visible, dim it slightly so it reads as editing chrome. */
-#write.fw-mode-live .fw-revealed { color: inherit; }
-#write.fw-mode-live .fw-revealed.fw-live-link { text-decoration: none; }
+/* `#write#write` raises these above the mapped theme copy (`#write.fw-mode-live .fw-live-link:hover` etc., which
+   comes later in <head>), so a theme's `a` / `strong` colour and underline never leak onto revealed source. */
+#write#write.fw-mode-live .fw-revealed { color: inherit; }
+#write#write.fw-mode-live .fw-revealed.fw-live-link { text-decoration: none; }
 
 #write.fw-mode-live .fw-h1,
 #write.fw-mode-live .fw-h2,

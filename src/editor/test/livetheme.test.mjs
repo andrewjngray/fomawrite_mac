@@ -2,13 +2,14 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   FILL_BG_CLASS, FILL_FG_CLASS, LIVE_EXACT_CLASS, LIVE_OVERLAY_CSS, LIVE_OVERLAY_ID,
-  HOST_SIZE_CLASS, LIVE_HTML_CLASS, MAPPED_ID, THEME_ID, applyLiveOverlay, applyLiveTheme, applyThemeMapped, isUnsetColour, parseLiveThemePatch, parsePalette, pickReadableColours,
+  HOST_SIZE_CLASS, LIVE_HTML_CLASS, LIVE_ROOT_CLASS, MAPPED_ID, THEME_ID, applyLiveOverlay, applyLiveTheme, applyThemeMapped,
+  contrastRatio, isUnsetColour, parseColour, parseLiveThemePatch, parsePalette, pickReadableColours, relativeLuminance,
 } from "../src/livetheme.ts";
 import { INITIAL_APPEARANCE, effectiveAppearanceClasses, parseAppearancePatch, reduceAppearance } from "../src/appearance.ts";
 import { Session, applyAppearanceDom, applyThemeDom } from "../src/modes.ts";
 
 // ---------------------------------------------------------------- tiny fake Document
-function fakeDoc({ computed = {} } = {}) {
+function fakeDoc({ computed = {}, body = {}, html = {}, vars = {} } = {}) {
   const head = {
     children: [],
     get lastChild() { return this.children[this.children.length - 1] ?? null; },
@@ -36,13 +37,20 @@ function fakeDoc({ computed = {} } = {}) {
     };
   };
   const write = el("div"); write.id = "write";
-  const html = el("html");
+  const htmlEl = el("html");
+  const bodyEl = el("body");
+  // the editor's own defaults: --fw-bg / --fw-fg on :root, painted on html and body, inherited by #write
+  const rootVars = { "--fw-bg": "#ffffff", "--fw-fg": "#24292f", ...vars };
   const doc = {
-    head, documentElement: html, write,
+    head, documentElement: htmlEl, body: bodyEl, write,
     createElement: el,
     getElementById: (id) => (id === "write" ? write : head.children.find((c) => c.id === id) ?? null),
     defaultView: {
-      getComputedStyle: (e) => (e === write ? { backgroundColor: "rgba(0, 0, 0, 0)", color: "rgb(36, 41, 47)", ...computed } : { color: "rgb(36, 41, 47)" }),
+      getComputedStyle: (e) => {
+        if (e === write) return { backgroundColor: "rgba(0, 0, 0, 0)", color: "rgb(36, 41, 47)", ...computed };
+        if (e === bodyEl) return { backgroundColor: "rgb(255, 255, 255)", color: "rgb(36, 41, 47)", ...body };
+        return { backgroundColor: "rgb(255, 255, 255)", color: "rgb(36, 41, 47)", getPropertyValue: (n) => rootVars[n] ?? "", ...html };
+      },
     },
   };
   return doc;
@@ -102,10 +110,76 @@ test("effectiveAppearanceClasses: no fw-appearance-* in live, usual ones in sour
 // ---------------------------------------------------------------- pickReadableColours
 test("pickReadableColours: both set, bg missing, fg missing, both missing", () => {
   assert.deepEqual(pickReadableColours("rgb(255, 255, 255)", "rgb(0, 0, 0)", PALETTE), { background: null, text: null });
-  assert.deepEqual(pickReadableColours("rgba(0, 0, 0, 0)", "rgb(0, 0, 0)", PALETTE), { background: "#101010", text: null });
-  assert.deepEqual(pickReadableColours("rgb(255, 255, 255)", null, PALETTE), { background: null, text: "#eeeeee" });
+  // bg missing, theme text black: the palette's near-black background would not read, so #eee
+  assert.deepEqual(pickReadableColours("rgba(0, 0, 0, 0)", "rgb(0, 0, 0)", PALETTE), { background: "#eee", text: null });
+  // text missing on a white background: the palette's light text would not read, so #111
+  assert.deepEqual(pickReadableColours("rgb(255, 255, 255)", null, PALETTE), { background: null, text: "#111" });
   assert.deepEqual(pickReadableColours("transparent", "", PALETTE), { background: "#101010", text: "#eeeeee" });
   assert.deepEqual(pickReadableColours("rgba(0, 0, 0, 0)", null, undefined), { background: null, text: null });
+});
+
+// ---------------------------------------------------------------- colour maths and the contrast rule
+const LIGHT = { background: "#ffffff", text: "#24292f" };
+const DARK = { background: "#1e1f22", text: "#e6edf3" };
+const CREAM = "rgb(250, 249, 245)"; // claude-like body background
+const BROWN = "rgb(43, 38, 33)"; // claude-like text
+
+test("parseColour, relativeLuminance, contrastRatio", () => {
+  assert.deepEqual(parseColour("#fff"), { r: 255, g: 255, b: 255, a: 1 });
+  assert.deepEqual(parseColour("#1e1f22"), { r: 30, g: 31, b: 34, a: 1 });
+  assert.deepEqual(parseColour("rgb(1 2 3 / 50%)"), { r: 1, g: 2, b: 3, a: 0.5 });
+  assert.deepEqual(parseColour(" RGBA(1, 2, 3, 0.25) "), { r: 1, g: 2, b: 3, a: 0.25 });
+  assert.deepEqual(parseColour("rgb(100%, 0%, 0%)"), { r: 255, g: 0, b: 0, a: 1 });
+  assert.equal(parseColour("white").r, 255);
+  for (const bad of ["oklch(0.5 0.1 20)", "var(--x)", "#12", "rgb(1,2)", "", null, undefined, "rgb(a,b,c)"]) assert.equal(parseColour(bad), null, String(bad));
+  assert.equal(relativeLuminance("#000"), 0);
+  assert.equal(relativeLuminance("#fff"), 1);
+  assert.ok(Math.abs(relativeLuminance("#808080") - 0.2158) < 0.001);
+  assert.ok(Number.isNaN(relativeLuminance("oklch(0.5 0.1 20)")));
+  assert.equal(contrastRatio("#000", "#fff"), 21);
+  assert.equal(contrastRatio("#fff", "#000"), 21, "symmetric");
+  assert.equal(contrastRatio("#777", "#777"), 1);
+  assert.ok(Math.abs(contrastRatio("#777777", "#ffffff") - 4.48) < 0.01);
+  assert.ok(Number.isNaN(contrastRatio("#fff", "nonsense")));
+});
+
+test("pickReadableColours: body-painted theme (claude-like) with unset text, light and dark palette", () => {
+  // light mode: the palette's dark text reads on cream
+  assert.deepEqual(pickReadableColours(CREAM, null, LIGHT), { background: null, text: LIGHT.text });
+  // dark mode: the palette's light text would be unreadable on cream, so plain #111; never the palette background
+  assert.deepEqual(pickReadableColours(CREAM, null, DARK), { background: null, text: "#111" });
+  assert.deepEqual(pickReadableColours(CREAM, "", DARK), { background: null, text: "#111" });
+});
+
+test("pickReadableColours: light background + unset text in dark mode, dark background + unset text in light mode", () => {
+  assert.deepEqual(pickReadableColours("rgb(255, 255, 255)", null, DARK), { background: null, text: "#111" });
+  assert.deepEqual(pickReadableColours("#fdf6e3", null, DARK), { background: null, text: "#111" });
+  assert.deepEqual(pickReadableColours("rgb(28, 24, 21)", null, LIGHT), { background: null, text: "#eee" });
+  // a dark background that suits the dark palette keeps the palette text
+  assert.deepEqual(pickReadableColours("rgb(28, 24, 21)", null, DARK), { background: null, text: DARK.text });
+});
+
+test("pickReadableColours: text set, background unset, and both unset", () => {
+  assert.deepEqual(pickReadableColours(null, BROWN, LIGHT), { background: LIGHT.background, text: null });
+  assert.deepEqual(pickReadableColours(null, BROWN, DARK), { background: "#eee", text: null }, "dark palette bg would hide dark text");
+  assert.deepEqual(pickReadableColours("rgba(0, 0, 0, 0)", "rgb(240, 240, 240)", LIGHT), { background: "#111", text: null });
+  assert.deepEqual(pickReadableColours(null, null, LIGHT), { background: LIGHT.background, text: LIGHT.text });
+  assert.deepEqual(pickReadableColours("transparent", "", DARK), { background: DARK.background, text: DARK.text });
+  assert.deepEqual(pickReadableColours(null, null, null), { background: null, text: null });
+});
+
+test("pickReadableColours: whatever is filled reads at 4.5:1 against what the theme set", () => {
+  const grounds = ["#ffffff", "#faf9f5", "#fdf6e3", "#eeeeee", "#1e1f22", "#000000", "#1c1815", "#222222", "#0b3d91", "#a52a2a", "#ffeb3b"];
+  for (const p of [LIGHT, DARK, { background: "#777777", text: "#888888" }]) {
+    for (const g of grounds) {
+      const fill = pickReadableColours(g, null, p);
+      assert.ok(contrastRatio(g, fill.text) >= 4.5, `text ${fill.text} on ${g}`);
+      const fill2 = pickReadableColours(null, g, p);
+      assert.ok(contrastRatio(g, fill2.background) >= 4.5, `bg ${fill2.background} behind ${g}`);
+    }
+  }
+  // an unparsable colour (oklch) cannot be judged: the palette colour is used as is
+  assert.deepEqual(pickReadableColours("oklch(0.95 0.02 90)", null, DARK), { background: null, text: DARK.text });
 });
 
 test("isUnsetColour and palette parsing", () => {
@@ -261,12 +335,15 @@ test("mapped theme element follows the theme text and the filter switch", () => 
   applyThemeDom("#write table { color: red }", doc);
   applyLiveTheme({ mode: "live", filter: true }, doc);
   assert.ok(!has(doc, MAPPED_ID));
-  // exact mode removes it with the overlay; the theme element itself is untouched
+  // exact mode removes the overlay but KEEPS the mapped copy (typography of Live lines); the theme element is untouched
   applyThemeDom(THEME, doc);
   applyLiveTheme({ mode: "live", filter: true }, doc);
   assert.ok(has(doc, MAPPED_ID));
+  const mappedText = doc.getElementById(MAPPED_ID).textContent;
   applyLiveTheme({ mode: "live", filter: false }, doc);
-  assert.deepEqual(ids(doc), [THEME_ID]);
+  assert.deepEqual(ids(doc), [THEME_ID, MAPPED_ID]);
+  assert.equal(doc.getElementById(MAPPED_ID).textContent, mappedText, "same mapped text in exact mode");
+  assert.ok(!mappedText.includes("fw-live-exact"), "mapped rules are not scoped away from exact mode");
   assert.equal(doc.getElementById(THEME_ID).textContent, THEME);
   applyLiveTheme({ mode: "live", filter: true }, doc);
   assert.deepEqual(ids(doc), [THEME_ID, MAPPED_ID, LIVE_OVERLAY_ID]);
@@ -287,7 +364,8 @@ test("Session.setMode / setAppearance keep the mapped element and the html class
     session.setMode("live");
     assert.ok(doc.documentElement.classList.has(LIVE_HTML_CLASS));
     session.setAppearance({ liveThemeFilter: false });
-    assert.ok(!has(doc, MAPPED_ID) && !doc.documentElement.classList.has(LIVE_HTML_CLASS));
+    assert.ok(has(doc, MAPPED_ID), "exact mode keeps the mapped copy");
+    assert.ok(!has(doc, LIVE_OVERLAY_ID) && !doc.documentElement.classList.has(LIVE_HTML_CLASS));
     session.setAppearance({ liveThemeFilter: true });
     assert.ok(has(doc, MAPPED_ID) && doc.documentElement.classList.has(LIVE_HTML_CLASS));
     session.setMode("source");
@@ -346,7 +424,210 @@ test("body rule resets geometry only: no colour, and it keys on the html class",
   const decls = m[1].split(";").map((d) => d.trim()).filter(Boolean).sort();
   assert.deepEqual(decls, [
     "background-image: none !important", "column-count: auto !important", "columns: auto !important",
-    "margin: 0 !important", "padding: 0 !important",
+    "display: block !important", "margin: 0 !important", "max-width: none !important", "padding: 0 !important",
+    "position: static !important", "transform: none !important", "width: auto !important",
   ]);
   assert.ok(!/background-color|background:|\bcolor\b/.test(m[1]));
+});
+
+// ---------------------------------------------------------------- readability measured on the DOM (body-painted themes)
+const fillOf = (doc) => ({
+  bg: doc.write.classList.has(FILL_BG_CLASS) ? doc.write.style.get("--fw-live-bg") : null,
+  fg: doc.write.classList.has(FILL_FG_CLASS) ? doc.write.style.get("--fw-live-fg") : null,
+});
+
+test("claude-like (body painted, #write transparent, text colour inherited from body): nothing is filled, light or dark", () => {
+  // light: body bg cream, #write transparent, text brown from `body { color }`
+  const light = fakeDoc({ body: { backgroundColor: CREAM }, html: { backgroundColor: CREAM }, computed: { color: BROWN } });
+  applyLiveTheme({ mode: "live", filter: true, palette: LIGHT }, light);
+  assert.deepEqual(fillOf(light), { bg: null, fg: null }, "no white column on cream");
+  // dark mode: the editor defaults are dark, the theme still paints cream and brown: left alone (no dark column with brown text)
+  const dark = fakeDoc({
+    vars: { "--fw-bg": "#1e1f22", "--fw-fg": "#e6edf3" },
+    body: { backgroundColor: CREAM }, html: { backgroundColor: CREAM }, computed: { color: BROWN },
+  });
+  applyLiveTheme({ mode: "live", filter: true, palette: DARK }, dark);
+  assert.deepEqual(fillOf(dark), { bg: null, fg: null });
+});
+
+test("body-painted theme that leaves the text colour alone: light bg + dark mode gets #111 text, never a palette background", () => {
+  const dark = fakeDoc({
+    vars: { "--fw-bg": "#1e1f22", "--fw-fg": "#e6edf3" },
+    body: { backgroundColor: CREAM }, html: { backgroundColor: CREAM },
+    computed: { color: "rgb(230, 237, 243)" }, // inherited editor default (dark mode: light)
+  });
+  applyLiveTheme({ mode: "live", filter: true, palette: DARK }, dark);
+  assert.deepEqual(fillOf(dark), { bg: null, fg: "#111" });
+  // same page in light mode: the palette's own dark text reads on cream
+  const light = fakeDoc({ body: { backgroundColor: CREAM }, html: { backgroundColor: CREAM } });
+  applyLiveTheme({ mode: "live", filter: true, palette: LIGHT }, light);
+  assert.deepEqual(fillOf(light), { bg: null, fg: LIGHT.text });
+});
+
+test("a background on html alone counts; the editor's own body / html background does not", () => {
+  const htmlOnly = fakeDoc({ html: { backgroundColor: CREAM }, body: { backgroundColor: "rgba(0, 0, 0, 0)" } });
+  applyLiveTheme({ mode: "live", filter: true, palette: LIGHT }, htmlOnly);
+  assert.equal(fillOf(htmlOnly).bg, null, "html paints it");
+  assert.equal(fillOf(htmlOnly).fg, LIGHT.text);
+  // nothing painted by the theme: body and html are just the editor's --fw-bg
+  const none = fakeDoc();
+  applyLiveTheme({ mode: "live", filter: true, palette: LIGHT }, none);
+  assert.deepEqual(fillOf(none), { bg: LIGHT.background, fg: LIGHT.text });
+  const noneDark = fakeDoc({ vars: { "--fw-bg": "#1e1f22", "--fw-fg": "#e6edf3" }, body: { backgroundColor: "rgb(30, 31, 34)" }, html: { backgroundColor: "rgb(30, 31, 34)" }, computed: { color: "rgb(230, 237, 243)" } });
+  applyLiveTheme({ mode: "live", filter: true, palette: DARK }, noneDark);
+  assert.deepEqual(fillOf(noneDark), { bg: DARK.background, fg: DARK.text });
+  // theme text colour set (differs from --fw-fg) but no background: palette background chosen for contrast with that text
+  const fgOnly = fakeDoc({ vars: { "--fw-bg": "#1e1f22", "--fw-fg": "#e6edf3" }, body: { backgroundColor: "rgb(30, 31, 34)" }, html: { backgroundColor: "rgb(30, 31, 34)" }, computed: { color: BROWN } });
+  applyLiveTheme({ mode: "live", filter: true, palette: DARK }, fgOnly);
+  assert.deepEqual(fillOf(fgOnly), { bg: "#eee", fg: null });
+});
+
+// ---------------------------------------------------------------- overlay: tables at full measure, more neutralising
+const overlayRule = (selector) => {
+  const css = LIVE_OVERLAY_CSS.replace(/\/\*[\s\S]*?\*\//g, "");
+  const i = css.indexOf(selector + " {");
+  assert.ok(i >= 0, selector);
+  return css.slice(css.indexOf("{", i) + 1, css.indexOf("}", i)).split(";").map((d) => d.trim()).filter(Boolean);
+};
+const SCOPE = "#write.fw-mode-live:not(.fw-live-exact)";
+
+test("the rendered table is forced to the full measure in filtered Live", () => {
+  assert.ok(overlayRule(`${SCOPE} .fw-table`).includes("width: 100% !important"));
+});
+
+test("#write is neutralised further: display, box model, border, outline, filter, opacity, zoom, overflow, height", () => {
+  const rule = overlayRule(SCOPE);
+  for (const d of [
+    "display: block", "box-sizing: border-box", "border: none", "border-radius: 0", "min-height: auto", "height: auto",
+    "outline: none", "filter: none", "opacity: 1", "zoom: 1", "overflow: visible",
+  ]) assert.ok(rule.includes(d + " !important"), d);
+});
+
+test("the <body> reset also clears width, max-width, display, position and transform", () => {
+  const rule = overlayRule("html.fw-live-filtered body");
+  for (const d of ["width: auto", "max-width: none", "display: block", "position: static", "transform: none"])
+    assert.ok(rule.includes(d + " !important"), d);
+});
+
+// ---------------------------------------------------------------- host font / line height are fallbacks (real cascade)
+import { readFileSync } from "node:fs";
+import { computed as cascade, el as celem, higher, parseRules, specificity } from "./cascade.mjs";
+import { mapThemeCss } from "../src/thememap.ts";
+
+const EDITOR_CSS = readFileSync(new URL("../editor.css", import.meta.url), "utf8");
+const BLOCKS_CSS = readFileSync(new URL("../blocks.css", import.meta.url), "utf8");
+
+// A tiny page: html > body > #write > #editor > .cm-content (a Live or Source content area).
+function page({ live, theme = "", host = {}, exact = false }) {
+  const vars = {};
+  if (host.font) vars["--fw-font"] = host.font; // applyAppearanceDom mirrors these onto <html> and #write
+  if (host.lineHeight) vars["--fw-line-height"] = String(host.lineHeight);
+  const html = celem("html", { classes: live ? [LIVE_ROOT_CLASS] : [], vars });
+  const body = celem("body", { parent: html });
+  const write = celem("div", { id: "write", parent: body, classes: live ? ["fw-mode-live"].concat(exact ? ["fw-live-exact"] : []) : ["fw-mode-source"], vars });
+  const content = celem("div", { parent: write, classes: ["cm-content"] });
+  const rules = [...parseRules(EDITOR_CSS), ...parseRules(BLOCKS_CSS, 5000), ...parseRules(theme, 10000)];
+  return { html, body, write, content, rules };
+}
+const face = (p) => cascade("font-family", p.content, p.rules);
+const lh = (p) => cascade("line-height", p.write, p.rules);
+
+test("filtered Live: a face the theme sets on body wins over the host fontFamily", () => {
+  const p = page({ live: true, theme: "body { font-family: Palatino, serif; line-height: 1.62 }", host: { font: "Menlo", lineHeight: 2 } });
+  assert.equal(face(p), "Palatino, serif");
+  assert.equal(lh(p), "1.62");
+});
+
+test("filtered Live: the theme's face on html or #write also wins (and #write beats body)", () => {
+  assert.equal(face(page({ live: true, theme: "html { font-family: Optima }", host: { font: "Menlo" } })), "Optima");
+  assert.equal(face(page({ live: true, theme: "#write { font-family: Garamond } body { font-family: Palatino }", host: { font: "Menlo" } })), "Garamond");
+  assert.equal(lh(page({ live: true, theme: "#write { line-height: 1.9 }", host: { lineHeight: 1.4 } })), "1.9");
+  assert.equal(lh(page({ live: true, theme: "html { line-height: 1.7 }", host: { lineHeight: 1.4 } })), "1.7");
+});
+
+test("filtered Live: a theme that sets no face falls back to the host fontFamily, then Georgia", () => {
+  const themeNoFont = "body { color: #222; background: #fafafa } #write { padding: 1px }";
+  assert.equal(face(page({ live: true, theme: themeNoFont, host: { font: '"Iowan Old Style", serif' } })), '"Iowan Old Style", serif');
+  assert.equal(face(page({ live: true, theme: themeNoFont })), "Georgia, serif");
+  assert.equal(face(page({ live: true, theme: "", host: { font: "Menlo" } })), "Menlo");
+  assert.equal(lh(page({ live: true, theme: themeNoFont, host: { lineHeight: 1.75 } })), "1.75");
+  assert.equal(lh(page({ live: true, theme: themeNoFont })), "1.6");
+});
+
+test("exact Live follows the same face rule", () => {
+  assert.equal(face(page({ live: true, exact: true, theme: "body { font-family: Palatino }", host: { font: "Menlo" } })), "Palatino");
+  assert.equal(face(page({ live: true, exact: true, theme: "", host: { font: "Menlo" } })), "Menlo");
+});
+
+test("Source keeps the host face on the content and the host line height on #write, whatever the theme's body says", () => {
+  const theme = "body { font-family: Palatino; line-height: 1.62 }";
+  const p = page({ live: false, theme, host: { font: "Menlo", lineHeight: 2 } });
+  assert.equal(face(p), "Menlo");
+  assert.equal(lh(p), "2");
+  const mono = page({ live: false, theme });
+  assert.equal(face(mono), '"iA Writer Mono S", Menlo, monospace');
+  assert.equal(lh(mono), "1.6");
+  // a theme's own `#write { line-height }` still wins in Source (zero-specificity host rule, theme comes later)
+  assert.equal(lh(page({ live: false, theme: "#write { line-height: 1.9 }", host: { lineHeight: 2 } })), "1.9");
+});
+
+test("applyAppearanceDom mirrors --fw-font and --fw-line-height onto <html> (the Live fallback reads them there)", () => {
+  const doc = fakeDoc();
+  applyAppearanceDom({ fontFamily: "Menlo", lineHeight: 1.8, fontSize: 18 }, doc);
+  assert.equal(doc.documentElement.style.get("--fw-font"), "Menlo");
+  assert.equal(doc.documentElement.style.get("--fw-line-height"), "1.8");
+  assert.equal(doc.write.style.get("--fw-font"), "Menlo");
+  assert.equal(doc.documentElement.style.get("--fw-font-size"), undefined, "size is not mirrored");
+  applyAppearanceDom({ fontFamily: "" }, doc); // empty clears
+  assert.equal(doc.documentElement.style.get("--fw-font"), undefined);
+  assert.equal(doc.write.style.get("--fw-font"), undefined);
+});
+
+test("fw-live-root is on <html> in Live, filtered or exact, and off in Source", () => {
+  const doc = fakeDoc();
+  const on = () => doc.documentElement.classList.has(LIVE_ROOT_CLASS);
+  applyLiveTheme({ mode: "source", filter: true }, doc);
+  assert.ok(!on());
+  applyLiveTheme({ mode: "live", filter: true }, doc);
+  assert.ok(on());
+  applyLiveTheme({ mode: "live", filter: false }, doc);
+  assert.ok(on());
+  applyLiveTheme({ mode: "source", filter: false }, doc);
+  assert.ok(!on());
+  assert.equal(LIVE_ROOT_CLASS, "fw-live-root");
+  assert.ok(EDITOR_CSS.includes(":where(html.fw-live-root)"));
+  assert.ok(!/(^|\n)#write\.fw-mode-live[^{]*\{[^}]*font-family:\s*var\(--fw-font/.test(EDITOR_CSS.replace(/\.cm-content/g, "")), "no host face directly on #write in Live");
+});
+
+// ---------------------------------------------------------------- revealed links beat the mapped theme copy
+test("revealed links stay un-underlined and un-tinted whatever the theme says about `a` (filtered and exact)", () => {
+  const theme = "a { color: #bc6a3a; text-decoration: underline } a:hover { color: red; text-decoration: underline } strong { color: crimson }";
+  const mapped = mapThemeCss(theme);
+  assert.ok(mapped.includes("fw-live-link"));
+  for (const exact of [false, true]) {
+    const html = celem("html", { classes: [LIVE_ROOT_CLASS] });
+    const write = celem("div", { id: "write", parent: celem("body", { parent: html }), classes: ["fw-mode-live"].concat(exact ? ["fw-live-exact"] : []) });
+    const line = celem("div", { parent: write, classes: ["cm-line"] });
+    const rev = celem("span", { parent: line, classes: ["fw-revealed", "fw-live-link"] });
+    const plain = celem("span", { parent: line, classes: ["fw-live-link"] });
+    // the order in <head>: editor.css, blocks.css, theme, mapped copy, overlay
+    const rules = [...parseRules(EDITOR_CSS), ...parseRules(BLOCKS_CSS, 5000), ...parseRules(theme, 10000), ...parseRules(mapped, 20000)];
+    for (const state of [new Set(), new Set(["hover"])]) {
+      assert.equal(cascade("text-decoration", rev, rules, { state, inherited: false }), "none", `revealed, exact=${exact}, ${[...state]}`);
+      assert.equal(cascade("color", rev, rules, { state }), cascade("color", line, rules, { state }), "revealed text takes the line colour");
+    }
+    assert.equal(cascade("text-decoration", plain, rules, { inherited: false }), "underline", "an unrevealed link keeps the theme's decoration");
+    assert.equal(cascade("color", plain, rules), "#bc6a3a");
+  }
+});
+
+test("the revealed rules out-specify any mapped selector", () => {
+  const revealed = "#write#write.fw-mode-live .fw-revealed.fw-live-link";
+  assert.ok(EDITOR_CSS.includes(revealed + " { text-decoration: none; }"));
+  assert.ok(EDITOR_CSS.includes("#write#write.fw-mode-live .fw-revealed { color: inherit; }"));
+  for (const sel of ["#write a", "#write a:hover", "#write a:focus", "#write.x h1 a:active", "#write li strong"]) {
+    const m = mapThemeCss(`${sel} { color: red }`).split("{")[0].trim();
+    assert.ok(m, sel);
+    assert.ok(higher(revealed, m), `${revealed} vs ${m}: ${specificity(revealed)} vs ${specificity(m)}`);
+  }
 });

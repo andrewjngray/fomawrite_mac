@@ -1,8 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { LIVE_SCOPE, mapSelector, mapThemeCss, stripComments } from "../src/thememap.ts";
+import { LIVE_SCOPE, MAPPED_SCOPE, mapSelector, mapThemeCss, stripComments } from "../src/thememap.ts";
 
-const S = "#write.fw-mode-live:not(.fw-live-exact)";
+const S = "#write.fw-mode-live"; // mapped copies are scoped to every Live (filtered and exact)
 
 /** Parse mapper output into [{selectors, body}] for top-level rules (at-rules are returned as {at, text}). */
 function rules(css) {
@@ -182,7 +182,8 @@ test("mapSelector: accepted forms", () => {
   assert.equal(m("  #write   h1  "), `${S} .cm-line.fw-h1`);
   assert.equal(m("#write p:hover"), `${S} .cm-line:not(:where(.fw-h1,.fw-h2,.fw-h3,.fw-h4,.fw-h5,.fw-h6,.fw-list-line,.fw-code-line,.fw-table-line,.fw-front-matter-line,.fw-math-src-line,.fw-footnote-def)):hover`);
   assert.equal(mapSelector("#write blockquote").cssDepth1, `${S} .cm-line.fw-quote-line.fw-quote-d1`);
-  assert.equal(LIVE_SCOPE, S);
+  assert.equal(MAPPED_SCOPE, S);
+  assert.equal(LIVE_SCOPE, "#write.fw-mode-live:not(.fw-live-exact)", "the overlay scope is unchanged");
 });
 
 test("mapSelector: rejected forms", () => {
@@ -227,8 +228,9 @@ test("comments, strings and malformed input are tolerated", () => {
   assert.equal(mapThemeCss(THEME), mapThemeCss(THEME));
 });
 
-test("every mapped selector is scoped to filtered Live", () => {
+test("every mapped selector is scoped to Live, filtered and exact alike", () => {
   const css = mapThemeCss(THEME);
+  assert.ok(!css.includes("fw-live-exact"), "no :not(.fw-live-exact): exact mode keeps the mapped copy");
   const heads = css.replace(/@font-face[^}]*}|@keyframes[^{]*\{(?:[^{}]|\{[^}]*\})*\}/g, "").match(/[^{}]+(?=\{)/g).map((h) => h.trim()).filter((h) => !h.startsWith("@"));
   assert.ok(heads.length > 10);
   for (const head of heads) for (const sel of head.split(/,\s*(?=#write)/)) assert.ok(sel.startsWith(S + " ") || sel.startsWith(S + "."), sel);

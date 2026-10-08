@@ -136,12 +136,16 @@ export function applyAppearanceDom(a: Appearance, doc: Document | undefined = ty
   if (write) {
     const set = (name: string, v: string | null) =>
       v === null ? write.style.removeProperty(name) : write.style.setProperty(name, v);
-    if (a.fontFamily !== undefined) set("--fw-font", a.fontFamily || null);
+    // --fw-font / --fw-line-height are mirrored onto <html>: in Live they are only fallbacks declared there (editor.css),
+    // so a theme's face on html / body / #write beats them. Source and the Live fallback read the same value.
+    const root = doc.documentElement.style;
+    const setRoot = (name: string, v: string | null) => (v === null ? root.removeProperty(name) : root.setProperty(name, v));
+    if (a.fontFamily !== undefined) { set("--fw-font", a.fontFamily || null); setRoot("--fw-font", a.fontFamily || null); }
     if (typeof a.fontSize === "number") {
       set("--fw-font-size", a.fontSize + "px");
       write.classList.add(HOST_SIZE_CLASS); // lets the host size beat a theme's `#write { font-size }` in filtered Live
     }
-    if (typeof a.lineHeight === "number") set("--fw-line-height", String(a.lineHeight));
+    if (typeof a.lineHeight === "number") { set("--fw-line-height", String(a.lineHeight)); setRoot("--fw-line-height", String(a.lineHeight)); }
   }
   if (a.dark !== undefined) doc.documentElement.classList.toggle("dark", !!a.dark);
 }
