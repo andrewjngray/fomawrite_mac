@@ -66,6 +66,12 @@ export function appearanceClasses(s: AppearanceState): string[] {
   return out;
 }
 
+/** Classes for `#write` given the mode. Live ignores the Source appearances (Manuscript / Editorial / Book / Code
+ *  have no meaning there): no `fw-appearance-*` class, while focus and typewriter still apply. Source: unchanged. */
+export function effectiveAppearanceClasses(mode: "source" | "live", s: AppearanceState): string[] {
+  return appearanceClasses(mode === "live" ? { ...s, appearance: null } : s);
+}
+
 /** What each compartment holds for a state. */
 export interface Plan {
   wrap: boolean;
@@ -363,7 +369,7 @@ const reconfigurer = EditorState.transactionExtender.of((tr) => {
 function applyClasses(view: EditorView, s: AppearanceState) {
   const write = view.dom.closest?.("#write");
   if (!write) return;
-  const want = new Set(appearanceClasses(s));
+  const want = new Set(effectiveAppearanceClasses(s.mode, s));
   for (const c of [...APPEARANCE_CLASSES, "fw-focus", "fw-typewriter"]) write.classList.toggle(c, want.has(c));
 }
 
