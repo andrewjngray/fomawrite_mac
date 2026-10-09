@@ -24,6 +24,8 @@ Yes [ ]  No [ ]  Maybe [x]
 
 Ten-minute experiment script for Andrew: [research/overnight-2026-10-08/grammarly-experiment.md](research/overnight-2026-10-08/grammarly-experiment.md).
 
+**Result, 9 October 2026:** Grammarly Desktop attaches to nothing in Fomawrite (works in Word on the same Mac). Cause found by probe: neither Qt Quick nor Qt WebEngine reports character bounds to macOS Accessibility (upstream stubs), so an overlay cannot place its button or underlines. The SDK route closed in January 2024. Remaining options are in the experiment note: a Source-only accessibility fix in the app (unproven), nothing for Live short of patching Qt, or the system checker wired into Live with a toggle.
+
 Requirement from Andrew: it must be switchable on and off. The Grammarly overlay (the small moving icon) is distracting when writing and creating; the purity of the editor and the clean panes are a feature, not a bug. Andrew will supply screenshots of how it behaves on his other devices.
 
 Andrew has a Grammarly account and finds its grammar checking good when it appears over text fields in Chrome. Three routes, in order of likelihood:

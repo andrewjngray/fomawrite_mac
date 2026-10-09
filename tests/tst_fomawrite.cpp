@@ -150,6 +150,7 @@ private slots:
     void footerCompactStylesRemainReachableAcrossModes();
     void footerViewControlsStayStationaryAcrossModes();
     void footerLiveOptionJoinsEditingCapsule();
+    void accessibilityProbeForWritingAssistants();
     void footerLayoutCapsuleNamesPreviewOnly();
     void footerViewCyclesPreserveDraftSelectionAndWidths();
     void footerModesAndTemplatesPreserveDraftAndUndo();
@@ -5224,6 +5225,7 @@ private:
 #include "cycle134-live-editor.inc"
 #include "cycle134-footer-live.inc"
 #include "cycle140-typora-base.inc"
+#include "cycle142-accessibility-probe.inc"
 
 int main(int argc, char **argv) {
     QtWebEngineQuick::initialize();
