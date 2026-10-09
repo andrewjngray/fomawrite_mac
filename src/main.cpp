@@ -28,6 +28,7 @@
 #include "workspace.h"
 
 #include "backend.h"
+#include "sourceaccessibility.h"
 #include "macbridge.h"
 #include "systemtheme.h"
 #include "documentviewcheck.h"
@@ -122,6 +123,7 @@ public:
 int main(int argc, char *argv[]) {
     QtWebEngineQuick::initialize();
     WriterApplication app(argc, argv);
+    installSourceEditorAccessibility();
     app.setApplicationName(QStringLiteral("fomawrite"));
     app.setDesktopFileName(QStringLiteral("fomawrite"));
 #ifdef Q_OS_MACOS
@@ -145,7 +147,7 @@ int main(int argc, char *argv[]) {
     app.setOrganizationName(QStringLiteral("AndrewGray"));
     app.setOrganizationDomain(QStringLiteral("andrewjngray.github.io"));
     app.setApplicationDisplayName(QStringLiteral("Fomawrite"));
-    app.setApplicationVersion(QStringLiteral("0.3.0-dev37"));
+    app.setApplicationVersion(QStringLiteral("0.3.0-dev38"));
     const int documentCheck = app.arguments().indexOf(QStringLiteral("--check-document-views"));
     if (documentCheck >= 0) {
         const QString destination = app.arguments().value(documentCheck + 1);

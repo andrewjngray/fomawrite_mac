@@ -34,6 +34,7 @@
 #include <QStandardPaths>
 
 #include "backend.h"
+#include "sourceaccessibility.h"
 #include "markdownhighlighter.h"
 
 
@@ -410,6 +411,7 @@ private slots:
     void publishingPreviewOwnsTemporaryFilesAndReportsErrors();
 
     void initTestCase() {
+        installSourceEditorAccessibility();
         QCoreApplication::setOrganizationName("FomawriteTests");
         // One app-data directory per test process: several suites can run at
         // once (worktrees, CI matrix) without their recovery snapshots and

@@ -59,6 +59,27 @@ void FomawriteTest::accessibilityProbeForWritingAssistants() {
         QAccessibleInterface *focus = QAccessible::queryAccessibleInterface(quick) ? QAccessible::queryAccessibleInterface(quick)->focusChild() : nullptr;
         cycle142Report("window.focusChild", focus);
     }
+    // With the Source factory installed, character bounds are real and round-trip.
+    if (auto *a = QAccessible::queryAccessibleInterface(editor)) {
+        auto *t = a->textInterface(); QVERIFY(t);
+        const QRect fifth = t->characterRect(5), twelfth = t->characterRect(12);
+        QVERIFY2(fifth.width() > 0 && fifth.height() > 0, "characterRect(5) is empty");
+        QVERIFY(twelfth.x() > fifth.x() && twelfth.y() == fifth.y());
+        QCOMPARE(t->offsetAtPoint(fifth.center()), 5);
+        QCOMPARE(t->offsetAtPoint(twelfth.center()), 12);
+        QVERIFY(t->characterRect(t->characterCount()).height() > 0);
+        QVERIFY(t->characterRect(t->characterCount() + 1).isEmpty());
+        QCOMPARE(t->offsetAtPoint(QPoint(-5000, -5000)), -1);
+        const QRect secondParagraph = t->characterRect(36);
+        QVERIFY2(secondParagraph.y() > fifth.y(), "second paragraph is below the first");
+        auto *e = a->editableTextInterface(); QVERIFY2(e, "editable-text interface kept");
+        e->replaceText(0, 5, QStringLiteral("They're"));
+        QVERIFY(editor->property("text").toString().startsWith(QStringLiteral("They're going too")));
+        e->deleteText(0, 8); e->insertText(0, QStringLiteral("Their "));
+        QVERIFY(editor->property("text").toString().startsWith(QStringLiteral("Their going too")));
+        e->replaceText(0, 10000, QStringLiteral("x")); // out of range: ignored
+        QVERIFY(editor->property("text").toString().startsWith(QStringLiteral("Their going too")));
+    }
     qInfo() << "--- Live surface";
     QVERIFY(QMetaObject::invokeMethod(window.data(), "selectWritingMode", Q_ARG(QVariant, QStringLiteral("live"))));
     auto *bridge = backend.editorBridge();

@@ -1,4 +1,5 @@
 QT += core gui quick testlib
+QT += quick-private
 CONFIG += testcase c++17
 TEMPLATE = app
 TARGET = tst_fomawrite
@@ -7,10 +8,12 @@ INCLUDEPATH += ../src
 SOURCES += \
     tst_fomawrite.cpp \
     ../src/backend.cpp \
+    ../src/sourceaccessibility.cpp \
     ../src/markdownhighlighter.cpp \
     ../src/outputcss.cpp
 HEADERS += \
     ../src/backend.h \
+    ../src/sourceaccessibility.h \
     ../src/markdownhighlighter.h \
     ../src/outputcss.h
 
