@@ -149,12 +149,15 @@ void FomawriteTest::linkEditorRejectsChangedAndReloadedTargets() {
         QCOMPARE(f.editor->property("text").toString(), before); QCOMPARE(f.backend.documentRevision(), revision);
         QCOMPARE(f.field("linkEditorUrl")->property("text").toString(), "Kept destination.md");
         QVERIFY(f.field("linkEditorError")->property("text").toString().contains("document changed"));
-        QTest::qWait(40); // Let the error label wrap and the popup clamp to its new height.
+        // The error label wraps and the popup clamps to its new height; on the
+        // CI runner that takes longer than a fixed wait, so poll for it.
         const QRectF viewport(QPointF(), f.quick->size());
-        for (const char *name : {"linkEditorLabel", "linkEditorUrl", "linkEditorTitle", "linkEditorApplyButton", "linkEditorCancelButton", "linkEditorError"}) {
-            auto *item = f.field(name); QVERIFY(item && item->isVisible());
-            QVERIFY2(viewport.contains(QRectF(item->mapToScene(QPointF()), item->size())), name);
-        }
+        const auto inside = [&](const char *name) {
+            auto *item = f.field(name);
+            return item && item->isVisible() && viewport.contains(QRectF(item->mapToScene(QPointF()), item->size()));
+        };
+        for (const char *name : {"linkEditorLabel", "linkEditorUrl", "linkEditorTitle", "linkEditorApplyButton", "linkEditorCancelButton", "linkEditorError"})
+            QTRY_VERIFY2_WITH_TIMEOUT(inside(name), name, 3000);
         QVERIFY(f.click("linkEditorCancelButton")); QTRY_VERIFY(!f.popup->property("visible").toBool());
     }
 }
