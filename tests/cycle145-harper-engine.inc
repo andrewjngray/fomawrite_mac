@@ -636,6 +636,11 @@ void FomawriteTest::harperDrivesSourceTheLivePageAndThePaneInTheRealPage() {
     // Style goes on: grey under "very unique"; off: gone.
     spell->setStyleEnabled(true);
     QTRY_VERIFY(cycle145Underline(document, unique) == QColor("#8a8f98"));
+    { // A frame for the record: Source with all three categories and the pane listing them (captures dir is git-ignored).
+        QString why; QDir().mkpath(QStringLiteral("%1/../research/cycle-145/captures").arg(QFINDTESTDATA("tests.pro").section('/', 0, -2)));
+        const QString file = QDir(QStringLiteral("%1/../research/cycle-145/captures").arg(QFINDTESTDATA("tests.pro").section('/', 0, -2))).filePath("harper-source-and-pane.png");
+        if (!cycle134SaveFrame(f.quick, file, &why)) qWarning() << "capture skipped:" << why;
+    }
     spell->setStyleEnabled(false);
     QTRY_VERIFY(!cycle145Underline(document, unique).isValid());
     spell->setStyleEnabled(true);
