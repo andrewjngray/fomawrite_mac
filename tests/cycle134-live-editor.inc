@@ -819,7 +819,7 @@ void FomawriteTest::liveModeInMainWindowLoadsPageAndNavigatesOutline() {
         const int token = bridge->fetchText(); QTest::qWait(60);
         for (const auto &args : received) if (args.at(0).toInt() == token && args.at(1).toString() == text) return true;
         return false;
-    })(), 15000);
+    })(), 45000); // the GitHub runner's first page load is slow
     auto *liveToggle = window->findChild<QQuickItem *>("liveEditToggle"); QVERIFY(liveToggle);
     QTRY_VERIFY(liveToggle->property("checked").toBool());
     // Edit > Select All while the page has focus acts on the page.

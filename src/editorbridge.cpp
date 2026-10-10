@@ -108,6 +108,7 @@ void EditorBridge::spellingSuggestions(int token, const QString &word) { emit su
 void EditorBridge::replySuggestions(int token, const QString &wordsJson) { emit suggestionsReply(token, wordsJson); }
 void EditorBridge::learnWord(const QString &word) { emit wordLearned(word); }
 void EditorBridge::ignoreWord(const QString &word) { emit wordIgnored(word); }
+void EditorBridge::ignoreGrammar(const QString &text, const QString &message) { emit grammarIgnored(text, message); }
 void EditorBridge::applySpellCheck(bool enabled) {
     m_spellCheck = enabled;
     if (m_ready) emit setSpellCheck(m_spellCheck);

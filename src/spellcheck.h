@@ -58,6 +58,9 @@ public:
     // Grammar findings in `text`, sentence by sentence, as [start, end) with the
     // checker's message and corrections. Empty when grammar is off.
     QList<Issue> grammarIssues(const QString &text) const;
+    // [start, end) chunks of `text`, split at sentence ends (or line ends, or
+    // spaces) so no chunk is longer than `limit`; public for tests.
+    static QList<Range> grammarChunks(const QString &text, int limit = 1000);
     // Spelling and grammar together, in document order; the one list the
     // surfaces underline and the review pane shows.
     QList<Issue> issues(const QString &text) const;
@@ -88,5 +91,10 @@ private:
     // every word's on each rebuild; keep them until the language or the
     // learned/ignored words change.
     mutable QHash<QString, QStringList> m_suggestionCache;
+    // Raw grammar answers per chunk of prose (before the ignore filter). The
+    // macOS pass is super-linear in the text length (0.9 s at 8,700 chars), so a
+    // paragraph is checked in sentence-aligned chunks of at most ~1,000
+    // characters and a keystroke only re-checks the chunk it touched.
+    mutable QHash<QString, QVariantList> m_grammarChunkCache;
     QSet<QString> m_ignoredGrammar;
 };

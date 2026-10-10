@@ -257,6 +257,7 @@ export interface SpellingBridge {
   spellingSuggestions?: (token: number, word: string) => void;
   learnWord?: (word: string) => void;
   ignoreWord?: (word: string) => void;
+  ignoreGrammar?: (text: string, message: string) => void;
   spellingReply?: { connect(fn: (token: number, rangesJson: string) => void): void };
   suggestionsReply?: { connect(fn: (token: number, wordsJson: string) => void): void };
   setSpellCheck?: { connect(fn: (enabled: boolean) => void): void };
@@ -593,6 +594,7 @@ export function spellingExtension(bridge: SpellingBridge): Extension {
   class SpellPlugin {
     private timer: ReturnType<typeof setTimeout> | null = null;
     private menu: SpellMenu | null = null;
+    private menuGrammarMessage = "";
 
     constructor(private view: EditorView) {
       plugin = this;
@@ -657,6 +659,7 @@ export function spellingExtension(bridge: SpellingBridge): Extension {
     // ---- context menu
     openMenu(range: DocRange, x: number, y: number): void {
       this.closeMenu();
+      this.menuGrammarMessage = "";
       const word = this.view.state.doc.sliceString(range.from, range.to);
       engine.requestSuggestions(word, (words) => {
         if (plugin !== this || this.view.state.doc.sliceString(range.from, range.to) !== word) return; // edited meanwhile
@@ -667,6 +670,7 @@ export function spellingExtension(bridge: SpellingBridge): Extension {
     /** The grammar menu needs no host round trip: the message and corrections came with the reply. */
     openGrammarMenu(range: DocRange, info: GrammarInfo, x: number, y: number): void {
       this.closeMenu();
+      this.menuGrammarMessage = info.message;
       this.show(grammarMenuModel(info), range, this.view.state.doc.sliceString(range.from, range.to), x, y);
     }
 
@@ -684,6 +688,8 @@ export function spellingExtension(bridge: SpellingBridge): Extension {
       if (choice.kind === "ignoreGrammar") {
         if (state.doc.sliceString(range.from, range.to) !== word) return;
         this.view.dispatch(engine.ignoreGrammar(state, word));
+        // The host owns the ignore list the pane and the Source editor read.
+        try { bridge.ignoreGrammar?.(word, this.menuGrammarMessage); } catch (e) { engine.log(`ignoreGrammar failed: ${e instanceof Error ? e.message : String(e)}`); }
         return;
       }
       try {

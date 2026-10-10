@@ -73,6 +73,18 @@ void FomawriteTest::checkSpellingWhileTypingCommandTogglesTheSetting() {
     QCOMPARE(spell->enabled(), before);
 }
 
+// The macOS grammar pass is not present on every machine (the GitHub runner's
+// image has none), so grammar tests skip where a doubled word is not flagged.
+static bool cycle144GrammarAvailable(SpellCheck &check) {
+    if (!check.available()) return false;
+    const bool enabled = check.enabled(), grammar = check.grammarEnabled();
+    check.setEnabled(true); check.setGrammarEnabled(true);
+    const bool found = !check.grammarIssues(QStringLiteral("This is is a test.")).isEmpty();
+    check.setEnabled(enabled); check.setGrammarEnabled(grammar);
+    return found;
+}
+#define CYCLE144_NEEDS_GRAMMAR(check) if (!cycle144GrammarAvailable(check)) QSKIP("this macOS has no grammar pass for the test language")
+
 // Grammar findings come from the same service with a message and a category,
 // follow their own setting, and issuesInBlock lists spelling and grammar in order.
 void FomawriteTest::spellCheckServiceReportsGrammarIssuesWithCategory() {
@@ -80,6 +92,7 @@ void FomawriteTest::spellCheckServiceReportsGrammarIssuesWithCategory() {
     SpellCheck check;
     if (!check.available()) QSKIP("the system checker exists only on macOS");
     check.setEnabled(true); check.setGrammarEnabled(true); check.setLanguage(QStringLiteral("en_US"));
+    CYCLE144_NEEDS_GRAMMAR(check);
     const QString text = QStringLiteral("This is is a test. We recieve the the mail here.");
     const auto grammar = check.grammarIssues(text);
     QVERIFY2(!grammar.isEmpty(), "the macOS grammar pass flags a doubled word");
@@ -109,4 +122,45 @@ void FomawriteTest::spellCheckServiceReportsGrammarIssuesWithCategory() {
     QVERIFY(highlighter.issuesInBlock(document.findBlockByNumber(3)).isEmpty());
     check.setGrammarEnabled(false);
     QVERIFY(highlighter.issuesInBlock(document.firstBlock()).size() < first.size());
+}
+
+// Grammar runs in sentence-aligned chunks with a per-chunk cache: a long
+// paragraph costs about one chunk per keystroke instead of a super-linear
+// whole-paragraph pass (0.9 s at 8,700 characters before, reviewer finding).
+void FomawriteTest::grammarChecksLongParagraphsInCachedChunks() {
+    Cycle103SettingsSnapshot settings;
+    // Chunking is pure: sentence ends win, then line ends, then spaces, never longer than the limit.
+    QString text;
+    for (int i = 0; i < 120; ++i) text += QStringLiteral("Sentence number %1 says something ordinary about the weather today. ").arg(i);
+    text += QStringLiteral("Finally the the end.");
+    const auto chunks = SpellCheck::grammarChunks(text, 1000);
+    QVERIFY(chunks.size() >= 8);
+    int cursor = 0;
+    for (const auto &chunk : chunks) {
+        QCOMPARE(chunk.start, cursor);
+        QVERIFY(chunk.end > chunk.start && chunk.end - chunk.start <= 1000);
+        if (chunk.end < text.size()) QVERIFY2(text.at(chunk.end - 1).isSpace() && text.at(chunk.end - 2) == QLatin1Char('.'), "cut at a sentence end");
+        cursor = chunk.end;
+    }
+    QCOMPARE(cursor, text.size());
+    const auto noSentences = SpellCheck::grammarChunks(QString(2500, QLatin1Char('x')), 1000);
+    QCOMPARE(noSentences.size(), 3);
+    QCOMPARE(SpellCheck::grammarChunks(QString(), 1000).size(), 0);
+    SpellCheck check;
+    CYCLE144_NEEDS_GRAMMAR(check);
+    check.setEnabled(true); check.setGrammarEnabled(true); check.setLanguage(QStringLiteral("en_US"));
+    QElapsedTimer timer; timer.start();
+    const auto cold = check.grammarIssues(text);
+    const qint64 coldMs = timer.elapsed();
+    bool found = false;
+    for (const auto &issue : cold) if (text.mid(issue.start, issue.end - issue.start) == QStringLiteral("the the")) found = true;
+    QVERIFY2(found, "the doubled word in the last chunk is reported at its document offset");
+    QVERIFY2(coldMs < 2000, qPrintable(QStringLiteral("cold pass took %1 ms").arg(coldMs)));
+    // One edit near the end re-checks one chunk: the earlier chunks come from the cache.
+    timer.restart();
+    const auto warm = check.grammarIssues(text + QStringLiteral(" More."));
+    const qint64 warmMs = timer.elapsed();
+    qInfo("grammar chunks: cold %lld ms, after a one-chunk edit %lld ms", coldMs, warmMs);
+    QCOMPARE(warm.size(), cold.size());
+    QVERIFY2(warmMs * 2 <= coldMs + 20, "the cache makes the second pass markedly cheaper");
 }

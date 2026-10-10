@@ -273,3 +273,15 @@ test("fw-grammar is a blue wavy underline; where spelling and grammar meet, one 
     assert.equal(cascade("text-underline-offset", celem("span", { parent: line, classes: ["fw-misspelled"] }), rules, { inherited: false }) ?? "", "", "spelling keeps the default offset");
   }
 });
+
+test("the host slot for Ignore Grammar Issue exists on the mock bridge and the engine drops the mark", () => {
+  const bridge = sent();
+  const engine = new SpellEngine(bridge);
+  let s = checked(engine, bridge, stateOf(DOC, 0), reply(grammar(IS_IS)));
+  s = apply(s, engine.ignoreGrammar(s, "is is"));
+  assert.deepEqual(grammarRanges(s), []);
+  const mock = createMockBridge();
+  assert.equal(typeof mock.ignoreGrammar, "function", "the mock host accepts ignoreGrammar(text, message)");
+  mock.ignoreGrammar("is is", "Repeated word");
+  assert.deepEqual(mock.calls.filter((c) => c.name === "ignoreGrammar").map((c) => c.args), [["is is", "Repeated word"]]);
+});

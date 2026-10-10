@@ -643,6 +643,12 @@ Backend::Backend(QObject *parent, bool outputOnly) : QObject(parent), m_library(
     });
     connect(m_editorBridge.get(), &EditorBridge::wordLearned, this, [this](const QString &word) { m_spellCheck.learnWord(word); });
     connect(m_editorBridge.get(), &EditorBridge::wordIgnored, this, [this](const QString &word) { m_spellCheck.ignoreWord(word); });
+    connect(m_editorBridge.get(), &EditorBridge::cursorMoved, this, [this](int, int head) {
+        if (m_liveCaret == head) return;
+        m_liveCaret = head; m_liveCaretClock.start();
+        if (m_reviewWithheldWord) m_reviewTimer.start();
+    });
+    connect(m_editorBridge.get(), &EditorBridge::grammarIgnored, this, [this](const QString &text, const QString &message) { m_spellCheck.ignoreGrammar(text, message); });
     const auto pushSpellCheck = [this]() { m_editorBridge->applySpellCheck(m_spellCheck.enabled() && m_spellCheck.available()); };
     connect(&m_spellCheck, &SpellCheck::enabledChanged, this, pushSpellCheck);
     connect(&m_spellCheck, &SpellCheck::languageChanged, this, pushSpellCheck);
@@ -1611,7 +1617,7 @@ void Backend::setFocusPosition(int position, bool enabled, bool sentence) {
     if (!m_document || !m_highlighter) return;
     m_highlighter->setCaret(position);
     if (m_caret != position) {
-        m_caret = position;
+        m_caret = position; m_sourceCaretClock.start();
         // The word that was being typed becomes a finding once the caret leaves it.
         if (m_reviewWithheldWord) m_reviewTimer.start();
     }
@@ -4098,11 +4104,23 @@ QVariantMap Backend::issueMap(const QTextBlock &block, const SpellCheck::Issue &
             {QStringLiteral("blockNumber"), block.blockNumber()}};
 }
 
+// The caret the hold-back uses: Source's or Live's, whichever moved last. In
+// Live the host never sees the Source caret move, so without this the pane
+// listed every half-typed word 300 ms after the keystroke.
+int Backend::reviewCaret() const {
+    const bool source = m_sourceCaretClock.isValid(), live = m_liveCaretClock.isValid();
+    if (!source && !live) return m_caret;
+    if (!live) return m_caret;
+    if (!source) return m_liveCaret;
+    return m_liveCaretClock.elapsed() <= m_sourceCaretClock.elapsed() ? m_liveCaret : m_caret;
+}
+
 void Backend::rebuildReviewIssues() {
     m_reviewTimer.stop();
     QVariantList list;
     bool truncated = false;
     m_reviewWithheldWord = false;
+    const int caret = reviewCaret();
     if (m_document && m_highlighter && m_spellCheck.available() && m_spellCheck.enabled()) {
         for (QTextBlock block = m_document->begin(); block.isValid() && !truncated; block = block.next()) {
             if (block.length() <= 1) continue;
@@ -4110,7 +4128,7 @@ void Backend::rebuildReviewIssues() {
                 // A word the caret ends, typed within the last moment, is still
                 // being typed (the underline withholds it too): it is listed
                 // once the caret leaves or the writer pauses.
-                if (issue.category == QLatin1String("Spelling") && m_caret >= 0 && block.position() + issue.end == m_caret
+                if (caret >= 0 && block.position() + issue.end == caret
                     && m_reviewEditClock.isValid() && m_reviewEditClock.elapsed() < ReviewTypingPause) {
                     m_reviewWithheldWord = true;
                     continue;
@@ -4185,11 +4203,19 @@ QVariantMap Backend::grammarIssueAt(int position) {
     }
     return {};
 }
+// One ignore list for grammar, the service's: the pane, the Source underline
+// and the Live page all read it (SpellCheck::ignoreGrammar emits wordsChanged;
+// the highlighter restyles and the page is told to re-check).
 void Backend::ignoreGrammarIssue(int start, int end) {
-    if (!m_document || !m_highlighter || start < 0) return;
+    if (!m_document || !m_highlighter || start < 0 || end <= start) return;
     const QTextBlock block = m_document->findBlock(start);
     if (!block.isValid()) return;
-    m_highlighter->ignoreIssue(block.blockNumber(), start - block.position(), end - block.position());
+    const int offset = start - block.position();
+    for (const SpellCheck::Issue &issue : m_highlighter->issuesInBlock(block)) {
+        if (issue.category != QLatin1String("Grammar") || issue.start != offset || issue.end != end - block.position()) continue;
+        m_spellCheck.ignoreGrammar(block.text().mid(issue.start, issue.end - issue.start), issue.message);
+        return;
+    }
 }
 void Backend::speakText(const QString &text) {
 #ifdef Q_OS_MACOS

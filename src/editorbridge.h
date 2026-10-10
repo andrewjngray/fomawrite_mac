@@ -94,6 +94,7 @@ public slots:
     void replySuggestions(int token, const QString &wordsJson);
     void learnWord(const QString &word);
     void ignoreWord(const QString &word);
+    void ignoreGrammar(const QString &text, const QString &message);
 
 signals:
     // Connected to by the page.
@@ -121,6 +122,7 @@ signals:
     void suggestionsRequested(int token, const QString &word);
     void wordLearned(const QString &word);
     void wordIgnored(const QString &word);
+    void grammarIgnored(const QString &text, const QString &message);
     void scrollFractionChanged(double fraction);
     void imageRequested(int token, const QString &src);
     void imageSaveRequested(int token, const QString &name, const QString &mime, const QString &base64);

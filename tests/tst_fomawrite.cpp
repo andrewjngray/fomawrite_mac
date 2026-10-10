@@ -156,6 +156,9 @@ private slots:
     void spellCheckServiceFindsWordsAndHonoursIgnoreAndSetting();
     void checkSpellingWhileTypingCommandTogglesTheSetting();
     void spellCheckServiceReportsGrammarIssuesWithCategory();
+    void grammarChecksLongParagraphsInCachedChunks();
+    void reviewPaneWithholdsTheWordBeingTypedInLive();
+    void ignoreGrammarFromAnySurfaceReachesEverySurface();
     void sourceSpellingUnderlinesProseOnly();
     void sourceSpellingFollowsTheSettingAndLearnedWords();
     void sourceSpellingChecksOnlyChangedBlocks();

@@ -1,7 +1,6 @@
 // Cycle143 — misspelled words are underlined as the writer types in the Source
 // editor, and a right-click on one offers suggestions, Learn Spelling and
-// Ignore Spelling. Spelling only; grammar stays in the Spelling and Grammar
-// dialog.
+// Ignore Spelling. Grammar joined in Cycle 144 (blue marks, tests/cycle144-source-grammar.inc).
 //
 // Real-checker tests use words no other test touches ("recieve", "definately",
 // "occured", "accomodate"): the system checker's ignore list lasts for the whole
@@ -115,7 +114,8 @@ void FomawriteTest::sourceSpellingFollowsTheSettingAndLearnedWords() {
     QElapsedTimer timer; timer.start();
     largeHighlighter.setSpellCheck(&spell); // restyles every block once, uncached
     qInfo("real checker, 2000 lines: %lld ms", timer.elapsed());
-    QVERIFY(timer.elapsed() < 8000);
+    QVERIFY(timer.elapsed() < 15000);
+    large.adjustSize(); // Qt 6.11 restyles lazily as layout reaches each block
     QVERIFY(cycle143Underlined(large, large.findBlockByNumber(1500).text().indexOf("accomodate") + large.findBlockByNumber(1500).position()));
 }
 

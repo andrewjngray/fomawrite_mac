@@ -66,6 +66,7 @@ void FomawriteTest::reviewIssuesListSpellingAndGrammarInOrderWithDocumentOffsets
     auto *spell = f.backend.spellCheck();
     if (!spell->available()) QSKIP("the system spell checker exists only on macOS");
     spell->setEnabled(true); spell->setGrammarEnabled(true); spell->setLanguage(QStringLiteral("en_US"));
+    CYCLE144_NEEDS_GRAMMAR((*spell));
     QVERIFY(f.mode(0));
     const QString text = cycle144Text();
     f.editor->setProperty("text", text);
@@ -506,6 +507,7 @@ void FomawriteTest::reviewPaneRendersInLightAndDarkThemes() {
     auto *spell = f.backend.spellCheck();
     if (!spell->available()) QSKIP("the system spell checker exists only on macOS");
     spell->setEnabled(true); spell->setGrammarEnabled(true); spell->setLanguage(QStringLiteral("en_US"));
+    CYCLE144_NEEDS_GRAMMAR((*spell));
     QVERIFY(f.mode(1));
     f.editor->setProperty("text", cycle144Text());
     QVERIFY(cycle144Run(f.window.data(), "spelling"));
@@ -526,4 +528,83 @@ void FomawriteTest::reviewPaneRendersInLightAndDarkThemes() {
         for (int y = box.top(); y < box.bottom(); y += 3) for (int x = box.left(); x < box.right(); x += 3) colours.insert(frame.pixel(x, y));
         QVERIFY2(colours.size() > 8, theme);
     }
+}
+
+// In Live the host never sees the Source caret move, so the pane used to list
+// every half-typed word 300 ms after the keystroke (reviewer finding). The
+// hold-back now follows whichever caret moved last.
+void FomawriteTest::reviewPaneWithholdsTheWordBeingTypedInLive() {
+#ifndef Q_OS_MACOS
+    QSKIP("the system spell checker is only available on macOS");
+#endif
+    Cycle103SettingsSnapshot settings;
+    Backend backend;
+    backend.spellCheck()->setEnabled(true); backend.spellCheck()->setGrammarEnabled(false); backend.spellCheck()->setLanguage(QStringLiteral("en_US"));
+    QQmlEngine engine; engine.rootContext()->setContextProperty("backend", &backend);
+    QQmlComponent component(&engine, QUrl(QStringLiteral("qrc:/Main.qml")));
+    QScopedPointer<QObject> window(component.create()); QVERIFY2(window, qPrintable(component.errorString()));
+    auto *quick = qobject_cast<QQuickWindow *>(window.data()); QVERIFY(quick);
+    auto *editor = window->findChild<QQuickItem *>("sourceEditor"); QVERIFY(editor);
+    auto *layout = window->findChild<QObject *>("workspaceLayout"); QVERIFY(layout);
+    quick->resize(1280, 800); quick->show(); QVERIFY(QTest::qWaitForWindowExposed(quick));
+    layout->setProperty("organizerVisible", false); layout->setProperty("filesVisible", false);
+    const QString text = QStringLiteral("We recieve the mail.");
+    editor->setProperty("text", text);
+    QVERIFY(QMetaObject::invokeMethod(window.data(), "selectWritingMode", Q_ARG(QVariant, QStringLiteral("live"))));
+    auto *bridge = backend.editorBridge();
+    QTRY_VERIFY_WITH_TIMEOUT(bridge->isReady(), 20000);
+    auto *view = window->findChild<QObject *>("liveEditorView"); QVERIFY(view);
+    QTRY_VERIFY_WITH_TIMEOUT(!view->property("loading").toBool(), 15000);
+    QTRY_COMPARE(cycle144PageText(bridge), text);
+    QVERIFY(cycle144Run(window.data(), "spelling"));
+    QTRY_VERIFY(!cycle144Find(backend.reviewIssues(), "Spelling", "recieve").isEmpty());
+    // Type a misspelled word at the end of the page, caret left at its end.
+    const QString typed = QStringLiteral(" zxqvwha");
+    const QString script = QStringLiteral(R"JS(
+        (function() { const v = window.fomawriteEditor.view; const end = v.state.doc.length;
+          v.dispatch({ changes: { from: end, insert: "%1" }, selection: { anchor: end + %2 }, userEvent: "input.type" }); })())JS")
+        .arg(typed).arg(typed.size());
+    QVERIFY(QMetaObject::invokeMethod(view, "runJavaScript", Q_ARG(QString, script)));
+    QTRY_COMPARE_WITH_TIMEOUT(editor->property("text").toString(), text + typed, 5000);
+    QTRY_COMPARE_WITH_TIMEOUT(bridge->lastCursor(), text.size() + typed.size(), 5000);
+    // Within the typing pause the half-typed word is not a row.
+    QTest::qWait(700);
+    QVERIFY2(cycle144Find(backend.reviewIssues(), "Spelling", "zxqvwha").isEmpty(), "the word at the Live caret is withheld");
+    QVERIFY(!cycle144Find(backend.reviewIssues(), "Spelling", "recieve").isEmpty());
+    // The caret leaves the word: it is listed.
+    bridge->placeCursor(0);
+    QTRY_VERIFY_WITH_TIMEOUT(!cycle144Find(backend.reviewIssues(), "Spelling", "zxqvwha").isEmpty(), 5000);
+    backend.discardRecovery();
+}
+
+// Ignore Grammar Issue from the Source menu, the pane or the Live page lands in
+// the one list the service keeps, so every surface drops the finding.
+void FomawriteTest::ignoreGrammarFromAnySurfaceReachesEverySurface() {
+    Cycle103SettingsSnapshot settings;
+    Cycle117Window f; QVERIFY2(f.start(1100), qPrintable(f.error));
+    auto *spell = f.backend.spellCheck();
+    if (!spell->available()) QSKIP("the system spell checker exists only on macOS");
+    spell->setEnabled(true); spell->setGrammarEnabled(true); spell->setLanguage(QStringLiteral("en_US"));
+    CYCLE144_NEEDS_GRAMMAR((*spell));
+    const QString text = QStringLiteral("This is is a test.\n\nAnd the the end of it.\n");
+    f.editor->setProperty("text", text);
+    QTRY_VERIFY(!cycle144Find(f.backend.reviewIssues(), "Grammar", "is is").isEmpty());
+    QTRY_VERIFY(!cycle144Find(f.backend.reviewIssues(), "Grammar", "the the").isEmpty());
+    // Source menu path: Backend::ignoreGrammarIssue(start, end).
+    const QVariantMap doubled = cycle144Find(f.backend.reviewIssues(), "Grammar", "is is"); // "This is is": the range the checker gives, not indexOf
+    const int isIs = doubled.value("start").toInt();
+    f.backend.ignoreGrammarIssue(isIs, doubled.value("end").toInt());
+    QTRY_VERIFY(cycle144Find(f.backend.reviewIssues(), "Grammar", "is is").isEmpty());
+    QVERIFY(f.backend.grammarIssueAt(isIs + 2).isEmpty());
+    QVERIFY(spell->grammarIssues(QStringLiteral("This is is a test.")).isEmpty()); // what the Live host reply is built from
+    QVERIFY(!cycle144Find(f.backend.reviewIssues(), "Grammar", "the the").isEmpty());
+    // Live page path: the bridge slot with the text and the message.
+    const QString message = cycle144Find(f.backend.reviewIssues(), "Grammar", "the the").value("message").toString();
+    QVERIFY(!message.isEmpty());
+    f.backend.editorBridge()->ignoreGrammar(QStringLiteral("the the"), message);
+    QTRY_VERIFY(cycle144Find(f.backend.reviewIssues(), "Grammar", "the the").isEmpty());
+    QVERIFY(f.backend.grammarIssueAt(text.indexOf(QStringLiteral("the the")) + 2).isEmpty());
+    // Spelling is untouched by grammar ignores.
+    f.editor->setProperty("text", text + QStringLiteral("\nWe recieve it.\n"));
+    QTRY_VERIFY(!cycle144Find(f.backend.reviewIssues(), "Spelling", "recieve").isEmpty());
 }

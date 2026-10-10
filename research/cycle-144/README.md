@@ -52,7 +52,7 @@ Red then green: with the grammar drawing loop stubbed (the loop iterating an emp
 - Straight underline with a wash, not a wave (as spelling).
 - Not hand-tested in an installed app.
 
-# Cycle 144
+## (merged section)
 
 Other sections of this record are written by the agents that built the other pieces.
 
@@ -60,7 +60,7 @@ Other sections of this record are written by the agents that built the other pie
 
 Grammar findings get a blue wavy underline in the Live page as the writer types, next to the red spelling ones. A right-click on a grammar range shows the checker's message, its corrections and "Ignore Grammar Issue". Spelling behaviour is unchanged.
 
-# Cycle 144
+## (merged section)
 
 This record has one section per piece of the cycle; each agent adds its own.
 
@@ -128,6 +128,21 @@ Red, then green:
 
 - The shortcuts are untested by hand. On a US keyboard ⌘: *is* ⇧⌘;, so the spec's ⇧⌘; for Previous Issue would have collided with Show Spelling and Grammar; Previous Issue is ⌥⌘; instead. Whether Qt's native menu accepts `Ctrl+:` as ⌘: needs a try on a real Mac.
 - Ignore on a grammar finding is per run and per window (`SpellCheck::ignoreGrammar`); the spelling ignore list is the system's, per process.
-- Findings cover what the checker and the prose rules cover: the Live page still draws only spelling underlines, but the pane lists grammar for both surfaces.
+- Findings cover what the checker and the prose rules cover: the Live page draws grammar too (its own section below), and the pane lists both for both surfaces.
 - The word the caret ends is held out of the list for 1.5 s after an edit; in Live the host does not see the page caret per keystroke, so the rule uses the Source caret only.
 - Not installed or hand-tested in the app (no install was made from this worktree).
+
+
+## Review and fixes (build 144)
+
+A separate reviewer read the merged cycle (`git diff cf10baf..HEAD`), ran both suites and wrote probes. Verdict: ship with fixes. Offsets with emoji, one-step undo from the pane and both menus, dark-mode readability, the checker-off states, the footer geometry and the dialog removal were checked and found fine. Three builders had met at the seams in three places:
+
+| Finding | Fix |
+| --- | --- |
+| Three "ignore grammar" mechanisms with three different reaches: the Source menu's per-block highlighter set (pane stale, Live untouched), the pane's service list (reached everywhere), the Live page's local set (page only). | One list, the service's `SpellCheck::ignoreGrammar(text, message)`. The Source menu's `Backend::ignoreGrammarIssue` looks the finding up and calls it; the Live page tells the host through a new bridge slot `ignoreGrammar(text, message)` and still drops its marks at once. `wordsChanged` restyles Source, rebuilds the pane and re-checks the page. The highlighter's per-block set remains as an API but no surface uses it. Test `ignoreGrammarFromAnySurfaceReachesEverySurface`. |
+| The macOS grammar pass is super-linear (17 ms at 1,000 characters, 0.9 s at 8,700, 3.9 s at 17,400), ran on the GUI thread per keystroke on the whole paragraph, and twice in Live (hidden highlighter plus the host reply). | `SpellCheck::grammarIssues` checks sentence-aligned chunks of at most 1,000 characters (`grammarChunks`) and caches the raw answer per chunk, so a keystroke re-checks one chunk and the second surface hits the cache. Test `grammarChecksLongParagraphsInCachedChunks`. |
+| The pane's hold-back of the word being typed used the Source caret only; in Live every half-typed word was listed 300 ms after the keystroke. | `Backend::reviewCaret()` uses whichever caret moved last (Source's from `setFocusPosition`, Live's from the bridge's `cursorMoved`), the Live caret restarts the pane's timer, and the hold-back applies to grammar as well as spelling. Test `reviewPaneWithholdsTheWordBeingTypedInLive`. |
+
+Also from this pass: the GitHub macOS runner has no grammar pass at all, so every grammar test now skips where a doubled word is not flagged (`CYCLE144_NEEDS_GRAMMAR`); the Live page load test allows 45 s on the runner; the 2,000-line spelling test forces the lazy layout before asserting. CI had been red since 6122471 for these reasons.
+
+Still open: the Source menu's Ignore now restyles through `wordsChanged`, which bumps the document revision once (a user action, unlike a caret move); shortcut ⌘: on a hardware keyboard is unverified; cold open of a multi-megabyte file still runs the checker once synchronously.

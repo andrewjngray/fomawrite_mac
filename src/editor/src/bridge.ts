@@ -30,6 +30,8 @@ export interface Bridge {
   spellingSuggestions?(token: number, word: string): void;
   learnWord?(word: string): void;
   ignoreWord?(word: string): void;
+  // Ignore Grammar Issue: the host keeps the one ignore list all surfaces read.
+  ignoreGrammar?(text: string, message: string): void;
   // C++ -> JS signals
   setDocument: Signal<[string, number]>;
   applyChanges: Signal<[string, number]>;
@@ -171,7 +173,7 @@ export function createMockBridge(): MockBridge {
     calls.push({ name: "spellingSuggestions", args: [token, word] });
     setTimeout(() => mock.emit("suggestionsReply", token, JSON.stringify(MOCK_MISSPELLED[word.toLowerCase()] ?? [])), 20);
   };
-  for (const s of ["learnWord", "ignoreWord"]) mock[s] = slot(s);
+  for (const s of ["learnWord", "ignoreWord", "ignoreGrammar"]) mock[s] = slot(s);
   mock.emit = (signal: string, ...args: unknown[]) => handlers[signal]?.forEach((f) => f(...args));
   return mock as MockBridge;
 }

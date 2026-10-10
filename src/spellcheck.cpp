@@ -76,18 +76,49 @@ QVariantList SpellCheck::misspelledRanges(const QString &text) const {
     return list;
 }
 
+QList<SpellCheck::Range> SpellCheck::grammarChunks(const QString &text, int limit) {
+    QList<Range> chunks;
+    const int size = text.size();
+    int start = 0;
+    while (start < size) {
+        if (size - start <= limit) { chunks.append({start, size}); break; }
+        // Prefer the last sentence end inside the window, then a line end, then a space.
+        int cut = -1;
+        for (int i = start + limit - 1; i > start + limit / 4; --i) {
+            const QChar c = text.at(i);
+            // Cut after the space that follows the sentence end, so the next chunk starts on its own sentence.
+            if ((c == QLatin1Char('.') || c == QLatin1Char('!') || c == QLatin1Char('?')) && i + 1 < size && text.at(i + 1).isSpace()) { cut = i + 2; break; }
+        }
+        if (cut < 0) for (int i = start + limit - 1; i > start + limit / 4; --i) if (text.at(i) == QLatin1Char('\n')) { cut = i + 1; break; }
+        if (cut < 0) for (int i = start + limit - 1; i > start + limit / 4; --i) if (text.at(i).isSpace()) { cut = i + 1; break; }
+        if (cut < 0) cut = start + limit;
+        chunks.append({start, cut});
+        start = cut;
+    }
+    return chunks;
+}
+
 QList<SpellCheck::Issue> SpellCheck::grammarIssues(const QString &text) const {
     QList<Issue> issues;
     if (!m_enabled || !m_grammarEnabled || !available() || text.trimmed().isEmpty()) return issues;
 #ifdef Q_OS_MACOS
-    for (const QVariant &entry : macGrammarIssues(text, m_language)) {
-        const QVariantMap map = entry.toMap();
-        const int start = map.value(QStringLiteral("start")).toInt(), end = map.value(QStringLiteral("end")).toInt();
-        if (start < 0 || end <= start || end > text.size()) continue;
-        if (!m_ignoredGrammar.isEmpty()
-            && m_ignoredGrammar.contains(text.mid(start, end - start) + QLatin1Char('\n') + map.value(QStringLiteral("message")).toString())) continue;
-        issues.append({start, end, QStringLiteral("Grammar"), map.value(QStringLiteral("message")).toString(),
-                       map.value(QStringLiteral("suggestions")).toStringList()});
+    for (const Range &chunk : grammarChunks(text)) {
+        const QString piece = text.mid(chunk.start, chunk.end - chunk.start);
+        if (piece.trimmed().isEmpty()) continue;
+        auto cached = m_grammarChunkCache.constFind(piece);
+        if (cached == m_grammarChunkCache.constEnd()) {
+            if (m_grammarChunkCache.size() > 4096) m_grammarChunkCache.clear();
+            cached = m_grammarChunkCache.insert(piece, macGrammarIssues(piece, m_language));
+        }
+        for (const QVariant &entry : *cached) {
+            const QVariantMap map = entry.toMap();
+            const int start = chunk.start + map.value(QStringLiteral("start")).toInt(), end = chunk.start + map.value(QStringLiteral("end")).toInt();
+            if (start < chunk.start || end <= start || end > chunk.end) continue;
+            if (!m_ignoredGrammar.isEmpty()
+                && m_ignoredGrammar.contains(text.mid(start, end - start) + QLatin1Char('\n') + map.value(QStringLiteral("message")).toString())) continue;
+            issues.append({start, end, QStringLiteral("Grammar"), map.value(QStringLiteral("message")).toString(),
+                           map.value(QStringLiteral("suggestions")).toStringList()});
+        }
     }
 #endif
     return issues;

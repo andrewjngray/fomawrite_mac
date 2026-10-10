@@ -21,6 +21,7 @@ void FomawriteTest::liveGrammarUnderlinesFollowTheGrammarSetting() {
     Cycle103SettingsSnapshot settings;
     Backend backend;
     backend.spellCheck()->setLanguage(QStringLiteral("en_US"));
+    CYCLE144_NEEDS_GRAMMAR((*backend.spellCheck()));
     QQmlEngine engine; engine.rootContext()->setContextProperty("backend", &backend);
     QQmlComponent component(&engine, QUrl(QStringLiteral("qrc:/Main.qml")));
     QScopedPointer<QObject> window(component.create()); QVERIFY2(window, qPrintable(component.errorString()));

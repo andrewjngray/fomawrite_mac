@@ -447,7 +447,10 @@ private:
     QTimer m_reviewTimer;
     QElapsedTimer m_reviewEditClock;
     QList<QMetaObject::Connection> m_reviewConnections;
-    int m_caret = -1;
+    int m_caret = -1;      // Source caret (setFocusPosition)
+    int m_liveCaret = -1;  // Live caret (the page's cursorChanged)
+    QElapsedTimer m_sourceCaretClock, m_liveCaretClock;
+    int reviewCaret() const; // whichever surface moved its caret last
     bool m_reviewWithheldWord = false;
     QString m_lastDocumentText;
     QByteArray m_lastKnownFileContents;

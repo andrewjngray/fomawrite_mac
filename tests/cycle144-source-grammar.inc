@@ -45,6 +45,7 @@ void FomawriteTest::sourceGrammarUnderlinesDoubledWordsAndSpellingStaysRed() {
     SpellCheck spell;
     if (!spell.available()) QSKIP("the system spell checker exists only on macOS");
     spell.setEnabled(true); spell.setGrammarEnabled(true); spell.setLanguage(QStringLiteral("en_US"));
+    CYCLE144_NEEDS_GRAMMAR(spell);
     const QString source = QStringLiteral(
         "We recieve the the mail today.\n\n"
         "```\nfenced the the recieve here\n```\n\n"
@@ -133,6 +134,7 @@ void FomawriteTest::sourceGrammarFollowsItsSettingAndKeepsSpelling() {
     SpellCheck spell;
     if (!spell.available()) QSKIP("the system spell checker exists only on macOS");
     spell.setEnabled(true); spell.setGrammarEnabled(true); spell.setLanguage(QStringLiteral("en_US"));
+    CYCLE144_NEEDS_GRAMMAR(spell);
     const QString source = QStringLiteral("We recieve the the mail today.");
     QTextDocument document; document.setPlainText(source);
     MarkdownHighlighter highlighter(&document);
@@ -160,6 +162,7 @@ void FomawriteTest::sourceGrammarWithholdsTheRangeAtTheCaretWithoutARevision() {
     SpellCheck spell;
     if (!spell.available()) QSKIP("the system spell checker exists only on macOS");
     spell.setEnabled(true); spell.setGrammarEnabled(true); spell.setLanguage(QStringLiteral("en_US"));
+    CYCLE144_NEEDS_GRAMMAR(spell);
     const QString source = QStringLiteral("We send the the parcel today.\n\nA second line we send the the letter.");
     QTextDocument document; document.setPlainText(source);
     MarkdownHighlighter highlighter(&document);
@@ -225,6 +228,7 @@ void FomawriteTest::sourceGrammarUnderlineIsBlueInTheRenderedWindow() {
     auto *spell = f.backend.spellCheck();
     if (!spell->available()) QSKIP("the system spell checker exists only on macOS");
     spell->setEnabled(true); spell->setGrammarEnabled(true); spell->setLanguage(QStringLiteral("en_US"));
+    CYCLE144_NEEDS_GRAMMAR((*spell));
     QVERIFY(f.mode(0));
     const QString text = QStringLiteral("We send the the parcel today and then ship it onward.");
     f.editor->setProperty("text", text);
@@ -274,6 +278,7 @@ void FomawriteTest::sourceGrammarContextMenuShowsTheMessageCorrectsAndIgnores() 
     auto *spell = f.backend.spellCheck();
     if (!spell->available()) QSKIP("the system spell checker exists only on macOS");
     spell->setEnabled(true); spell->setGrammarEnabled(true); spell->setLanguage(QStringLiteral("en_US"));
+    CYCLE144_NEEDS_GRAMMAR((*spell));
     QVERIFY(f.mode(0));
     const QString text = QStringLiteral("We recieve mail today.\n\nThen we send the the parcel onward.");
     f.editor->setProperty("text", text);
@@ -326,14 +331,14 @@ void FomawriteTest::sourceGrammarContextMenuShowsTheMessageCorrectsAndIgnores() 
     QTRY_VERIFY(!menu->property("visible").toBool());
     QVERIFY(QMetaObject::invokeMethod(f.editor, "undo"));
     QCOMPARE(f.editor->property("text").toString(), text);
-    // Ignore Grammar Issue clears the mark and the menu's reach, with no revision bump.
+    // Ignore Grammar Issue clears the mark and the menu's reach everywhere (one
+    // ignore list in the service; the restyle it triggers is a user action).
     QTRY_VERIFY(!f.backend.grammarIssueAt(doubled + 2).isEmpty());
     rightClick(pointAt(doubled, 7));
     QTRY_VERIFY(menu->property("visible").toBool());
-    const int revision = f.backend.documentRevision();
     QVERIFY(cycle102Click(f.quick, menu->findChild<QQuickItem *>("grammarIgnore")));
     QTRY_VERIFY(f.backend.grammarIssueAt(doubled + 2).isEmpty());
-    QCOMPARE(f.backend.documentRevision(), revision);
+    QVERIFY(spell->issues(QStringLiteral("and the the mail")).isEmpty()); // the service holds the ignore, so the pane and Live see it too
     QCOMPARE(f.editor->property("text").toString(), text);
     rightClick(pointAt(doubled, 7));
     QVERIFY(!menu->property("visible").toBool());
@@ -354,6 +359,7 @@ void FomawriteTest::sourceGrammarIgnoreIsPerDocumentAndRestylesInPlace() {
     SpellCheck spell;
     if (!spell.available()) QSKIP("the system spell checker exists only on macOS");
     spell.setEnabled(true); spell.setGrammarEnabled(true); spell.setLanguage(QStringLiteral("en_US"));
+    CYCLE144_NEEDS_GRAMMAR(spell);
     const QString source = QStringLiteral("We hand the the cargo over.\n\nThen we hand the the crate over.");
     QTextDocument document; document.setPlainText(source);
     MarkdownHighlighter highlighter(&document);
