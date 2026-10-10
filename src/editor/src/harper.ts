@@ -6,6 +6,15 @@
 //
 // Spans are UTF-16 offsets (JavaScript string indices), the same units the
 // host and CodeMirror use.
+//
+// The page is the host's lint service (README "Harper"): wireHarperBridge()
+// connects the host's harperLoad / harperLint / harperImportWords signals to the
+// engine and answers through the harperReady / harperReply / harperFailed slots.
+// The queue, ready and token rules live in HarperService, which takes the engine
+// as a parameter so node tests run it against a fake.
+
+import type { Signal } from "./bridge";
+import { mockHarperLint } from "./bridge";
 
 export interface HarperFinding {
   start: number;
@@ -43,11 +52,12 @@ const inApp = typeof location !== "undefined" && location.protocol === "qrc:";
 const MODULE_URL = inApp ? "fomawrite://harper/index.js" : "./harper/index.js";
 const BINARY_URL = inApp ? "fomawrite://harper/binary.js" : "./harper/binary.js";
 
-let linterPromise: Promise<{ linter: HarperLinter; module: HarperModule }> | null = null;
+type Loaded = { linter: HarperLinter; module: HarperModule };
+let linterPromise: Promise<Loaded> | null = null;
 let currentDialect: HarperDialect = "Australian";
 
 declare global { interface Window { __harperStage?: string } } // loader stage, read by the Qt test
-async function load(dialect: HarperDialect): Promise<{ linter: HarperLinter; module: HarperModule }> {
+async function load(dialect: HarperDialect): Promise<Loaded> {
   const moduleUrl = MODULE_URL, binaryUrl = BINARY_URL;
   window.__harperStage = "importing";
   const [module, binaryModule] = await Promise.all([import(moduleUrl) as Promise<HarperModule>, import(binaryUrl) as Promise<{ binary: unknown }>]);
@@ -59,19 +69,23 @@ async function load(dialect: HarperDialect): Promise<{ linter: HarperLinter; mod
   return { linter, module };
 }
 
-/** Start loading the engine (idempotent). Resolves once it can lint. */
-export function harperReady(dialect: HarperDialect = currentDialect): Promise<void> {
+/** The shared engine for `dialect` (a different dialect replaces it). Resolves once it can lint. */
+function ensureLinter(dialect: HarperDialect): Promise<Loaded> {
   if (!linterPromise || dialect !== currentDialect) {
     currentDialect = dialect;
-    linterPromise = load(dialect);
+    const p = load(dialect);
+    linterPromise = p;
+    p.catch(() => { if (linterPromise === p) linterPromise = null; }); // a failed load is retried by the next request
   }
-  return linterPromise.then(() => undefined);
+  return linterPromise;
 }
 
-/** Lint `text` with the engine (loading it first if needed). */
-export async function harperLint(text: string, dialect: HarperDialect = currentDialect): Promise<HarperFinding[]> {
-  await harperReady(dialect);
-  const { linter } = await linterPromise!;
+/** Start loading the engine (idempotent). Resolves once it can lint. */
+export function harperReady(dialect: HarperDialect = currentDialect): Promise<void> {
+  return ensureLinter(dialect).then(() => undefined);
+}
+
+export async function lintWith(linter: HarperLinter, text: string): Promise<HarperFinding[]> {
   const lints = await linter.lint(text);
   return lints.map((lint) => {
     const span = lint.span();
@@ -79,10 +93,15 @@ export async function harperLint(text: string, dialect: HarperDialect = currentD
   });
 }
 
+/** Lint `text` with the engine (loading it first if needed). */
+export async function harperLint(text: string, dialect: HarperDialect = currentDialect): Promise<HarperFinding[]> {
+  const { linter } = await ensureLinter(dialect);
+  return lintWith(linter, text);
+}
+
 /** Words the writer taught the checker (Learn Spelling). */
 export async function harperImportWords(words: string[]): Promise<void> {
-  await harperReady();
-  const { linter } = await linterPromise!;
+  const { linter } = await ensureLinter(currentDialect);
   await linter.importWords(words);
 }
 
@@ -91,4 +110,217 @@ declare global {
 }
 export function exposeHarperForTests(): void {
   window.fomawriteHarper = { ready: harperReady, lint: harperLint, importWords: harperImportWords };
+}
+
+// ---------------------------------------------------------------- the host's lint service
+
+/** One loaded engine, as the service sees it. */
+export interface LoadedEngine {
+  lint(text: string): Promise<HarperFinding[]>;
+  importWords(words: string[]): Promise<void>;
+}
+/** Where engines come from. `load` rejects when the engine cannot be loaded; `version` never rejects. */
+export interface HarperBackend {
+  load(dialect: HarperDialect): Promise<LoadedEngine>;
+  version(): Promise<string>;
+}
+
+/** The slots and signals the service uses (the host side is EditorBridge; all optional so an older host just gets nothing). */
+export interface HarperBridge {
+  log?: (message: string) => void;
+  harperReady?: (version: string) => void;
+  harperReply?: (token: number, lintsJson: string) => void;
+  harperFailed?: (token: number, error: string) => void;
+  harperLoad?: Signal<[string]>;
+  harperLint?: Signal<[number, string]>;
+  harperImportWords?: Signal<[string]>;
+}
+
+const DIALECTS: readonly HarperDialect[] = ["American", "British", "Australian", "Canadian"];
+/** The dialect used when a lint arrives before any harperLoad (the app's default). */
+export const DEFAULT_DIALECT: HarperDialect = "Australian";
+/** Reported when `fomawrite://harper/VERSION` cannot be read. */
+export const UNKNOWN_VERSION = "unknown";
+
+const errorText = (e: unknown): string => (e instanceof Error ? e.message || String(e) : String(e));
+
+/**
+ * Queue, ready and token rules between the host and the engine:
+ * - `load(dialect)` starts a load; a different dialect replaces the engine (a load still running is abandoned); the same
+ *   dialect while loading or loaded starts nothing (once loaded it answers `harperReady` again, so a host that waits for it
+ *   never hangs);
+ * - `lint(token, text)` with empty text is answered `[]` at once; otherwise it is queued and answered in order once the
+ *   engine is ready; a reload (new dialect) keeps the queue. A token still queued or being linted is not queued twice, so
+ *   one request is answered exactly once, whatever happens (a reload, a failure) in between;
+ * - a lint that throws answers `harperFailed(token, ...)` for that token only; a load that fails answers
+ *   `harperFailed(-1, ...)` once and fails every queued token; lints arriving after a failure fail at once until the
+ *   next `load` retries;
+ * - `importWords(list)` is kept and imported into the engine before any later lint, and again after every reload.
+ */
+export class HarperService {
+  private dialect: HarperDialect | null = null;
+  private generation = 0;
+  private engine: LoadedEngine | null = null;
+  private failure: string | null = null;
+  private queue: { token: number; text: string }[] = [];
+  private pending = new Set<number>();
+  private words: string[] | null = null;
+  private wordsVersion = 0;
+  private importedVersion = 0;
+  private pumping = false;
+  private cachedVersion: string | null = null;
+
+  constructor(private bridge: HarperBridge, private backend: HarperBackend) {}
+
+  get ready(): boolean { return this.engine !== null; }
+  get queued(): number { return this.queue.length; }
+
+  private log(message: string): void {
+    try { this.bridge.log?.(message); } catch { /* ignore */ }
+  }
+  private send(what: "ready" | "reply" | "failed", a: string | number, b?: string): void {
+    try {
+      if (what === "ready") this.bridge.harperReady?.(a as string);
+      else if (what === "reply") this.bridge.harperReply?.(a as number, b!);
+      else this.bridge.harperFailed?.(a as number, b!);
+    } catch (e) {
+      this.log(`harper ${what} failed: ${errorText(e)}`);
+    }
+  }
+
+  /** `harperLoad(dialect)`. An unknown dialect name loads the default. */
+  load(dialect: string): void {
+    const d = (DIALECTS as readonly string[]).includes(dialect) ? (dialect as HarperDialect) : DEFAULT_DIALECT;
+    if (d === this.dialect && this.failure === null) {
+      if (this.engine) void this.announceReady(this.generation); // already loaded: say so again
+      return; // or still loading: the ready that is coming answers this too
+    }
+    this.dialect = d;
+    const generation = ++this.generation;
+    this.engine = null;
+    this.failure = null;
+    void this.start(d, generation);
+  }
+
+  private async start(dialect: HarperDialect, generation: number): Promise<void> {
+    let engine: LoadedEngine;
+    try {
+      engine = await this.backend.load(dialect);
+      this.importedVersion = this.wordsVersion;
+      if (this.words && this.words.length > 0) {
+        try { await engine.importWords(this.words); } catch (e) { this.log(`harperImportWords failed: ${errorText(e)}`); }
+      }
+    } catch (e) {
+      if (generation !== this.generation) return; // abandoned: the newer load answers
+      this.failure = errorText(e) || "Harper failed to load";
+      this.send("failed", -1, this.failure);
+      this.failQueued();
+      return;
+    }
+    if (generation !== this.generation) return; // a newer load replaced this one
+    this.engine = engine;
+    await this.announceReady(generation);
+    if (generation === this.generation) void this.pump();
+  }
+
+  private async announceReady(generation: number): Promise<void> {
+    if (this.cachedVersion === null) {
+      try { this.cachedVersion = (await this.backend.version()) || UNKNOWN_VERSION; } catch { this.cachedVersion = UNKNOWN_VERSION; }
+    }
+    if (generation !== this.generation || !this.engine) return;
+    this.send("ready", this.cachedVersion);
+  }
+
+  /** `harperLint(token, text)`. */
+  lint(token: number, text: string): void {
+    if (this.pending.has(token)) return; // already queued or being linted: it will be answered once
+    if (text === "") { this.send("reply", token, "[]"); return; }
+    if (this.failure !== null) { this.send("failed", token, this.failure); return; }
+    this.pending.add(token);
+    this.queue.push({ token, text });
+    if (this.dialect === null) this.load(DEFAULT_DIALECT); // a lint before any harperLoad starts the default engine
+    else void this.pump();
+  }
+
+  /** `harperImportWords(wordsJson)`: a JSON array of words; anything else is ignored. */
+  importWords(wordsJson: string): void {
+    let list: unknown;
+    try { list = JSON.parse(wordsJson); } catch { this.log("harperImportWords: not JSON"); return; }
+    if (!Array.isArray(list)) { this.log("harperImportWords: not an array"); return; }
+    this.words = list.filter((w): w is string => typeof w === "string" && w.trim() !== "");
+    this.wordsVersion++;
+    void this.pump();
+  }
+
+  private failQueued(): void {
+    const failed = this.queue; this.queue = [];
+    for (const { token } of failed) { this.pending.delete(token); this.send("failed", token, this.failure ?? "Harper failed to load"); }
+  }
+
+  /** Imports pending words, then answers queued lints in order, while an engine is ready. */
+  private async pump(): Promise<void> {
+    if (this.pumping) return;
+    this.pumping = true;
+    try {
+      while (this.engine) {
+        const engine = this.engine;
+        if (this.importedVersion !== this.wordsVersion) {
+          this.importedVersion = this.wordsVersion;
+          try { await engine.importWords(this.words ?? []); } catch (e) { this.log(`harperImportWords failed: ${errorText(e)}`); }
+          continue; // the engine (or the list) may have changed meanwhile
+        }
+        const job = this.queue.shift();
+        if (!job) break;
+        try {
+          const findings = await engine.lint(job.text);
+          this.pending.delete(job.token);
+          this.send("reply", job.token, JSON.stringify(findings));
+        } catch (e) {
+          this.pending.delete(job.token);
+          this.send("failed", job.token, errorText(e) || "lint failed");
+        }
+      }
+    } finally {
+      this.pumping = false;
+    }
+  }
+}
+
+/** The engine in this page, behind the shared loader above. */
+export function realHarperBackend(): HarperBackend {
+  return {
+    async load(dialect) {
+      const { linter } = await ensureLinter(dialect);
+      return { lint: (text) => lintWith(linter, text), importWords: (words) => linter.importWords(words) };
+    },
+    async version() {
+      try {
+        const res = await fetch(inApp ? "fomawrite://harper/VERSION" : "./harper/VERSION");
+        if (!res.ok) return UNKNOWN_VERSION;
+        return (await res.text()).trim() || UNKNOWN_VERSION;
+      } catch {
+        return UNKNOWN_VERSION;
+      }
+    },
+  };
+}
+
+/** A stand-in engine for the dev server: no WebAssembly, version "mock", loads in 10 ms, fixed findings. */
+export function mockHarperBackend(): HarperBackend {
+  return {
+    load: () => new Promise((resolve) => setTimeout(() => resolve({ lint: async (text) => mockHarperLint(text), importWords: async () => {} }), 10)),
+    version: async () => "mock",
+  };
+}
+
+/** Connect the host's three Harper signals to a service; `backend` defaults to the real engine. */
+export function wireHarperBridge(bridge: HarperBridge, backend: HarperBackend = realHarperBackend()): HarperService {
+  const service = new HarperService(bridge, backend);
+  const guarded = <A extends unknown[]>(name: string, fn: (...a: A) => void) => (...a: A) => {
+    try { fn(...a); } catch (e) { try { bridge.log?.(`${name} failed: ${errorText(e)}`); } catch { /* ignore */ } }
+  };
+  bridge.harperLoad?.connect?.(guarded("harperLoad", (dialect: string) => service.load(String(dialect))));
+  bridge.harperLint?.connect?.(guarded("harperLint", (token: number, text: string) => service.lint(token, String(text ?? ""))));
+  bridge.harperImportWords?.connect?.(guarded("harperImportWords", (json: string) => service.importWords(String(json))));
+  return service;
 }

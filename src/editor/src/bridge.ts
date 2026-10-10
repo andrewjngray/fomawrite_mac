@@ -58,6 +58,13 @@ export interface Bridge {
   spellingReply?: Signal<[number, string]>;
   suggestionsReply?: Signal<[number, string]>;
   setSpellCheck?: Signal<[boolean]>;
+  // Harper, the host's lint service (README "Harper"). Optional: a host without them never asks.
+  harperReady?(version: string): void;
+  harperReply?(token: number, lintsJson: string): void;
+  harperFailed?(token: number, error: string): void;
+  harperLoad?: Signal<[string]>;
+  harperLint?: Signal<[number, string]>;
+  harperImportWords?: Signal<[string]>;
 }
 
 export interface BridgeConnection {
@@ -116,8 +123,23 @@ const MOCK_PNG =
 const SIGNALS = [
   "setDocument", "applyChanges", "setMode", "setTheme", "setAppearance",
   "focusEditor", "requestText", "requestSelection", "simulateUserChanges", "undo", "redo", "imageReply", "imageSaved", "scrollToFraction", "setCursor", "command",
-  "spellingReply", "suggestionsReply", "setSpellCheck"
+  "spellingReply", "suggestionsReply", "setSpellCheck", "harperLoad", "harperLint", "harperImportWords"
 ] as const;
+
+/**
+ * The mock host's stand-in for Harper's findings (dev server and node tests, no WebAssembly): "recieve" (Spelling), a
+ * doubled word (Repetition) and "very unique" (Enhancement, which the host files under Style). UTF-16 offsets into `text`.
+ */
+export function mockHarperLint(text: string): { start: number; end: number; kind: string; message: string; suggestions: string[] }[] {
+  const out: { start: number; end: number; kind: string; message: string; suggestions: string[] }[] = [];
+  for (const m of text.matchAll(/\brecieve\b/gi))
+    out.push({ start: m.index!, end: m.index! + m[0].length, kind: "Spelling", message: "Did you mean to spell \"" + m[0] + "\" this way?", suggestions: ["receive"] });
+  for (const m of text.matchAll(/\b([\p{L}']+) \1\b/giu))
+    out.push({ start: m.index!, end: m.index! + m[0].length, kind: "Repetition", message: "Did you mean to repeat this word?", suggestions: [m[1]] });
+  for (const m of text.matchAll(/\bvery unique\b/gi))
+    out.push({ start: m.index!, end: m.index! + m[0].length, kind: "Enhancement", message: "\"Unique\" is absolute; \"very\" adds nothing.", suggestions: ["unique"] });
+  return out.sort((a, b) => a.start - b.start);
+}
 
 export type MockBridge = Bridge & {
   /** Fire a signal from the "C++ side" (for manual testing in a browser). */
@@ -133,7 +155,7 @@ export function createMockBridge(): MockBridge {
     calls.push({ name, args });
     console.log("[bridge mock]", name, ...args);
   };
-  for (const s of ["ready", "documentChanged", "cursorChanged", "metric", "log", "textReply", "selectionReply", "scrolled"]) mock[s] = slot(s);
+  for (const s of ["ready", "documentChanged", "cursorChanged", "metric", "log", "textReply", "selectionReply", "scrolled", "harperReady", "harperReply", "harperFailed"]) mock[s] = slot(s);
   for (const s of SIGNALS) {
     handlers[s] = [];
     mock[s] = { connect: (fn: (...a: any[]) => void) => handlers[s].push(fn) };

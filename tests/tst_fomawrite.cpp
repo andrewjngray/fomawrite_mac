@@ -156,6 +156,7 @@ private slots:
     void checkSpellingWhileTypingCommandTogglesTheSetting();
     void spellCheckServiceReportsGrammarIssuesWithCategory();
     void harperLintsInsideTheEditorPage();
+    void harperBridgeAnswersLintRequestsFromTheHost();
     void grammarChecksLongParagraphsInCachedChunks();
     void reviewPaneWithholdsTheWordBeingTypedInLive();
     void ignoreGrammarFromAnySurfaceReachesEverySurface();

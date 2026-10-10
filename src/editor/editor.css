@@ -102,6 +102,9 @@ html.dark, html.dark body { color-scheme: dark; }
 /* ---------------------------------------------------------------- spelling (src/spelling.ts) */
 /* A decoration on the word's own span: the Live theme overlay never mentions text-decoration, and a theme's
    `text-decoration: none` on an ancestor does not remove an underline drawn by a descendant. */
+/* Style suggestions: a grey dotted underline, the weakest of the three. It comes first so that where marks meet on one
+   element the later rules win: Spelling over Grammar over Style (see the nesting rules after the grammar ones). */
+.fw-style { text-decoration: underline dotted #8a8f98; text-decoration-skip-ink: none; }
 .fw-misspelled { text-decoration: underline wavy #d93025; text-decoration-skip-ink: none; }
 /* Grammar findings: blue wave. Both marks can cover the same characters (CodeMirror nests one span in the other, or one
    span carries both classes); the red spelling underline wins so one readable line is drawn:
@@ -112,6 +115,11 @@ html.dark, html.dark body { color-scheme: dark; }
 .fw-grammar { text-decoration: underline wavy #1a73e8; text-decoration-skip-ink: none; text-underline-offset: 0.2em; }
 .fw-grammar.fw-misspelled { text-decoration: underline wavy #d93025; text-underline-offset: auto; }
 .fw-misspelled .fw-grammar { text-decoration: none; }
+/* A style span inside a spelling or grammar span adds no line of its own (theirs already runs under it); a style span that
+   is also a spelling span is still red (it is the same element, spelling wins). A spelling or grammar span inside a longer
+   style span keeps its own line over the dotted one. */
+.fw-misspelled .fw-style, .fw-grammar .fw-style { text-decoration: none; }
+.fw-style.fw-misspelled { text-decoration: underline wavy #d93025; }
 /* The right-click menu lives on <body> (position: fixed), so it uses the page palette variables from :root / html.dark. */
 .fw-spell-menu {
   position: fixed; z-index: 1000; min-width: 160px; max-width: 320px; padding: 4px 0;
