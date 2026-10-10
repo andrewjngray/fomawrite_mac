@@ -73,6 +73,7 @@ QtObject {
         { id: "liveThemeExact", title: "Live Follows Theme Exactly", toggle: true },
         { id: "appearanceFollowsOutputStyle", title: "Appearance Follows Output Style", toggle: true },
         { id: "checkSpellingWhileTyping", title: "Check Spelling While Typing", toggle: true },
+        { id: "checkGrammarWhileTyping", title: "Check Grammar While Typing", toggle: true },
         { id: "editor", title: "Single", toggle: true },
         { id: "split", title: "Split", toggle: true },
         { id: "preview", title: "Preview Only", toggle: true },
@@ -131,6 +132,7 @@ QtObject {
         if (["quickOpen", "refreshTags"].indexOf(id) >= 0) return library.rootFolder.toString() !== "";
         if (id === "spelling") return window.isMac && editor.length > 0;
         if (id === "checkSpellingWhileTyping") return backend.spellCheck.available;
+        if (id === "checkGrammarWhileTyping") return backend.spellCheck.available && backend.spellCheck.enabled;
         if (id === "organizer") return true;
         if (id === "liveThemeExact") return layoutState.liveEditEnabled;
         if (id === "split") return layoutState.availableWidth >= 800;
@@ -194,6 +196,7 @@ QtObject {
         case "liveThemeExact": return settings.liveThemeExact;
         case "appearanceFollowsOutputStyle": return backend.appearanceFollowsOutputStyle;
         case "checkSpellingWhileTyping": return backend.spellCheck.available && backend.spellCheck.enabled;
+        case "checkGrammarWhileTyping": return backend.spellCheck.available && backend.spellCheck.enabled && backend.spellCheck.grammarEnabled;
         case "fillersStyleCheck": return settings.styleCheckFillers;
         case "customStyleCheck": return settings.styleCheckCustom;
         default: return false;
@@ -264,6 +267,7 @@ QtObject {
         case "liveThemeExact": if (layoutState.liveEditEnabled) settings.liveThemeExact = !settings.liveThemeExact; break;
         case "appearanceFollowsOutputStyle": backend.appearanceFollowsOutputStyle = !backend.appearanceFollowsOutputStyle; break;
         case "checkSpellingWhileTyping": backend.spellCheck.enabled = !backend.spellCheck.enabled; break;
+        case "checkGrammarWhileTyping": backend.spellCheck.grammarEnabled = !backend.spellCheck.grammarEnabled; break;
         case "fillersStyleCheck": settings.styleCheckFillers = !settings.styleCheckFillers; break;
         case "customStyleCheck": settings.styleCheckCustom = !settings.styleCheckCustom; break;
         case "strike": window.tryWrapSelection("~~", "~~"); break;

@@ -21,16 +21,28 @@ class SpellCheck : public QObject {
     Q_OBJECT
     Q_PROPERTY(bool available READ available CONSTANT)
     Q_PROPERTY(bool enabled READ enabled WRITE setEnabled NOTIFY enabledChanged)
+    Q_PROPERTY(bool grammarEnabled READ grammarEnabled WRITE setGrammarEnabled NOTIFY grammarEnabledChanged)
     Q_PROPERTY(QString language READ language WRITE setLanguage NOTIFY languageChanged)
 
 public:
     explicit SpellCheck(QObject *parent = nullptr);
 
     struct Range { int start; int end; };
+    // One finding in a stretch of prose. Category is "Spelling" (a word the
+    // dictionary does not know) or "Grammar" (a sentence-level finding with the
+    // checker's own message). Suggestions are replacements for [start, end).
+    struct Issue {
+        int start; int end; QString category; QString message; QStringList suggestions;
+        bool operator==(const Issue &o) const { return start == o.start && end == o.end && category == o.category; }
+    };
 
     bool available() const;
     bool enabled() const { return m_enabled; }
     void setEnabled(bool enabled);
+    // Grammar as you type (macOS grammar pass: doubled words, capitalisation,
+    // agreement). Separate setting; off means issues() returns spelling only.
+    bool grammarEnabled() const { return m_grammarEnabled; }
+    void setGrammarEnabled(bool enabled);
     // Empty means the system language; otherwise a tag from languages().
     QString language() const { return m_language; }
     void setLanguage(const QString &language);
@@ -41,6 +53,13 @@ public:
     // code, URLs and markup first.
     QList<Range> misspellings(const QString &text) const;
     Q_INVOKABLE QVariantList misspelledRanges(const QString &text) const;
+    // Grammar findings in `text`, sentence by sentence, as [start, end) with the
+    // checker's message and corrections. Empty when grammar is off.
+    QList<Issue> grammarIssues(const QString &text) const;
+    // Spelling and grammar together, in document order; the one list the
+    // surfaces underline and the review pane shows.
+    QList<Issue> issues(const QString &text) const;
+    Q_INVOKABLE QVariantList issueList(const QString &text) const;
     // Up to eight replacements for one word, best first.
     Q_INVOKABLE QStringList suggestions(const QString &word) const;
     // Learned words persist in the system dictionary; ignored words last for
@@ -52,10 +71,12 @@ public:
 
 signals:
     void enabledChanged();
+    void grammarEnabledChanged();
     void languageChanged();
     void wordsChanged();
 
 private:
     bool m_enabled = true;
+    bool m_grammarEnabled = true;
     QString m_language;
 };

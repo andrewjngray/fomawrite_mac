@@ -72,3 +72,41 @@ void FomawriteTest::checkSpellingWhileTypingCommandTogglesTheSetting() {
     QVERIFY(QMetaObject::invokeMethod(commands, "run", Q_ARG(QVariant, QStringLiteral("checkSpellingWhileTyping"))));
     QCOMPARE(spell->enabled(), before);
 }
+
+// Grammar findings come from the same service with a message and a category,
+// follow their own setting, and issuesInBlock lists spelling and grammar in order.
+void FomawriteTest::spellCheckServiceReportsGrammarIssuesWithCategory() {
+    Cycle103SettingsSnapshot settings;
+    SpellCheck check;
+    if (!check.available()) QSKIP("the system checker exists only on macOS");
+    check.setEnabled(true); check.setGrammarEnabled(true); check.setLanguage(QStringLiteral("en_US"));
+    const QString text = QStringLiteral("This is is a test. We recieve the the mail here.");
+    const auto grammar = check.grammarIssues(text);
+    QVERIFY2(!grammar.isEmpty(), "the macOS grammar pass flags a doubled word");
+    for (const auto &issue : grammar) {
+        QCOMPARE(issue.category, QStringLiteral("Grammar"));
+        QVERIFY(issue.start >= 0 && issue.end <= text.size() && issue.end > issue.start);
+    }
+    const auto all = check.issues(text);
+    QVERIFY(all.size() >= grammar.size() + 1);
+    for (int i = 1; i < all.size(); ++i) QVERIFY(all.at(i).start >= all.at(i - 1).start);
+    bool spelling = false; for (const auto &issue : all) if (issue.category == QStringLiteral("Spelling") && text.mid(issue.start, issue.end - issue.start) == QStringLiteral("recieve")) spelling = true;
+    QVERIFY(spelling);
+    QCOMPARE(check.issueList(text).size(), all.size());
+    QSignalSpy changed(&check, &SpellCheck::grammarEnabledChanged);
+    check.setGrammarEnabled(false);
+    QCOMPARE(changed.count(), 1);
+    QVERIFY(check.grammarIssues(text).isEmpty());
+    QVERIFY(check.issues(text).size() < all.size());
+    QCOMPARE(QSettings().value("writing/checkGrammarWhileTyping").toBool(), false);
+    check.setGrammarEnabled(true);
+    // The highlighter lists both per block, and nothing inside a fence.
+    QTextDocument document; document.setPlainText(text + QStringLiteral("\n\n```\nthe the recieve\n```\n"));
+    MarkdownHighlighter highlighter(&document);
+    highlighter.setSpellCheck(&check); QTest::qWait(20); highlighter.rehighlight();
+    const auto first = highlighter.issuesInBlock(document.firstBlock());
+    QCOMPARE(first.size(), all.size());
+    QVERIFY(highlighter.issuesInBlock(document.findBlockByNumber(3)).isEmpty());
+    check.setGrammarEnabled(false);
+    QVERIFY(highlighter.issuesInBlock(document.firstBlock()).size() < first.size());
+}

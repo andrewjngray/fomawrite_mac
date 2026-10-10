@@ -155,6 +155,7 @@ private slots:
     void accessibilityProbeForWritingAssistants();
     void spellCheckServiceFindsWordsAndHonoursIgnoreAndSetting();
     void checkSpellingWhileTypingCommandTogglesTheSetting();
+    void spellCheckServiceReportsGrammarIssuesWithCategory();
     void sourceSpellingUnderlinesProseOnly();
     void sourceSpellingFollowsTheSettingAndLearnedWords();
     void sourceSpellingChecksOnlyChangedBlocks();

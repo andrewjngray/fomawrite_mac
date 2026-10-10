@@ -112,6 +112,7 @@ Platform.MenuBar {
         }
         Platform.MenuItem { objectName: "editSpelling"; text: "Spelling and Grammar…"; enabled: editor.length > 0; onTriggered: spellingDialog.open() }
         NativeCommand { objectName: "editCheckSpellingWhileTyping"; commandId: "checkSpellingWhileTyping" }
+        NativeCommand { objectName: "editCheckGrammarWhileTyping"; commandId: "checkGrammarWhileTyping" }
         Platform.Menu {
             title: "Substitutions"
             Platform.MenuItem {

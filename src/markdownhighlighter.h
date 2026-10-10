@@ -57,6 +57,12 @@ public:
     static constexpr int SpellWordEndProperty = QTextFormat::UserProperty + 42;
     // Block-relative [start, end) ranges the layer underlines in `block`.
     QList<SpellCheck::Range> misspellingsInBlock(const QTextBlock &block);
+    // Spelling and grammar findings in `block`, block-relative, document order:
+    // the one list the review pane lists and the surfaces draw. Grammar comes
+    // from the service (cached by prose like spelling) when it is enabled.
+    QList<SpellCheck::Issue> issuesInBlock(const QTextBlock &block);
+    // The service, when one is attached (null with a bare checker function).
+    SpellCheck *spellCheck() const { return m_spellCheck; }
     // The prose of one block as the checker sees it (public for tests).
     static QString spellingProse(const QString &blockText);
 
@@ -118,6 +124,8 @@ private:
     int m_caret = -1;
     int m_withheldBlock = -1;
     QHash<QString, QList<SpellCheck::Range>> m_spellCache;
+    QHash<QString, QList<SpellCheck::Issue>> m_grammarCache;
+    SpellCheck *m_spellCheck = nullptr;
     QTextCharFormat m_reviewFormat;
     QString m_searchQuery;
     int m_currentMatchStart = -1;

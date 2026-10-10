@@ -295,6 +295,29 @@ QStringList macSpellingGuesses(const QString &word,const QString &language) {
     }
     return guesses;
 }
+QVariantList macGrammarIssues(const QString &text,const QString &language) {
+    NSString *input=[NSString stringWithUTF8String:text.toUtf8().constData()];
+    NSSpellChecker *checker=[NSSpellChecker sharedSpellChecker];
+    NSString *chosen=fomawriteSpellLanguage(language);
+    QVariantList issues; NSUInteger position=0;
+    while(position<input.length && issues.size()<500) {
+        NSArray *details=nil;
+        NSRange sentence=[checker checkGrammarOfString:input startingAt:position language:chosen wrap:NO inSpellDocumentWithTag:fomawriteSpellTag() details:&details];
+        if(sentence.location==NSNotFound || sentence.location<position || !sentence.length) break;
+        for(NSDictionary *detail in details) {
+            NSRange local=[detail[NSGrammarRange] rangeValue];
+            NSRange range=NSMakeRange(sentence.location+local.location,local.length);
+            if(NSMaxRange(range)>input.length || !range.length) continue;
+            QStringList suggestions;
+            for(NSString *guess in detail[NSGrammarCorrections]) { if(suggestions.size()>=8) break; suggestions.append(QString::fromUtf8(guess.UTF8String)); }
+            NSString *description=detail[NSGrammarUserDescription];
+            issues.append(QVariantMap{{"start",int(range.location)},{"end",int(NSMaxRange(range))},
+                {"message",description ? QString::fromUtf8(description.UTF8String) : QString()},{"suggestions",suggestions}});
+        }
+        position=NSMaxRange(sentence);
+    }
+    return issues;
+}
 void macLearnWord(const QString &word) { [[NSSpellChecker sharedSpellChecker] learnWord:[NSString stringWithUTF8String:word.toUtf8().constData()]]; }
 void macUnlearnWord(const QString &word) { [[NSSpellChecker sharedSpellChecker] unlearnWord:[NSString stringWithUTF8String:word.toUtf8().constData()]]; }
 bool macHasLearnedWord(const QString &word) { return [[NSSpellChecker sharedSpellChecker] hasLearnedWord:[NSString stringWithUTF8String:word.toUtf8().constData()]]; }

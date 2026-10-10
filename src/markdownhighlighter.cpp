@@ -352,6 +352,7 @@ void MarkdownHighlighter::setSpellingEnabled(bool enabled) {
 }
 
 void MarkdownHighlighter::setSpellCheck(SpellCheck *spellCheck) {
+    m_spellCheck = spellCheck;
     if (!spellCheck) {
         m_spellingEnabled = false;
         setSpellChecker(nullptr);
@@ -368,6 +369,7 @@ void MarkdownHighlighter::setSpellCheck(SpellCheck *spellCheck) {
         refreshSpelling();
     });
     connect(spellCheck, &SpellCheck::languageChanged, this, &MarkdownHighlighter::refreshSpelling);
+    connect(spellCheck, &SpellCheck::grammarEnabledChanged, this, &MarkdownHighlighter::refreshSpelling);
     connect(spellCheck, &SpellCheck::wordsChanged, this, &MarkdownHighlighter::refreshSpelling);
     refreshSpelling();
 }
@@ -426,6 +428,7 @@ void MarkdownHighlighter::applyCaretRule(const QTextBlock &block) {
 
 void MarkdownHighlighter::refreshSpelling() {
     m_spellCache.clear();
+    m_grammarCache.clear();
     rehighlight();
 }
 
@@ -506,6 +509,42 @@ QList<SpellCheck::Range> MarkdownHighlighter::misspellingsInBlock(const QTextBlo
         result.append(range);
     }
     return result;
+}
+
+QList<SpellCheck::Issue> MarkdownHighlighter::issuesInBlock(const QTextBlock &block) {
+    QList<SpellCheck::Issue> issues;
+    const QString text = block.text();
+    for (const SpellCheck::Range &range : misspellingsInBlock(block)) {
+        const QString word = text.mid(range.start, range.end - range.start);
+        issues.append({range.start, range.end, QStringLiteral("Spelling"), QString(),
+                       m_spellCheck ? m_spellCheck->suggestions(word) : QStringList()});
+    }
+    if (m_spellCheck && m_spellingEnabled && m_spellCheck->grammarEnabled()) {
+        // Grammar runs on the same prose as spelling, under the same prose
+        // rules (code, fences, front matter and syntax are never grammar).
+        const QString prose = spellingProse(text);
+        bool checkable = !prose.trimmed().isEmpty();
+        if (checkable) {
+            // The same literal/code/front-matter gate misspellingsInBlock applies.
+            if (m_codeStyle && !m_codeLanguage.isEmpty()) checkable = false;
+            const int previousState = block.previous().isValid() ? block.previous().userState() : 0;
+            static const QRegularExpression fenceRe(QStringLiteral("^ {0,3}(`{3,}|~{3,})(.*)$"));
+            if (previousState > 0 || fenceRe.match(text).hasMatch()) checkable = false;
+            if (block.blockNumber() <= 500 && block.blockNumber() <= frontMatterEndBlock()) checkable = false;
+        }
+        if (checkable) {
+            auto cached = m_grammarCache.constFind(prose);
+            if (cached == m_grammarCache.constEnd()) {
+                if (m_grammarCache.size() > 65536) m_grammarCache.clear();
+                cached = m_grammarCache.insert(prose, m_spellCheck->grammarIssues(prose));
+            }
+            for (const SpellCheck::Issue &issue : *cached)
+                if (issue.start >= 0 && issue.end <= text.size() && issue.end > issue.start) issues.append(issue);
+        }
+    }
+    std::stable_sort(issues.begin(), issues.end(), [](const SpellCheck::Issue &a, const SpellCheck::Issue &b) {
+        return a.start < b.start || (a.start == b.start && a.end < b.end); });
+    return issues;
 }
 
 void MarkdownHighlighter::highlightSpelling(const QString &text) {

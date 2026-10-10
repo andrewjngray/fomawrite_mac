@@ -29,6 +29,8 @@ QStringList macWritingLanguages();
 // are UTF-16 [start, end) into `text`; language empty means the system one.
 QVariantList macMisspelledRanges(const QString &text, const QString &language);
 QStringList macSpellingGuesses(const QString &word, const QString &language);
+// Grammar findings: [{start, end, message, suggestions}] in UTF-16 units.
+QVariantList macGrammarIssues(const QString &text, const QString &language);
 void macLearnWord(const QString &word);
 void macUnlearnWord(const QString &word);
 bool macHasLearnedWord(const QString &word);
