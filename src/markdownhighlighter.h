@@ -47,6 +47,14 @@ public:
     void setSpellCheck(SpellCheck *spellCheck);
     // Forget cached results and restyle every block (words or language changed).
     void refreshSpelling();
+    // The writer's caret. A misspelled word that ends exactly at the caret is
+    // the one being typed: it is not drawn until the caret leaves it, so every
+    // half-typed word does not flash red (the Live page applies the same rule).
+    void setCaret(int position);
+    // Format properties the spelling layer leaves on marked text: the state
+    // (1 drawn, 2 withheld at the caret) and the block-relative end of the word.
+    static constexpr int SpellMarkProperty = QTextFormat::UserProperty + 41;
+    static constexpr int SpellWordEndProperty = QTextFormat::UserProperty + 42;
     // Block-relative [start, end) ranges the layer underlines in `block`.
     QList<SpellCheck::Range> misspellingsInBlock(const QTextBlock &block);
     // The prose of one block as the checker sees it (public for tests).
@@ -75,6 +83,11 @@ private:
     void highlightReviewSpans(const QString &text);
     void highlightSearch(const QString &text);
     void highlightSpelling(const QString &text);
+    void applySpellingMark(QTextCharFormat &format, bool drawn) const;
+    // Re-applies the caret rule to one block's layout formats directly, without
+    // a rehighlight: a rehighlight opens an edit block and bumps the document
+    // revision, which the link editor and the Live sync read as an edit.
+    void applyCaretRule(const QTextBlock &block);
     int frontMatterEndBlock() const;
     void highlightCode(const QString &text, const QString &language, int lexicalState = 0,
                        int *nextLexicalState = nullptr, int offset = 0);
@@ -102,6 +115,8 @@ private:
     SpellChecker m_spellChecker;
     QColor m_spellBackground;
     bool m_spellingEnabled = false;
+    int m_caret = -1;
+    int m_withheldBlock = -1;
     QHash<QString, QList<SpellCheck::Range>> m_spellCache;
     QTextCharFormat m_reviewFormat;
     QString m_searchQuery;

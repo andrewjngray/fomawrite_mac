@@ -1595,6 +1595,7 @@ QPair<int, int> Backend::sentenceRange(const QString &text, int position) {
 
 void Backend::setFocusPosition(int position, bool enabled, bool sentence) {
     if (!m_document || !m_highlighter) return;
+    m_highlighter->setCaret(position);
     const auto block = m_document->findBlock(position);
     if (!enabled && !sentence) { m_highlighter->setFocusRange(-1, -1); return; }
     // Keep fenced code as a whole line; sentence boundaries are Unicode rules,

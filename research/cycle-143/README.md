@@ -68,3 +68,26 @@ Misspelled words get a red wavy underline in the Live page as the writer types, 
 - The page's own `spellcheck="true"` content attribute is left as it was; Qt WebEngine has no dictionaries configured here, so it draws nothing of its own.
 - A language change is picked up through `languageChanged`; there is no language menu in the Live page.
 - Not hand-tested in the installed app (no install was made from this worktree).
+
+## Review and fixes (build 143)
+
+A separate reviewer read the whole cycle (`git diff 8fe5b30..HEAD`), ran the suites and wrote probes. Verdict: ship with fixes. Offsets (emoji, ZWJ sequences, CJK, in-flight edits), undo in both surfaces, the Source right-click area (scroll, drag, selection untouched; hidden items collapse), the Live menu (focus, keys, closing, clamping) and the unavailable/disabled/no-page paths were checked and found fine.
+
+| Finding | Fix |
+| --- | --- |
+| F1 high: Source washed every half-typed word red (59% of typed prefixes are "misspelled" to the checker). | `MarkdownHighlighter::setCaret`: a word ending exactly at the caret is withheld until the caret leaves it; `Backend::setFocusPosition` feeds the caret on every cursor move. Same rule as Live. The first version restyled the block through the highlighter, which opens an edit block and bumps `QTextDocument::revision()`; the link editor then refused to apply ("document changed") and `linkEditorRejectsChangedAndReloadedTargets` failed. The shipped version edits the block's layout formats directly, marks the contents dirty and emits the layout's `updateBlock` so the Qt Quick item repaints, with no edit block and no revision change. Tests `sourceSpellingWithholdsTheCaretWordAndDimmedText` (formats and revision) and the rendered-frame test (the mark vanishes at the caret and returns). |
+| F2 medium-high: cache cleared at 4096 distinct blocks; above it every focus-mode caret move re-checked the whole document (953 ms at 664k chars, 4.5 s at 3 MB). | Cap raised to 65536 entries (reviewer measured 83 ms at the old cliff). Cold open of a very large file is still one synchronous pass (about 1.3 ms per paragraph); recorded as open. |
+| F3 medium: the glue filter (snake_case, paths, e-mail) ran on the raw block text, so the last word of almost every link text was skipped. | Filter runs on the blanked prose. Test cases added for `[the recieve](url/with/path)` and `<a href>recieve</a>`. |
+| F5 medium: two tests shared the process-wide ignore list ("occured"), failing in one order. | The long-document assertion uses its own word; the order the reviewer reported now passes. |
+| F9 low: the command reported checked when the checker is unavailable. | `isChecked` is `available && enabled`. |
+| F10 low: in focus mode the pink wash sat under dimmed grey text (1.8:1). | Spelling marks are skipped outside the focus range. |
+
+The caret-rule and focus-range tests were written after the fixes; there is no recorded red run for them.
+
+### Still open after review
+
+- The two surfaces disagree on some non-prose (F4): Source still checks display-math `$$` lines, entity names like `&nbsp;`, reference-definition labels, `[text][ref]` and `[^fn]` ids, multi-line HTML attributes and comments; Live still checks `snake_case`, paths and e-mail addresses. Worth one small cycle to make both use the same rules.
+- A wrapped continuation line under a nested bullet is skipped as code in Source (F6).
+- Live: the blanking loop is lines × blanks (F7, fine in practice); a single very long line is sent whole every pause; marks cannot render inside rendered tables, math or images (F8).
+- Each window reads the setting at construction, so a second window goes stale until restart (F9).
+- Cold open of a multi-megabyte file runs the checker synchronously once (F2).

@@ -4,7 +4,8 @@
 // dialog.
 //
 // Real-checker tests use words no other test touches ("recieve", "definately",
-// "occured"): the system checker's ignore list lasts for the whole test run.
+// "occured", "accomodate"): the system checker's ignore list lasts for the whole
+// test run, so a word one test ignores must not be asserted underlined by another.
 
 namespace {
 bool cycle143Underlined(QTextDocument &document, int position) {
@@ -44,6 +45,7 @@ void FomawriteTest::sourceSpellingUnderlinesProseOnly() {
         "    indented recieve code\n\n"
         "- list item recieve\n    - nested recieve\n\n"
         "snake_recieve_case and foo/recieve/bar.\n\n"
+        "Read [the recieve](https://example.com/x/y) note and <a href=\"https://x.com/p\">recieve</a> it.\n\n"
         "[ref]: https://example.com/recieve\n");
     QTextDocument document; document.setPlainText(source);
     MarkdownHighlighter highlighter(&document);
@@ -55,7 +57,8 @@ void FomawriteTest::sourceSpellingUnderlinesProseOnly() {
         {"`recieve` in code", false}, {"``recieve`` too", false},
         {"https://example.com/recieve and", false}, {"[a link](https://example.com/recieve)", false},
         {"class=\"recieve\"", false}, {"fenced recieve here", false}, {"indented recieve code", false},
-        {"snake_recieve_case", false}, {"foo/recieve/bar", false}, {"[ref]: https://example.com/recieve", false},
+        {"snake_recieve_case", false}, {"foo/recieve/bar", false},
+        {"[the recieve](https://example.com/x/y)", true}, {"\">recieve</a>", true}, {"[ref]: https://example.com/recieve", false},
         {"and receive more", false},
     };
     for (const auto &item : cases) {
@@ -106,14 +109,14 @@ void FomawriteTest::sourceSpellingFollowsTheSettingAndLearnedWords() {
     spell.setEnabled(true);
     QStringList lines;
     for (int line = 0; line < 2000; ++line)
-        lines << QStringLiteral("Paragraph %1 has the usual ordinary words, one occured slip and a **bold** [link](https://example.com/%1) too.").arg(line);
+        lines << QStringLiteral("Paragraph %1 has the usual ordinary words, one accomodate slip and a **bold** [link](https://example.com/%1) too.").arg(line);
     QTextDocument large; large.setPlainText(lines.join('\n'));
     MarkdownHighlighter largeHighlighter(&large);
     QElapsedTimer timer; timer.start();
     largeHighlighter.setSpellCheck(&spell); // restyles every block once, uncached
     qInfo("real checker, 2000 lines: %lld ms", timer.elapsed());
     QVERIFY(timer.elapsed() < 8000);
-    QVERIFY(cycle143Underlined(large, large.findBlockByNumber(1500).text().indexOf("occured") + large.findBlockByNumber(1500).position()));
+    QVERIFY(cycle143Underlined(large, large.findBlockByNumber(1500).text().indexOf("accomodate") + large.findBlockByNumber(1500).position()));
 }
 
 void FomawriteTest::sourceSpellingChecksOnlyChangedBlocks() {
@@ -211,6 +214,17 @@ void FomawriteTest::sourceSpellingUnderlineIsRedInTheRenderedWindow() {
     qInfo("reddish pixels under recieve: %d (saturated red, i.e. the underline itself: %d), under receive: %d", underBad, strongBad, underGood);
     QVERIFY2(underBad >= 100, qPrintable(QString("no red under the misspelled word (%1)").arg(underBad)));
     QCOMPARE(underGood, 0);
+    // The caret at the end of the word (the word being typed) hides the mark in
+    // the rendered frame without a rehighlight; moving on brings it back.
+    const int revision = f.backend.documentRevision();
+    f.editor->setProperty("cursorPosition", bad + 7);
+    QVERIFY(cycle134SaveFrame(f.quick, QDir(cycle143CapturesDirectory()).filePath("source-spelling-caret.png"), &why));
+    QCOMPARE(cycle143RedPixels(f.quick->grabWindow(), badBox, scale), 0);
+    QCOMPARE(f.backend.documentRevision(), revision);
+    f.editor->setProperty("cursorPosition", good);
+    QVERIFY(cycle134SaveFrame(f.quick, QDir(cycle143CapturesDirectory()).filePath("source-spelling-caret-left.png"), &why));
+    QVERIFY(cycle143RedPixels(f.quick->grabWindow(), badBox, scale) >= 100);
+    QCOMPARE(f.backend.documentRevision(), revision);
     // Switching the setting off removes it from the rendered frame.
     spell->setEnabled(false);
     QVERIFY(cycle134SaveFrame(f.quick, QDir(cycle143CapturesDirectory()).filePath("source-spelling-off.png"), &why));
@@ -274,4 +288,58 @@ void FomawriteTest::sourceSpellingContextMenuOffersSuggestionsAndCorrects() {
     // Turned off, a right-click on a misspelling opens nothing.
     spell->setEnabled(false);
     rightClick(pointAt("We recieve mail", "recieve")); QVERIFY(!menu->property("visible").toBool());
+}
+
+// The word being typed is not marked until the caret leaves it, and focus mode
+// leaves the dimmed text outside the focus alone (reviewer findings F1, F10).
+void FomawriteTest::sourceSpellingWithholdsTheCaretWordAndDimmedText() {
+    Cycle103SettingsSnapshot settings;
+    SpellCheck spell;
+    if (!spell.available()) QSKIP("the system spell checker exists only on macOS");
+    spell.setEnabled(true); spell.setLanguage(QStringLiteral("en_US"));
+    const QString source = QStringLiteral("We recieve mail here.\n\nA second recieve line.");
+    QTextDocument document; document.setPlainText(source);
+    MarkdownHighlighter highlighter(&document);
+    highlighter.setSpellCheck(&spell); QTest::qWait(20); highlighter.rehighlight();
+    const int first = cycle143Word(source, "We recieve mail"), second = cycle143Word(source, "second recieve line");
+    QVERIFY(cycle143Underlined(document, first) && cycle143Underlined(document, second));
+    // Caret at the end of the first word: that word is withheld, the other stays,
+    // and the document revision does not move (a caret move is not an edit).
+    const int revision = document.revision();
+    highlighter.setCaret(first + 7);
+    QVERIFY(!cycle143Underlined(document, first));
+    QVERIFY(cycle143Underlined(document, second));
+    QCOMPARE(document.revision(), revision);
+    // Caret one short of the end, or past it: the word is drawn again.
+    highlighter.setCaret(first + 6);
+    QVERIFY(cycle143Underlined(document, first));
+    highlighter.setCaret(first + 7);
+    QVERIFY(!cycle143Underlined(document, first));
+    highlighter.setCaret(first + 8);
+    QVERIFY(cycle143Underlined(document, first));
+    // Leaving the block restyles the withheld block too.
+    highlighter.setCaret(first + 7);
+    QVERIFY(!cycle143Underlined(document, first));
+    highlighter.setCaret(second);
+    QVERIFY(cycle143Underlined(document, first));
+    QCOMPARE(document.revision(), revision);
+    // Typing a word: each step keeps the caret at its end, so nothing flashes.
+    QTextCursor cursor(&document); cursor.setPosition(document.characterCount() - 1);
+    const QString typed = QStringLiteral(" tomor");
+    for (int i = 0; i < typed.size(); ++i) {
+        cursor.insertText(typed.mid(i, 1));
+        highlighter.setCaret(cursor.position());
+        document.adjustSize();
+        QVERIFY2(!cycle143Underlined(document, cursor.position() - 1), qPrintable(QStringLiteral("after typing %1").arg(typed.left(i + 1))));
+    }
+    cursor.insertText(QStringLiteral(" "));
+    highlighter.setCaret(cursor.position()); document.adjustSize();
+    QVERIFY(cycle143Underlined(document, cursor.position() - 3)); // "tomor" is a word now
+    // Focus mode: a misspelling outside the focused range carries no wash.
+    highlighter.setCaret(-1);
+    highlighter.setFocusRange(document.findBlock(second).position(), document.findBlock(second).position() + document.findBlock(second).length());
+    QVERIFY(!cycle143Underlined(document, first));
+    QVERIFY(cycle143Underlined(document, second));
+    highlighter.setFocusRange(-1, -1);
+    QVERIFY(cycle143Underlined(document, first));
 }

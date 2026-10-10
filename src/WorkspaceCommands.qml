@@ -193,7 +193,7 @@ QtObject {
         case "typewriter": return settings.typewriter;
         case "liveThemeExact": return settings.liveThemeExact;
         case "appearanceFollowsOutputStyle": return backend.appearanceFollowsOutputStyle;
-        case "checkSpellingWhileTyping": return backend.spellCheck.enabled;
+        case "checkSpellingWhileTyping": return backend.spellCheck.available && backend.spellCheck.enabled;
         case "fillersStyleCheck": return settings.styleCheckFillers;
         case "customStyleCheck": return settings.styleCheckCustom;
         default: return false;

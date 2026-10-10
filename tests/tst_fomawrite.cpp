@@ -160,6 +160,7 @@ private slots:
     void sourceSpellingChecksOnlyChangedBlocks();
     void sourceSpellingUnderlineIsRedInTheRenderedWindow();
     void sourceSpellingContextMenuOffersSuggestionsAndCorrects();
+    void sourceSpellingWithholdsTheCaretWordAndDimmedText();
     void liveSpellingUnderlinesMisspelledWordsAndFollowsTheSetting();
     void footerLayoutCapsuleNamesPreviewOnly();
     void footerViewCyclesPreserveDraftSelectionAndWidths();

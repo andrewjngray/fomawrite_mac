@@ -5,6 +5,9 @@
 #include <QFontMetricsF>
 #include <QTextDocument>
 #include <QTextBlock>
+#include <QTextLayout>
+#include <QAbstractTextDocumentLayout>
+#include <QBrush>
 #include <algorithm>
 
 namespace {
@@ -369,6 +372,58 @@ void MarkdownHighlighter::setSpellCheck(SpellCheck *spellCheck) {
     refreshSpelling();
 }
 
+void MarkdownHighlighter::setCaret(int position) {
+    if (m_caret == position) return;
+    m_caret = position;
+    if (!m_spellingEnabled || !document()) return;
+    const QTextBlock current = document()->findBlock(position);
+    const int withheld = m_withheldBlock; m_withheldBlock = -1;
+    if (withheld >= 0 && (!current.isValid() || withheld != current.blockNumber()))
+        applyCaretRule(document()->findBlockByNumber(withheld));
+    if (current.isValid()) applyCaretRule(current);
+}
+
+void MarkdownHighlighter::applySpellingMark(QTextCharFormat &format, bool drawn) const {
+    if (drawn) {
+        // Measured in the rendered window (Qt 6.11, tests/cycle143-source-
+        // spelling.inc): Qt Quick never draws SpellCheckUnderline (it tests
+        // fontUnderline), and a plain underline takes the text colour unless
+        // the run also has a background, when the underline colour is used.
+        // So the mark is a single underline in red plus a pale red wash.
+        format.setUnderlineStyle(QTextCharFormat::SingleUnderline);
+        format.setUnderlineColor(QColor(QStringLiteral("#d93025")));
+        if (!format.hasProperty(QTextFormat::BackgroundBrush) || format.background().style() == Qt::NoBrush)
+            format.setBackground(m_spellBackground);
+        format.setProperty(SpellMarkProperty, 1);
+    } else {
+        format.setUnderlineStyle(QTextCharFormat::NoUnderline);
+        if (format.background() == QBrush(m_spellBackground)) format.clearBackground();
+        format.setProperty(SpellMarkProperty, 2);
+    }
+}
+
+void MarkdownHighlighter::applyCaretRule(const QTextBlock &block) {
+    if (!block.isValid() || !block.layout()) return;
+    QList<QTextLayout::FormatRange> ranges = block.layout()->formats();
+    bool changed = false;
+    for (QTextLayout::FormatRange &range : ranges) {
+        const int state = range.format.intProperty(SpellMarkProperty);
+        if (!state) continue;
+        const bool atCaret = m_caret >= 0 && block.position() + range.format.intProperty(SpellWordEndProperty) == m_caret;
+        if (atCaret == (state == 2)) continue;
+        applySpellingMark(range.format, !atCaret);
+        if (atCaret) m_withheldBlock = block.blockNumber();
+        changed = true;
+    }
+    if (!changed) return;
+    block.layout()->setFormats(ranges);
+    document()->markContentsDirty(block.position(), block.length());
+    // Views repaint a block on the layout's updateBlock signal (the Qt Quick
+    // text item connects it to its own invalidateBlock). A format change
+    // outside an edit block has to announce itself.
+    if (auto *layout = document()->documentLayout()) emit layout->updateBlock(block);
+}
+
 void MarkdownHighlighter::refreshSpelling() {
     m_spellCache.clear();
     rehighlight();
@@ -433,7 +488,9 @@ QList<SpellCheck::Range> MarkdownHighlighter::misspellingsInBlock(const QTextBlo
     if (prose.trimmed().isEmpty()) return result;
     auto cached = m_spellCache.constFind(prose);
     if (cached == m_spellCache.constEnd()) {
-        if (m_spellCache.size() > 4096) m_spellCache.clear();
+        // One entry per distinct block text. 4096 was a cliff: a long document
+        // above it re-checked everything on every focus-mode caret move.
+        if (m_spellCache.size() > 65536) m_spellCache.clear();
         cached = m_spellCache.insert(prose, m_spellChecker(prose));
     }
     static const QRegularExpression glueRe(QStringLiteral("[\\p{L}\\p{N}][_@/\\\\][\\p{L}\\p{N}]"));
@@ -441,9 +498,11 @@ QList<SpellCheck::Range> MarkdownHighlighter::misspellingsInBlock(const QTextBlo
         if (range.start < 0 || range.end > text.size() || range.end <= range.start) continue;
         // snake_case, paths, e-mail addresses and the like are tokens, not words.
         int tokenStart = range.start, tokenEnd = range.end;
-        while (tokenStart > 0 && !text.at(tokenStart - 1).isSpace()) --tokenStart;
-        while (tokenEnd < text.size() && !text.at(tokenEnd).isSpace()) ++tokenEnd;
-        if (glueRe.match(text.mid(tokenStart, tokenEnd - tokenStart)).hasMatch()) continue;
+        // Measured on the blanked prose, not the raw text: a link destination
+        // has already been blanked, so the last word of link text is a word.
+        while (tokenStart > 0 && !prose.at(tokenStart - 1).isSpace()) --tokenStart;
+        while (tokenEnd < prose.size() && !prose.at(tokenEnd).isSpace()) ++tokenEnd;
+        if (glueRe.match(prose.mid(tokenStart, tokenEnd - tokenStart)).hasMatch()) continue;
         result.append(range);
     }
     return result;
@@ -451,18 +510,19 @@ QList<SpellCheck::Range> MarkdownHighlighter::misspellingsInBlock(const QTextBlo
 
 void MarkdownHighlighter::highlightSpelling(const QString &text) {
     Q_UNUSED(text);
-    for (const SpellCheck::Range &range : misspellingsInBlock(currentBlock())) {
+    const QTextBlock block = currentBlock();
+    const int blockStart = block.position(), blockEnd = blockStart + block.length();
+    // In focus mode the dimmed text outside the focus is left alone: a pink
+    // wash under dimmed grey text reads worse than the dimming itself.
+    if (m_focusStart >= 0 && (blockEnd <= m_focusStart || blockStart >= m_focusEnd)) return;
+    for (const SpellCheck::Range &range : misspellingsInBlock(block)) {
+        const bool atCaret = m_caret >= 0 && blockStart + range.end == m_caret;
+        if (atCaret) m_withheldBlock = block.blockNumber();
         for (int i = range.start; i < range.end; ++i) {
             QTextCharFormat composed = format(i);
             if (composed.fontPointSize() == 1.0) continue; // a hidden marker, not a letter
-            // Measured in the rendered window (Qt 6.11, tests/cycle143-source-
-            // spelling.inc): Qt Quick never draws SpellCheckUnderline (it tests
-            // fontUnderline), and a plain underline takes the text colour unless
-            // the run also has a background, when the underline colour is used.
-            // So the mark is a single underline in red plus a pale red wash.
-            composed.setUnderlineStyle(QTextCharFormat::SingleUnderline);
-            composed.setUnderlineColor(QColor(QStringLiteral("#d93025")));
-            composed.setBackground(m_spellBackground);
+            composed.setProperty(SpellWordEndProperty, range.end);
+            applySpellingMark(composed, !atCaret);
             setFormat(i, 1, composed);
         }
     }
