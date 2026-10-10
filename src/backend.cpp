@@ -1708,6 +1708,9 @@ void Backend::attachDocument(QObject *textDocument) {
     m_highlighter->setCodeStyle(m_sourceAppearance == "code");
     m_highlighter->setCodeLanguage(QFileInfo(m_fileUrl.toLocalFile()).suffix());
     m_highlighter->setColors(palette().value("editor").toString(), m_themeForeground, m_themeAccent);
+    // Misspellings underline as the writer types; the highlighter follows the
+    // service's setting, language and learned/ignored words.
+    m_highlighter->setSpellCheck(&m_spellCheck);
 
     // Includes format-only authorship edits and their Undo/Redo paths. The QML
     // consumer debounces this signal before recomputing the displayed metrics.
@@ -4001,6 +4004,20 @@ bool Backend::correctWriting(int start,int end,const QString &expected,const QSt
        currentDocumentText().mid(start,end-start)!=expected || replacement.size()>1000) return false;
     QTextCursor cursor(m_document); cursor.setPosition(start); cursor.setPosition(end,QTextCursor::KeepAnchor);
     cursor.beginEditBlock(); cursor.insertText(replacement); cursor.endEditBlock(); return true;
+}
+QVariantMap Backend::misspelledWordAt(int position) {
+    if (!m_document || !m_highlighter || position < 0) return {};
+    const QTextBlock block = m_document->findBlock(position);
+    if (!block.isValid()) return {};
+    const int offset = position - block.position();
+    const QString text = block.text();
+    for (const auto &range : m_highlighter->misspellingsInBlock(block)) {
+        if (offset < range.start || offset > range.end) continue;
+        return {{QStringLiteral("start"), block.position() + range.start},
+                {QStringLiteral("end"), block.position() + range.end},
+                {QStringLiteral("word"), text.mid(range.start, range.end - range.start)}};
+    }
+    return {};
 }
 void Backend::speakText(const QString &text) {
 #ifdef Q_OS_MACOS

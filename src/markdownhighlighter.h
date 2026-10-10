@@ -1,8 +1,14 @@
 #pragma once
 
+#include <QHash>
+#include <QPointer>
 #include <QRegularExpression>
 #include <QSyntaxHighlighter>
+#include <QTextBlock>
 #include <QTextCharFormat>
+#include <functional>
+
+#include "spellcheck.h"
 
 class MarkdownHighlighter : public QSyntaxHighlighter {
     Q_OBJECT
@@ -29,6 +35,23 @@ public:
 
     void setReviewSpans(const QList<Span> &spans);
 
+    // Spelling layer. The checker receives the prose of one block (code, link
+    // destinations, URLs and tags blanked to spaces so UTF-16 offsets still line
+    // up) and returns [start, end) ranges of misspelled words; those get a red
+    // spell-check underline composed onto the syntax format. Results are cached
+    // by prose text so typing in one block never re-checks the others.
+    using SpellChecker = std::function<QList<SpellCheck::Range>(const QString &)>;
+    void setSpellChecker(const SpellChecker &checker);
+    void setSpellingEnabled(bool enabled);
+    // Follows the shared service: its setting, language and word lists.
+    void setSpellCheck(SpellCheck *spellCheck);
+    // Forget cached results and restyle every block (words or language changed).
+    void refreshSpelling();
+    // Block-relative [start, end) ranges the layer underlines in `block`.
+    QList<SpellCheck::Range> misspellingsInBlock(const QTextBlock &block);
+    // The prose of one block as the checker sees it (public for tests).
+    static QString spellingProse(const QString &blockText);
+
     enum class InlineKind { Bold, Italic, BoldItalic, Link };
 
     struct InlineMarkup {
@@ -51,6 +74,8 @@ private:
     void highlightInline(const QString &text);
     void highlightReviewSpans(const QString &text);
     void highlightSearch(const QString &text);
+    void highlightSpelling(const QString &text);
+    int frontMatterEndBlock() const;
     void highlightCode(const QString &text, const QString &language, int lexicalState = 0,
                        int *nextLexicalState = nullptr, int offset = 0);
 
@@ -74,6 +99,10 @@ private:
     QTextCharFormat m_quoteFormat;
     QTextCharFormat m_linkFormat;
     QList<Span> m_reviewSpans;
+    SpellChecker m_spellChecker;
+    QColor m_spellBackground;
+    bool m_spellingEnabled = false;
+    QHash<QString, QList<SpellCheck::Range>> m_spellCache;
     QTextCharFormat m_reviewFormat;
     QString m_searchQuery;
     int m_currentMatchStart = -1;

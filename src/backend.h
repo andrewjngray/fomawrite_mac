@@ -243,6 +243,10 @@ public:
     Q_INVOKABLE QStringList writingLanguages() const;
     Q_INVOKABLE QVariantList writingIssues(const QString &text, const QString &language, bool grammar);
     Q_INVOKABLE bool correctWriting(int start, int end, const QString &expected, const QString &replacement);
+    // The word the Source editor underlines at (or touching) a document
+    // position: {start, end, word} in UTF-16 units, or an empty map when the
+    // position is not on an underlined word. Same rules as the underline.
+    Q_INVOKABLE QVariantMap misspelledWordAt(int position);
     Q_INVOKABLE void speakText(const QString &text);
     Q_INVOKABLE void stopSpeaking();
     static QString proseForReview(const QString &markdown);

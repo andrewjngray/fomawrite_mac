@@ -216,6 +216,8 @@ void MarkdownHighlighter::rebuildFormats() {
     m_reviewFormat.setBackground(m_darkMode ? QColor(QStringLiteral("#554315"))
                                             : QColor(QStringLiteral("#fff1b8")));
 
+    m_spellBackground = m_darkMode ? QColor(QStringLiteral("#5c2b2b")) : QColor(QStringLiteral("#fbd5d1"));
+
     m_searchFormat = QTextCharFormat();
     m_searchFormat.setBackground(m_darkMode ? QColor(QStringLiteral("#725b18"))
                                             : QColor(QStringLiteral("#ffe58a")));
@@ -331,7 +333,139 @@ void MarkdownHighlighter::highlightBlock(const QString &text) {
         }
     }
     if (!literal) highlightReviewSpans(text);
+    if (!literal && !text.isEmpty()) highlightSpelling(text);
     highlightSearch(text);
+}
+
+void MarkdownHighlighter::setSpellChecker(const SpellChecker &checker) {
+    m_spellChecker = checker;
+    refreshSpelling();
+}
+
+void MarkdownHighlighter::setSpellingEnabled(bool enabled) {
+    if (m_spellingEnabled == enabled) return;
+    m_spellingEnabled = enabled;
+    rehighlight();
+}
+
+void MarkdownHighlighter::setSpellCheck(SpellCheck *spellCheck) {
+    if (!spellCheck) {
+        m_spellingEnabled = false;
+        setSpellChecker(nullptr);
+        return;
+    }
+    // A guarded pointer keeps a late repaint from reaching a destroyed checker.
+    const QPointer<SpellCheck> guarded(spellCheck);
+    m_spellingEnabled = spellCheck->enabled();
+    m_spellChecker = [guarded](const QString &prose) -> QList<SpellCheck::Range> {
+        return guarded ? guarded->misspellings(prose) : QList<SpellCheck::Range>();
+    };
+    connect(spellCheck, &SpellCheck::enabledChanged, this, [this, guarded] {
+        if (guarded) m_spellingEnabled = guarded->enabled();
+        refreshSpelling();
+    });
+    connect(spellCheck, &SpellCheck::languageChanged, this, &MarkdownHighlighter::refreshSpelling);
+    connect(spellCheck, &SpellCheck::wordsChanged, this, &MarkdownHighlighter::refreshSpelling);
+    refreshSpelling();
+}
+
+void MarkdownHighlighter::refreshSpelling() {
+    m_spellCache.clear();
+    rehighlight();
+}
+
+// Blank what is syntax rather than prose, keeping every UTF-16 offset.
+QString MarkdownHighlighter::spellingProse(const QString &blockText) {
+    QString prose = blockText;
+    const auto blank = [&prose](int start, int length) {
+        for (int i = start; i < start + length && i < prose.size(); ++i) prose[i] = QLatin1Char(' ');
+    };
+    if (prose.contains(QLatin1Char('`')))
+        for (const auto &code : inlineCodeSpans(prose)) blank(code.start, code.length);
+    // Link destinations, raw tags, raw URLs and inline math are syntax.
+    static const QRegularExpression syntax(QStringLiteral(
+        "\\]\\([^\\n]*?\\)|<[^>\\n]*>|(?:https?|ftp|file)://[^\\s)>\\]]+|www\\.[^\\s)>\\]]+"
+        "|(?<![\\\\$\\w])\\$(?=\\S)[^$\\n]*?\\S\\$(?![\\d\\w])"));
+    auto matches = syntax.globalMatch(prose);
+    while (matches.hasNext()) {
+        const auto match = matches.next();
+        blank(int(match.capturedStart()), int(match.capturedLength()));
+    }
+    return prose;
+}
+
+int MarkdownHighlighter::frontMatterEndBlock() const {
+    const QTextDocument *doc = document();
+    if (!doc || doc->firstBlock().text().trimmed() != QLatin1String("---")) return -1;
+    int number = 0;
+    for (QTextBlock block = doc->firstBlock().next(); block.isValid() && number < 500;
+         block = block.next(), ++number) {
+        const QString trimmed = block.text().trimmed();
+        if (trimmed == QLatin1String("---") || trimmed == QLatin1String("...")) return number + 1;
+    }
+    return -1;
+}
+
+// The misspelled words in one block, as block-relative [start, end) ranges. The
+// highlighter underlines exactly these, and the right-click menu offers exactly
+// these, so what is drawn and what can be corrected never disagree.
+QList<SpellCheck::Range> MarkdownHighlighter::misspellingsInBlock(const QTextBlock &block) {
+    QList<SpellCheck::Range> result;
+    if (!m_spellingEnabled || !m_spellChecker || !block.isValid()) return result;
+    const QString text = block.text();
+    if (text.isEmpty()) return result;
+    // Fenced and raw code are literal (the highlighter's block state says so).
+    if (m_codeStyle && !m_codeLanguage.isEmpty()) return result;
+    const int previousState = block.previous().isValid() ? block.previous().userState() : 0;
+    static const QRegularExpression fenceRe(QStringLiteral("^ {0,3}(`{3,}|~{3,})(.*)$"));
+    if (previousState > 0 || fenceRe.match(text).hasMatch()) return result;
+    if (block.blockNumber() <= 500 && block.blockNumber() <= frontMatterEndBlock()) return result;
+    // An indented run that follows a blank line is a code block, not prose; a
+    // nested list item or continuation line follows text and is checked.
+    static const QRegularExpression indentedRe(QStringLiteral("^(?: {4,}|\\t)"));
+    static const QRegularExpression listItemRe(QStringLiteral("^\\s*(?:[-+*]|\\d+[.)])\\s"));
+    if (indentedRe.match(text).hasMatch() && !listItemRe.match(text).hasMatch()) {
+        const QTextBlock previous = block.previous();
+        if (!previous.isValid() || previous.text().trimmed().isEmpty()
+            || indentedRe.match(previous.text()).hasMatch()) return result;
+    }
+    const QString prose = spellingProse(text);
+    if (prose.trimmed().isEmpty()) return result;
+    auto cached = m_spellCache.constFind(prose);
+    if (cached == m_spellCache.constEnd()) {
+        if (m_spellCache.size() > 4096) m_spellCache.clear();
+        cached = m_spellCache.insert(prose, m_spellChecker(prose));
+    }
+    static const QRegularExpression glueRe(QStringLiteral("[\\p{L}\\p{N}][_@/\\\\][\\p{L}\\p{N}]"));
+    for (const SpellCheck::Range &range : *cached) {
+        if (range.start < 0 || range.end > text.size() || range.end <= range.start) continue;
+        // snake_case, paths, e-mail addresses and the like are tokens, not words.
+        int tokenStart = range.start, tokenEnd = range.end;
+        while (tokenStart > 0 && !text.at(tokenStart - 1).isSpace()) --tokenStart;
+        while (tokenEnd < text.size() && !text.at(tokenEnd).isSpace()) ++tokenEnd;
+        if (glueRe.match(text.mid(tokenStart, tokenEnd - tokenStart)).hasMatch()) continue;
+        result.append(range);
+    }
+    return result;
+}
+
+void MarkdownHighlighter::highlightSpelling(const QString &text) {
+    Q_UNUSED(text);
+    for (const SpellCheck::Range &range : misspellingsInBlock(currentBlock())) {
+        for (int i = range.start; i < range.end; ++i) {
+            QTextCharFormat composed = format(i);
+            if (composed.fontPointSize() == 1.0) continue; // a hidden marker, not a letter
+            // Measured in the rendered window (Qt 6.11, tests/cycle143-source-
+            // spelling.inc): Qt Quick never draws SpellCheckUnderline (it tests
+            // fontUnderline), and a plain underline takes the text colour unless
+            // the run also has a background, when the underline colour is used.
+            // So the mark is a single underline in red plus a pale red wash.
+            composed.setUnderlineStyle(QTextCharFormat::SingleUnderline);
+            composed.setUnderlineColor(QColor(QStringLiteral("#d93025")));
+            composed.setBackground(m_spellBackground);
+            setFormat(i, 1, composed);
+        }
+    }
 }
 
 void MarkdownHighlighter::highlightCode(const QString &text, const QString &language,

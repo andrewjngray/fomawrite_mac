@@ -946,6 +946,46 @@ ApplicationWindow {
         CompactMenuItem { enabled: win.canFormatSource; text: "Strikethrough"; onTriggered: workspaceCommands.run("strike") }
         CompactMenuItem { enabled: win.canFormatSource; text: "Inline code"; onTriggered: workspaceCommands.run("inlineCode") }
     }
+    // Right-click on an underlined word in the Source editor: suggestions, then
+    // Learn Spelling and Ignore Spelling. Replacements go through
+    // backend.correctWriting, one undoable edit.
+    CompactMenu {
+        id: spellingMenu
+        objectName: "spellingContextMenu"
+        property int wordStart: -1
+        property int wordEnd: -1
+        property string word: ""
+        property var guesses: []
+        function showFor(point, hit) {
+            wordStart = hit.start; wordEnd = hit.end; word = hit.word;
+            guesses = backend.spellCheck.suggestions(hit.word).slice(0, 5);
+            popup(editor, point.x, point.y);
+        }
+        function replaceWith(replacement) {
+            var ok = false;
+            win.performDocumentEdit(function() { ok = backend.correctWriting(wordStart, wordEnd, word, replacement); });
+            if (ok) editor.cursorPosition = wordStart + replacement.length;
+            editor.forceActiveFocus();
+        }
+        onClosed: if (win.sourceEditorVisible) editor.forceActiveFocus()
+        CompactMenuItem { objectName: "spellingSuggestion0"; visible: spellingMenu.guesses.length > 0; height: visible ? implicitHeight : 0
+            text: spellingMenu.guesses.length > 0 ? spellingMenu.guesses[0] : ""; onTriggered: spellingMenu.replaceWith(text) }
+        CompactMenuItem { objectName: "spellingSuggestion1"; visible: spellingMenu.guesses.length > 1; height: visible ? implicitHeight : 0
+            text: spellingMenu.guesses.length > 1 ? spellingMenu.guesses[1] : ""; onTriggered: spellingMenu.replaceWith(text) }
+        CompactMenuItem { objectName: "spellingSuggestion2"; visible: spellingMenu.guesses.length > 2; height: visible ? implicitHeight : 0
+            text: spellingMenu.guesses.length > 2 ? spellingMenu.guesses[2] : ""; onTriggered: spellingMenu.replaceWith(text) }
+        CompactMenuItem { objectName: "spellingSuggestion3"; visible: spellingMenu.guesses.length > 3; height: visible ? implicitHeight : 0
+            text: spellingMenu.guesses.length > 3 ? spellingMenu.guesses[3] : ""; onTriggered: spellingMenu.replaceWith(text) }
+        CompactMenuItem { objectName: "spellingSuggestion4"; visible: spellingMenu.guesses.length > 4; height: visible ? implicitHeight : 0
+            text: spellingMenu.guesses.length > 4 ? spellingMenu.guesses[4] : ""; onTriggered: spellingMenu.replaceWith(text) }
+        CompactMenuItem { objectName: "spellingNoGuesses"; visible: spellingMenu.guesses.length === 0; height: visible ? implicitHeight : 0
+            enabled: false; text: "No Guesses Found" }
+        MenuSeparator {}
+        CompactMenuItem { objectName: "spellingLearn"; text: "Learn Spelling"
+            onTriggered: { backend.spellCheck.learnWord(spellingMenu.word); editor.forceActiveFocus(); } }
+        CompactMenuItem { objectName: "spellingIgnore"; text: "Ignore Spelling"
+            onTriggered: { backend.spellCheck.ignoreWord(spellingMenu.word); editor.forceActiveFocus(); } }
+    }
     CompactMenu {
         id: writingOptions
         objectName: "writingOptions"
@@ -3005,6 +3045,20 @@ ApplicationWindow {
                         customReviewRefreshTimer.restart();
                     if (win.searchOpen)
                         win.updateSearch(editor.cursorPosition, !editor.activeFocus);
+                }
+
+                // A right-click on an underlined word offers corrections. Anywhere
+                // else the press is declined, so default behaviour is untouched.
+                MouseArea {
+                    objectName: "sourceSpellingArea"
+                    anchors.fill: parent
+                    acceptedButtons: Qt.RightButton
+                    onPressed: function(mouse) {
+                        var hit = backend.spellCheck.enabled && !editor.inputMethodComposing
+                            ? backend.misspelledWordAt(editor.positionAt(mouse.x, mouse.y)) : ({});
+                        if (hit.word === undefined) { mouse.accepted = false; return; }
+                        spellingMenu.showFor(Qt.point(mouse.x, mouse.y), hit);
+                    }
                 }
 
                 Text {
