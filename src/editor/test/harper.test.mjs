@@ -360,3 +360,71 @@ test("real LocalLinter: findings are UTF-16 spans (an emoji before the word shif
   assert.ok(reply, "answered");
   assert.deepEqual(JSON.parse(reply.args[1]), found);
 });
+
+// ---- Cycle 146: an engine installed after the page loaded one -------------------------------------------------------
+/** A backend whose served version can change between loads, as after Help > Check for Writing Checker Updates. */
+function updatingBackend(initial = "2.10.0") {
+  const state = { served: initial, loads: [], resets: 0 };
+  return {
+    state,
+    async load(dialect) {
+      const version = state.served; // what the page reads when it starts loading
+      state.loads.push(`${dialect}@${version}`);
+      return { version, lint: async (text) => [{ start: 0, end: text.length, kind: "Spelling", message: version, suggestions: [] }], importWords: async () => {} };
+    },
+    version: async () => state.served,
+    reset() { state.resets++; },
+  };
+}
+
+test("harperLoad after an update: the version is read again, a fresh engine loads from it, and its version is announced", async () => {
+  const bridge = createMockBridge();
+  const backend = updatingBackend("2.10.0");
+  wireHarperBridge(bridge, backend);
+  const ready = () => bridge.calls.filter((c) => c.name === "harperReady").map((c) => c.args[0]);
+  bridge.emit("harperLoad", "Australian");
+  await tick();
+  assert.deepEqual(ready(), ["2.10.0"]);
+  // nothing new is served: the same engine says it is ready again, no second load
+  bridge.emit("harperLoad", "Australian");
+  await tick();
+  assert.deepEqual(ready(), ["2.10.0", "2.10.0"]);
+  assert.deepEqual(backend.state.loads, ["Australian@2.10.0"]);
+  assert.equal(backend.state.resets, 0);
+  // an update is installed: the same harperLoad now means a new engine
+  backend.state.served = "2.12.0";
+  bridge.emit("harperLoad", "Australian");
+  await tick();
+  assert.deepEqual(ready(), ["2.10.0", "2.10.0", "2.12.0"]);
+  assert.deepEqual(backend.state.loads, ["Australian@2.10.0", "Australian@2.12.0"]);
+  assert.equal(backend.state.resets, 1, "the shared engine was dropped so the new import is not the old module");
+  bridge.emit("harperLint", 5, "recieve");
+  await tick();
+  const reply = bridge.calls.find((c) => c.name === "harperReply" && c.args[0] === 5);
+  assert.equal(JSON.parse(reply.args[1])[0].message, "2.12.0", "lints are answered by the new engine");
+  // rolled back: the bundled version is served again and loads again
+  backend.state.served = "2.10.0";
+  bridge.emit("harperLoad", "Australian");
+  await tick();
+  assert.deepEqual(ready().slice(-1), ["2.10.0"]);
+  assert.equal(backend.state.loads.length, 3);
+});
+
+test("a harperLoad that arrives while the engine is still loading is checked once it has loaded", async () => {
+  const bridge = createMockBridge();
+  const backend = updatingBackend("2.10.0");
+  const first = backend.load.bind(backend);
+  const gate = deferred();
+  let calls = 0;
+  backend.load = async (d) => { const engine = await first(d); if (calls++ === 0) await gate.promise; return engine; };
+  wireHarperBridge(bridge, backend);
+  bridge.emit("harperLoad", "Australian");
+  await tick();
+  backend.state.served = "2.12.0"; // installed while the old one was loading
+  bridge.emit("harperLoad", "Australian"); // the host reloads
+  gate.resolve();
+  await tick(); await tick();
+  const ready = bridge.calls.filter((c) => c.name === "harperReady").map((c) => c.args[0]);
+  assert.deepEqual(ready, ["2.12.0"], "only the version that is actually loaded is announced");
+  assert.deepEqual(backend.state.loads, ["Australian@2.10.0", "Australian@2.12.0"]);
+});

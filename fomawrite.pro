@@ -11,6 +11,7 @@ HEADERS += \
     src/spellcheck.h \
     src/harperscheme.h \
     src/harperengine.h \
+    src/harperupdater.h \
     src/markdownhighlighter.h \
     src/outputcss.h \
     src/systemtheme.h
@@ -21,6 +22,7 @@ SOURCES += \
     src/spellcheck.cpp \
     src/harperscheme.cpp \
     src/harperengine.cpp \
+    src/harperupdater.cpp \
     src/backend.cpp \
     src/markdownhighlighter.cpp \
     src/outputcss.cpp

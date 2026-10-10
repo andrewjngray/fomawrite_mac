@@ -48,7 +48,8 @@ Rectangle {
         return kind !== "" ? kind.replace(/([a-z])([A-Z])/g, "$1 $2") : issue.category
     }
     function engineStatus() {
-        if (harperActive) return "Harper " + checker.harperVersion
+        // "Harper 2.10.0 · 2.12.0 available (built-in)": the version in use, what the weekly check found, and where the engine came from
+        if (harperActive) return "Harper " + checker.harperVersion + backend.harperUpdater.paneSuffix
         return checker.engine === "harper" ? "macOS checker (Harper is loading)" : "macOS checker"
     }
     function emphasised(issue) {

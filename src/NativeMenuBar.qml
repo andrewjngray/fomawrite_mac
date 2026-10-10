@@ -537,6 +537,9 @@ Platform.MenuBar {
     }
     Platform.Menu {
         title: "Help"
+        // The grammar engine inside the Live page is Harper; its rules ship with it, so
+        // "update the rules" means a newer Harper release (Cycle 146, src/harperupdater.cpp).
+        onAboutToShow: { backend.harperUpdater.refresh(); writingCheckerAutoItem.resync(); }
         Platform.MenuItem {
             objectName: "helpAboutFomawrite"
             text: "About Fomawrite"
@@ -556,5 +559,9 @@ Platform.MenuBar {
         }
         Platform.MenuSeparator {}
         Platform.MenuItem { objectName: "helpKeyboardShortcuts"; text: "Keyboard Shortcuts"; onTriggered: shortcutsDialog.open() }
+        Platform.MenuSeparator {}
+        NativeCommand { objectName: "helpCheckWritingCheckerUpdates"; commandId: "checkWritingCheckerUpdates" }
+        NativeCommand { objectName: "helpUseBuiltInWritingChecker"; commandId: "useBuiltInWritingChecker" }
+        NativeCommand { id: writingCheckerAutoItem; objectName: "helpCheckWritingCheckerAutomatically"; commandId: "checkWritingCheckerAutomatically" }
     }
 }

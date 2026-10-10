@@ -22,6 +22,7 @@
 #include "editorbridge.h"
 #include "spellcheck.h"
 #include "harperengine.h"
+#include "harperupdater.h"
 
 class MarkdownHighlighter;
 class QTextDocument;
@@ -62,6 +63,7 @@ class Backend : public QObject, public PublishingSource {
     // the whole window as it does in Typora. Off: the Theme preset alone decides.
     Q_PROPERTY(bool appearanceFollowsOutputStyle READ appearanceFollowsOutputStyle WRITE setAppearanceFollowsOutputStyle NOTIFY appearanceFollowsOutputStyleChanged)
     Q_PROPERTY(SpellCheck *spellCheck READ spellCheck CONSTANT)
+    Q_PROPERTY(HarperUpdater *harperUpdater READ harperUpdater CONSTANT)
     // Every spelling and grammar finding in the document, in order, for the
     // Review pane (see rebuildReviewIssues). Capped; the flag says so.
     Q_PROPERTY(QVariantList reviewIssues READ reviewIssues NOTIFY reviewIssuesChanged)
@@ -83,6 +85,10 @@ public:
     QObject *publisher() { return m_publisher.get(); }
     EditorBridge *editorBridge() { return m_editorBridge.get(); }
     SpellCheck *spellCheck() { return &m_spellCheck; }
+    HarperUpdater *harperUpdater() { return &m_harperUpdater; }
+    // Whether the weekly Harper update check runs (Main.qml starts it ten seconds after the
+    // window shows); the test suite sets FOMAWRITE_NO_HARPER_UPDATE_CHECK so nothing reaches the network.
+    Q_INVOKABLE bool checksHarperUpdates() const { return !qEnvironmentVariableIsSet("FOMAWRITE_NO_HARPER_UPDATE_CHECK"); }
     // The Live pane calls this as its view is created (see harperscheme.h).
     Q_INVOKABLE void installHarperScheme();
     // Whether the hidden Live page is created a second after the window shows
@@ -386,6 +392,8 @@ private:
     SpellCheck m_spellCheck{this};
     // Harper, on the Live page's bridge; destroyed before the service that points at it.
     std::unique_ptr<HarperEngine> m_harper;
+    // Help > Check for Writing Checker Updates (Cycle 146); an installed engine reloads m_harper.
+    HarperUpdater m_harperUpdater{this};
     // The Live page's own underlines (spellingRequested). Harper answers
     // arrive later than the request, so a request whose texts are not all
     // known waits (at most 2 s) for their resultsReady and is answered once.

@@ -570,7 +570,7 @@ void FomawriteTest::writingCheckerCommandsMenuAndPaneFollowTheEngine() {
     QCOMPARE(issues.at(2).toMap()["kind"].toString(), QStringLiteral("WordChoice"));
     QCOMPARE(issues.at(2).toMap()["word"].toString(), QStringLiteral("very unique"));
     QCOMPARE(cycle145Label(window, "reviewCounts"), QStringLiteral("1 spelling · 1 grammar · 1 style"));
-    QCOMPARE(cycle145Label(window, "reviewEngine"), QStringLiteral("Harper 2.10.0-test"));
+    QCOMPARE(cycle145Label(window, "reviewEngine"), QStringLiteral("Harper 2.10.0-test (built-in)"));
     QCOMPARE(cycle144Control(window, "reviewLanguage")->property("text").toString(), QStringLiteral("Australian")); // the dialect, not a macOS language
     QTRY_COMPARE(cycle145RowTags(window), (QStringList{"Spelling", "Repetition", "Word Choice"}));
     // The Style filter shows the style row only; the underline setting does not matter to the pane.

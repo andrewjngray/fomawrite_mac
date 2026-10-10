@@ -83,6 +83,9 @@ QtObject {
         { id: "dialectBritish", title: "British", toggle: true },
         { id: "dialectAmerican", title: "American", toggle: true },
         { id: "dialectCanadian", title: "Canadian", toggle: true },
+        { id: "checkWritingCheckerUpdates", title: "Check for Writing Checker Updates…" },
+        { id: "useBuiltInWritingChecker", title: "Use Built-in Writing Checker" },
+        { id: "checkWritingCheckerAutomatically", title: "Check for Updates Automatically", toggle: true },
         { id: "editor", title: "Single", toggle: true },
         { id: "split", title: "Split", toggle: true },
         { id: "preview", title: "Preview Only", toggle: true },
@@ -146,6 +149,8 @@ QtObject {
         if (id === "checkStyleWhileTyping") return backend.spellCheck.available && backend.spellCheck.enabled && backend.spellCheck.engine === "harper";
         if (id === "engineHarper" || id === "engineMacos") return backend.spellCheck.available;
         if (id.indexOf("dialect") === 0) return backend.spellCheck.available && backend.spellCheck.engine === "harper";
+        if (id === "checkWritingCheckerUpdates") return !backend.harperUpdater.checking && !backend.harperUpdater.installing;
+        if (id === "useBuiltInWritingChecker") return backend.harperUpdater.hasOverride && !backend.harperUpdater.installing;
         if (id === "organizer") return true;
         if (id === "liveThemeExact") return layoutState.liveEditEnabled;
         if (id === "split") return layoutState.availableWidth >= 800;
@@ -218,6 +223,7 @@ QtObject {
         case "dialectBritish": return backend.spellCheck.dialect === "British";
         case "dialectAmerican": return backend.spellCheck.dialect === "American";
         case "dialectCanadian": return backend.spellCheck.dialect === "Canadian";
+        case "checkWritingCheckerAutomatically": return backend.harperUpdater.autoCheck;
         case "fillersStyleCheck": return settings.styleCheckFillers;
         case "customStyleCheck": return settings.styleCheckCustom;
         default: return false;
@@ -296,6 +302,9 @@ QtObject {
         case "dialectBritish": backend.spellCheck.dialect = "British"; break;
         case "dialectAmerican": backend.spellCheck.dialect = "American"; break;
         case "dialectCanadian": backend.spellCheck.dialect = "Canadian"; break;
+        case "checkWritingCheckerUpdates": backend.harperUpdater.checkAndInstall(); break;
+        case "useBuiltInWritingChecker": backend.harperUpdater.rollback(); break;
+        case "checkWritingCheckerAutomatically": backend.harperUpdater.autoCheck = !backend.harperUpdater.autoCheck; break;
         case "fillersStyleCheck": settings.styleCheckFillers = !settings.styleCheckFillers; break;
         case "customStyleCheck": settings.styleCheckCustom = !settings.styleCheckCustom; break;
         case "strike": window.tryWrapSelection("~~", "~~"); break;
