@@ -68,6 +68,7 @@ void EditorBridge::ready() {
     emit setTheme(m_theme);
     emit setMode(m_mode);
     if (m_hasDocument) emit setDocument(m_text, m_revision);
+    emit setSpellCheck(m_spellCheck);
     emit readyChanged();
 }
 
@@ -101,3 +102,13 @@ void EditorBridge::requestImage(int token, const QString &src) { emit imageReque
 void EditorBridge::replyImage(int token, const QString &dataUrl, const QString &error) { emit imageReply(token, dataUrl, error); }
 void EditorBridge::saveImage(int token, const QString &name, const QString &mime, const QString &base64) { emit imageSaveRequested(token, name, mime, base64); }
 void EditorBridge::replyImageSaved(int token, const QString &relativePath, const QString &error) { emit imageSaved(token, relativePath, error); }
+void EditorBridge::checkSpelling(int token, const QString &segmentsJson) { emit spellingRequested(token, segmentsJson); }
+void EditorBridge::replySpelling(int token, const QString &rangesJson) { emit spellingReply(token, rangesJson); }
+void EditorBridge::spellingSuggestions(int token, const QString &word) { emit suggestionsRequested(token, word); }
+void EditorBridge::replySuggestions(int token, const QString &wordsJson) { emit suggestionsReply(token, wordsJson); }
+void EditorBridge::learnWord(const QString &word) { emit wordLearned(word); }
+void EditorBridge::ignoreWord(const QString &word) { emit wordIgnored(word); }
+void EditorBridge::applySpellCheck(bool enabled) {
+    m_spellCheck = enabled;
+    if (m_ready) emit setSpellCheck(m_spellCheck);
+}

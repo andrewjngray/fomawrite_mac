@@ -160,6 +160,7 @@ private slots:
     void sourceSpellingChecksOnlyChangedBlocks();
     void sourceSpellingUnderlineIsRedInTheRenderedWindow();
     void sourceSpellingContextMenuOffersSuggestionsAndCorrects();
+    void liveSpellingUnderlinesMisspelledWordsAndFollowsTheSetting();
     void footerLayoutCapsuleNamesPreviewOnly();
     void footerViewCyclesPreserveDraftSelectionAndWidths();
     void footerModesAndTemplatesPreserveDraftAndUndo();
@@ -5238,6 +5239,7 @@ private:
 #include "cycle142-accessibility-probe.inc"
 #include "cycle143-spellcheck.inc"
 #include "cycle143-source-spelling.inc"
+#include "cycle143-live-spelling.inc"
 
 int main(int argc, char **argv) {
     QtWebEngineQuick::initialize();

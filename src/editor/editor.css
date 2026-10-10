@@ -99,6 +99,26 @@ html.dark, html.dark body { color-scheme: dark; }
 #editor .fw-link-panel .cm-button { font-size: 80%; padding: 0.2em 0.9em; }
 #editor .fw-link-panel .cm-textfield.fw-invalid { border-color: var(--fw-danger); outline-color: var(--fw-danger); }
 
+/* ---------------------------------------------------------------- spelling (src/spelling.ts) */
+/* A decoration on the word's own span: the Live theme overlay never mentions text-decoration, and a theme's
+   `text-decoration: none` on an ancestor does not remove an underline drawn by a descendant. */
+.fw-misspelled { text-decoration: underline wavy #d93025; text-decoration-skip-ink: none; }
+/* The right-click menu lives on <body> (position: fixed), so it uses the page palette variables from :root / html.dark. */
+.fw-spell-menu {
+  position: fixed; z-index: 1000; min-width: 160px; max-width: 320px; padding: 4px 0;
+  background: var(--fw-bg, #fff); color: var(--fw-fg, #24292f);
+  border: 1px solid var(--fw-quote-bar, #d0d7de); border-radius: 6px; box-shadow: 0 4px 14px rgba(0, 0, 0, 0.2);
+  font: 13px/1.4 -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif;
+}
+.fw-spell-menu .fw-spell-item {
+  display: block; width: 100%; padding: 4px 14px; border: 0; border-radius: 0; background: transparent; color: inherit;
+  font: inherit; text-align: left; cursor: default;
+}
+.fw-spell-menu .fw-spell-item:hover, .fw-spell-menu .fw-spell-item:focus-visible { background: var(--fw-selection, rgba(9, 105, 218, 0.22)); outline: none; }
+.fw-spell-menu .fw-spell-none, .fw-spell-menu .fw-spell-none:hover { background: transparent; color: var(--fw-muted, #8c959f); }
+.fw-spell-menu .fw-spell-suggestion { font-weight: 600; }
+.fw-spell-menu .fw-spell-separator { height: 1px; margin: 4px 0; background: var(--fw-quote-bar, #d0d7de); }
+
 /* ---------------------------------------------------------------- source mode (monospace) */
 #write.fw-mode-source .cm-content,
 #write:not(.fw-mode-live) .cm-content {
