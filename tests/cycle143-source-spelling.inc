@@ -3,7 +3,7 @@
 // Ignore Spelling. Grammar joined in Cycle 144 (blue marks, tests/cycle144-source-grammar.inc).
 //
 // Real-checker tests use words no other test touches ("recieve", "definately",
-// "occured", "accomodate"): the system checker's ignore list lasts for the whole
+// "occured"; "recieve" is never ignored): the system checker's ignore list lasts for the whole
 // test run, so a word one test ignores must not be asserted underlined by another.
 
 namespace {
@@ -108,7 +108,7 @@ void FomawriteTest::sourceSpellingFollowsTheSettingAndLearnedWords() {
     spell.setEnabled(true);
     QStringList lines;
     for (int line = 0; line < 2000; ++line)
-        lines << QStringLiteral("Paragraph %1 has the usual ordinary words, one accomodate slip and a **bold** [link](https://example.com/%1) too.").arg(line);
+        lines << QStringLiteral("Paragraph %1 has the usual ordinary words, one recieve slip and a **bold** [link](https://example.com/%1) too.").arg(line);
     QTextDocument large; large.setPlainText(lines.join('\n'));
     MarkdownHighlighter largeHighlighter(&large);
     QElapsedTimer timer; timer.start();
@@ -118,7 +118,17 @@ void FomawriteTest::sourceSpellingFollowsTheSettingAndLearnedWords() {
     // Qt 6.11 restyles lazily as layout reaches each block (adjustSize was not
     // enough on the CI runner): ask for the far block's restyle explicitly.
     largeHighlighter.rehighlightBlock(large.findBlockByNumber(1500));
-    QVERIFY(cycle143Underlined(large, large.findBlockByNumber(1500).text().indexOf("accomodate") + large.findBlockByNumber(1500).position()));
+    const QTextBlock far = large.findBlockByNumber(1500);
+    const int farWord = far.position() + far.text().indexOf("recieve");
+    if (!cycle143Underlined(large, farWord)) {
+        // Say what this machine's checker and the layer think, for the CI log.
+        int underlinedBlocks = 0;
+        for (QTextBlock b = large.firstBlock(); b.isValid(); b = b.next()) if (cycle143Underlined(large, b.position() + b.text().indexOf("recieve"))) ++underlinedBlocks;
+        qWarning() << "far block not underlined; checker on its text:" << spell.misspelledRanges(far.text()).size()
+                   << "layer ranges:" << largeHighlighter.misspellingsInBlock(far).size() << "formats:" << far.layout()->formats().size()
+                   << "blocks underlined:" << underlinedBlocks << "of" << large.blockCount();
+    }
+    QVERIFY(cycle143Underlined(large, farWord));
 }
 
 void FomawriteTest::sourceSpellingChecksOnlyChangedBlocks() {

@@ -27,6 +27,7 @@
 #include <QTextBoundaryFinder>
 #include <QStringDecoder>
 #include "backend.h"
+#include "harperscheme.h"
 #include "macbridge.h"
 #include <QClipboard>
 #include <QColor>
@@ -674,6 +675,7 @@ Backend::Backend(QObject *parent, bool outputOnly) : QObject(parent), m_library(
 
 Backend::~Backend() { liveBackends.remove(this); }
 
+void Backend::installHarperScheme() { installHarperSchemeHandler(); }
 int Backend::documentRevision() const { return m_document ? m_document->revision() : 0; }
 
 QString Backend::bundledHelp(const QString &page) const {

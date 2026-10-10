@@ -2,6 +2,8 @@
 set -eu
 ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
 . "$ROOT/bin/qt-env"
+# The Harper engine files are in the resource list; fetch the pinned release if missing.
+"$ROOT/bin/fetch-harper"
 mkdir -p "$ROOT/build"
 cd "$ROOT/build"
 "$QMAKE" "$ROOT/fomawrite.pro"

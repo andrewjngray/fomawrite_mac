@@ -35,6 +35,7 @@
 
 #include "backend.h"
 #include "spellcheck.h"
+#include "harperscheme.h"
 #include "markdownhighlighter.h"
 
 
@@ -154,6 +155,7 @@ private slots:
     void spellCheckServiceFindsWordsAndHonoursIgnoreAndSetting();
     void checkSpellingWhileTypingCommandTogglesTheSetting();
     void spellCheckServiceReportsGrammarIssuesWithCategory();
+    void harperLintsInsideTheEditorPage();
     void grammarChecksLongParagraphsInCachedChunks();
     void reviewPaneWithholdsTheWordBeingTypedInLive();
     void ignoreGrammarFromAnySurfaceReachesEverySurface();
@@ -5262,6 +5264,7 @@ private:
 #include "cycle134-footer-live.inc"
 #include "cycle140-typora-base.inc"
 #include "cycle143-spellcheck.inc"
+#include "cycle145-harper.inc"
 #include "cycle143-source-spelling.inc"
 #include "cycle143-live-spelling.inc"
 #include "cycle144-source-grammar.inc"
@@ -5269,6 +5272,7 @@ private:
 #include "cycle144-review-pane.inc"
 
 int main(int argc, char **argv) {
+    registerHarperScheme();
     QtWebEngineQuick::initialize();
     QApplication app(argc, argv);
     FomawriteTest test;

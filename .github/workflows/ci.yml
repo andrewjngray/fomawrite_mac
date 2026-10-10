@@ -64,6 +64,9 @@ jobs:
           xcodebuild -version
           sw_vers
 
+      - name: Fetch the pinned Harper engine
+        run: ./bin/fetch-harper
+
       - name: Build app
         env:
           QMAKE: ${{ env.QT_ROOT_DIR }}/bin/qmake

@@ -36,3 +36,4 @@ Makefile
 
 # Agent worktrees and local Claude state
 .claude/
+/src/editor/dist/harper/

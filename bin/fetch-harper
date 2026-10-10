@@ -1,0 +1,35 @@
+#!/usr/bin/env sh
+# Fetch the pinned Harper engine (harper.lock.json) into src/editor/dist/harper/.
+# The npm tarball is verified against the lock's sha512 before anything is
+# unpacked. Only the files the page loads are kept: the ES module, its glue, and
+# the WebAssembly binary. Nothing here needs node. Idempotent: a matching
+# version already in place is left alone (pass --force to refetch).
+set -eu
+ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
+LOCK="$ROOT/harper.lock.json"
+OUT="$ROOT/src/editor/dist/harper"
+read_key() { sed -n "s/^ *\"$1\": *\"\([^\"]*\)\".*/\1/p" "$LOCK" | head -1; }
+VERSION="$(read_key version)"; TARBALL="$(read_key tarball)"; INTEGRITY="$(read_key integrity)"
+[ -n "$VERSION" ] && [ -n "$TARBALL" ] && [ -n "$INTEGRITY" ] || { echo "fetch-harper: harper.lock.json is incomplete" >&2; exit 1; }
+if [ "${1:-}" != "--force" ] && [ -f "$OUT/VERSION" ] && [ "$(cat "$OUT/VERSION")" = "$VERSION" ] && [ -f "$OUT/harper_wasm_bg.wasm" ]; then
+  echo "Harper $VERSION already in $OUT"; exit 0
+fi
+TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT
+curl -fsSL "$TARBALL" -o "$TMP/harper.tgz"
+# sha512 integrity: the npm string is base64 of the raw digest.
+EXPECTED="${INTEGRITY#sha512-}"
+ACTUAL="$(openssl dgst -sha512 -binary "$TMP/harper.tgz" | openssl base64 -A)"
+[ "$ACTUAL" = "$EXPECTED" ] || { echo "fetch-harper: integrity mismatch for $TARBALL" >&2; echo " expected $EXPECTED" >&2; echo " actual   $ACTUAL" >&2; exit 1; }
+mkdir -p "$TMP/x" && tar -xzf "$TMP/harper.tgz" -C "$TMP/x"
+D="$TMP/x/package/dist"
+GLUE="$(ls "$D" | grep '^BinaryModule-.*\.js$' | head -1)"
+[ -n "$GLUE" ] && [ -f "$D/index.js" ] && [ -f "$D/binary.js" ] && [ -f "$D/harper_wasm_bg.wasm" ] || { echo "fetch-harper: unexpected package layout" >&2; exit 1; }
+rm -rf "$OUT" && mkdir -p "$OUT"
+# Stable file names so the Qt resource list can name them.
+sed "s|\./$GLUE|./BinaryModule.js|g" "$D/index.js" > "$OUT/index.js"
+sed "s|\./$GLUE|./BinaryModule.js|g" "$D/binary.js" > "$OUT/binary.js"
+cp "$D/$GLUE" "$OUT/BinaryModule.js"
+cp "$D/harper_wasm_bg.wasm" "$OUT/harper_wasm_bg.wasm"
+cp "$TMP/x/package/LICENSE"* "$OUT/" 2>/dev/null || true
+printf '%s\n' "$VERSION" > "$OUT/VERSION"
+echo "Fetched Harper $VERSION into $OUT ($(du -sh "$OUT" | cut -f1))"

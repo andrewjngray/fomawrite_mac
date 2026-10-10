@@ -82,6 +82,8 @@ public:
     QObject *publisher() { return m_publisher.get(); }
     EditorBridge *editorBridge() { return m_editorBridge.get(); }
     SpellCheck *spellCheck() { return &m_spellCheck; }
+    // The Live pane calls this as its view is created (see harperscheme.h).
+    Q_INVOKABLE void installHarperScheme();
     QVariantList reviewIssues() const { return m_reviewIssues; }
     bool reviewIssuesTruncated() const { return m_reviewIssuesTruncated; }
     static constexpr int ReviewIssueLimit = 500;

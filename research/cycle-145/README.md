@@ -1,0 +1,15 @@
+# Cycle 145 — Harper, the writing engine
+
+Decision (Andrew, 10 October 2026): Grammarly is a failed experiment; Harper (Automattic, Apache-2.0, offline) becomes the grammar and style engine, with the macOS checker as the fallback, Australian English as the default dialect with British and American as options, and a way to pull new Harper releases down periodically with a menu trigger. Plan: [docs/harper-plan.md](../../docs/harper-plan.md).
+
+## Spike: Harper runs inside the editor page (done, this record's first commit)
+
+- **Pinned release.** `harper.lock.json` names harper.js 2.10.0 and its npm sha512. `bin/fetch-harper` downloads the tarball, verifies the hash, and places the four files the page loads (`index.js`, `binary.js`, `BinaryModule.js`, `harper_wasm_bg.wasm`, 16 MB) in `src/editor/dist/harper/` (git-ignored). `bin/build` and CI run it; `bin/package-mac` copies Harper's licence into the bundle.
+- **Serving.** The page is on `qrc:`, and Chromium's `fetch()` refuses `qrc:`, which the WebAssembly loader needs. A `fomawrite:` scheme (`src/harperscheme.cpp`; secure, CORS, fetch-capable; registered before WebEngine starts) serves `fomawrite://harper/<file>` from a downloaded update in the app's data folder when one exists, else from the bundled resources. The handler is installed from the Live pane as its view is created: installing it at startup, before any window, left WebEngine windows painting blank in the offscreen capture tests.
+- **Loader.** `src/editor/src/harper.ts`: `harperLint(text, dialect)` imports the engine on demand (`LocalLinter`, on the page's thread), and returns `{start, end, kind, message, suggestions}` in UTF-16 offsets (checked with emoji: Harper's spans are JavaScript string indices). The page's content policy allows `wasm-unsafe-eval` and the scheme.
+- **Measured in the app (test `harperLintsInsideTheEditorPage`):** engine ready about 2 s after the first request; a warm lint round trip under 110 ms including the test's polling; all six planted errors found (`is is`, `recieve`, `tomorow`, `their going too`, `could of`, `we was`) and Australian spellings left alone. In Node: setup 364 ms, 200 characters in 39 ms, 8,100 characters in 31 ms, 885 rules, dialects American, British, Australian, Canadian, Indian.
+- **Lint kinds** (from the package's types): Agreement, BoundaryError, Capitalization, Eggcorn, Enhancement, Formatting, Grammar, Malapropism, Miscellaneous, Nonstandard, Punctuation, Readability, Redundancy, Regionalism, Repetition, Spelling, Style, Typo, Usage, WordChoice, WordOrder.
+
+## Next: the engine behind the surfaces (builders)
+
+See the plan. Host: `HarperEngine` behind `SpellCheck` (async cache, requests through the bridge, the macOS checker as fallback), dialect setting and menu, categories Spelling / Grammar / Style, the highlighter's reply-driven restyle without a revision bump, the pane rebuilding on replies. Page: bridge slots for linting, dictionary words and dialect. Then Cycle 146: Help → Check for Writing Checker Updates…, the weekly check, verified download into the data folder, rollback, and a Rules page.

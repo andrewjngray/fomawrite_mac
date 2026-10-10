@@ -16,6 +16,7 @@ import { spellingExtension } from "./spelling";
 import { Session, applyModeClass, applyThemeDom, Appearance } from "./modes";
 import { appearanceExtension } from "./appearance";
 import { replySelection } from "./selection";
+import { exposeHarperForTests } from "./harper";
 
 declare global {
   interface Window {
@@ -167,6 +168,7 @@ async function main() {
   }));
   onSignal(bridge.redo, guard("redo", () => void session.redo()));
 
+  exposeHarperForTests();
   window.fomawriteEditor = {
     getText: () => session.getText(),
     setText: (text: string) => session.setDocument(text, session.revision),

@@ -28,6 +28,7 @@
 #include "workspace.h"
 
 #include "backend.h"
+#include "harperscheme.h"
 #include "macbridge.h"
 #include "systemtheme.h"
 #include "documentviewcheck.h"
@@ -120,6 +121,7 @@ public:
 };
 
 int main(int argc, char *argv[]) {
+    registerHarperScheme(); // before WebEngine starts: schemes register once
     QtWebEngineQuick::initialize();
     WriterApplication app(argc, argv);
     app.setApplicationName(QStringLiteral("fomawrite"));

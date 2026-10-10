@@ -59,6 +59,7 @@ Rectangle {
     Component.onCompleted: {
         channel.registerObject("bridge", root.bridge);
         pushAppearance();
+        backend.installHarperScheme(); // fomawrite://harper/* for the engine the page loads on demand
         web.url = "qrc:/editor/index.html";
         // Created lazily when Live is switched on: push the document straight
         // away (the bridge replays it once the page connects).

@@ -1,0 +1,7 @@
+{
+  "package": "harper.js",
+  "version": "2.10.0",
+  "tarball": "https://registry.npmjs.org/harper.js/-/harper.js-2.10.0.tgz",
+  "integrity": "sha512-s6BDuqtRbX8M/5exH1G5M7VzAuv6l0TagbRxMY37OsrT/1kWFjWmqHydWrkYFqTUW+fFhu4Hj2yUxvChp862Pg==",
+  "license": "Apache-2.0"
+}
