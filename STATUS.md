@@ -4,7 +4,7 @@ This is the only place the current review build is recorded. Update it at the en
 
 | | |
 | --- | --- |
-| **Current review build** | `0.3.0-dev39` / macOS `0.3.0 (143)` |
+| **Current review build** | `0.3.0-dev40` / macOS `0.3.0 (144)` |
 | **Last completed cycle** | 143 — spelling as you type in Source and Live from one macOS checker, right-click corrections, Edit → Check Spelling While Typing ([record](research/cycle-143/README.md)); 142 — Source editor answers accessibility character geometry after Grammarly Desktop attached to nothing ([record](research/cycle-142/README.md), [plan](docs/grammarly-like-plan.md)); 141 — highlighted text readable under any theme ([record](research/cycle-140/README.md)); 140 — Live friction fixes ([record](research/cycle-140/README.md)) |
 | **Regression suite** | **231 passed, 0 failed, 0 skipped** (`./bin/test`, offscreen Qt 6.11.2, Apple Silicon); editor page **276 passed** (`cd src/editor && npm test`). Two known Qt Material `SplitView` null-parent warnings in `savesAndOpensFromFooterMenu`. Real-checker spelling tests share the system checker's process-wide ignore list: a word one test ignores must not be asserted by another. |
 | **Packaged bundles** | `dist/Fomawrite.app`, `dist/Fomawrite Dev.app` and `/Applications/Fomawrite.app` are all at build **143**. **Refresh with the app closed:** `./bin/package-mac && ./bin/prepare-dev-app && ./bin/install-mac`. |
