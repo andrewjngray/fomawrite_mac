@@ -40,6 +40,10 @@ static void cycle142Walk(QAccessibleInterface *a, int depth, int &budget, const 
 
 void FomawriteTest::accessibilityProbeForWritingAssistants() {
     Cycle103SettingsSnapshot settings;
+    // Activating accessibility is process-wide and makes WebEngine build its
+    // tree for every later test (slow on the CI runner): restore it on exit.
+    const bool wasActive = QAccessible::isActive();
+    const auto restore = qScopeGuard([wasActive] { QAccessible::setActive(wasActive); });
     QAccessible::setActive(true);
     qInfo() << "QAccessible::isActive =" << QAccessible::isActive() << "platform =" << QGuiApplication::platformName();
     Backend backend;

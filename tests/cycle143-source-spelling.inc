@@ -115,7 +115,9 @@ void FomawriteTest::sourceSpellingFollowsTheSettingAndLearnedWords() {
     largeHighlighter.setSpellCheck(&spell); // restyles every block once, uncached
     qInfo("real checker, 2000 lines: %lld ms", timer.elapsed());
     QVERIFY(timer.elapsed() < 15000);
-    large.adjustSize(); // Qt 6.11 restyles lazily as layout reaches each block
+    // Qt 6.11 restyles lazily as layout reaches each block (adjustSize was not
+    // enough on the CI runner): ask for the far block's restyle explicitly.
+    largeHighlighter.rehighlightBlock(large.findBlockByNumber(1500));
     QVERIFY(cycle143Underlined(large, large.findBlockByNumber(1500).text().indexOf("accomodate") + large.findBlockByNumber(1500).position()));
 }
 

@@ -815,11 +815,17 @@ void FomawriteTest::liveModeInMainWindowLoadsPageAndNavigatesOutline() {
     auto *bridge = backend.editorBridge();
     QTRY_VERIFY_WITH_TIMEOUT(bridge->isReady(), 20000);
     QSignalSpy received(bridge, &EditorBridge::textReceived);
-    QTRY_VERIFY_WITH_TIMEOUT(([&] {
+    const bool pageHasText = QTest::qWaitFor([&] {
         const int token = bridge->fetchText(); QTest::qWait(60);
         for (const auto &args : received) if (args.at(0).toInt() == token && args.at(1).toString() == text) return true;
         return false;
-    })(), 45000); // the GitHub runner's first page load is slow
+    }, 45000); // the GitHub runner's first page load is slow
+    if (!pageHasText) {
+        QString last; if (!received.isEmpty()) last = received.last().at(1).toString();
+        qWarning() << "page never reported the document; ready =" << bridge->isReady() << "replies =" << received.count()
+                   << "last reply =" << last.left(120) << "expected =" << text.left(120);
+    }
+    QVERIFY(pageHasText);
     auto *liveToggle = window->findChild<QQuickItem *>("liveEditToggle"); QVERIFY(liveToggle);
     QTRY_VERIFY(liveToggle->property("checked").toBool());
     // Edit > Select All while the page has focus acts on the page.
