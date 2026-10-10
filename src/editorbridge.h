@@ -95,6 +95,13 @@ public slots:
     void learnWord(const QString &word);
     void ignoreWord(const QString &word);
     void ignoreGrammar(const QString &text, const QString &message);
+    // Harper (the page's grammar engine; the host decides what is prose and
+    // brokers the findings). The page answers harperLint(token, text) with
+    // harperReply(token, lintsJson) or harperFailed(token, error) (token -1:
+    // the engine failed to load); harperReady(version) says a load finished.
+    void harperReady(const QString &version);
+    void harperReply(int token, const QString &lintsJson);
+    void harperFailed(int token, const QString &error);
 
 signals:
     // Connected to by the page.
@@ -117,12 +124,18 @@ signals:
     void spellingReply(int token, const QString &rangesJson);
     void suggestionsReply(int token, const QString &wordsJson);
     void setSpellCheck(bool enabled);
+    void harperLoad(const QString &dialect);
+    void harperLint(int token, const QString &text);
+    void harperImportWords(const QString &wordsJson);
     // For the app.
     void spellingRequested(int token, const QString &segmentsJson);
     void suggestionsRequested(int token, const QString &word);
     void wordLearned(const QString &word);
     void wordIgnored(const QString &word);
     void grammarIgnored(const QString &text, const QString &message);
+    void harperReadied(const QString &version);
+    void harperReplied(int token, const QString &lintsJson);
+    void harperLintFailed(int token, const QString &error);
     void scrollFractionChanged(double fraction);
     void imageRequested(int token, const QString &src);
     void imageSaveRequested(int token, const QString &name, const QString &mime, const QString &base64);

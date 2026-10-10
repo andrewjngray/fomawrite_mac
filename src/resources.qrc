@@ -35,6 +35,7 @@
         <file>editor/dist/harper/binary.js</file>
         <file>editor/dist/harper/BinaryModule.js</file>
         <file>editor/dist/harper/harper_wasm_bg.wasm</file>
+        <file>editor/dist/harper/VERSION</file>
         <file>editor/dist/katex.css</file>
         <file>editor/dist/fonts/KaTeX_AMS-Regular.woff2</file>
         <file>editor/dist/fonts/KaTeX_Caligraphic-Bold.woff2</file>

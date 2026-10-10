@@ -57,7 +57,7 @@ test("parseSpellRanges: grammar entries keep message and suggestions, an entry w
     spelling({ from: 5, to: 8 }),
     { from: 10, to: 14, category: "Grammar", message: "Agreement", suggestions: ["a", "b", "a", "", 3, "c", "d", "e", "f"] },
     { from: 20, to: 25, category: "Grammar" }, // no message, no corrections: still a mark
-    { from: 26, to: 30, category: "Style", message: "x" },
+    { from: 26, to: 30, category: "Wording", message: "x" }, // not a category the page draws
     { from: 31, to: 99, category: "Grammar", message: "past the end" },
     { from: 3, to: 3, category: "Grammar" },
     null,

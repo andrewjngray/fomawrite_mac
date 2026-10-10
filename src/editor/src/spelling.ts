@@ -2,7 +2,9 @@
 // decides which stretches of the document are prose, asks the host what is wrong in them, and draws a red wavy underline
 // for a misspelled word (`.fw-misspelled`) and a blue one for a grammar finding (`.fw-grammar`). A right-click on a red word
 // offers suggestions, Learn Spelling and Ignore Spelling; on a blue range the checker's message, its corrections and
-// Ignore Grammar Issue (page-local, per document).
+// Ignore Grammar Issue (page-local, per document). A third category, Style (`.fw-style`, grey dotted), is a grammar-like finding
+// with its own look: same message and corrections menu (titled "Style", "Ignore Style Suggestion"), same caret rule, same
+// ignore list; where marks overlap, Spelling wins over Grammar over Style.
 //
 // Layers, so most of it is testable in node without a DOM:
 //   - proseSegments()        pure over EditorState: prose text (code, URLs, HTML, front matter, math blanked) per block
@@ -43,7 +45,7 @@ const MARKUP_NODES = new Set([
 export interface Segment { from: number; to: number; text: string }
 export interface DocRange { from: number; to: number }
 /** The checker's finding behind a grammar mark: its message and its corrections (up to `MAX_SUGGESTIONS`). */
-export interface GrammarInfo { message: string; suggestions: string[] }
+export interface GrammarInfo { message: string; suggestions: string[]; /** A Style finding (grey dotted) rather than a Grammar one. */ style?: true }
 /** A finding in the document: spelling (no `grammar`) or grammar (with the checker's message and corrections). */
 export interface SpellRange extends DocRange { grammar?: GrammarInfo }
 
@@ -124,7 +126,7 @@ export const clearSpellEffect = StateEffect.define<null>();
 
 const misspelledMark = Decoration.mark({ class: "fw-misspelled" });
 /** One grammar mark per finding: the message and corrections ride on the spec, so the menu needs no host round trip. */
-const grammarMark = (info: GrammarInfo) => Decoration.mark({ class: "fw-grammar", grammar: info });
+const grammarMark = (info: GrammarInfo) => Decoration.mark({ class: info.style ? "fw-style" : "fw-grammar", grammar: info });
 const WORD_CHAR = /[\p{L}\p{N}\p{M}'’_]/u;
 
 /**
@@ -194,16 +196,21 @@ export function misspelledAt(state: EditorState, pos: number): DocRange | null {
   return misspelledRanges(state).find((r) => r.from <= pos && pos <= r.to) ?? null;
 }
 
-/** The grammar mark containing `pos` (one that holds it strictly wins over one that only ends or starts there), or null. */
+/**
+ * The grammar (or style) mark containing `pos`: one that holds it strictly wins over one that only ends or starts there, and
+ * a Grammar mark wins over a Style one at the same level (Spelling > Grammar > Style), or null.
+ */
 export function grammarAt(state: EditorState, pos: number): (DocRange & GrammarInfo) | null {
   const all = grammarRanges(state);
-  return all.find((r) => r.from < pos && pos < r.to) ?? all.find((r) => r.from <= pos && pos <= r.to) ?? null;
+  const strict = all.filter((r) => r.from < pos && pos < r.to);
+  const edge = all.filter((r) => r.from <= pos && pos <= r.to);
+  return strict.find((r) => !r.style) ?? strict[0] ?? edge.find((r) => !r.style) ?? edge[0] ?? null;
 }
 
 /**
  * Reply JSON -> valid findings, ordered, of `[0, length]`; anything malformed is dropped (never throws). An entry without a
- * category, or with "Spelling", is a misspelled word; "Grammar" carries the checker's `message` and `suggestions`; any other
- * category is not drawn.
+ * category, or with "Spelling", is a misspelled word; "Grammar" and "Style" carry the checker's `message` and `suggestions`
+ * ("Style" findings are marked `style`); any other category is not drawn.
  */
 export function parseSpellRanges(json: string, length: number): SpellRange[] {
   let raw: unknown;
@@ -216,15 +223,14 @@ export function parseSpellRanges(json: string, length: number): SpellRange[] {
     if (!(typeof from === "number" && typeof to === "number" && Number.isInteger(from) && Number.isInteger(to) && from >= 0 && to > from && to <= length)) continue;
     const category = e?.category;
     if (category === undefined || category === "Spelling") out.push({ from, to });
-    else if (category === "Grammar")
-      out.push({
-        from,
-        to,
-        grammar: {
-          message: typeof e?.message === "string" ? e.message : "",
-          suggestions: Array.isArray(e?.suggestions) ? parseSuggestions(JSON.stringify(e.suggestions)) : [],
-        },
-      });
+    else if (category === "Grammar" || category === "Style") {
+      const info: GrammarInfo = {
+        message: typeof e?.message === "string" ? e.message : "",
+        suggestions: Array.isArray(e?.suggestions) ? parseSuggestions(JSON.stringify(e.suggestions)) : [],
+      };
+      if (category === "Style") info.style = true;
+      out.push({ from, to, grammar: info });
+    }
   }
   return out.sort((a, b) => a.from - b.from);
 }
@@ -490,12 +496,13 @@ export function spellingMenuModel(suggestions: string[]): MenuModel {
   };
 }
 
+/** The menu of a Grammar or Style finding (Style: its own title and wording; the choices, and the host's ignore slot, are the same). */
 export function grammarMenuModel(info: GrammarInfo): MenuModel {
   return {
-    label: "Grammar",
-    header: info.message.trim() || "Possible grammar issue",
+    label: info.style ? "Style" : "Grammar",
+    header: info.message.trim() || (info.style ? "Possible style suggestion" : "Possible grammar issue"),
     corrections: info.suggestions.slice(0, MAX_SUGGESTIONS).map((word) => ({ text: word, choice: { kind: "grammarSuggestion", word } })),
-    footer: [{ cls: "fw-spell-ignore-grammar", text: "Ignore Grammar Issue", choice: { kind: "ignoreGrammar" } }],
+    footer: [{ cls: "fw-spell-ignore-grammar", text: info.style ? "Ignore Style Suggestion" : "Ignore Grammar Issue", choice: { kind: "ignoreGrammar" } }],
   };
 }
 
@@ -724,7 +731,7 @@ export function spellingExtension(bridge: SpellingBridge): Extension {
         const target = event.target as Element | null;
         // Where both apply, the spelling menu wins (the red underline is the one drawn).
         const span = target?.closest?.(".fw-misspelled");
-        const gspan = span ? null : target?.closest?.(".fw-grammar");
+        const gspan = span ? null : target?.closest?.(".fw-grammar, .fw-style");
         if (!span && !gspan) return false;
         const pos = view.posAtCoords({ x: event.clientX, y: event.clientY }, false);
         if (span) {

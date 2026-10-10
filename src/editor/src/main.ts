@@ -16,7 +16,7 @@ import { spellingExtension } from "./spelling";
 import { Session, applyModeClass, applyThemeDom, Appearance } from "./modes";
 import { appearanceExtension } from "./appearance";
 import { replySelection } from "./selection";
-import { exposeHarperForTests } from "./harper";
+import { exposeHarperForTests, mockHarperBackend, wireHarperBridge } from "./harper";
 
 declare global {
   interface Window {
@@ -169,6 +169,8 @@ async function main() {
   onSignal(bridge.redo, guard("redo", () => void session.redo()));
 
   exposeHarperForTests();
+  // The host's lint service: harperLoad / harperLint / harperImportWords in, harperReady / harperReply / harperFailed out.
+  wireHarperBridge(bridge, isMock ? mockHarperBackend() : undefined);
   window.fomawriteEditor = {
     getText: () => session.getText(),
     setText: (text: string) => session.setDocument(text, session.revision),
