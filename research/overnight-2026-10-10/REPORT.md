@@ -67,5 +67,5 @@ Stated plainly, as the reviewer asked: npm's integrity hash proves the download 
 | Installed everywhere | build 146 (`0.3.0-dev42`) |
 | Qt suite | 273 passed, 0 failed |
 | Page suite | 321 passed |
-| Last commit | d0dc016 on master, pushed; CI result recorded in the line below when it landed |
+| Last commit | 366ae3e on master, pushed; CI green on it (the one runner-only flake, a link-editor popup timing check, now polls) |
 | Agents | two builders and one reviewer per cycle (145, 146), one builder for the page lint service; Fable did the spike, the theme, merges, review fixes, installs and this report |
