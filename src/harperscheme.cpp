@@ -7,6 +7,7 @@
 #include <QMultiMap>
 #include <QRegularExpression>
 #include <QStandardPaths>
+#include <QVersionNumber>
 #include <QWebEngineUrlRequestJob>
 #include <QWebEngineUrlScheme>
 #include <QtWebEngineQuick/QQuickWebEngineProfile>
@@ -34,7 +35,8 @@ QString readVersionFile(const QString &path) {
 HarperSchemeHandler::HarperSchemeHandler(QObject *parent) : QWebEngineUrlSchemeHandler(parent) {}
 
 bool HarperSchemeHandler::isValidVersion(const QString &version) {
-    static const QRegularExpression pattern(QStringLiteral("^\\d{1,6}\\.\\d{1,6}\\.\\d{1,6}$"));
+    // \A…\z, not ^…$: PCRE's $ matches before a trailing newline, which would make "1.2.3\n" a folder name.
+    static const QRegularExpression pattern(QStringLiteral("\\A\\d{1,6}\\.\\d{1,6}\\.\\d{1,6}\\z"));
     return pattern.match(version).hasMatch();
 }
 
@@ -49,7 +51,13 @@ QString HarperSchemeHandler::overrideDirectory() {
     const QDir dir(root + QStringLiteral("/current"));
     for (const char *name : {"harper_wasm_bg.wasm", "index.js", "binary.js", "BinaryModule.js"})
         if (!dir.exists(QString::fromLatin1(name))) return {};
-    return readVersionFile(dir.filePath(QStringLiteral("VERSION"))).isEmpty() ? QString() : dir.absolutePath();
+    const QString version = readVersionFile(dir.filePath(QStringLiteral("VERSION")));
+    if (version.isEmpty()) return {};
+    // An app update may ship a newer engine than an earlier download: the
+    // bundled copy wins unless the override is strictly newer.
+    const QString bundled = bundledVersion();
+    if (!bundled.isEmpty() && QVersionNumber::compare(QVersionNumber::fromString(version), QVersionNumber::fromString(bundled)) <= 0) return {};
+    return dir.absolutePath();
 }
 
 QString HarperSchemeHandler::overrideVersion() {

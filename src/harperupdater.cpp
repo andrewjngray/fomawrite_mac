@@ -142,7 +142,13 @@ bool HarperUpdater::tarEntryAllowed(const QString &entry) {
     if (parts.first() != QLatin1String("package")) return false;
     if (parts.size() == 1) return directory;                                   // the package/ folder itself
     if (parts.size() == 2) return !directory || parts.at(1) == QLatin1String("dist"); // package.json, LICENSE, README; or package/dist/
-    return parts.at(1) == QLatin1String("dist");                               // anything under package/dist/
+    if (parts.at(1) != QLatin1String("dist")) return false;
+    if (parts.size() != 3 || directory) return false;                           // nothing nested under dist (package/dist/ itself is the size-2 case)
+    // Only the kinds of file a release holds; a package of other names is refused before extraction.
+    const QString name = parts.at(2);
+    return name == QLatin1String("harper_wasm_bg.wasm") || name == QLatin1String("harper_wasm_slim_bg.wasm")
+        || name.startsWith(QLatin1String("LICENSE")) || name.endsWith(QLatin1String(".js")) || name.endsWith(QLatin1String(".d.ts"))
+        || name.endsWith(QLatin1String(".json"));
 }
 
 bool HarperUpdater::registryAllowed(const QUrl &url, QString *why) const {
@@ -188,8 +194,9 @@ void HarperUpdater::checkAndInstall() {
 
 void HarperUpdater::runScheduledCheck() {
     if (!autoCheck() || m_checking || m_installing) return;
-    const QDateTime last = lastCheck();
-    if (last.isValid() && last.addDays(ScheduledCheckDays) > QDateTime::currentDateTime()) return;
+    const QDateTime last = lastCheck(), now = QDateTime::currentDateTime();
+    // A recorded time in the future (a clock set wrong) must not silence the check until then.
+    if (last.isValid() && last <= now && last.addDays(ScheduledCheckDays) > now) return;
     m_mode = Mode::Scheduled;
     startCheck();
 }
@@ -307,6 +314,8 @@ void HarperUpdater::finishCheck(bool ok, const QString &message, bool) {
 
 void HarperUpdater::install() {
     if (m_checking || m_installing) return;
+    // One install at a time across windows: each window has its own updater.
+    for (HarperUpdater *other : std::as_const(s_instances)) if (other != this && other->m_installing) { finishInstall(false, QStringLiteral("another window is installing an update"), false); return; }
     if (m_mode == Mode::Idle) m_mode = Mode::Plain;
     if (m_latest.isEmpty() || !HarperSchemeHandler::isValidVersion(m_latest) || m_digest.size() != 64 || !m_tarball.isValid()) {
         finishInstall(false, QStringLiteral("check for updates first"), false);
@@ -390,8 +399,14 @@ void HarperUpdater::runTar(const QStringList &arguments, int stage) {
             return;
         }
         if (stage == 0) {
-            // Every entry must be acceptable before anything is extracted.
-            for (const QString &entry : QString::fromUtf8(out).split(QLatin1Char('\n'), Qt::SkipEmptyParts)) {
+            // Every entry must be acceptable before anything is extracted, and
+            // there must be few of them (the real package has 17).
+            const QStringList entries = QString::fromUtf8(out).split(QLatin1Char('\n'), Qt::SkipEmptyParts);
+            if (entries.size() > 64) {
+                finishInstall(false, QStringLiteral("the package holds %1 entries; a Harper release has about 17; nothing was installed").arg(entries.size()), false);
+                return;
+            }
+            for (const QString &entry : entries) {
                 if (!tarEntryAllowed(entry)) {
                     finishInstall(false, QStringLiteral("the package holds an entry outside package/dist: %1; nothing was installed").arg(entry.left(80)), false);
                     return;
@@ -523,7 +538,7 @@ void HarperUpdater::finishInstall(bool ok, const QString &message, bool network)
 }
 
 void HarperUpdater::rollback() {
-    if (m_installing) return;
+    if (m_installing || root().isEmpty()) return;
     const QString current = root() + QStringLiteral("/current");
     const QString was = installedVersion();
     const QFileInfo info(current);

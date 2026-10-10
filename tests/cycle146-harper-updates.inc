@@ -414,10 +414,11 @@ void FomawriteTest::harperUpdaterRefusesAWrongIntegrityAndLeavesNothingBehind() 
 void FomawriteTest::harperUpdaterRefusesPackagesThatReachOutsideDist() {
     Cycle146Sandbox sandbox;
     // The entry rules, directly.
-    for (const char *entry : {"package/", "package/dist/", "package/dist/index.js", "package/dist/sub/deeper.js", "package/package.json", "package/LICENSE", "package/README.md"})
+    for (const char *entry : {"package/", "package/dist/", "package/dist/index.js", "package/dist/BinaryModule-abc.js", "package/dist/harper_wasm_bg.wasm", "package/dist/index.d.ts", "package/dist/tsdoc-metadata.json", "package/dist/LICENSE", "package/package.json", "package/LICENSE", "package/README.md"})
         QVERIFY2(HarperUpdater::tarEntryAllowed(QString::fromLatin1(entry)), entry);
     for (const char *entry : {"", "/etc/passwd", "../escape.txt", "package/../escape.txt", "package/dist/../../x", "other/dist/index.js", "package/evil/x.txt", "package/evil/", "package//dist/x",
-                              "package/./dist/x", "packages/dist/x", "package", "/package/dist/x", "package/dist/a\\b", "package/dist/a\nb"})
+                              "package/./dist/x", "packages/dist/x", "package", "/package/dist/x", "package/dist/a\\b", "package/dist/a\nb",
+                              "package/dist/sub/deeper.js", "package/dist/sub/", "package/dist/run.sh", "package/dist/image.png"}) // nothing nested under dist, only the kinds a release holds
         QVERIFY2(!HarperUpdater::tarEntryAllowed(QString::fromLatin1(entry)), entry);
 
     Backend backend;

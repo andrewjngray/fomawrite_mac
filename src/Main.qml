@@ -839,9 +839,12 @@ ApplicationWindow {
     Timer {
         id: harperUpdateTimer
         objectName: "harperUpdateTimer"
+        // First look 10 s after the window shows, then every six hours while the
+        // app stays open; runScheduledCheck itself applies the weekly rule.
         interval: 10000
+        repeat: true
         running: win.visible && backend.checksHarperUpdates()
-        onTriggered: backend.harperUpdater.runScheduledCheck()
+        onTriggered: { backend.harperUpdater.runScheduledCheck(); harperUpdateTimer.interval = 6 * 3600 * 1000; }
     }
     Rectangle {
         objectName: "navigationNotice"
