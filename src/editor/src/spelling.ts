@@ -1,6 +1,8 @@
-// Spelling in the Live page. The host owns the dictionary (macOS system checker, see src/spellcheck.h); the page decides
-// which stretches of the document are prose, asks the host which words in them are misspelled, and draws a red wavy
-// underline (`.fw-misspelled`). A right-click on an underlined word offers suggestions, Learn Spelling and Ignore Spelling.
+// Spelling and grammar in the Live page. The host owns the checker (macOS system checker, see src/spellcheck.h); the page
+// decides which stretches of the document are prose, asks the host what is wrong in them, and draws a red wavy underline
+// for a misspelled word (`.fw-misspelled`) and a blue one for a grammar finding (`.fw-grammar`). A right-click on a red word
+// offers suggestions, Learn Spelling and Ignore Spelling; on a blue range the checker's message, its corrections and
+// Ignore Grammar Issue (page-local, per document).
 //
 // Layers, so most of it is testable in node without a DOM:
 //   - proseSegments()        pure over EditorState: prose text (code, URLs, HTML, front matter, math blanked) per block
@@ -40,6 +42,10 @@ const MARKUP_NODES = new Set([
 
 export interface Segment { from: number; to: number; text: string }
 export interface DocRange { from: number; to: number }
+/** The checker's finding behind a grammar mark: its message and its corrections (up to `MAX_SUGGESTIONS`). */
+export interface GrammarInfo { message: string; suggestions: string[] }
+/** A finding in the document: spelling (no `grammar`) or grammar (with the checker's message and corrections). */
+export interface SpellRange extends DocRange { grammar?: GrammarInfo }
 
 /** The syntax tree for `state`, parsed up to `upto` if that can be done quickly; `complete` says whether it was. */
 function treeFor(state: EditorState, upto: number): { tree: Tree; complete: boolean } {
@@ -112,11 +118,13 @@ export function windowAround(state: EditorState, from: number, to: number, margi
 // ---------------------------------------------------------------- the marks
 
 /** `ranges` replace the marks inside `from..to` (all marks when `all`). An empty `ranges` clears that part. */
-export interface SpellPatch { from: number; to: number; ranges: DocRange[]; all: boolean }
+export interface SpellPatch { from: number; to: number; ranges: SpellRange[]; all: boolean }
 export const setSpellEffect = StateEffect.define<SpellPatch>();
 export const clearSpellEffect = StateEffect.define<null>();
 
 const misspelledMark = Decoration.mark({ class: "fw-misspelled" });
+/** One grammar mark per finding: the message and corrections ride on the spec, so the menu needs no host round trip. */
+const grammarMark = (info: GrammarInfo) => Decoration.mark({ class: "fw-grammar", grammar: info });
 const WORD_CHAR = /[\p{L}\p{N}\p{M}'’_]/u;
 
 /**
@@ -151,7 +159,7 @@ export const spellField = StateField.define<DecorationSet>({
         const add = ranges
           .filter((r) => r.from >= 0 && r.to <= len && r.to > r.from)
           .sort((a, b) => a.from - b.from)
-          .map((r) => misspelledMark.range(r.from, r.to));
+          .map((r) => (r.grammar ? grammarMark(r.grammar) : misspelledMark).range(r.from, r.to));
         value = value.update({ filter: all ? () => false : (f, t) => t <= from || f >= to, add, sort: true });
       }
     }
@@ -160,29 +168,63 @@ export const spellField = StateField.define<DecorationSet>({
   provide: (f) => EditorView.decorations.from(f),
 });
 
-/** The marked ranges, in order. */
-export function misspelledRanges(state: EditorState): DocRange[] {
-  const out: DocRange[] = [];
+/** Every mark (spelling and grammar), in order; grammar ones carry their finding. */
+export function markedRanges(state: EditorState): SpellRange[] {
+  const out: SpellRange[] = [];
   const set = state.field(spellField, false);
-  set?.between(0, state.doc.length, (from, to) => { out.push({ from, to }); });
+  set?.between(0, state.doc.length, (from, to, value) => {
+    const grammar = value.spec.grammar as GrammarInfo | undefined;
+    out.push(grammar ? { from, to, grammar } : { from, to });
+  });
   return out;
 }
 
-/** The marked range containing `pos` (both ends inclusive), or null. */
+/** The spelling marks, in order. */
+export function misspelledRanges(state: EditorState): DocRange[] {
+  return markedRanges(state).filter((r) => !r.grammar).map(({ from, to }) => ({ from, to }));
+}
+
+/** The grammar marks, in order, with their message and corrections. */
+export function grammarRanges(state: EditorState): (DocRange & GrammarInfo)[] {
+  return markedRanges(state).flatMap((r) => (r.grammar ? [{ from: r.from, to: r.to, ...r.grammar }] : []));
+}
+
+/** The spelling mark containing `pos` (both ends inclusive), or null. */
 export function misspelledAt(state: EditorState, pos: number): DocRange | null {
   return misspelledRanges(state).find((r) => r.from <= pos && pos <= r.to) ?? null;
 }
 
-/** Reply JSON -> valid, ordered ranges of `[0, length]`; anything malformed is dropped (never throws). */
-export function parseSpellRanges(json: string, length: number): DocRange[] {
+/** The grammar mark containing `pos` (one that holds it strictly wins over one that only ends or starts there), or null. */
+export function grammarAt(state: EditorState, pos: number): (DocRange & GrammarInfo) | null {
+  const all = grammarRanges(state);
+  return all.find((r) => r.from < pos && pos < r.to) ?? all.find((r) => r.from <= pos && pos <= r.to) ?? null;
+}
+
+/**
+ * Reply JSON -> valid findings, ordered, of `[0, length]`; anything malformed is dropped (never throws). An entry without a
+ * category, or with "Spelling", is a misspelled word; "Grammar" carries the checker's `message` and `suggestions`; any other
+ * category is not drawn.
+ */
+export function parseSpellRanges(json: string, length: number): SpellRange[] {
   let raw: unknown;
   try { raw = JSON.parse(json); } catch { return []; }
   if (!Array.isArray(raw)) return [];
-  const out: DocRange[] = [];
+  const out: SpellRange[] = [];
   for (const r of raw) {
-    const from = (r as { from?: unknown } | null)?.from, to = (r as { to?: unknown } | null)?.to;
-    if (typeof from === "number" && typeof to === "number" && Number.isInteger(from) && Number.isInteger(to) && from >= 0 && to > from && to <= length)
-      out.push({ from, to });
+    const e = r as { from?: unknown; to?: unknown; category?: unknown; message?: unknown; suggestions?: unknown } | null;
+    const from = e?.from, to = e?.to;
+    if (!(typeof from === "number" && typeof to === "number" && Number.isInteger(from) && Number.isInteger(to) && from >= 0 && to > from && to <= length)) continue;
+    const category = e?.category;
+    if (category === undefined || category === "Spelling") out.push({ from, to });
+    else if (category === "Grammar")
+      out.push({
+        from,
+        to,
+        grammar: {
+          message: typeof e?.message === "string" ? e.message : "",
+          suggestions: Array.isArray(e?.suggestions) ? parseSuggestions(JSON.stringify(e.suggestions)) : [],
+        },
+      });
   }
   return out.sort((a, b) => a.from - b.from);
 }
@@ -198,10 +240,10 @@ export function parseSuggestions(json: string): string[] {
 }
 
 /**
- * The word the caret is still typing is not underlined: a range that ends at an empty caret is withheld (the writer has not
- * finished it) and `withheldAt` says where, so it can be checked once the caret leaves.
+ * The word the caret is still typing is not underlined: a range (spelling or grammar) that ends at an empty caret is withheld
+ * (the writer has not finished it) and `withheldAt` says where, so it can be checked once the caret leaves.
  */
-export function withholdCaretWord(ranges: DocRange[], selection: { empty: boolean; head: number }): { keep: DocRange[]; withheldAt: number | null } {
+export function withholdCaretWord<R extends DocRange>(ranges: R[], selection: { empty: boolean; head: number }): { keep: R[]; withheldAt: number | null } {
   if (!selection.empty) return { keep: ranges, withheldAt: null };
   const keep = ranges.filter((r) => r.to !== selection.head);
   return { keep, withheldAt: keep.length === ranges.length ? null : selection.head };
@@ -231,6 +273,8 @@ export class SpellEngine {
   checked: DocRange | null = null;
   /** The last request was made on a syntax tree that was not parsed that far; check again when the tree grows. */
   treeIncomplete = false;
+  /** Texts of grammar findings the writer chose "Ignore Grammar Issue" for; per document (cleared by `clearIgnored`). */
+  readonly ignoredGrammar = new Set<string>();
   private nextToken = 1;
   private inflight: InFlight | null = null;
   private suggest: { token: number; done: (words: string[]) => void; timer: ReturnType<typeof setTimeout> } | null = null;
@@ -244,6 +288,17 @@ export class SpellEngine {
 
   log(message: string): void {
     try { this.bridge.log?.(message); } catch { /* ignore */ }
+  }
+
+  /** "Ignore Grammar Issue": remember `text`, drop every grammar mark spelling it, and filter it from later replies. */
+  ignoreGrammar(state: EditorState, text: string): TransactionSpec {
+    this.ignoredGrammar.add(text);
+    return dropGrammarSpec(state, text);
+  }
+
+  /** A new document starts with no ignored grammar issues. */
+  clearIgnored(): void {
+    this.ignoredGrammar.clear();
   }
 
   /** Forget everything in flight (document replaced, checking switched off). */
@@ -306,13 +361,18 @@ export class SpellEngine {
     if (!req || req.token !== token || !this.enabled) return null;
     this.inflight = null;
     const desc = req.changes;
-    const ranges: DocRange[] = [];
+    const ranges: SpellRange[] = [];
     for (const r of parseSpellRanges(rangesJson, desc ? desc.length : state.doc.length)) {
       if (r.from < req.from || r.to > req.to) continue; // outside what was asked
-      if (!desc) { ranges.push(r); continue; }
-      if (desc.touchesRange(r.from, r.to)) continue;
-      const from = desc.mapPos(r.from, 1), to = desc.mapPos(r.to, -1);
-      if (to > from) ranges.push({ from, to });
+      let from = r.from, to = r.to;
+      if (desc) {
+        if (desc.touchesRange(r.from, r.to)) continue;
+        from = desc.mapPos(r.from, 1);
+        to = desc.mapPos(r.to, -1);
+        if (to <= from) continue;
+      }
+      if (r.grammar && this.ignoredGrammar.has(state.doc.sliceString(from, to))) continue; // "Ignore Grammar Issue"
+      ranges.push(r.grammar ? { from, to, grammar: r.grammar } : { from, to });
     }
     let from = req.from, to = req.to;
     if (desc) { from = desc.mapPos(from, 1); to = desc.mapPos(to, -1); }
@@ -371,27 +431,71 @@ export class SpellEngine {
 
 // ---------------------------------------------------------------- the context menu (plain DOM)
 
-export type SpellChoice = { kind: "suggestion"; word: string } | { kind: "learn" } | { kind: "ignore" };
+export type SpellChoice =
+  | { kind: "suggestion"; word: string }
+  | { kind: "grammarSuggestion"; word: string }
+  | { kind: "learn" }
+  | { kind: "ignore" }
+  | { kind: "ignoreGrammar" };
 
 /**
- * The transaction for a suggestion: replaces the word as an ordinary user change (reported to the host, undoable). Null for
- * Learn / Ignore (no text changes) and when the document no longer holds `word` at `range`.
+ * The transaction for a correction: replaces the word (or the grammar range) as an ordinary user change (reported to the
+ * host, undoable; `input.spelling` or `input.grammar`). Null for Learn / Ignore (no text changes) and when the document no
+ * longer holds `word` at `range`.
  */
 export function choiceSpec(state: EditorState, range: DocRange, word: string, choice: SpellChoice): TransactionSpec | null {
   if (state.doc.sliceString(range.from, range.to) !== word) return null;
-  if (choice.kind !== "suggestion") return null;
+  if (choice.kind !== "suggestion" && choice.kind !== "grammarSuggestion") return null;
   return {
     changes: { from: range.from, to: range.to, insert: choice.word },
     selection: { anchor: range.from + choice.word.length },
     scrollIntoView: true,
-    userEvent: "input.spelling",
+    userEvent: choice.kind === "grammarSuggestion" ? "input.grammar" : "input.spelling",
   };
 }
 
-/** After Learn / Ignore: every mark that spells exactly `word` goes at once (the host's re-check settles the rest). */
+/** After Learn / Ignore: every spelling mark that spells exactly `word` goes at once (the host's re-check settles the rest). Grammar marks stay. */
 export function dropWordSpec(state: EditorState, word: string): TransactionSpec {
-  const keep = misspelledRanges(state).filter((r) => state.doc.sliceString(r.from, r.to) !== word);
+  const keep = markedRanges(state).filter((r) => r.grammar || state.doc.sliceString(r.from, r.to) !== word);
   return { effects: setSpellEffect.of({ from: 0, to: state.doc.length, ranges: keep, all: true }) };
+}
+
+/** After Ignore Grammar Issue: every grammar mark whose text is exactly `text` goes (spelling marks stay). */
+export function dropGrammarSpec(state: EditorState, text: string): TransactionSpec {
+  const keep = markedRanges(state).filter((r) => !r.grammar || state.doc.sliceString(r.from, r.to) !== text);
+  return { effects: setSpellEffect.of({ from: 0, to: state.doc.length, ranges: keep, all: true }) };
+}
+
+/** What a context menu shows: an optional non-clickable first line, corrections, then the fixed items after a separator. */
+export interface MenuModel {
+  label: string;
+  /** The checker's message (grammar); a disabled first line. */
+  header?: string;
+  corrections: { text: string; choice: SpellChoice }[];
+  /** Shown, disabled, when there are no corrections (spelling: "No Guesses Found"). */
+  none?: string;
+  footer: { cls: string; text: string; choice: SpellChoice }[];
+}
+
+export function spellingMenuModel(suggestions: string[]): MenuModel {
+  return {
+    label: "Spelling",
+    corrections: suggestions.slice(0, MAX_SUGGESTIONS).map((word) => ({ text: word, choice: { kind: "suggestion", word } })),
+    none: "No Guesses Found",
+    footer: [
+      { cls: "fw-spell-learn", text: "Learn Spelling", choice: { kind: "learn" } },
+      { cls: "fw-spell-ignore", text: "Ignore Spelling", choice: { kind: "ignore" } },
+    ],
+  };
+}
+
+export function grammarMenuModel(info: GrammarInfo): MenuModel {
+  return {
+    label: "Grammar",
+    header: info.message.trim() || "Possible grammar issue",
+    corrections: info.suggestions.slice(0, MAX_SUGGESTIONS).map((word) => ({ text: word, choice: { kind: "grammarSuggestion", word } })),
+    footer: [{ cls: "fw-spell-ignore-grammar", text: "Ignore Grammar Issue", choice: { kind: "ignoreGrammar" } }],
+  };
 }
 
 class SpellMenu {
@@ -401,7 +505,7 @@ class SpellMenu {
 
   constructor(
     private view: EditorView,
-    suggestions: string[],
+    model: MenuModel,
     x: number,
     y: number,
     private onChoice: (choice: SpellChoice) => void,
@@ -411,7 +515,7 @@ class SpellMenu {
     const dom = (this.dom = doc.createElement("div"));
     dom.className = "fw-spell-menu";
     dom.setAttribute("role", "menu");
-    dom.setAttribute("aria-label", "Spelling");
+    dom.setAttribute("aria-label", model.label);
     const item = (cls: string, text: string, choice: SpellChoice | null) => {
       const b = doc.createElement("button");
       b.type = "button";
@@ -422,14 +526,14 @@ class SpellMenu {
       else b.disabled = true;
       dom.append(b);
     };
-    for (const s of suggestions.slice(0, MAX_SUGGESTIONS)) item("fw-spell-suggestion", s, { kind: "suggestion", word: s });
-    if (suggestions.length === 0) item("fw-spell-none", "No Guesses Found", null);
+    if (model.header) item("fw-spell-message", model.header, null);
+    for (const c of model.corrections) item("fw-spell-suggestion", c.text, c.choice);
+    if (model.corrections.length === 0 && model.none) item("fw-spell-none", model.none, null);
     const sep = doc.createElement("div");
     sep.className = "fw-spell-separator";
     sep.setAttribute("role", "separator");
     dom.append(sep);
-    item("fw-spell-learn", "Learn Spelling", { kind: "learn" });
-    item("fw-spell-ignore", "Ignore Spelling", { kind: "ignore" });
+    for (const f of model.footer) item(f.cls, f.text, f.choice);
 
     dom.style.left = x + "px";
     dom.style.top = y + "px";
@@ -493,6 +597,7 @@ export function spellingExtension(bridge: SpellingBridge): Extension {
     constructor(private view: EditorView) {
       plugin = this;
       engine.reset(); // a replaced document (setDocument) forgets everything in flight
+      engine.clearIgnored(); // and the grammar issues the writer ignored in the old one
       this.schedule(50);
     }
 
@@ -555,15 +660,30 @@ export function spellingExtension(bridge: SpellingBridge): Extension {
       const word = this.view.state.doc.sliceString(range.from, range.to);
       engine.requestSuggestions(word, (words) => {
         if (plugin !== this || this.view.state.doc.sliceString(range.from, range.to) !== word) return; // edited meanwhile
-        this.menu = new SpellMenu(this.view, words, x, y, (choice) => this.choose(range, word, choice), () => { this.menu = null; });
+        this.show(spellingMenuModel(words), range, word, x, y);
       });
+    }
+
+    /** The grammar menu needs no host round trip: the message and corrections came with the reply. */
+    openGrammarMenu(range: DocRange, info: GrammarInfo, x: number, y: number): void {
+      this.closeMenu();
+      this.show(grammarMenuModel(info), range, this.view.state.doc.sliceString(range.from, range.to), x, y);
+    }
+
+    private show(model: MenuModel, range: DocRange, word: string, x: number, y: number): void {
+      this.menu = new SpellMenu(this.view, model, x, y, (choice) => this.choose(range, word, choice), () => { this.menu = null; });
     }
 
     private choose(range: DocRange, word: string, choice: SpellChoice): void {
       const state = this.view.state;
-      if (choice.kind === "suggestion") {
+      if (choice.kind === "suggestion" || choice.kind === "grammarSuggestion") {
         const spec = choiceSpec(state, range, word, choice);
         if (spec) this.view.dispatch(spec);
+        return;
+      }
+      if (choice.kind === "ignoreGrammar") {
+        if (state.doc.sliceString(range.from, range.to) !== word) return;
+        this.view.dispatch(engine.ignoreGrammar(state, word));
         return;
       }
       try {
@@ -596,13 +716,22 @@ export function spellingExtension(bridge: SpellingBridge): Extension {
       contextmenu(event, view) {
         if (!plugin || !engine.active) return false;
         const target = event.target as Element | null;
+        // Where both apply, the spelling menu wins (the red underline is the one drawn).
         const span = target?.closest?.(".fw-misspelled");
-        if (!span) return false;
+        const gspan = span ? null : target?.closest?.(".fw-grammar");
+        if (!span && !gspan) return false;
         const pos = view.posAtCoords({ x: event.clientX, y: event.clientY }, false);
-        const range = misspelledAt(view.state, pos) ?? misspelledAt(view.state, view.posAtDOM(span, 0));
-        if (!range) return false;
+        if (span) {
+          const range = misspelledAt(view.state, pos) ?? misspelledAt(view.state, view.posAtDOM(span, 0));
+          if (!range) return false;
+          event.preventDefault();
+          plugin.openMenu(range, event.clientX, event.clientY);
+          return true;
+        }
+        const grammar = grammarAt(view.state, pos) ?? grammarAt(view.state, view.posAtDOM(gspan!, 0));
+        if (!grammar) return false;
         event.preventDefault();
-        plugin.openMenu(range, event.clientX, event.clientY);
+        plugin.openGrammarMenu({ from: grammar.from, to: grammar.to }, grammar, event.clientX, event.clientY);
         return true;
       },
     }),

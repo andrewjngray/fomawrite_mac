@@ -163,6 +163,7 @@ private slots:
     void sourceSpellingContextMenuOffersSuggestionsAndCorrects();
     void sourceSpellingWithholdsTheCaretWordAndDimmedText();
     void liveSpellingUnderlinesMisspelledWordsAndFollowsTheSetting();
+    void liveGrammarUnderlinesFollowTheGrammarSetting();
     void footerLayoutCapsuleNamesPreviewOnly();
     void footerViewCyclesPreserveDraftSelectionAndWidths();
     void footerModesAndTemplatesPreserveDraftAndUndo();
@@ -5242,6 +5243,7 @@ private:
 #include "cycle143-spellcheck.inc"
 #include "cycle143-source-spelling.inc"
 #include "cycle143-live-spelling.inc"
+#include "cycle144-live-grammar.inc"
 
 int main(int argc, char **argv) {
     QtWebEngineQuick::initialize();

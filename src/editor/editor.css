@@ -103,6 +103,15 @@ html.dark, html.dark body { color-scheme: dark; }
 /* A decoration on the word's own span: the Live theme overlay never mentions text-decoration, and a theme's
    `text-decoration: none` on an ancestor does not remove an underline drawn by a descendant. */
 .fw-misspelled { text-decoration: underline wavy #d93025; text-decoration-skip-ink: none; }
+/* Grammar findings: blue wave. Both marks can cover the same characters (CodeMirror nests one span in the other, or one
+   span carries both classes); the red spelling underline wins so one readable line is drawn:
+   - one element with both classes: red;
+   - a grammar span inside a spelling span: no underline of its own (the spelling span's red line already runs under it);
+   - a spelling span inside a grammar span (the grammar range is longer): the grammar line sits lower, so the red word
+     keeps its own line and the blue one reads as a second line beneath it. */
+.fw-grammar { text-decoration: underline wavy #1a73e8; text-decoration-skip-ink: none; text-underline-offset: 0.2em; }
+.fw-grammar.fw-misspelled { text-decoration: underline wavy #d93025; text-underline-offset: auto; }
+.fw-misspelled .fw-grammar { text-decoration: none; }
 /* The right-click menu lives on <body> (position: fixed), so it uses the page palette variables from :root / html.dark. */
 .fw-spell-menu {
   position: fixed; z-index: 1000; min-width: 160px; max-width: 320px; padding: 4px 0;
@@ -117,6 +126,8 @@ html.dark, html.dark body { color-scheme: dark; }
 .fw-spell-menu .fw-spell-item:hover, .fw-spell-menu .fw-spell-item:focus-visible { background: var(--fw-selection, rgba(9, 105, 218, 0.22)); outline: none; }
 .fw-spell-menu .fw-spell-none, .fw-spell-menu .fw-spell-none:hover { background: transparent; color: var(--fw-muted, #8c959f); }
 .fw-spell-menu .fw-spell-suggestion { font-weight: 600; }
+/* The checker's message heads the grammar menu: not clickable, wraps, muted. */
+.fw-spell-menu .fw-spell-message, .fw-spell-menu .fw-spell-message:hover { background: transparent; color: var(--fw-muted, #8c959f); white-space: normal; }
 .fw-spell-menu .fw-spell-separator { height: 1px; margin: 4px 0; background: var(--fw-quote-bar, #d0d7de); }
 
 /* ---------------------------------------------------------------- source mode (monospace) */
