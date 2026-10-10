@@ -23,6 +23,13 @@ export interface Bridge {
   saveImage(token: number, name: string, mime: string, base64: string): void;
   // Vertical scroll position as a 0..1 fraction (debounced), for pane sync.
   scrolled(fraction: number): void;
+  // Spelling (live mode). Optional: a host without them simply gets no spelling. See README "Spelling".
+  // segmentsJson = [{from, to, text}] prose segments in document offsets; answered by spellingReply(token, rangesJson).
+  checkSpelling?(token: number, segmentsJson: string): void;
+  // Suggestions for one word; answered by suggestionsReply(token, wordsJson).
+  spellingSuggestions?(token: number, word: string): void;
+  learnWord?(word: string): void;
+  ignoreWord?(word: string): void;
   // C++ -> JS signals
   setDocument: Signal<[string, number]>;
   applyChanges: Signal<[string, number]>;
@@ -45,6 +52,10 @@ export interface Bridge {
   setCursor: Signal<[number]>;
   // Host-invoked editor commands: "find", "replace", "selectAll".
   command: Signal<[string]>;
+  // Spelling answers and the host's setting (every setSpellCheck also means "check again").
+  spellingReply?: Signal<[number, string]>;
+  suggestionsReply?: Signal<[number, string]>;
+  setSpellCheck?: Signal<[boolean]>;
 }
 
 export interface BridgeConnection {
@@ -102,7 +113,8 @@ const MOCK_PNG =
 
 const SIGNALS = [
   "setDocument", "applyChanges", "setMode", "setTheme", "setAppearance",
-  "focusEditor", "requestText", "requestSelection", "simulateUserChanges", "undo", "redo", "imageReply", "imageSaved", "scrollToFraction", "setCursor", "command"
+  "focusEditor", "requestText", "requestSelection", "simulateUserChanges", "undo", "redo", "imageReply", "imageSaved", "scrollToFraction", "setCursor", "command",
+  "spellingReply", "suggestionsReply", "setSpellCheck"
 ] as const;
 
 export type MockBridge = Bridge & {
@@ -135,6 +147,26 @@ export function createMockBridge(): MockBridge {
     console.log("[bridge mock] saveImage", token, name, mime, `<${base64.length} base64 chars>`);
     setTimeout(() => mock.emit("imageSaved", token, "assets/" + name, ""), 50);
   };
+  // Host stand-in for spelling: a tiny word list instead of the system checker, answered after 20 ms.
+  const MOCK_MISSPELLED: Record<string, string[]> = {
+    tomorow: ["tomorrow"], teh: ["the", "tea"], recieve: ["receive"], mispelled: ["misspelled"], wrold: ["world", "word"],
+  };
+  mock.checkSpelling = (token: number, segmentsJson: string) => {
+    calls.push({ name: "checkSpelling", args: [token, segmentsJson] });
+    console.log("[bridge mock] checkSpelling", token, segmentsJson.length, "chars");
+    const ranges: { from: number; to: number }[] = [];
+    try {
+      for (const seg of JSON.parse(segmentsJson) as { from: number; text: string }[])
+        for (const m of seg.text.matchAll(/[\p{L}']+/gu))
+          if (MOCK_MISSPELLED[m[0].toLowerCase()]) ranges.push({ from: seg.from + m.index!, to: seg.from + m.index! + m[0].length });
+    } catch { /* malformed: answer with nothing */ }
+    setTimeout(() => mock.emit("spellingReply", token, JSON.stringify(ranges)), 20);
+  };
+  mock.spellingSuggestions = (token: number, word: string) => {
+    calls.push({ name: "spellingSuggestions", args: [token, word] });
+    setTimeout(() => mock.emit("suggestionsReply", token, JSON.stringify(MOCK_MISSPELLED[word.toLowerCase()] ?? [])), 20);
+  };
+  for (const s of ["learnWord", "ignoreWord"]) mock[s] = slot(s);
   mock.emit = (signal: string, ...args: unknown[]) => handlers[signal]?.forEach((f) => f(...args));
   return mock as MockBridge;
 }

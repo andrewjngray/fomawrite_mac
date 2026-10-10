@@ -608,6 +608,33 @@ Backend::Backend(QObject *parent, bool outputOnly) : QObject(parent), m_library(
     connect(m_editorBridge.get(), &EditorBridge::imageRequested, this, &Backend::resolveLiveImage);
     connect(m_editorBridge.get(), &EditorBridge::imageSaveRequested, this, &Backend::saveLiveImage);
     connect(m_editorBridge.get(), &EditorBridge::messageLogged, this, [](const QString &message) { qWarning("Live editor: %s", qPrintable(message)); });
+    // Spelling in the Live page: the page sends prose segments, the shared
+    // SpellCheck service finds the misspelled words, ranges go back in document
+    // offsets. The setting, the language and the learned/ignored words all
+    // reach the page as setSpellCheck, which makes it check again.
+    connect(m_editorBridge.get(), &EditorBridge::spellingRequested, this, [this](int token, const QString &segmentsJson) {
+        QJsonArray ranges;
+        const QJsonDocument document = QJsonDocument::fromJson(segmentsJson.toUtf8());
+        const QJsonArray segments = document.isArray() ? document.array() : QJsonArray();
+        for (int i = 0; i < qMin(int(segments.size()), 5000); ++i) {
+            const QJsonObject segment = segments.at(i).toObject();
+            const int from = segment.value(QStringLiteral("from")).toInt(-1);
+            if (from < 0) continue;
+            for (const auto &range : m_spellCheck.misspellings(segment.value(QStringLiteral("text")).toString()))
+                ranges.append(QJsonObject{{QStringLiteral("from"), from + range.start}, {QStringLiteral("to"), from + range.end}});
+        }
+        m_editorBridge->replySpelling(token, QString::fromUtf8(QJsonDocument(ranges).toJson(QJsonDocument::Compact)));
+    });
+    connect(m_editorBridge.get(), &EditorBridge::suggestionsRequested, this, [this](int token, const QString &word) {
+        m_editorBridge->replySuggestions(token, QString::fromUtf8(QJsonDocument(QJsonArray::fromStringList(m_spellCheck.suggestions(word))).toJson(QJsonDocument::Compact)));
+    });
+    connect(m_editorBridge.get(), &EditorBridge::wordLearned, this, [this](const QString &word) { m_spellCheck.learnWord(word); });
+    connect(m_editorBridge.get(), &EditorBridge::wordIgnored, this, [this](const QString &word) { m_spellCheck.ignoreWord(word); });
+    const auto pushSpellCheck = [this]() { m_editorBridge->applySpellCheck(m_spellCheck.enabled() && m_spellCheck.available()); };
+    connect(&m_spellCheck, &SpellCheck::enabledChanged, this, pushSpellCheck);
+    connect(&m_spellCheck, &SpellCheck::languageChanged, this, pushSpellCheck);
+    connect(&m_spellCheck, &SpellCheck::wordsChanged, this, pushSpellCheck);
+    pushSpellCheck();
     // New installations start with the composed writing palette; a stored
     // choice, including System, always takes precedence.
     const auto preset = QSettings().value("appearance/theme", "studio").toString();

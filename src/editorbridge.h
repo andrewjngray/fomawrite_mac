@@ -37,6 +37,11 @@ public:
     // Forget an outstanding selection request (the host gave up waiting); a
     // late reply then no longer updates the last-known selection.
     Q_INVOKABLE void cancelSelectionRequest(int token);
+    // The "check spelling while typing" setting for the page. Every call makes
+    // the page check again (it clears nothing first), so the host also calls it
+    // when the language or the learned/ignored words change. Remembered and
+    // replayed on ready().
+    Q_INVOKABLE void applySpellCheck(bool enabled);
     // Test support: edits that the page applies as ordinary user input.
     Q_INVOKABLE void injectUserChanges(const QString &changesJson);
     Q_INVOKABLE void requestUndo();
@@ -79,6 +84,16 @@ public slots:
     void replyImageSaved(int token, const QString &relativePath, const QString &error);
     // The page reports its vertical position as a 0..1 fraction (debounced).
     void scrolled(double fraction);
+    // Spelling. The page sends the prose segments it wants checked (a JSON
+    // array of {from, to, text}, document offsets) under a token of its own;
+    // the host answers through replySpelling with the same token. Suggestions
+    // work the same way. Learn/ignore carry no answer: the host re-checks.
+    void checkSpelling(int token, const QString &segmentsJson);
+    void replySpelling(int token, const QString &rangesJson);
+    void spellingSuggestions(int token, const QString &word);
+    void replySuggestions(int token, const QString &wordsJson);
+    void learnWord(const QString &word);
+    void ignoreWord(const QString &word);
 
 signals:
     // Connected to by the page.
@@ -98,7 +113,14 @@ signals:
     void scrollToFraction(double fraction);
     void setCursor(int position);
     void command(const QString &name);
+    void spellingReply(int token, const QString &rangesJson);
+    void suggestionsReply(int token, const QString &wordsJson);
+    void setSpellCheck(bool enabled);
     // For the app.
+    void spellingRequested(int token, const QString &segmentsJson);
+    void suggestionsRequested(int token, const QString &word);
+    void wordLearned(const QString &word);
+    void wordIgnored(const QString &word);
     void scrollFractionChanged(double fraction);
     void imageRequested(int token, const QString &src);
     void imageSaveRequested(int token, const QString &name, const QString &mime, const QString &base64);
@@ -120,6 +142,7 @@ private:
     int m_lastAnchor = -1;
     int m_selectionRequestInFlight = 0;
     bool m_hasDocument = false;
+    bool m_spellCheck = true;
     QString m_text;
     QString m_mode = QStringLiteral("live");
     QString m_theme;

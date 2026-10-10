@@ -12,6 +12,7 @@ import { mathExtension } from "./math";
 import { extrasExtension } from "./extras";
 import { imagesExtension } from "./images";
 import { linksExtension, openLinkPanel } from "./links";
+import { spellingExtension } from "./spelling";
 import { Session, applyModeClass, applyThemeDom, Appearance } from "./modes";
 import { appearanceExtension } from "./appearance";
 import { replySelection } from "./selection";
@@ -74,6 +75,7 @@ async function main() {
     extrasExtension(),
     imagesExtension(bridge),
     linksExtension(),
+    spellingExtension(bridge),
     EditorView.updateListener.of((u) => {
       if (u.docChanged) session.handleTransactions(u.transactions);
       if (u.selectionSet || u.docChanged)

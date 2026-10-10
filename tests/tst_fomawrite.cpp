@@ -155,6 +155,7 @@ private slots:
     void accessibilityProbeForWritingAssistants();
     void spellCheckServiceFindsWordsAndHonoursIgnoreAndSetting();
     void checkSpellingWhileTypingCommandTogglesTheSetting();
+    void liveSpellingUnderlinesMisspelledWordsAndFollowsTheSetting();
     void footerLayoutCapsuleNamesPreviewOnly();
     void footerViewCyclesPreserveDraftSelectionAndWidths();
     void footerModesAndTemplatesPreserveDraftAndUndo();
@@ -5232,6 +5233,7 @@ private:
 #include "cycle140-typora-base.inc"
 #include "cycle142-accessibility-probe.inc"
 #include "cycle143-spellcheck.inc"
+#include "cycle143-live-spelling.inc"
 
 int main(int argc, char **argv) {
     QtWebEngineQuick::initialize();
