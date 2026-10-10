@@ -75,6 +75,8 @@ public:
     void setEngine(const QString &engine);
     QString effectiveEngine() const;
     bool harperReady() const;
+    // Why Harper is not running, when it tried and failed; empty otherwise.
+    Q_INVOKABLE QString harperLoadError() const;
     QString harperVersion() const;
     QString dialect() const { return m_dialect; }
     void setDialect(const QString &dialect);

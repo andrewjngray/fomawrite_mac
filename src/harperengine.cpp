@@ -43,6 +43,7 @@ void HarperEngine::onBridgeReady() {
 void HarperEngine::onReadied(const QString &version) {
     const bool changed = !m_ready || m_version != version;
     m_ready = true;
+    m_loadError.clear();
     m_version = version;
     sendWords();
     pump();
@@ -77,7 +78,9 @@ void HarperEngine::importWords(const QStringList &words) {
 }
 
 void HarperEngine::sendWords() {
-    if (!m_ready || m_words.isEmpty()) return;
+    if (!m_ready) return;
+    if (m_words.isEmpty() && !m_sentWords) return; // nothing to clear yet
+    m_sentWords = !m_words.isEmpty();
     emit m_bridge->harperImportWords(QString::fromUtf8(QJsonDocument(QJsonArray::fromStringList(m_words)).toJson(QJsonDocument::Compact)));
 }
 
@@ -127,6 +130,8 @@ void HarperEngine::onReplied(int token, const QString &lintsJson) {
         const QJsonObject lint = value.toObject();
         const int start = lint.value(QStringLiteral("start")).toInt(-1), end = lint.value(QStringLiteral("end")).toInt(-1);
         if (start < 0 || end <= start || end > text.size()) continue;
+        // Syntax the surfaces blanked (link targets, code, emphasis marks) reaches Harper as runs of spaces: "N spaces where there should be one" is noise.
+        if (text.mid(start, end - start).trimmed().isEmpty()) continue;
         const QString kind = lint.value(QStringLiteral("kind")).toString();
         QStringList suggestions;
         for (const QJsonValue &suggestion : lint.value(QStringLiteral("suggestions")).toArray())
@@ -147,6 +152,14 @@ void HarperEngine::onReplied(int token, const QString &lintsJson) {
 }
 
 void HarperEngine::onFailed(int token, const QString &error) {
+    if (token < 0) {
+        // The engine itself failed to load: fall back until a page or dialect change retries.
+        const bool wasReady = m_ready;
+        m_ready = false; m_loadError = error;
+        if (wasReady) emit readyChanged();
+        emit failed(error);
+        return;
+    }
     const auto it = m_tokens.find(token);
     if (it == m_tokens.end()) return;
     m_wanted.remove(it.value());

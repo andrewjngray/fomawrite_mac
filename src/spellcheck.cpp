@@ -34,7 +34,7 @@ void SpellCheck::setHarper(HarperEngine *harper) {
         harper->importWords(learnedWords());
         connect(harper, &HarperEngine::readyChanged, this, [this] {
             emit harperReadyChanged();
-            emit engineChanged(); // effectiveEngine moved between harper and macos
+            if (m_engine == QLatin1String("harper")) emit engineChanged(); // effectiveEngine moved between harper and macos
         });
         connect(harper, &HarperEngine::resultsReady, this, &SpellCheck::resultsReady);
     }
@@ -43,6 +43,7 @@ void SpellCheck::setHarper(HarperEngine *harper) {
 }
 
 bool SpellCheck::harperReady() const { return m_harper && m_harper->ready(); }
+QString SpellCheck::harperLoadError() const { return m_harper ? m_harper->loadError() : QString(); }
 QString SpellCheck::harperVersion() const { return m_harper && m_harper->ready() ? m_harper->version() : QString(); }
 
 QString SpellCheck::effectiveEngine() const {

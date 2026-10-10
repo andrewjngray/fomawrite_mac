@@ -528,6 +528,11 @@ QString MarkdownHighlighter::spellingProse(const QString &blockText) {
         const auto match = matches.next();
         blank(int(match.capturedStart()), int(match.capturedLength()));
     }
+    // A heading marker is syntax too (the Live page blanks it): Harper otherwise judges the line as a heading
+    // ("use title case") and the finding covers the whole line.
+    static const QRegularExpression headingMarker(QStringLiteral("^ {0,3}#{1,6}[ \\t]"));
+    const auto heading = headingMarker.match(prose);
+    if (heading.hasMatch()) blank(0, int(heading.capturedLength()));
     return prose;
 }
 
@@ -696,6 +701,15 @@ QList<SpellCheck::Issue> MarkdownHighlighter::grammarIssuesInBlock(const QTextBl
     QList<SpellCheck::Issue> found;
     if (usesHarper() && !m_grammarChecker) {
         found = harperFindings(block, prose).grammar;
+        // A hard-wrapped line that continues a sentence starts lower-case; Harper, given the line alone, calls that a
+        // missing capital (the Live page lints the whole paragraph and says nothing).
+        const QString before = block.previous().isValid() ? block.previous().text().trimmed() : QString();
+        if (!before.isEmpty() && !QStringLiteral(".!?:;…\"”)").contains(before.back())) {
+            int first = 0;
+            while (first < prose.size() && prose.at(first).isSpace()) ++first;
+            found.erase(std::remove_if(found.begin(), found.end(), [first](const SpellCheck::Issue &issue) {
+                return issue.kind == QLatin1String("Capitalization") && issue.start <= first; }), found.end());
+        }
     } else {
         auto cached = m_grammarCache.constFind(prose);
         if (cached == m_grammarCache.constEnd()) {

@@ -37,6 +37,7 @@ public:
 
     // The page has loaded Harper and answers requests.
     bool ready() const { return m_ready; }
+    QString loadError() const { return m_loadError; }
     QString version() const { return m_version; }
     QString dialect() const { return m_dialect; }
     // Remembered for a later page; sent at once when the page is there. Drops
@@ -88,6 +89,8 @@ private:
 
     EditorBridge *m_bridge;
     bool m_ready = false;
+    bool m_sentWords = false;
+    QString m_loadError; // last load failure, for the pane's status line
     QString m_version;
     QString m_dialect = QStringLiteral("Australian");
     QStringList m_words;

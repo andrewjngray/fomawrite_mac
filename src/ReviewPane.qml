@@ -49,7 +49,9 @@ Rectangle {
     }
     function engineStatus() {
         if (harperActive) return "Harper " + checker.harperVersion
-        return checker.engine === "harper" ? "macOS checker (Harper is loading)" : "macOS checker"
+        if (checker.engine !== "harper") return "macOS checker"
+        var why = checker.harperLoadError()
+        return why !== "" ? "macOS checker (Harper failed to load)" : "macOS checker (Harper is loading)"
     }
     function emphasised(issue) {
         var context = String(issue.context), from = issue.wordOffset, to = from + String(issue.word).length

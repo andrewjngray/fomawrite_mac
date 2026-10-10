@@ -102,6 +102,7 @@ Rectangle {
         onLoadingChanged: function(info) {
             if (info.status === WebEngineView.LoadFailedStatus) console.warn("Live editor page failed to load: " + info.errorString);
         }
+        onRenderProcessTerminated: function(terminationStatus, exitCode) { web.reload(); }
         Keys.onPressed: root.writingActivity()
         Accessible.name: "Live Markdown editor"
     }

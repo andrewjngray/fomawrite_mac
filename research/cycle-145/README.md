@@ -93,3 +93,17 @@ A note on the red runs: this Makefile compares mtimes at one-second resolution, 
 - Style findings have no right-click menu in Source (only Spelling and Grammar have); they are in the pane, with Ignore and the suggestions.
 - Harper's lint config (rules on and off) is not touched; Cycle 146.
 - Not installed or hand-tested in the app.
+
+## Review and fixes (build 145)
+
+A separate reviewer ran the merged cycle end to end in the real page: Harper ready 2.97 s after the window, all planted errors found, 319 page tests and the full Qt suite green after the fixes. Verdict: ship with fixes. Taken:
+
+| Finding | Fix |
+| --- | --- |
+| `engineChanged` fired whenever Harper's readiness flipped even with the macOS engine selected, forcing a rebuild between the page's edit and its caret update (the pane listed a half-typed word; a full re-highlight and page re-check for nothing). | Emitted only when the effective engine moves. |
+| A Chromium renderer death left Source with no marks for the rest of the session: the hidden page serves Source now and nothing reloaded it. | The Live pane reloads on `renderProcessTerminated`; the bridge's `ready()` re-sends `harperLoad`. Confirmed by killing the renderer in a probe. |
+| Source and the pane sent Harper text the Live page did not: heading markers were linted ("use title case"), blanked link/code spans produced "two spaces" Formatting rows, hard-wrapped continuation lines produced Capitalization findings. | Whitespace-only findings dropped; heading markers blanked like the page's; Capitalization findings at the start of a continuation line dropped. All three surfaces now agree on the probe document. |
+| harper.js `importWords` appends, so an unlearned word stayed accepted; the host also sent nothing for an emptied list. | The page clears before importing; the host sends an empty list once something was sent. |
+| `harperFailed(-1)` (engine failed to load) was ignored: the pane said "Harper is loading" forever. | The engine drops to not-ready with the error kept; the pane says "Harper failed to load". |
+
+Still open from the review: marks vanish once for a moment when Harper becomes ready (macOS marks go, Harper's arrive); a block split by Enter waits for its answer; list items and quotes are linted twice per edit (the page blanks `-`/`>`, the highlighter does not); the Writing Checker submenu's three toggles have no `resync()` on open; memory: about 450 MB for the page with Harper loaded, and each window has its own (896 MB resident for one window, 1.6 GB for two) — the levers are not warming the page when the engine setting is macOS, one engine shared across windows, or unloading after idle.

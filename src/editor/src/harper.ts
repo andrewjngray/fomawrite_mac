@@ -34,6 +34,7 @@ interface HarperLinter {
   setup(): Promise<void>;
   lint(text: string): Promise<HarperLint[]>;
   importWords(words: string[]): Promise<void>;
+  clearWords(): Promise<void>;
   getLintConfig(): Promise<Record<string, boolean | undefined>>;
   setLintConfig(config: Record<string, boolean | undefined>): Promise<void>;
 }
@@ -102,6 +103,8 @@ export async function harperLint(text: string, dialect: HarperDialect = currentD
 /** Words the writer taught the checker (Learn Spelling). */
 export async function harperImportWords(words: string[]): Promise<void> {
   const { linter } = await ensureLinter(currentDialect);
+  // harper.js importWords appends; the host sends the whole list, so clear first.
+  await linter.clearWords();
   await linter.importWords(words);
 }
 
@@ -291,7 +294,7 @@ export function realHarperBackend(): HarperBackend {
   return {
     async load(dialect) {
       const { linter } = await ensureLinter(dialect);
-      return { lint: (text) => lintWith(linter, text), importWords: (words) => linter.importWords(words) };
+      return { lint: (text) => lintWith(linter, text), importWords: async (words) => { await linter.clearWords(); await linter.importWords(words); } };
     },
     async version() {
       try {
