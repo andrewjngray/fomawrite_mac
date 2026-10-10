@@ -35,6 +35,7 @@
 
 #include "backend.h"
 #include "sourceaccessibility.h"
+#include "spellcheck.h"
 #include "markdownhighlighter.h"
 
 
@@ -152,6 +153,8 @@ private slots:
     void footerViewControlsStayStationaryAcrossModes();
     void footerLiveOptionJoinsEditingCapsule();
     void accessibilityProbeForWritingAssistants();
+    void spellCheckServiceFindsWordsAndHonoursIgnoreAndSetting();
+    void checkSpellingWhileTypingCommandTogglesTheSetting();
     void footerLayoutCapsuleNamesPreviewOnly();
     void footerViewCyclesPreserveDraftSelectionAndWidths();
     void footerModesAndTemplatesPreserveDraftAndUndo();
@@ -5228,6 +5231,7 @@ private:
 #include "cycle134-footer-live.inc"
 #include "cycle140-typora-base.inc"
 #include "cycle142-accessibility-probe.inc"
+#include "cycle143-spellcheck.inc"
 
 int main(int argc, char **argv) {
     QtWebEngineQuick::initialize();

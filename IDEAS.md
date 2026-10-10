@@ -15,7 +15,9 @@ Larger concepts get their own document and only a pointer here.
 Things the Cycle 134–135 work surfaced that are plausible next cycles once the current measure ([MISSION.md](MISSION.md): is Live the daily editor?) is answered.
 
 ### Spell check in Live
-Yes [ ]  No [ ]  Maybe [x]
+Yes [x]  No [ ]  Maybe [ ]
+
+Yes, 10 October 2026 (Andrew): spell check in the document first, in both surfaces, from the macOS checker, with a toggle; the review dialog is reworked after. Cycle 143.
 
 Source mode uses the native Qt text editor and its spell check; the Live page is Chromium and has none today. Qt WebEngine can spell check but needs bundled `.bdic` dictionaries, which Homebrew Qt does not ship. Options: bundle dictionaries for the languages Andrew writes in, or rely on an external checker (see Grammarly below).
 
@@ -23,6 +25,8 @@ Source mode uses the native Qt text editor and its spell check; the Live page is
 Yes [ ]  No [ ]  Maybe [x]
 
 Ten-minute experiment script for Andrew: [research/overnight-2026-10-08/grammarly-experiment.md](research/overnight-2026-10-08/grammarly-experiment.md).
+
+Plan of inquiry for a Grammarly-like result by other means: [docs/grammarly-like-plan.md](docs/grammarly-like-plan.md).
 
 **Result, 9 October 2026:** Grammarly Desktop attaches to nothing in Fomawrite (works in Word on the same Mac). Cause found by probe: neither Qt Quick nor Qt WebEngine reports character bounds to macOS Accessibility (upstream stubs), so an overlay cannot place its button or underlines. The SDK route closed in January 2024. Remaining options are in the experiment note: a Source-only accessibility fix in the app (unproven), nothing for Live short of patching Qt, or the system checker wired into Live with a toggle.
 

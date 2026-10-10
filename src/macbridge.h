@@ -25,6 +25,14 @@ int macTabInset(QWindow *window);
 void restoreMacWorkspaceTabs(const QList<QWindow *> &windows);
 void applyMacWindowTheme(QWindow *window, bool followSystem, bool dark);
 QStringList macWritingLanguages();
+// Spell checking shared by both writing surfaces (see spellcheck.h). Ranges
+// are UTF-16 [start, end) into `text`; language empty means the system one.
+QVariantList macMisspelledRanges(const QString &text, const QString &language);
+QStringList macSpellingGuesses(const QString &word, const QString &language);
+void macLearnWord(const QString &word);
+void macUnlearnWord(const QString &word);
+bool macHasLearnedWord(const QString &word);
+void macIgnoreWord(const QString &word);
 QVariantList macWritingIssues(const QString &text, const QString &language, bool grammar);
 void macSpeakText(const QString &text);
 void macStopSpeaking();

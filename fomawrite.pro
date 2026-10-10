@@ -11,6 +11,7 @@ HEADERS += \
     src/backend.h \
     src/documentviewcheck.h \
     src/sourceaccessibility.h \
+    src/spellcheck.h \
     src/markdownhighlighter.h \
     src/outputcss.h \
     src/systemtheme.h
@@ -19,6 +20,7 @@ SOURCES += \
     src/main.cpp \
     src/documentviewcheck.cpp \
     src/sourceaccessibility.cpp \
+    src/spellcheck.cpp \
     src/backend.cpp \
     src/markdownhighlighter.cpp \
     src/outputcss.cpp

@@ -264,6 +264,41 @@ QVariantList macWritingIssues(const QString &text,const QString &language,bool g
     }
     [checker closeSpellDocumentWithTag:tag]; return issues;
 }
+// One spell document for the whole app, so an ignored word stays ignored on
+// both surfaces for the rest of the run.
+static NSInteger fomawriteSpellTag() { static NSInteger tag=[NSSpellChecker uniqueSpellDocumentTag]; return tag; }
+static NSString *fomawriteSpellLanguage(const QString &language) {
+    NSSpellChecker *checker=[NSSpellChecker sharedSpellChecker];
+    if(language.isEmpty()) return nil;
+    NSString *chosen=[NSString stringWithUTF8String:language.toUtf8().constData()];
+    return [[checker availableLanguages] containsObject:chosen] ? chosen : nil;
+}
+QVariantList macMisspelledRanges(const QString &text,const QString &language) {
+    NSString *input=[NSString stringWithUTF8String:text.toUtf8().constData()];
+    NSSpellChecker *checker=[NSSpellChecker sharedSpellChecker];
+    NSString *chosen=fomawriteSpellLanguage(language);
+    QVariantList ranges; NSUInteger position=0;
+    while(position<input.length && ranges.size()<2000) {
+        NSRange range=[checker checkSpellingOfString:input startingAt:position language:chosen wrap:NO inSpellDocumentWithTag:fomawriteSpellTag() wordCount:nil];
+        if(range.location==NSNotFound || range.location<position || !range.length) break;
+        ranges.append(QVariantMap{{"start",int(range.location)},{"end",int(NSMaxRange(range))}});
+        position=NSMaxRange(range);
+    }
+    return ranges;
+}
+QStringList macSpellingGuesses(const QString &word,const QString &language) {
+    NSString *input=[NSString stringWithUTF8String:word.toUtf8().constData()];
+    NSSpellChecker *checker=[NSSpellChecker sharedSpellChecker];
+    QStringList guesses;
+    for(NSString *guess in [checker guessesForWordRange:NSMakeRange(0,input.length) inString:input language:fomawriteSpellLanguage(language) inSpellDocumentWithTag:fomawriteSpellTag()]) {
+        if(guesses.size()>=8) break; guesses.append(QString::fromUtf8(guess.UTF8String));
+    }
+    return guesses;
+}
+void macLearnWord(const QString &word) { [[NSSpellChecker sharedSpellChecker] learnWord:[NSString stringWithUTF8String:word.toUtf8().constData()]]; }
+void macUnlearnWord(const QString &word) { [[NSSpellChecker sharedSpellChecker] unlearnWord:[NSString stringWithUTF8String:word.toUtf8().constData()]]; }
+bool macHasLearnedWord(const QString &word) { return [[NSSpellChecker sharedSpellChecker] hasLearnedWord:[NSString stringWithUTF8String:word.toUtf8().constData()]]; }
+void macIgnoreWord(const QString &word) { [[NSSpellChecker sharedSpellChecker] ignoreWord:[NSString stringWithUTF8String:word.toUtf8().constData()] inSpellDocumentWithTag:fomawriteSpellTag()]; }
 static NSSpeechSynthesizer *writingSpeaker=nil;
 void macSpeakText(const QString &text) {
     if(!writingSpeaker) writingSpeaker=[[NSSpeechSynthesizer alloc] initWithVoice:nil];

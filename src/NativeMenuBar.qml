@@ -111,6 +111,7 @@ Platform.MenuBar {
             Platform.MenuItem { objectName: "editFindSelection"; text: "Use Selection for Find"; enabled: editor.selectedText.length > 0; onTriggered: win.openSearch(false, true) }
         }
         Platform.MenuItem { objectName: "editSpelling"; text: "Spelling and Grammar…"; enabled: editor.length > 0; onTriggered: spellingDialog.open() }
+        NativeCommand { objectName: "editCheckSpellingWhileTyping"; commandId: "checkSpellingWhileTyping" }
         Platform.Menu {
             title: "Substitutions"
             Platform.MenuItem {

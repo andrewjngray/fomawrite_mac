@@ -18,6 +18,7 @@
 #include "filelibrary.h"
 #include "publisher.h"
 #include "editorbridge.h"
+#include "spellcheck.h"
 
 class MarkdownHighlighter;
 class QTextDocument;
@@ -57,6 +58,7 @@ class Backend : public QObject, public PublishingSource {
     // --bg-color / --text-color) when the theme defines them, so a dark theme darkens
     // the whole window as it does in Typora. Off: the Theme preset alone decides.
     Q_PROPERTY(bool appearanceFollowsOutputStyle READ appearanceFollowsOutputStyle WRITE setAppearanceFollowsOutputStyle NOTIFY appearanceFollowsOutputStyleChanged)
+    Q_PROPERTY(SpellCheck *spellCheck READ spellCheck CONSTANT)
     Q_PROPERTY(qreal textScale READ textScale WRITE setTextScale NOTIFY textScaleChanged)
     Q_PROPERTY(QString themeBackground READ themeBackground NOTIFY themeColorsChanged)
     Q_PROPERTY(QString themeForeground READ themeForeground NOTIFY themeColorsChanged)
@@ -73,6 +75,7 @@ public:
     QObject *library() { return &m_library; }
     QObject *publisher() { return m_publisher.get(); }
     EditorBridge *editorBridge() { return m_editorBridge.get(); }
+    SpellCheck *spellCheck() { return &m_spellCheck; }
     // Push the current document, theme and appearance to the Live editor page.
     Q_INVOKABLE void syncLiveEditor(int cursor = -1);
     // Re-style the Live editor after a theme change without reloading the document.
@@ -348,6 +351,7 @@ private:
     QString m_liveMirror;
     bool m_liveMirrorValid = false;
     std::unique_ptr<EditorBridge> m_editorBridge;
+    SpellCheck m_spellCheck{this};
     void paintOutput(QPagedPaintDevice &device, QTextDocument &document) const;
     void paintPublishingOutput(QPagedPaintDevice &device);
     void applyTemplate(QTextDocument &document, bool preview) const;
