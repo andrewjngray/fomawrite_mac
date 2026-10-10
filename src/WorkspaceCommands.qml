@@ -76,6 +76,13 @@ QtObject {
         { id: "appearanceFollowsOutputStyle", title: "Appearance Follows Output Style", toggle: true },
         { id: "checkSpellingWhileTyping", title: "Check Spelling While Typing", toggle: true },
         { id: "checkGrammarWhileTyping", title: "Check Grammar While Typing", toggle: true },
+        { id: "checkStyleWhileTyping", title: "Check Style While Typing", toggle: true },
+        { id: "engineHarper", title: "Harper", toggle: true },
+        { id: "engineMacos", title: "macOS", toggle: true },
+        { id: "dialectAustralian", title: "Australian", toggle: true },
+        { id: "dialectBritish", title: "British", toggle: true },
+        { id: "dialectAmerican", title: "American", toggle: true },
+        { id: "dialectCanadian", title: "Canadian", toggle: true },
         { id: "editor", title: "Single", toggle: true },
         { id: "split", title: "Split", toggle: true },
         { id: "preview", title: "Preview Only", toggle: true },
@@ -135,6 +142,10 @@ QtObject {
         if (id === "spelling" || id === "nextIssue" || id === "previousIssue") return backend.spellCheck.available;
         if (id === "checkSpellingWhileTyping") return backend.spellCheck.available;
         if (id === "checkGrammarWhileTyping") return backend.spellCheck.available && backend.spellCheck.enabled;
+        // Style findings and dialects are Harper's: the macOS checker has neither.
+        if (id === "checkStyleWhileTyping") return backend.spellCheck.available && backend.spellCheck.enabled && backend.spellCheck.engine === "harper";
+        if (id === "engineHarper" || id === "engineMacos") return backend.spellCheck.available;
+        if (id.indexOf("dialect") === 0) return backend.spellCheck.available && backend.spellCheck.engine === "harper";
         if (id === "organizer") return true;
         if (id === "liveThemeExact") return layoutState.liveEditEnabled;
         if (id === "split") return layoutState.availableWidth >= 800;
@@ -200,6 +211,13 @@ QtObject {
         case "appearanceFollowsOutputStyle": return backend.appearanceFollowsOutputStyle;
         case "checkSpellingWhileTyping": return backend.spellCheck.available && backend.spellCheck.enabled;
         case "checkGrammarWhileTyping": return backend.spellCheck.available && backend.spellCheck.enabled && backend.spellCheck.grammarEnabled;
+        case "checkStyleWhileTyping": return backend.spellCheck.available && backend.spellCheck.enabled && backend.spellCheck.engine === "harper" && backend.spellCheck.styleEnabled;
+        case "engineHarper": return backend.spellCheck.engine === "harper";
+        case "engineMacos": return backend.spellCheck.engine === "macos";
+        case "dialectAustralian": return backend.spellCheck.dialect === "Australian";
+        case "dialectBritish": return backend.spellCheck.dialect === "British";
+        case "dialectAmerican": return backend.spellCheck.dialect === "American";
+        case "dialectCanadian": return backend.spellCheck.dialect === "Canadian";
         case "fillersStyleCheck": return settings.styleCheckFillers;
         case "customStyleCheck": return settings.styleCheckCustom;
         default: return false;
@@ -271,6 +289,13 @@ QtObject {
         case "appearanceFollowsOutputStyle": backend.appearanceFollowsOutputStyle = !backend.appearanceFollowsOutputStyle; break;
         case "checkSpellingWhileTyping": backend.spellCheck.enabled = !backend.spellCheck.enabled; break;
         case "checkGrammarWhileTyping": backend.spellCheck.grammarEnabled = !backend.spellCheck.grammarEnabled; break;
+        case "checkStyleWhileTyping": backend.spellCheck.styleEnabled = !backend.spellCheck.styleEnabled; break;
+        case "engineHarper": backend.spellCheck.engine = "harper"; break;
+        case "engineMacos": backend.spellCheck.engine = "macos"; break;
+        case "dialectAustralian": backend.spellCheck.dialect = "Australian"; break;
+        case "dialectBritish": backend.spellCheck.dialect = "British"; break;
+        case "dialectAmerican": backend.spellCheck.dialect = "American"; break;
+        case "dialectCanadian": backend.spellCheck.dialect = "Canadian"; break;
         case "fillersStyleCheck": settings.styleCheckFillers = !settings.styleCheckFillers; break;
         case "customStyleCheck": settings.styleCheckCustom = !settings.styleCheckCustom; break;
         case "strike": window.tryWrapSelection("~~", "~~"); break;

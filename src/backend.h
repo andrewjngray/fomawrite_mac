@@ -21,6 +21,7 @@
 #include "publisher.h"
 #include "editorbridge.h"
 #include "spellcheck.h"
+#include "harperengine.h"
 
 class MarkdownHighlighter;
 class QTextDocument;
@@ -84,6 +85,9 @@ public:
     SpellCheck *spellCheck() { return &m_spellCheck; }
     // The Live pane calls this as its view is created (see harperscheme.h).
     Q_INVOKABLE void installHarperScheme();
+    // Whether the hidden Live page is created a second after the window shows
+    // (the default); FOMAWRITE_NO_LIVE_PREWARM=1 defers it to first use.
+    Q_INVOKABLE bool prewarmsLive() const { return !qEnvironmentVariableIsSet("FOMAWRITE_NO_LIVE_PREWARM"); }
     QVariantList reviewIssues() const { return m_reviewIssues; }
     bool reviewIssuesTruncated() const { return m_reviewIssuesTruncated; }
     static constexpr int ReviewIssueLimit = 500;
@@ -380,6 +384,19 @@ private:
     bool m_liveMirrorValid = false;
     std::unique_ptr<EditorBridge> m_editorBridge;
     SpellCheck m_spellCheck{this};
+    // Harper, on the Live page's bridge; destroyed before the service that points at it.
+    std::unique_ptr<HarperEngine> m_harper;
+    // The Live page's own underlines (spellingRequested). Harper answers
+    // arrive later than the request, so a request whose texts are not all
+    // known waits (at most 2 s) for their resultsReady and is answered once.
+    struct SpellingSegment { int from; QString text; };
+    struct PendingSpelling { QList<SpellingSegment> segments; QSet<QString> outstanding; };
+    void answerSpellingRequest(int token, const QString &segmentsJson);
+    void finishSpellingRequest(int token);
+    QString spellingReplyJson(const QList<SpellingSegment> &segments, QSet<QString> *unknown) const;
+    void pushSpellCheckState();
+    QHash<int, PendingSpelling> m_pendingSpelling;
+    QSet<QString> m_lateSpellingTexts; // answered after the 2 s limit: the page is asked to check again
     void paintOutput(QPagedPaintDevice &device, QTextDocument &document) const;
     void paintPublishingOutput(QPagedPaintDevice &device);
     void applyTemplate(QTextDocument &document, bool preview) const;

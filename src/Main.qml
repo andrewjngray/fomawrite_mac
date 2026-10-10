@@ -3136,8 +3136,19 @@ ApplicationWindow {
             }
         }
 
-        // The Live editor page (and its Chromium renderer) exists only while
-        // Live editing is on; every other mode pays nothing for it.
+        // Harper, the grammar and style engine, runs inside the Live page, so the
+        // page is created (hidden) shortly after the window first shows, not when
+        // Live is first used: Source needs the engine from its first keystroke.
+        // Set FOMAWRITE_NO_LIVE_PREWARM=1 to go back to creating it on first use.
+        Timer {
+            id: liveWarmTimer
+            interval: 1000
+            running: win.visible && backend.prewarmsLive()
+            onTriggered: liveEditorLoader.used = true
+        }
+
+        // The Live editor page (and its Chromium renderer) is created on first
+        // use of Live, or a second after the window shows (see liveWarmTimer).
         Loader {
             id: liveEditorLoader
             anchors.fill: parent

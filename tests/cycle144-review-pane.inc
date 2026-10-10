@@ -448,6 +448,7 @@ void FomawriteTest::reviewPaneFixesAndJumpsInTheLivePage() {
     Cycle103SettingsSnapshot settings;
     Backend backend;
     backend.spellCheck()->setEnabled(true); backend.spellCheck()->setGrammarEnabled(false); backend.spellCheck()->setLanguage(QStringLiteral("en_US"));
+    backend.spellCheck()->setEngine(QStringLiteral("macos")); // this test is about the macOS checker (Harper: tests/cycle145-harper-engine.inc)
     QQmlEngine engine; engine.rootContext()->setContextProperty("backend", &backend);
     QQmlComponent component(&engine, QUrl(QStringLiteral("qrc:/Main.qml")));
     QScopedPointer<QObject> window(component.create()); QVERIFY2(window, qPrintable(component.errorString()));
@@ -540,6 +541,7 @@ void FomawriteTest::reviewPaneWithholdsTheWordBeingTypedInLive() {
     Cycle103SettingsSnapshot settings;
     Backend backend;
     backend.spellCheck()->setEnabled(true); backend.spellCheck()->setGrammarEnabled(false); backend.spellCheck()->setLanguage(QStringLiteral("en_US"));
+    backend.spellCheck()->setEngine(QStringLiteral("macos")); // this test is about the macOS checker (Harper: tests/cycle145-harper-engine.inc)
     QQmlEngine engine; engine.rootContext()->setContextProperty("backend", &backend);
     QQmlComponent component(&engine, QUrl(QStringLiteral("qrc:/Main.qml")));
     QScopedPointer<QObject> window(component.create()); QVERIFY2(window, qPrintable(component.errorString()));

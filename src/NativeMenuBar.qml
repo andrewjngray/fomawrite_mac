@@ -113,8 +113,33 @@ Platform.MenuBar {
         NativeCommand { objectName: "editSpelling"; commandId: "spelling"; shortcut: "Ctrl+:" }
         NativeCommand { objectName: "editNextIssue"; commandId: "nextIssue"; shortcut: "Ctrl+;" }
         NativeCommand { objectName: "editPreviousIssue"; commandId: "previousIssue"; shortcut: "Ctrl+Alt+;" }
-        NativeCommand { objectName: "editCheckSpellingWhileTyping"; commandId: "checkSpellingWhileTyping" }
-        NativeCommand { objectName: "editCheckGrammarWhileTyping"; commandId: "checkGrammarWhileTyping" }
+        Platform.Menu {
+            objectName: "editWritingChecker"
+            title: "Writing Checker"
+            // The engine behind both surfaces and the review pane: Harper (grammar,
+            // style and dialects, offline) or the macOS checker (also the fallback
+            // while Harper loads).
+            Platform.Menu {
+                objectName: "editWritingEngine"
+                title: "Engine"
+                onAboutToShow: { engineHarperItem.resync(); engineMacosItem.resync(); }
+                NativeCommand { id: engineHarperItem; objectName: "editEngineHarper"; commandId: "engineHarper" }
+                NativeCommand { id: engineMacosItem; objectName: "editEngineMacos"; commandId: "engineMacos" }
+            }
+            Platform.Menu {
+                objectName: "editWritingDialect"
+                title: "Dialect"
+                onAboutToShow: { dialectAustralianItem.resync(); dialectBritishItem.resync(); dialectAmericanItem.resync(); dialectCanadianItem.resync(); }
+                NativeCommand { id: dialectAustralianItem; objectName: "editDialectAustralian"; commandId: "dialectAustralian" }
+                NativeCommand { id: dialectBritishItem; objectName: "editDialectBritish"; commandId: "dialectBritish" }
+                NativeCommand { id: dialectAmericanItem; objectName: "editDialectAmerican"; commandId: "dialectAmerican" }
+                NativeCommand { id: dialectCanadianItem; objectName: "editDialectCanadian"; commandId: "dialectCanadian" }
+            }
+            Platform.MenuSeparator {}
+            NativeCommand { objectName: "editCheckSpellingWhileTyping"; commandId: "checkSpellingWhileTyping" }
+            NativeCommand { objectName: "editCheckGrammarWhileTyping"; commandId: "checkGrammarWhileTyping" }
+            NativeCommand { objectName: "editCheckStyleWhileTyping"; commandId: "checkStyleWhileTyping" }
+        }
         Platform.Menu {
             title: "Substitutions"
             Platform.MenuItem {

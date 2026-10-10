@@ -157,6 +157,15 @@ private slots:
     void spellCheckServiceReportsGrammarIssuesWithCategory();
     void harperLintsInsideTheEditorPage();
     void harperBridgeAnswersLintRequestsFromTheHost();
+    void harperEngineCachesDedupesAndMapsKinds();
+    void harperEngineQueuesNewestFirstAndBoundsItsCache();
+    void spellCheckEngineDialectAndStyleSettingsPersistAndFallBackUntilHarperIsReady();
+    void sourceHarperPendingAnswerKeepsOldMarksAndReplyRestylesWithoutARevision();
+    void sourceHarperReplyFindsItsBlockAfterLinesAreInsertedAbove();
+    void liveSpellingRequestWaitsForHarperAndRepliesOnce();
+    void writingCheckerCommandsMenuAndPaneFollowTheEngine();
+    void harperDrivesSourceTheLivePageAndThePaneInTheRealPage();
+    void livePageWarmUpDoesNotDelayFirstPaintAndIsMeasured();
     void grammarChecksLongParagraphsInCachedChunks();
     void reviewPaneWithholdsTheWordBeingTypedInLive();
     void ignoreGrammarFromAnySurfaceReachesEverySurface();
@@ -464,6 +473,11 @@ private slots:
                 removed += data.remove(name) ? 1 : 0;
             if (removed) qInfo("Removed %d stale recovery file(s) from %s", removed, qPrintable(data.path()));
         }
+        // The hidden Live page is created a second after a window shows (Harper
+        // lives in it). Windows in tests would each grow a Chromium page mid-test;
+        // the suite defers it to first use, as before. Tests that want the
+        // warm-up clear this themselves (tests/cycle145-harper-engine.inc).
+        qputenv("FOMAWRITE_NO_LIVE_PREWARM", "1");
         QQuickStyle::setStyle(QStringLiteral("Material"));
         QSettings::setDefaultFormat(QSettings::IniFormat);
         QSettings::setPath(QSettings::IniFormat, QSettings::UserScope,
@@ -5271,6 +5285,7 @@ private:
 #include "cycle144-source-grammar.inc"
 #include "cycle144-live-grammar.inc"
 #include "cycle144-review-pane.inc"
+#include "cycle145-harper-engine.inc"
 
 int main(int argc, char **argv) {
     registerHarperScheme();

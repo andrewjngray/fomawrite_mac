@@ -95,10 +95,12 @@ public slots:
     void learnWord(const QString &word);
     void ignoreWord(const QString &word);
     void ignoreGrammar(const QString &text, const QString &message);
-    // Harper (the page's grammar engine; the host decides what is prose and
-    // brokers the findings). The page answers harperLint(token, text) with
-    // harperReply(token, lintsJson) or harperFailed(token, error) (token -1:
-    // the engine failed to load); harperReady(version) says a load finished.
+    // Harper (Cycle 145), the grammar and style engine that runs inside the
+    // page. The page announces it once loaded (harperReady with the engine's
+    // version) and answers each harperLint under the host's token with a JSON
+    // array of {start, end, kind, message, suggestions} (UTF-16 offsets into
+    // the text that was sent), or harperFailed with a reason. Plain
+    // pass-throughs; HarperEngine owns the meaning.
     void harperReady(const QString &version);
     void harperReply(int token, const QString &lintsJson);
     void harperFailed(int token, const QString &error);
@@ -124,6 +126,9 @@ signals:
     void spellingReply(int token, const QString &rangesJson);
     void suggestionsReply(int token, const QString &wordsJson);
     void setSpellCheck(bool enabled);
+    // Harper: load the engine for a dialect (American, British, Australian,
+    // Canadian); lint one text under a token; replace the engine's custom
+    // dictionary with this JSON array of words.
     void harperLoad(const QString &dialect);
     void harperLint(int token, const QString &text);
     void harperImportWords(const QString &wordsJson);

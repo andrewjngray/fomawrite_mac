@@ -11,16 +11,19 @@ Rectangle {
     property bool darkMode: false
     property var issues: backend.reviewIssues
     property bool truncated: backend.reviewIssuesTruncated
-    property string filter: "all" // all | spelling | grammar
+    property string filter: "all" // all | spelling | grammar | style
     property int selectedStart: -1
     readonly property var checker: backend.spellCheck
     readonly property int spellingCount: countOf("Spelling")
     readonly property int grammarCount: countOf("Grammar")
+    readonly property int styleCount: countOf("Style")
+    readonly property bool harperActive: checker.effectiveEngine === "harper"
     readonly property var shown: issues.filter(function(issue) {
         return filter === "all" || issue.category.toLowerCase() === filter
     })
     readonly property color spellingInk: darkMode ? "#ff8a80" : "#d93025"
     readonly property color grammarInk: darkMode ? "#8ab4f8" : "#1a5fd0"
+    readonly property color styleInk: darkMode ? "#a0a6b0" : "#5f6670"
     signal jumpRequested(int start, int end)
     signal fixRequested(var issue, string replacement)
     signal closeRequested()
@@ -36,9 +39,21 @@ Rectangle {
     function escaped(text) {
         return String(text).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
     }
+    function inkFor(category) { return category === "Spelling" ? spellingInk : category === "Style" ? styleInk : grammarInk }
+    // Harper's own name for the finding ("Agreement", "WordChoice") is the tag
+    // for grammar and style rows when there is one; spelling stays "Spelling".
+    function tagFor(issue) {
+        if (issue.category === "Spelling") return "Spelling"
+        var kind = issue.kind ? String(issue.kind) : ""
+        return kind !== "" ? kind.replace(/([a-z])([A-Z])/g, "$1 $2") : issue.category
+    }
+    function engineStatus() {
+        if (harperActive) return "Harper " + checker.harperVersion
+        return checker.engine === "harper" ? "macOS checker (Harper is loading)" : "macOS checker"
+    }
     function emphasised(issue) {
         var context = String(issue.context), from = issue.wordOffset, to = from + String(issue.word).length
-        var ink = issue.category === "Spelling" ? spellingInk : grammarInk
+        var ink = inkFor(issue.category)
         return escaped(context.substring(0, from)) + "<b><font color=\"" + ink + "\">"
             + escaped(context.substring(from, to)) + "</font></b>" + escaped(context.substring(to))
     }
@@ -48,6 +63,7 @@ Rectangle {
         var parts = []
         if (spellingCount > 0) parts.push(spellingCount + " spelling")
         if (grammarCount > 0) parts.push(grammarCount + " grammar")
+        if (styleCount > 0) parts.push(styleCount + " style")
         return parts.length ? parts.join(" · ") + (truncated ? " (first " + issues.length + ")" : "") : "No issues"
     }
     // Rows are replaced whenever the document is re-checked; keep the writer's place in the list.
@@ -87,19 +103,30 @@ Rectangle {
                     font.family: Qt.application.font.family
                     font.pixelSize: 12
                 }
+                Label {
+                    objectName: "reviewEngine"
+                    Layout.fillWidth: true
+                    text: root.engineStatus()
+                    elide: Text.ElideRight
+                    color: backend.palette.muted
+                    font.family: Qt.application.font.family
+                    font.pixelSize: 11
+                    opacity: 0.8
+                }
             }
             ChromeButton {
                 id: languageButton
                 objectName: "reviewLanguage"
                 Layout.minimumWidth: 28
                 Layout.maximumWidth: 120
-                text: root.checker.language === "" ? "System language" : root.checker.language
-                hint: "Spelling language"
+                text: root.harperActive ? root.checker.dialect
+                    : root.checker.language === "" ? "System language" : root.checker.language
+                hint: root.harperActive ? "Dialect" : "Spelling language"
                 darkMode: root.darkMode
                 enabled: root.checker.available
                 iconName: "down"
                 alignLeft: true
-                onClicked: languageMenu.popup(languageButton, 0, languageButton.height + 3)
+                onClicked: (root.harperActive ? dialectMenu : languageMenu).popup(languageButton, 0, languageButton.height + 3)
             }
             ToolbarButton {
                 objectName: "reviewClose"
@@ -110,13 +137,15 @@ Rectangle {
             }
         }
 
-        RowLayout {
+        // A Flow, not a row: four filters do not fit the narrowest pane (240 px) on one line.
+        Flow {
             Layout.fillWidth: true
             spacing: 4
             Repeater {
                 model: [{ id: "all", text: "All", name: "reviewFilterAll" },
                         { id: "spelling", text: "Spelling", name: "reviewFilterSpelling" },
-                        { id: "grammar", text: "Grammar", name: "reviewFilterGrammar" }]
+                        { id: "grammar", text: "Grammar", name: "reviewFilterGrammar" },
+                        { id: "style", text: "Style", name: "reviewFilterStyle" }]
                 ChromeButton {
                     required property var modelData
                     objectName: modelData.name
@@ -157,6 +186,7 @@ Rectangle {
                 required property var modelData
                 required property int index
                 readonly property bool spelling: modelData.category === "Spelling"
+                readonly property color ink: root.inkFor(modelData.category)
                 readonly property bool selected: root.selectedStart === modelData.start
                 objectName: "reviewRow_" + index
                 width: ListView.view.width - 10
@@ -190,9 +220,10 @@ Rectangle {
                         color: Qt.rgba(tagLabel.color.r, tagLabel.color.g, tagLabel.color.b, 0.14)
                         Label {
                             id: tagLabel
+                            objectName: "reviewTagLabel"
                             anchors.centerIn: parent
-                            text: row.spelling ? "Spelling" : "Grammar"
-                            color: row.spelling ? root.spellingInk : root.grammarInk
+                            text: root.tagFor(row.modelData)
+                            color: row.ink
                             font.family: Qt.application.font.family
                             font.pixelSize: 10
                             font.weight: Font.DemiBold
@@ -278,8 +309,9 @@ Rectangle {
                     text: !root.checker.available ? "Spelling check is not available on this platform"
                         : !root.checker.enabled ? "Spelling check is off"
                         : root.filter === "grammar" && !root.checker.grammarEnabled ? "Grammar check is off"
+                        : root.filter === "style" && !root.harperActive ? "Style suggestions come from Harper"
                         : root.issues.length > 0 ? "No " + root.filter + " issues"
-                        : "No spelling or grammar issues"
+                        : root.harperActive ? "No spelling, grammar or style issues" : "No spelling or grammar issues"
                     color: backend.palette.muted
                     font.family: Qt.application.font.family
                     font.pixelSize: 13
@@ -321,6 +353,25 @@ Rectangle {
                 checkable: true
                 checked: root.checker.language === modelData
                 onTriggered: root.checker.language = modelData
+            }
+        }
+    }
+
+    // Harper's dialects, where the macOS checker has languages.
+    CompactMenu {
+        id: dialectMenu
+        objectName: "reviewDialectMenu"
+        darkMode: root.darkMode
+        width: 200
+        Repeater {
+            model: root.checker.dialects
+            CompactMenuItem {
+                required property string modelData
+                objectName: "reviewDialect_" + modelData
+                text: modelData
+                checkable: true
+                checked: root.checker.dialect === modelData
+                onTriggered: root.checker.dialect = modelData
             }
         }
     }

@@ -46,6 +46,11 @@ public:
     void setSpellingEnabled(bool enabled);
     // Follows the shared service: its setting, language and word lists.
     void setSpellCheck(SpellCheck *spellCheck);
+    // Harper answered for `text`: restyle the blocks that were waiting for it
+    // straight through the layout (never rehighlightBlock: that opens an edit
+    // block and bumps QTextDocument::revision). Connected to
+    // SpellCheck::resultsReady; public for tests.
+    void harperAnswered(const QString &text);
     // Forget cached results and restyle every block (words or language changed).
     void refreshSpelling();
     // The writer's caret. A misspelled word that ends exactly at the caret is
@@ -57,14 +62,21 @@ public:
     static constexpr int SpellMarkProperty = QTextFormat::UserProperty + 41;
     static constexpr int SpellWordEndProperty = QTextFormat::UserProperty + 42;
     // Which kind of finding a mark is, so the caret rule restores the right
-    // colours: 1 spelling (red), 2 grammar (blue).
+    // colours: 1 spelling (red), 2 grammar (blue), 3 style (grey).
     static constexpr int SpellCategoryProperty = QTextFormat::UserProperty + 43;
+    // 1 when the text under a mark was underlined before the mark (a link), so
+    // taking the mark away gives the link its underline back.
+    static constexpr int SpellBaseUnderlineProperty = QTextFormat::UserProperty + 44;
     // Block-relative [start, end) ranges the layer underlines in `block`.
     QList<SpellCheck::Range> misspellingsInBlock(const QTextBlock &block);
     // Spelling and grammar findings in `block`, block-relative, document order:
     // the one list the review pane lists and the surfaces draw. Grammar comes
     // from the service (cached by prose like spelling) when it is enabled.
     QList<SpellCheck::Issue> issuesInBlock(const QTextBlock &block);
+    // Style findings (Harper only), block-relative: wording and readability
+    // suggestions. The pane lists them always; the document underlines them
+    // only while SpellCheck::styleEnabled is on.
+    QList<SpellCheck::Issue> styleIssuesInBlock(const QTextBlock &block);
     // Grammar findings only, block-relative, with the per-document ignore set
     // applied. This is what the grammar underline draws and the grammar
     // right-click offers; issuesInBlock lists it after the spelling findings.
@@ -84,6 +96,15 @@ public:
     SpellCheck *spellCheck() const { return m_spellCheck; }
     // The prose of one block as the checker sees it (public for tests).
     static QString spellingProse(const QString &blockText);
+
+    // What the engine found in one stretch of prose, by category.
+    struct ProseFindings {
+        QList<SpellCheck::Issue> spelling, grammar, style;
+        bool isEmpty() const { return spelling.isEmpty() && grammar.isEmpty() && style.isEmpty(); }
+    };
+    // True when the shared service answers with Harper: answers then arrive
+    // asynchronously (see harperAnswered).
+    bool usesHarper() const;
 
     enum class InlineKind { Bold, Italic, BoldItalic, Link };
 
@@ -109,6 +130,22 @@ private:
     void highlightSearch(const QString &text);
     void highlightSpelling(const QString &text);
     void applySpellingMark(QTextCharFormat &format, bool drawn, int category = 1) const;
+    // Draws the block's spelling, grammar and style marks through `get`/`set`
+    // (the highlighter's own per-character format in highlightBlock, a copy of
+    // the layout's in a direct restyle).
+    void paintSpelling(const QTextBlock &block, const QString &text,
+                       const std::function<QTextCharFormat(int)> &get,
+                       const std::function<void(int, const QTextCharFormat &)> &set);
+    void stripSpellingMark(QTextCharFormat &format) const;
+    // Re-styles one block's spelling layer in place (the reply-driven path).
+    void restyleSpelling(const QTextBlock &block);
+    // The prose the checker sees for a block, or empty when the block is not
+    // prose (code, fences, front matter, indented code, blank).
+    QString proseOfBlock(const QTextBlock &block) const;
+    // Harper's findings for a block's prose; while the answer is pending, the
+    // block's previous findings mapped onto the new text.
+    ProseFindings harperFindings(const QTextBlock &block, const QString &prose);
+    void rememberFindings(const QTextBlock &block, const QString &prose, const ProseFindings &findings) const;
     // Installs edited layout formats on a block without an edit block: marks the
     // contents dirty and emits updateBlock so the Qt Quick item repaints.
     void commitLayoutFormats(const QTextBlock &block, const QList<QTextLayout::FormatRange> &ranges);
@@ -144,12 +181,18 @@ private:
     SpellChecker m_spellChecker;
     QColor m_spellBackground;
     QColor m_grammarBackground;
+    QColor m_styleBackground;
     QSet<QString> m_ignoredIssues;
     bool m_spellingEnabled = false;
     int m_caret = -1;
     int m_withheldBlock = -1;
     QHash<QString, QList<SpellCheck::Range>> m_spellCache;
     QHash<QString, QList<SpellCheck::Issue>> m_grammarCache;
+    // Harper: known answers by prose, and the blocks waiting on a prose whose
+    // answer has not come (block numbers; verified against the text on reply).
+    QHash<QString, ProseFindings> m_harperCache;
+    QHash<QString, QSet<int>> m_pendingProse;
+    bool m_bareSpelling = false;
     GrammarChecker m_grammarChecker;
     SpellCheck *m_spellCheck = nullptr;
     QTextCharFormat m_reviewFormat;
