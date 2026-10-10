@@ -61,6 +61,19 @@ void HarperEngine::setDialect(const QString &dialect) {
     if (m_bridge->isReady()) emit m_bridge->harperLoad(m_dialect);
 }
 
+void HarperEngine::reload() {
+    // A newer (or older) engine may answer differently, so nothing cached stands.
+    m_cache.clear();
+    m_wordSuggestions.clear();
+    // Same steps as a new page: not ready, what the old engine held is asked again.
+    const bool wasReady = m_ready;
+    m_ready = false;
+    for (auto it = m_tokens.cbegin(); it != m_tokens.cend(); ++it) m_queue.append(it.value());
+    m_tokens.clear();
+    if (wasReady) emit readyChanged();
+    if (m_bridge->isReady()) emit m_bridge->harperLoad(m_dialect);
+}
+
 void HarperEngine::dropOutstanding() {
     m_queue.clear();
     m_overflow.clear();

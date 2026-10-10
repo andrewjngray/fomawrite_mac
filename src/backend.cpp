@@ -623,6 +623,8 @@ Backend::Backend(QObject *parent, bool outputOnly) : QObject(parent), m_library(
     // Harper lives in the Live page, so the bridge is its only line to the host.
     m_harper = std::make_unique<HarperEngine>(m_editorBridge.get());
     m_spellCheck.setHarper(m_harper.get());
+    // An installed or rolled-back engine: the page imports whatever the scheme serves now.
+    connect(&m_harperUpdater, &HarperUpdater::servedChanged, this, [this] { if (m_harper) m_harper->reload(); });
     connect(&m_spellCheck, &SpellCheck::resultsReady, this, [this](const QString &text) {
         for (const int token : m_pendingSpelling.keys()) {
             auto it = m_pendingSpelling.find(token);

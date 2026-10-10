@@ -46,20 +46,42 @@ interface HarperLint {
 }
 
 // In the app the engine is served by the fomawrite: scheme (src/harperscheme.cpp:
-// a downloaded update first, else the bundled copy). The dev server has no
-// scheme, so there the files are read next to the bundle. Not literals in
-// import(): esbuild must leave the specifiers to the browser.
+// a downloaded update first, else the bundled copy) under a versioned path,
+// fomawrite://harper/<version>/<file>, where <version> is what
+// fomawrite://harper/VERSION says now. ES module maps are keyed by URL, so an
+// engine installed later (Help -> Check for Writing Checker Updates) loads from
+// a URL this page has never imported, and the next harperLoad picks it up. The
+// dev server has no scheme, so there the files are read next to the bundle. Not
+// literals in import(): esbuild must leave the specifiers to the browser.
 const inApp = typeof location !== "undefined" && location.protocol === "qrc:";
-const MODULE_URL = inApp ? "fomawrite://harper/index.js" : "./harper/index.js";
-const BINARY_URL = inApp ? "fomawrite://harper/binary.js" : "./harper/binary.js";
 
-type Loaded = { linter: HarperLinter; module: HarperModule };
+/** Where the engine files for `version` live (a folder URL ending in "/"). */
+export function engineBase(version: string): string {
+  return inApp ? `fomawrite://harper/${version}/` : "./harper/";
+}
+
+/** The version the host serves right now (read fresh every time; the scheme says no-store), or "unknown". */
+export async function readServedVersion(): Promise<string> {
+  try {
+    const res = await fetch(inApp ? "fomawrite://harper/VERSION" : "./harper/VERSION", { cache: "no-store" });
+    if (!res.ok) return UNKNOWN_VERSION;
+    return (await res.text()).trim() || UNKNOWN_VERSION;
+  } catch {
+    return UNKNOWN_VERSION;
+  }
+}
+
+type Loaded = { linter: HarperLinter; module: HarperModule; version: string };
 let linterPromise: Promise<Loaded> | null = null;
 let currentDialect: HarperDialect = "Australian";
 
 declare global { interface Window { __harperStage?: string } } // loader stage, read by the Qt test
 async function load(dialect: HarperDialect): Promise<Loaded> {
-  const moduleUrl = MODULE_URL, binaryUrl = BINARY_URL;
+  window.__harperStage = "reading version";
+  const version = await readServedVersion();
+  if (inApp && version === UNKNOWN_VERSION) throw new Error("Harper's version could not be read from the app");
+  const base = engineBase(version);
+  const moduleUrl = base + "index.js", binaryUrl = base + "binary.js";
   window.__harperStage = "importing";
   const [module, binaryModule] = await Promise.all([import(moduleUrl) as Promise<HarperModule>, import(binaryUrl) as Promise<{ binary: unknown }>]);
   window.__harperStage = "constructing";
@@ -67,7 +89,7 @@ async function load(dialect: HarperDialect): Promise<Loaded> {
   window.__harperStage = "setup";
   await linter.setup();
   window.__harperStage = "ready";
-  return { linter, module };
+  return { linter, module, version };
 }
 
 /** The shared engine for `dialect` (a different dialect replaces it). Resolves once it can lint. */
@@ -79,6 +101,11 @@ function ensureLinter(dialect: HarperDialect): Promise<Loaded> {
     p.catch(() => { if (linterPromise === p) linterPromise = null; }); // a failed load is retried by the next request
   }
   return linterPromise;
+}
+
+/** Forget the loaded engine: the next request reads VERSION again and imports whatever the host serves now. */
+export function resetHarperEngine(): void {
+  linterPromise = null;
 }
 
 /** Start loading the engine (idempotent). Resolves once it can lint. */
@@ -121,11 +148,17 @@ export function exposeHarperForTests(): void {
 export interface LoadedEngine {
   lint(text: string): Promise<HarperFinding[]>;
   importWords(words: string[]): Promise<void>;
+  /** The version this engine was loaded as, when the backend knows it. */
+  version?: string;
 }
-/** Where engines come from. `load` rejects when the engine cannot be loaded; `version` never rejects. */
+/**
+ * Where engines come from. `load` rejects when the engine cannot be loaded; `version` (the version the host serves
+ * *now*, read fresh) never rejects; `reset` makes the next `load` build a new engine instead of returning the shared one.
+ */
 export interface HarperBackend {
   load(dialect: HarperDialect): Promise<LoadedEngine>;
   version(): Promise<string>;
+  reset?(): void;
 }
 
 /** The slots and signals the service uses (the host side is EditorBridge; all optional so an older host just gets nothing). */
@@ -172,6 +205,7 @@ export class HarperService {
   private importedVersion = 0;
   private pumping = false;
   private cachedVersion: string | null = null;
+  private reloadRequested = false;
 
   constructor(private bridge: HarperBridge, private backend: HarperBackend) {}
 
@@ -195,14 +229,34 @@ export class HarperService {
   load(dialect: string): void {
     const d = (DIALECTS as readonly string[]).includes(dialect) ? (dialect as HarperDialect) : DEFAULT_DIALECT;
     if (d === this.dialect && this.failure === null) {
-      if (this.engine) void this.announceReady(this.generation); // already loaded: say so again
-      return; // or still loading: the ready that is coming answers this too
+      // Already loaded: the host may have installed a newer engine since (it sends harperLoad again to say so), so look
+      // at what is served now: a different version is a fresh engine, the same one is just announced again.
+      if (this.engine) void this.recheck(this.generation);
+      else this.reloadRequested = true; // still loading: look again once it has loaded
+      return;
     }
     this.dialect = d;
     const generation = ++this.generation;
     this.engine = null;
     this.failure = null;
+    this.reloadRequested = false;
     void this.start(d, generation);
+  }
+
+  /** An engine is loaded and the host asked again: a newer version served means load it, else announce the one we have. */
+  private async recheck(generation: number): Promise<void> {
+    let served: string;
+    try { served = await this.backend.version(); } catch { served = UNKNOWN_VERSION; }
+    if (generation !== this.generation || !this.engine) return;
+    if (served !== UNKNOWN_VERSION && this.cachedVersion !== null && this.cachedVersion !== UNKNOWN_VERSION && served !== this.cachedVersion) {
+      this.backend.reset?.();
+      this.cachedVersion = null;
+      this.engine = null;
+      this.reloadRequested = false;
+      void this.start(this.dialect!, ++this.generation); // queued lints wait for the new engine
+      return;
+    }
+    await this.announceReady(generation);
   }
 
   private async start(dialect: HarperDialect, generation: number): Promise<void> {
@@ -221,8 +275,10 @@ export class HarperService {
       return;
     }
     if (generation !== this.generation) return; // a newer load replaced this one
+    if (engine.version) this.cachedVersion = engine.version; // what this engine is, not what an earlier one was
     this.engine = engine;
-    await this.announceReady(generation);
+    if (this.reloadRequested) { this.reloadRequested = false; await this.recheck(generation); } // asked again while loading
+    else await this.announceReady(generation);
     if (generation === this.generation) void this.pump();
   }
 
@@ -293,18 +349,11 @@ export class HarperService {
 export function realHarperBackend(): HarperBackend {
   return {
     async load(dialect) {
-      const { linter } = await ensureLinter(dialect);
-      return { lint: (text) => lintWith(linter, text), importWords: async (words) => { await linter.clearWords(); await linter.importWords(words); } };
+      const { linter, version } = await ensureLinter(dialect);
+      return { lint: (text) => lintWith(linter, text), importWords: async (words) => { await linter.clearWords(); await linter.importWords(words); }, version };
     },
-    async version() {
-      try {
-        const res = await fetch(inApp ? "fomawrite://harper/VERSION" : "./harper/VERSION");
-        if (!res.ok) return UNKNOWN_VERSION;
-        return (await res.text()).trim() || UNKNOWN_VERSION;
-      } catch {
-        return UNKNOWN_VERSION;
-      }
-    },
+    version: readServedVersion,
+    reset: resetHarperEngine,
   };
 }
 

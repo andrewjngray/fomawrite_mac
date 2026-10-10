@@ -43,6 +43,13 @@ public:
     // Remembered for a later page; sent at once when the page is there. Drops
     // every cached and outstanding answer: they were given in the old dialect.
     void setDialect(const QString &dialect);
+    // Load the engine again under the same dialect: the page re-reads the served
+    // version and, when an update was installed (or rolled back), imports it.
+    // Answers from the old engine are dropped (a newer Harper may say different
+    // things), what was with the page is queued again, and `ready` goes false
+    // until the page announces the engine (the surfaces use the macOS checker
+    // for a moment, as for a new page). Cycle 146.
+    void reload();
 
     // The findings for exactly `text`, or nullopt after queueing a request (the
     // answer then comes as resultsReady). Blank text has no findings.

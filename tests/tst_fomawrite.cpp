@@ -165,6 +165,16 @@ private slots:
     void liveSpellingRequestWaitsForHarperAndRepliesOnce();
     void writingCheckerCommandsMenuAndPaneFollowTheEngine();
     void harperDrivesSourceTheLivePageAndThePaneInTheRealPage();
+    void harperSchemeServesVersionedPathsFromTheOverrideThenTheBundle();
+    void harperUpdaterReportsUpToDateAndUpdateAvailable();
+    void harperUpdaterInstallsAnUpdateServesItAndReloadsTheEngine();
+    void harperUpdaterRollbackRestoresTheBundledVersionAndKeepsTheFolders();
+    void harperUpdaterRefusesAWrongIntegrityAndLeavesNothingBehind();
+    void harperUpdaterRefusesPackagesThatReachOutsideDist();
+    void harperUpdaterAcceptsOnlyHttpsAddressesOnTheRegistrysHost();
+    void harperUpdaterWeeklyCheckRespectsLastCheckAndAutoCheckAndInstallsOnce();
+    void helpMenuOffersWritingCheckerUpdatesWithBannerAndPaneStatus();
+    void harperUpdateLoadsInTheRealPageUnderItsOwnVersionedUrlAndRollsBack();
     void livePageWarmUpDoesNotDelayFirstPaintAndIsMeasured();
     void grammarChecksLongParagraphsInCachedChunks();
     void reviewPaneWithholdsTheWordBeingTypedInLive();
@@ -478,6 +488,9 @@ private slots:
         // the suite defers it to first use, as before. Tests that want the
         // warm-up clear this themselves (tests/cycle145-harper-engine.inc).
         qputenv("FOMAWRITE_NO_LIVE_PREWARM", "1");
+        // The weekly Harper update check (Main.qml, ten seconds after a window shows) would reach the
+        // npm registry; tests point HarperUpdater at a local server instead (tests/cycle146-harper-updates.inc).
+        qputenv("FOMAWRITE_NO_HARPER_UPDATE_CHECK", "1");
         QQuickStyle::setStyle(QStringLiteral("Material"));
         QSettings::setDefaultFormat(QSettings::IniFormat);
         QSettings::setPath(QSettings::IniFormat, QSettings::UserScope,
@@ -5286,6 +5299,7 @@ private:
 #include "cycle144-live-grammar.inc"
 #include "cycle144-review-pane.inc"
 #include "cycle145-harper-engine.inc"
+#include "cycle146-harper-updates.inc"
 
 int main(int argc, char **argv) {
     registerHarperScheme();

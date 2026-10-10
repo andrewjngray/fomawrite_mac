@@ -5,6 +5,7 @@
 #include <QFile>
 #include <QFileInfo>
 #include <QMultiMap>
+#include <QRegularExpression>
 #include <QStandardPaths>
 #include <QWebEngineUrlRequestJob>
 #include <QWebEngineUrlScheme>
@@ -18,46 +19,101 @@ QByteArray mimeFor(const QString &name) {
     if (name.endsWith(QLatin1String(".js"))) return "text/javascript";
     if (name.endsWith(QLatin1String(".wasm"))) return "application/wasm";
     if (name.endsWith(QLatin1String(".json"))) return "application/json";
+    if (name == QLatin1String("VERSION") || name.startsWith(QLatin1String("LICENSE"))) return "text/plain";
     return "application/octet-stream";
+}
+
+QString readVersionFile(const QString &path) {
+    QFile file(path);
+    if (!file.open(QIODevice::ReadOnly)) return {};
+    const QString version = QString::fromUtf8(file.read(64)).trimmed();
+    return HarperSchemeHandler::isValidVersion(version) ? version : QString();
 }
 } // namespace
 
 HarperSchemeHandler::HarperSchemeHandler(QObject *parent) : QWebEngineUrlSchemeHandler(parent) {}
 
-QString HarperSchemeHandler::overrideDirectory() {
-    const QString root = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
-    if (root.isEmpty()) return {};
-    const QDir dir(root + QStringLiteral("/harper/current"));
-    return dir.exists(QStringLiteral("harper_wasm_bg.wasm")) && dir.exists(QStringLiteral("index.js")) ? dir.absolutePath() : QString();
+bool HarperSchemeHandler::isValidVersion(const QString &version) {
+    static const QRegularExpression pattern(QStringLiteral("^\\d{1,6}\\.\\d{1,6}\\.\\d{1,6}$"));
+    return pattern.match(version).hasMatch();
 }
 
-QString HarperSchemeHandler::servedVersion() {
+QString HarperSchemeHandler::harperRoot() {
+    const QString root = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+    return root.isEmpty() ? QString() : root + QStringLiteral("/harper");
+}
+
+QString HarperSchemeHandler::overrideDirectory() {
+    const QString root = harperRoot();
+    if (root.isEmpty()) return {};
+    const QDir dir(root + QStringLiteral("/current"));
+    for (const char *name : {"harper_wasm_bg.wasm", "index.js", "binary.js", "BinaryModule.js"})
+        if (!dir.exists(QString::fromLatin1(name))) return {};
+    return readVersionFile(dir.filePath(QStringLiteral("VERSION"))).isEmpty() ? QString() : dir.absolutePath();
+}
+
+QString HarperSchemeHandler::overrideVersion() {
     const QString override = overrideDirectory();
-    QFile file((override.isEmpty() ? QString::fromLatin1(BundledRoot) : override + QLatin1Char('/')) + QStringLiteral("VERSION"));
-    if (!file.open(QIODevice::ReadOnly)) return {};
-    return QString::fromUtf8(file.readAll()).trimmed();
+    return override.isEmpty() ? QString() : readVersionFile(override + QStringLiteral("/VERSION"));
+}
+
+QString HarperSchemeHandler::bundledVersion() { return readVersionFile(QString::fromLatin1(BundledRoot) + QStringLiteral("VERSION")); }
+
+QString HarperSchemeHandler::servedVersion() {
+    const QString override = overrideVersion();
+    return override.isEmpty() ? bundledVersion() : override;
+}
+
+QString HarperSchemeHandler::resolvePath(const QUrl &url, QByteArray *mime) {
+    if (url.scheme() != QLatin1String(SchemeName) || url.host() != QLatin1String("harper")) return {};
+    const QString path = url.path();
+    QString file, version;
+    if (path == QLatin1String("/VERSION")) {
+        file = QStringLiteral("VERSION");
+    } else {
+        // /<version>/<file>: two flat segments, no traversal.
+        const QStringList parts = path.split(QLatin1Char('/'));
+        if (parts.size() != 3 || !parts.at(0).isEmpty()) return {};
+        version = parts.at(1);
+        file = parts.at(2);
+        if (!isValidVersion(version) || file.isEmpty() || file.contains(QLatin1String("..")) || file.contains(QLatin1Char('\\'))
+            || file == QLatin1String("VERSION"))
+            return {};
+    }
+    const QString override = overrideDirectory();
+    const QString overrideVer = override.isEmpty() ? QString() : overrideVersion();
+    QString resolved;
+    if (version.isEmpty()) {
+        // The version to use: the override's when valid, else the bundled one.
+        resolved = !overrideVer.isEmpty() ? override + QStringLiteral("/VERSION") : QString::fromLatin1(BundledRoot) + QStringLiteral("VERSION");
+    } else if (!overrideVer.isEmpty() && overrideVer == version) {
+        resolved = override + QLatin1Char('/') + file;
+    } else if (bundledVersion() == version) {
+        resolved = QString::fromLatin1(BundledRoot) + file;
+    }
+    if (resolved.isEmpty() || !QFileInfo(resolved).isFile()) return {};
+    if (mime) *mime = mimeFor(file);
+    return resolved;
 }
 
 void HarperSchemeHandler::requestStarted(QWebEngineUrlRequestJob *job) {
-    const QUrl url = job->requestUrl();
-    // fomawrite://harper/<file>: one flat folder, no traversal.
-    const QString name = QFileInfo(url.path()).fileName();
-    if (url.host() != QLatin1String("harper") || name.isEmpty() || name.contains(QLatin1String(".."))
-        || url.path() != QLatin1Char('/') + name) {
+    QByteArray mime;
+    const QString path = resolvePath(job->requestUrl(), &mime);
+    if (path.isEmpty()) {
         job->fail(QWebEngineUrlRequestJob::UrlNotFound);
         return;
     }
-    const QString override = overrideDirectory();
-    QString path = override.isEmpty() ? QString() : override + QLatin1Char('/') + name;
-    if (path.isEmpty() || !QFile::exists(path)) path = QString::fromLatin1(BundledRoot) + name;
     auto *file = new QFile(path, job);
     if (!file->open(QIODevice::ReadOnly)) {
         job->fail(QWebEngineUrlRequestJob::UrlNotFound);
         return;
     }
     // The page is on qrc:, so module and fetch loads here are cross-origin.
-    job->setAdditionalResponseHeaders({{QByteArrayLiteral("Access-Control-Allow-Origin"), QByteArrayLiteral("*")}});
-    job->reply(mimeFor(name), file);
+    // no-store on everything: VERSION must be read fresh after an update, and the
+    // versioned files are cheap (local) to serve again.
+    job->setAdditionalResponseHeaders({{QByteArrayLiteral("Access-Control-Allow-Origin"), QByteArrayLiteral("*")},
+                                       {QByteArrayLiteral("Cache-Control"), QByteArrayLiteral("no-store")}});
+    job->reply(mime.isEmpty() ? QByteArrayLiteral("application/octet-stream") : mime, file);
 }
 
 void registerHarperScheme() {

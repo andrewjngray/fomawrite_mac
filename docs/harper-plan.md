@@ -28,6 +28,8 @@ The pipeline from Cycles 143 and 144 stays: each surface marks what is prose, an
 
 ## Keeping Harper current
 
+**Built in Cycle 146** ([record](../research/cycle-146/README.md)). Two differences from the plan below: the page loads an update from a versioned path (`fomawrite://harper/<version>/…`, because module maps are keyed by URL) and reloads it as soon as it is installed rather than on the next document open, and the tarball check allows `package.json`/`LICENSE`/`README` beside `package/dist/` (real harper.js tarballs have them) while refusing every other entry outside `package/dist/`.
+
 - **Pinned bundle in the build.** `harper.lock.json` names the version and npm integrity hash; `bin/fetch-harper` downloads that tarball, verifies the hash, and places the needed files in the app's Resources (git-ignored, fetched in CI like `npm ci`).
 - **Updates at runtime.** A menu item **Help → Check for Writing Checker Updates…** and a weekly automatic check (a setting to turn it off). The check reads the npm registry's latest version; if newer, it downloads the tarball to the app's data folder, verifies the published sha512, unpacks the files the page needs, and loads the new engine on the next document open, with a notice ("Harper 2.11.0 installed; was 2.10.0"). A failed verification deletes the download and says so. Nothing in the page or the host executes outside Chromium's sandbox.
 - **Rollback:** the bundled version is always kept; a bad update can be discarded from the same menu.

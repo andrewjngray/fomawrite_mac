@@ -828,6 +828,21 @@ ApplicationWindow {
     }
 
     Timer { id: navigationNoticeTimer; interval: 7000; onTriggered: win.navigationNotice = "" }
+
+    // Keeping Harper current (Cycle 146): the updater reports through the same banner,
+    // and the weekly check runs ten seconds after the window first shows (once a week
+    // at most, only with "Check for Updates Automatically" on; see HarperUpdater).
+    Connections {
+        target: backend.harperUpdater
+        function onNotice(message) { win.showNavigationNotice(message); }
+    }
+    Timer {
+        id: harperUpdateTimer
+        objectName: "harperUpdateTimer"
+        interval: 10000
+        running: win.visible && backend.checksHarperUpdates()
+        onTriggered: backend.harperUpdater.runScheduledCheck()
+    }
     Rectangle {
         objectName: "navigationNotice"
         visible: win.navigationNotice !== ""
