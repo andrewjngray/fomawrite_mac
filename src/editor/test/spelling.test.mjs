@@ -323,7 +323,7 @@ test("the mock bridge answers checkSpelling / spellingSuggestions so the page ru
   bridge.learnWord("zzz");
   bridge.ignoreWord("yyy");
   await new Promise((r) => setTimeout(r, 80));
-  assert.deepEqual(replies, [["ranges", 7, [{ from: 22, to: 29 }]], ["words", 8, ["tomorrow"]]]);
+  assert.deepEqual(replies, [["ranges", 7, [{ from: 22, to: 29, category: "Spelling" }]], ["words", 8, ["tomorrow"]]]);
   assert.deepEqual(bridge.calls.filter((c) => /^(learn|ignore)Word$/.test(c.name)).map((c) => [c.name, c.args[0]]), [["learnWord", "zzz"], ["ignoreWord", "yyy"]]);
 });
 

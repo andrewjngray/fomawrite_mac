@@ -169,6 +169,7 @@ private slots:
     void sourceGrammarContextMenuShowsTheMessageCorrectsAndIgnores();
     void sourceGrammarIgnoreIsPerDocumentAndRestylesInPlace();
     void liveSpellingUnderlinesMisspelledWordsAndFollowsTheSetting();
+    void liveGrammarUnderlinesFollowTheGrammarSetting();
     void footerLayoutCapsuleNamesPreviewOnly();
     void footerViewCyclesPreserveDraftSelectionAndWidths();
     void footerModesAndTemplatesPreserveDraftAndUndo();
@@ -5249,6 +5250,7 @@ private:
 #include "cycle143-source-spelling.inc"
 #include "cycle143-live-spelling.inc"
 #include "cycle144-source-grammar.inc"
+#include "cycle144-live-grammar.inc"
 
 int main(int argc, char **argv) {
     QtWebEngineQuick::initialize();

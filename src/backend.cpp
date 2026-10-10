@@ -608,10 +608,11 @@ Backend::Backend(QObject *parent, bool outputOnly) : QObject(parent), m_library(
     connect(m_editorBridge.get(), &EditorBridge::imageRequested, this, &Backend::resolveLiveImage);
     connect(m_editorBridge.get(), &EditorBridge::imageSaveRequested, this, &Backend::saveLiveImage);
     connect(m_editorBridge.get(), &EditorBridge::messageLogged, this, [](const QString &message) { qWarning("Live editor: %s", qPrintable(message)); });
-    // Spelling in the Live page: the page sends prose segments, the shared
-    // SpellCheck service finds the misspelled words, ranges go back in document
-    // offsets. The setting, the language and the learned/ignored words all
-    // reach the page as setSpellCheck, which makes it check again.
+    // Spelling and grammar in the Live page: the page sends prose segments, the
+    // shared SpellCheck service finds the misspelled words and grammar findings,
+    // ranges (with a category) go back in document offsets. The setting, the
+    // grammar setting, the language and the learned/ignored words all reach the
+    // page as setSpellCheck, which makes it check again.
     connect(m_editorBridge.get(), &EditorBridge::spellingRequested, this, [this](int token, const QString &segmentsJson) {
         QJsonArray ranges;
         const QJsonDocument document = QJsonDocument::fromJson(segmentsJson.toUtf8());
@@ -620,8 +621,17 @@ Backend::Backend(QObject *parent, bool outputOnly) : QObject(parent), m_library(
             const QJsonObject segment = segments.at(i).toObject();
             const int from = segment.value(QStringLiteral("from")).toInt(-1);
             if (from < 0) continue;
-            for (const auto &range : m_spellCheck.misspellings(segment.value(QStringLiteral("text")).toString()))
-                ranges.append(QJsonObject{{QStringLiteral("from"), from + range.start}, {QStringLiteral("to"), from + range.end}});
+            // Spelling entries stay small (category only); a grammar entry also
+            // carries the checker's message and corrections for the page's menu.
+            for (const auto &issue : m_spellCheck.issues(segment.value(QStringLiteral("text")).toString())) {
+                QJsonObject entry{{QStringLiteral("from"), from + issue.start}, {QStringLiteral("to"), from + issue.end},
+                                  {QStringLiteral("category"), issue.category}};
+                if (issue.category == QLatin1String("Grammar")) {
+                    entry.insert(QStringLiteral("message"), issue.message);
+                    entry.insert(QStringLiteral("suggestions"), QJsonArray::fromStringList(issue.suggestions));
+                }
+                ranges.append(entry);
+            }
         }
         m_editorBridge->replySpelling(token, QString::fromUtf8(QJsonDocument(ranges).toJson(QJsonDocument::Compact)));
     });
@@ -634,6 +644,7 @@ Backend::Backend(QObject *parent, bool outputOnly) : QObject(parent), m_library(
     connect(&m_spellCheck, &SpellCheck::enabledChanged, this, pushSpellCheck);
     connect(&m_spellCheck, &SpellCheck::languageChanged, this, pushSpellCheck);
     connect(&m_spellCheck, &SpellCheck::wordsChanged, this, pushSpellCheck);
+    connect(&m_spellCheck, &SpellCheck::grammarEnabledChanged, this, pushSpellCheck); // the next reply carries (or omits) grammar
     pushSpellCheck();
     // New installations start with the composed writing palette; a stored
     // choice, including System, always takes precedence.
