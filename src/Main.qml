@@ -986,6 +986,47 @@ ApplicationWindow {
         CompactMenuItem { objectName: "spellingIgnore"; text: "Ignore Spelling"
             onTriggered: { backend.spellCheck.ignoreWord(spellingMenu.word); editor.forceActiveFocus(); } }
     }
+    // Right-click on a blue (grammar) range in the Source editor: the checker's
+    // message as a disabled first line, up to five corrections, then Ignore
+    // Grammar Issue. There is no Learn: a sentence is not a word. Corrections
+    // go through backend.correctWriting, one undoable edit.
+    CompactMenu {
+        id: grammarMenu
+        objectName: "grammarContextMenu"
+        width: 320
+        property int rangeStart: -1
+        property int rangeEnd: -1
+        property string original: ""
+        property string message: ""
+        property var corrections: []
+        function showFor(point, hit) {
+            rangeStart = hit.start; rangeEnd = hit.end; original = hit.word;
+            message = hit.message && hit.message.length > 0 ? hit.message : "Grammar";
+            corrections = hit.suggestions.slice(0, 5);
+            popup(editor, point.x, point.y);
+        }
+        function replaceWith(replacement) {
+            var ok = false;
+            win.performDocumentEdit(function() { ok = backend.correctWriting(rangeStart, rangeEnd, original, replacement); });
+            if (ok) editor.cursorPosition = rangeStart + replacement.length;
+            editor.forceActiveFocus();
+        }
+        onClosed: if (win.sourceEditorVisible) editor.forceActiveFocus()
+        CompactMenuItem { objectName: "grammarMessage"; enabled: false; text: grammarMenu.message }
+        CompactMenuItem { objectName: "grammarSuggestion0"; visible: grammarMenu.corrections.length > 0; height: visible ? implicitHeight : 0
+            text: grammarMenu.corrections.length > 0 ? grammarMenu.corrections[0] : ""; onTriggered: grammarMenu.replaceWith(text) }
+        CompactMenuItem { objectName: "grammarSuggestion1"; visible: grammarMenu.corrections.length > 1; height: visible ? implicitHeight : 0
+            text: grammarMenu.corrections.length > 1 ? grammarMenu.corrections[1] : ""; onTriggered: grammarMenu.replaceWith(text) }
+        CompactMenuItem { objectName: "grammarSuggestion2"; visible: grammarMenu.corrections.length > 2; height: visible ? implicitHeight : 0
+            text: grammarMenu.corrections.length > 2 ? grammarMenu.corrections[2] : ""; onTriggered: grammarMenu.replaceWith(text) }
+        CompactMenuItem { objectName: "grammarSuggestion3"; visible: grammarMenu.corrections.length > 3; height: visible ? implicitHeight : 0
+            text: grammarMenu.corrections.length > 3 ? grammarMenu.corrections[3] : ""; onTriggered: grammarMenu.replaceWith(text) }
+        CompactMenuItem { objectName: "grammarSuggestion4"; visible: grammarMenu.corrections.length > 4; height: visible ? implicitHeight : 0
+            text: grammarMenu.corrections.length > 4 ? grammarMenu.corrections[4] : ""; onTriggered: grammarMenu.replaceWith(text) }
+        MenuSeparator {}
+        CompactMenuItem { objectName: "grammarIgnore"; text: "Ignore Grammar Issue"
+            onTriggered: { backend.ignoreGrammarIssue(grammarMenu.rangeStart, grammarMenu.rangeEnd); editor.forceActiveFocus(); } }
+    }
     CompactMenu {
         id: writingOptions
         objectName: "writingOptions"
@@ -3054,10 +3095,15 @@ ApplicationWindow {
                     anchors.fill: parent
                     acceptedButtons: Qt.RightButton
                     onPressed: function(mouse) {
+                        var position = editor.positionAt(mouse.x, mouse.y);
                         var hit = backend.spellCheck.enabled && !editor.inputMethodComposing
-                            ? backend.misspelledWordAt(editor.positionAt(mouse.x, mouse.y)) : ({});
-                        if (hit.word === undefined) { mouse.accepted = false; return; }
-                        spellingMenu.showFor(Qt.point(mouse.x, mouse.y), hit);
+                            ? backend.misspelledWordAt(position) : ({});
+                        if (hit.word !== undefined) { spellingMenu.showFor(Qt.point(mouse.x, mouse.y), hit); return; }
+                        // Spelling first; then a blue grammar range.
+                        var grammar = backend.spellCheck.enabled && backend.spellCheck.grammarEnabled && !editor.inputMethodComposing
+                            ? backend.grammarIssueAt(position) : ({});
+                        if (grammar.word === undefined) { mouse.accepted = false; return; }
+                        grammarMenu.showFor(Qt.point(mouse.x, mouse.y), grammar);
                     }
                 }
 

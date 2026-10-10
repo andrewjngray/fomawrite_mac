@@ -247,6 +247,11 @@ public:
     // position: {start, end, word} in UTF-16 units, or an empty map when the
     // position is not on an underlined word. Same rules as the underline.
     Q_INVOKABLE QVariantMap misspelledWordAt(int position);
+    // The grammar finding the Source editor underlines at `position`, as
+    // {start, end, word, message, suggestions}; empty when there is none.
+    Q_INVOKABLE QVariantMap grammarIssueAt(int position);
+    // "Ignore Grammar Issue": hide that finding for this document.
+    Q_INVOKABLE void ignoreGrammarIssue(int start, int end);
     Q_INVOKABLE void speakText(const QString &text);
     Q_INVOKABLE void stopSpeaking();
     static QString proseForReview(const QString &markdown);

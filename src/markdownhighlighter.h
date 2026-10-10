@@ -3,6 +3,7 @@
 #include <QHash>
 #include <QPointer>
 #include <QRegularExpression>
+#include <QSet>
 #include <QSyntaxHighlighter>
 #include <QTextBlock>
 #include <QTextCharFormat>
@@ -55,12 +56,30 @@ public:
     // (1 drawn, 2 withheld at the caret) and the block-relative end of the word.
     static constexpr int SpellMarkProperty = QTextFormat::UserProperty + 41;
     static constexpr int SpellWordEndProperty = QTextFormat::UserProperty + 42;
+    // Which kind of finding a mark is, so the caret rule restores the right
+    // colours: 1 spelling (red), 2 grammar (blue).
+    static constexpr int SpellCategoryProperty = QTextFormat::UserProperty + 43;
     // Block-relative [start, end) ranges the layer underlines in `block`.
     QList<SpellCheck::Range> misspellingsInBlock(const QTextBlock &block);
     // Spelling and grammar findings in `block`, block-relative, document order:
     // the one list the review pane lists and the surfaces draw. Grammar comes
     // from the service (cached by prose like spelling) when it is enabled.
     QList<SpellCheck::Issue> issuesInBlock(const QTextBlock &block);
+    // Grammar findings only, block-relative, with the per-document ignore set
+    // applied. This is what the grammar underline draws and the grammar
+    // right-click offers; issuesInBlock lists it after the spelling findings.
+    QList<SpellCheck::Issue> grammarIssuesInBlock(const QTextBlock &block);
+    // The macOS checker has no per-issue ignore, so "Ignore Grammar Issue" is
+    // kept here: the finding at [start, end) of the block, keyed by its text,
+    // stops being drawn or listed until the document is attached again. The
+    // block is restyled without a revision bump (see applyCaretRule).
+    void ignoreIssue(int blockNumber, int start, int end);
+    void clearIgnoredIssues();
+    // A bare grammar function in place of the service's (tests, like
+    // setSpellChecker): receives the prose of one block, returns block-relative
+    // findings. Null goes back to the service.
+    using GrammarChecker = std::function<QList<SpellCheck::Issue>(const QString &)>;
+    void setGrammarChecker(const GrammarChecker &checker) { m_grammarChecker = checker; refreshSpelling(); }
     // The service, when one is attached (null with a bare checker function).
     SpellCheck *spellCheck() const { return m_spellCheck; }
     // The prose of one block as the checker sees it (public for tests).
@@ -89,7 +108,11 @@ private:
     void highlightReviewSpans(const QString &text);
     void highlightSearch(const QString &text);
     void highlightSpelling(const QString &text);
-    void applySpellingMark(QTextCharFormat &format, bool drawn) const;
+    void applySpellingMark(QTextCharFormat &format, bool drawn, int category = 1) const;
+    // Installs edited layout formats on a block without an edit block: marks the
+    // contents dirty and emits updateBlock so the Qt Quick item repaints.
+    void commitLayoutFormats(const QTextBlock &block, const QList<QTextLayout::FormatRange> &ranges);
+    QString issueKey(const QTextBlock &block, int start, int end) const;
     // Re-applies the caret rule to one block's layout formats directly, without
     // a rehighlight: a rehighlight opens an edit block and bumps the document
     // revision, which the link editor and the Live sync read as an edit.
@@ -120,11 +143,14 @@ private:
     QList<Span> m_reviewSpans;
     SpellChecker m_spellChecker;
     QColor m_spellBackground;
+    QColor m_grammarBackground;
+    QSet<QString> m_ignoredIssues;
     bool m_spellingEnabled = false;
     int m_caret = -1;
     int m_withheldBlock = -1;
     QHash<QString, QList<SpellCheck::Range>> m_spellCache;
     QHash<QString, QList<SpellCheck::Issue>> m_grammarCache;
+    GrammarChecker m_grammarChecker;
     SpellCheck *m_spellCheck = nullptr;
     QTextCharFormat m_reviewFormat;
     QString m_searchQuery;

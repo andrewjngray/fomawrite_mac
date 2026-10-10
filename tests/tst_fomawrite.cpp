@@ -162,6 +162,12 @@ private slots:
     void sourceSpellingUnderlineIsRedInTheRenderedWindow();
     void sourceSpellingContextMenuOffersSuggestionsAndCorrects();
     void sourceSpellingWithholdsTheCaretWordAndDimmedText();
+    void sourceGrammarUnderlinesDoubledWordsAndSpellingStaysRed();
+    void sourceGrammarFollowsItsSettingAndKeepsSpelling();
+    void sourceGrammarWithholdsTheRangeAtTheCaretWithoutARevision();
+    void sourceGrammarUnderlineIsBlueInTheRenderedWindow();
+    void sourceGrammarContextMenuShowsTheMessageCorrectsAndIgnores();
+    void sourceGrammarIgnoreIsPerDocumentAndRestylesInPlace();
     void liveSpellingUnderlinesMisspelledWordsAndFollowsTheSetting();
     void footerLayoutCapsuleNamesPreviewOnly();
     void footerViewCyclesPreserveDraftSelectionAndWidths();
@@ -5242,6 +5248,7 @@ private:
 #include "cycle143-spellcheck.inc"
 #include "cycle143-source-spelling.inc"
 #include "cycle143-live-spelling.inc"
+#include "cycle144-source-grammar.inc"
 
 int main(int argc, char **argv) {
     QtWebEngineQuick::initialize();

@@ -220,6 +220,7 @@ void MarkdownHighlighter::rebuildFormats() {
                                             : QColor(QStringLiteral("#fff1b8")));
 
     m_spellBackground = m_darkMode ? QColor(QStringLiteral("#5c2b2b")) : QColor(QStringLiteral("#fbd5d1"));
+    m_grammarBackground = m_darkMode ? QColor(QStringLiteral("#243a5c")) : QColor(QStringLiteral("#d9e7fb"));
 
     m_searchFormat = QTextCharFormat();
     m_searchFormat.setBackground(m_darkMode ? QColor(QStringLiteral("#725b18"))
@@ -385,23 +386,35 @@ void MarkdownHighlighter::setCaret(int position) {
     if (current.isValid()) applyCaretRule(current);
 }
 
-void MarkdownHighlighter::applySpellingMark(QTextCharFormat &format, bool drawn) const {
+void MarkdownHighlighter::applySpellingMark(QTextCharFormat &format, bool drawn, int category) const {
+    const QColor wash = category == 2 ? m_grammarBackground : m_spellBackground;
     if (drawn) {
         // Measured in the rendered window (Qt 6.11, tests/cycle143-source-
         // spelling.inc): Qt Quick never draws SpellCheckUnderline (it tests
         // fontUnderline), and a plain underline takes the text colour unless
         // the run also has a background, when the underline colour is used.
-        // So the mark is a single underline in red plus a pale red wash.
+        // So the mark is a single underline (red for spelling, blue for
+        // grammar) plus a pale wash of the same hue.
         format.setUnderlineStyle(QTextCharFormat::SingleUnderline);
-        format.setUnderlineColor(QColor(QStringLiteral("#d93025")));
+        format.setUnderlineColor(QColor(category == 2 ? QStringLiteral("#1a73e8") : QStringLiteral("#d93025")));
         if (!format.hasProperty(QTextFormat::BackgroundBrush) || format.background().style() == Qt::NoBrush)
-            format.setBackground(m_spellBackground);
+            format.setBackground(wash);
         format.setProperty(SpellMarkProperty, 1);
     } else {
         format.setUnderlineStyle(QTextCharFormat::NoUnderline);
-        if (format.background() == QBrush(m_spellBackground)) format.clearBackground();
+        if (format.background() == QBrush(wash)) format.clearBackground();
         format.setProperty(SpellMarkProperty, 2);
     }
+    format.setProperty(SpellCategoryProperty, category);
+}
+
+void MarkdownHighlighter::commitLayoutFormats(const QTextBlock &block, const QList<QTextLayout::FormatRange> &ranges) {
+    block.layout()->setFormats(ranges);
+    document()->markContentsDirty(block.position(), block.length());
+    // Views repaint a block on the layout's updateBlock signal (the Qt Quick
+    // text item connects it to its own invalidateBlock). A format change
+    // outside an edit block has to announce itself.
+    if (auto *layout = document()->documentLayout()) emit layout->updateBlock(block);
 }
 
 void MarkdownHighlighter::applyCaretRule(const QTextBlock &block) {
@@ -413,17 +426,50 @@ void MarkdownHighlighter::applyCaretRule(const QTextBlock &block) {
         if (!state) continue;
         const bool atCaret = m_caret >= 0 && block.position() + range.format.intProperty(SpellWordEndProperty) == m_caret;
         if (atCaret == (state == 2)) continue;
-        applySpellingMark(range.format, !atCaret);
+        const int category = range.format.intProperty(SpellCategoryProperty) == 2 ? 2 : 1;
+        applySpellingMark(range.format, !atCaret, category);
         if (atCaret) m_withheldBlock = block.blockNumber();
         changed = true;
     }
-    if (!changed) return;
-    block.layout()->setFormats(ranges);
-    document()->markContentsDirty(block.position(), block.length());
-    // Views repaint a block on the layout's updateBlock signal (the Qt Quick
-    // text item connects it to its own invalidateBlock). A format change
-    // outside an edit block has to announce itself.
-    if (auto *layout = document()->documentLayout()) emit layout->updateBlock(block);
+    if (changed) commitLayoutFormats(block, ranges);
+}
+
+QString MarkdownHighlighter::issueKey(const QTextBlock &block, int start, int end) const {
+    return QStringLiteral("%1:%2:%3:%4").arg(block.blockNumber()).arg(start).arg(end)
+        .arg(block.text().mid(start, end - start));
+}
+
+void MarkdownHighlighter::clearIgnoredIssues() {
+    if (m_ignoredIssues.isEmpty()) return;
+    m_ignoredIssues.clear();
+    rehighlight();
+}
+
+// A user action, but still the direct layout path: the marks of the ignored
+// finding are stripped from the block's formats in place (nothing is
+// rehighlighted, so the document revision does not move and the link editor or
+// the Live sync never reads the restyle as an edit).
+void MarkdownHighlighter::ignoreIssue(int blockNumber, int start, int end) {
+    if (!document()) return;
+    const QTextBlock block = document()->findBlockByNumber(blockNumber);
+    if (!block.isValid() || start < 0 || end > block.text().size() || end <= start) return;
+    m_ignoredIssues.insert(issueKey(block, start, end));
+    if (!block.layout()) return;
+    QList<QTextLayout::FormatRange> ranges = block.layout()->formats();
+    bool changed = false;
+    for (QTextLayout::FormatRange &range : ranges) {
+        if (range.format.intProperty(SpellCategoryProperty) != 2
+            || range.format.intProperty(SpellWordEndProperty) != end
+            || range.start + range.length <= start || range.start >= end) continue;
+        range.format.setUnderlineStyle(QTextCharFormat::NoUnderline);
+        if (range.format.background() == QBrush(m_grammarBackground)) range.format.clearBackground();
+        range.format.clearProperty(SpellMarkProperty);
+        range.format.clearProperty(SpellWordEndProperty);
+        range.format.clearProperty(SpellCategoryProperty);
+        changed = true;
+    }
+    if (m_withheldBlock == blockNumber) m_withheldBlock = -1;
+    if (changed) commitLayoutFormats(block, ranges);
 }
 
 void MarkdownHighlighter::refreshSpelling() {
@@ -511,6 +557,42 @@ QList<SpellCheck::Range> MarkdownHighlighter::misspellingsInBlock(const QTextBlo
     return result;
 }
 
+QList<SpellCheck::Issue> MarkdownHighlighter::grammarIssuesInBlock(const QTextBlock &block) {
+    QList<SpellCheck::Issue> issues;
+    const bool grammarOn = m_grammarChecker || (m_spellCheck && m_spellCheck->grammarEnabled());
+    if (!grammarOn || !m_spellingEnabled || !block.isValid()) return issues;
+    const QString text = block.text();
+    // Grammar runs on the same prose as spelling, under the same prose
+    // rules (code, fences, front matter and syntax are never grammar).
+    const QString prose = spellingProse(text);
+    if (prose.trimmed().isEmpty()) return issues;
+    // The same literal/code/front-matter gate misspellingsInBlock applies.
+    if (m_codeStyle && !m_codeLanguage.isEmpty()) return issues;
+    const int previousState = block.previous().isValid() ? block.previous().userState() : 0;
+    static const QRegularExpression fenceRe(QStringLiteral("^ {0,3}(`{3,}|~{3,})(.*)$"));
+    if (previousState > 0 || fenceRe.match(text).hasMatch()) return issues;
+    if (block.blockNumber() <= 500 && block.blockNumber() <= frontMatterEndBlock()) return issues;
+    // An indented run after a blank line is code, as in misspellingsInBlock.
+    static const QRegularExpression indentedRe(QStringLiteral("^(?: {4,}|\\t)"));
+    static const QRegularExpression listItemRe(QStringLiteral("^\\s*(?:[-+*]|\\d+[.)])\\s"));
+    if (indentedRe.match(text).hasMatch() && !listItemRe.match(text).hasMatch()) {
+        const QTextBlock previous = block.previous();
+        if (!previous.isValid() || previous.text().trimmed().isEmpty()
+            || indentedRe.match(previous.text()).hasMatch()) return issues;
+    }
+    auto cached = m_grammarCache.constFind(prose);
+    if (cached == m_grammarCache.constEnd()) {
+        if (m_grammarCache.size() > 65536) m_grammarCache.clear();
+        cached = m_grammarCache.insert(prose, m_grammarChecker ? m_grammarChecker(prose) : m_spellCheck->grammarIssues(prose));
+    }
+    for (const SpellCheck::Issue &issue : *cached) {
+        if (issue.start < 0 || issue.end > text.size() || issue.end <= issue.start) continue;
+        if (!m_ignoredIssues.isEmpty() && m_ignoredIssues.contains(issueKey(block, issue.start, issue.end))) continue;
+        issues.append(issue);
+    }
+    return issues;
+}
+
 QList<SpellCheck::Issue> MarkdownHighlighter::issuesInBlock(const QTextBlock &block) {
     QList<SpellCheck::Issue> issues;
     const QString text = block.text();
@@ -519,49 +601,47 @@ QList<SpellCheck::Issue> MarkdownHighlighter::issuesInBlock(const QTextBlock &bl
         issues.append({range.start, range.end, QStringLiteral("Spelling"), QString(),
                        m_spellCheck ? m_spellCheck->suggestions(word) : QStringList()});
     }
-    if (m_spellCheck && m_spellingEnabled && m_spellCheck->grammarEnabled()) {
-        // Grammar runs on the same prose as spelling, under the same prose
-        // rules (code, fences, front matter and syntax are never grammar).
-        const QString prose = spellingProse(text);
-        bool checkable = !prose.trimmed().isEmpty();
-        if (checkable) {
-            // The same literal/code/front-matter gate misspellingsInBlock applies.
-            if (m_codeStyle && !m_codeLanguage.isEmpty()) checkable = false;
-            const int previousState = block.previous().isValid() ? block.previous().userState() : 0;
-            static const QRegularExpression fenceRe(QStringLiteral("^ {0,3}(`{3,}|~{3,})(.*)$"));
-            if (previousState > 0 || fenceRe.match(text).hasMatch()) checkable = false;
-            if (block.blockNumber() <= 500 && block.blockNumber() <= frontMatterEndBlock()) checkable = false;
-        }
-        if (checkable) {
-            auto cached = m_grammarCache.constFind(prose);
-            if (cached == m_grammarCache.constEnd()) {
-                if (m_grammarCache.size() > 65536) m_grammarCache.clear();
-                cached = m_grammarCache.insert(prose, m_spellCheck->grammarIssues(prose));
-            }
-            for (const SpellCheck::Issue &issue : *cached)
-                if (issue.start >= 0 && issue.end <= text.size() && issue.end > issue.start) issues.append(issue);
-        }
-    }
+    issues.append(grammarIssuesInBlock(block));
     std::stable_sort(issues.begin(), issues.end(), [](const SpellCheck::Issue &a, const SpellCheck::Issue &b) {
         return a.start < b.start || (a.start == b.start && a.end < b.end); });
     return issues;
 }
 
 void MarkdownHighlighter::highlightSpelling(const QString &text) {
-    Q_UNUSED(text);
     const QTextBlock block = currentBlock();
     const int blockStart = block.position(), blockEnd = blockStart + block.length();
     // In focus mode the dimmed text outside the focus is left alone: a pink
     // wash under dimmed grey text reads worse than the dimming itself.
     if (m_focusStart >= 0 && (blockEnd <= m_focusStart || blockStart >= m_focusEnd)) return;
-    for (const SpellCheck::Range &range : misspellingsInBlock(block)) {
+    const QList<SpellCheck::Range> spelling = misspellingsInBlock(block);
+    // Grammar first, minus the characters spelling claims: where the two
+    // overlap, spelling wins for that character.
+    QVector<bool> spelled(text.size(), false);
+    for (const SpellCheck::Range &range : spelling)
+        for (int i = range.start; i < range.end && i < text.size(); ++i) spelled[i] = true;
+    for (const SpellCheck::Issue &issue : grammarIssuesInBlock(block)) {
+        const bool atCaret = m_caret >= 0 && blockStart + issue.end == m_caret;
+        if (atCaret) m_withheldBlock = block.blockNumber();
+        for (int i = issue.start; i < issue.end; ++i) {
+            if (spelled.at(i)) continue;
+            // Partly dimmed focus text carries no wash either.
+            const int offset = blockStart + i;
+            if (m_focusStart >= 0 && (offset < m_focusStart || offset >= m_focusEnd)) continue;
+            QTextCharFormat composed = format(i);
+            if (composed.fontPointSize() == 1.0) continue; // a hidden marker, not a letter
+            composed.setProperty(SpellWordEndProperty, issue.end);
+            applySpellingMark(composed, !atCaret, 2);
+            setFormat(i, 1, composed);
+        }
+    }
+    for (const SpellCheck::Range &range : spelling) {
         const bool atCaret = m_caret >= 0 && blockStart + range.end == m_caret;
         if (atCaret) m_withheldBlock = block.blockNumber();
         for (int i = range.start; i < range.end; ++i) {
             QTextCharFormat composed = format(i);
             if (composed.fontPointSize() == 1.0) continue; // a hidden marker, not a letter
             composed.setProperty(SpellWordEndProperty, range.end);
-            applySpellingMark(composed, !atCaret);
+            applySpellingMark(composed, !atCaret, 1);
             setFormat(i, 1, composed);
         }
     }

@@ -4047,6 +4047,32 @@ QVariantMap Backend::misspelledWordAt(int position) {
     }
     return {};
 }
+QVariantMap Backend::grammarIssueAt(int position) {
+    if (!m_document || !m_highlighter || position < 0) return {};
+    const QTextBlock block = m_document->findBlock(position);
+    if (!block.isValid()) return {};
+    const int offset = position - block.position();
+    const QString text = block.text();
+    // Spelling wins where the two overlap, so a position on a misspelled word
+    // is not a grammar hit (misspelledWordAt answers it first).
+    for (const auto &range : m_highlighter->misspellingsInBlock(block))
+        if (offset >= range.start && offset <= range.end) return {};
+    for (const auto &issue : m_highlighter->grammarIssuesInBlock(block)) {
+        if (offset < issue.start || offset > issue.end) continue;
+        return {{QStringLiteral("start"), block.position() + issue.start},
+                {QStringLiteral("end"), block.position() + issue.end},
+                {QStringLiteral("word"), text.mid(issue.start, issue.end - issue.start)},
+                {QStringLiteral("message"), issue.message},
+                {QStringLiteral("suggestions"), issue.suggestions}};
+    }
+    return {};
+}
+void Backend::ignoreGrammarIssue(int start, int end) {
+    if (!m_document || !m_highlighter || start < 0) return;
+    const QTextBlock block = m_document->findBlock(start);
+    if (!block.isValid()) return;
+    m_highlighter->ignoreIssue(block.blockNumber(), start - block.position(), end - block.position());
+}
 void Backend::speakText(const QString &text) {
 #ifdef Q_OS_MACOS
     macSpeakText(proseForReview(text));
