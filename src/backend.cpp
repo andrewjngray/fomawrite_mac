@@ -638,7 +638,9 @@ Backend::Backend(QObject *parent, bool outputOnly) : QObject(parent), m_library(
     connect(m_editorBridge.get(), &EditorBridge::cursorMoved, this, [this](int, int head) {
         if (m_liveCaret == head) return;
         m_liveCaret = head; m_liveCaretClock.start();
-        if (m_reviewWithheldWord) m_reviewTimer.start();
+        // A caret arriving just after an edit may land at the end of a word the
+        // list already shows: rebuild so the hold-back applies (and releases).
+        if (m_reviewWithheldWord || (m_reviewEditClock.isValid() && m_reviewEditClock.elapsed() < ReviewTypingPause)) m_reviewTimer.start();
     });
     connect(m_editorBridge.get(), &EditorBridge::grammarIgnored, this, [this](const QString &text, const QString &message) { m_spellCheck.ignoreGrammar(text, message); });
     connect(&m_spellCheck, &SpellCheck::enabledChanged, this, &Backend::pushSpellCheckState);
@@ -1676,7 +1678,7 @@ void Backend::setFocusPosition(int position, bool enabled, bool sentence) {
     if (m_caret != position) {
         m_caret = position; m_sourceCaretClock.start();
         // The word that was being typed becomes a finding once the caret leaves it.
-        if (m_reviewWithheldWord) m_reviewTimer.start();
+        if (m_reviewWithheldWord || (m_reviewEditClock.isValid() && m_reviewEditClock.elapsed() < ReviewTypingPause)) m_reviewTimer.start();
     }
     const auto block = m_document->findBlock(position);
     if (!enabled && !sentence) { m_highlighter->setFocusRange(-1, -1); return; }

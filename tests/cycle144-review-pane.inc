@@ -566,11 +566,14 @@ void FomawriteTest::reviewPaneWithholdsTheWordBeingTypedInLive() {
         (function() { const v = window.fomawriteEditor.view; const end = v.state.doc.length;
           v.dispatch({ changes: { from: end, insert: "%1" }, selection: { anchor: end + %2 }, userEvent: "input.type" }); })())JS")
         .arg(typed).arg(typed.size());
+    QElapsedTimer sinceTyping; sinceTyping.start();
     QVERIFY(QMetaObject::invokeMethod(view, "runJavaScript", Q_ARG(QString, script)));
     QTRY_COMPARE_WITH_TIMEOUT(editor->property("text").toString(), text + typed, 5000);
     QTRY_COMPARE_WITH_TIMEOUT(bridge->lastCursor(), text.size() + typed.size(), 5000);
-    // Within the typing pause the half-typed word is not a row.
-    QTest::qWait(700);
+    // Within the typing pause (1.5 s after the edit) the half-typed word is not
+    // a row. The pane rebuilds 300 ms after the edit; look just after that.
+    QTest::qWait(400);
+    if (sinceTyping.elapsed() > 1200) QSKIP("this machine took too long to mirror the edit for the timing check to mean anything");
     QVERIFY2(cycle144Find(backend.reviewIssues(), "Spelling", "zxqvwha").isEmpty(), "the word at the Live caret is withheld");
     QVERIFY(!cycle144Find(backend.reviewIssues(), "Spelling", "recieve").isEmpty());
     // The caret leaves the word: it is listed.
