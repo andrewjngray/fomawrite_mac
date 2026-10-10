@@ -18,9 +18,22 @@ Rectangle {
     readonly property int grammarCount: countOf("Grammar")
     readonly property int styleCount: countOf("Style")
     readonly property bool harperActive: checker.effectiveEngine === "harper"
+    // A fixed row leaves at once (the document is re-checked and the list
+    // rebuilt about 400 ms later; waiting for that made every fix feel slow),
+    // and the selection moves on to the next row so the writer keeps going.
+    property var pendingFixes: ({})
     readonly property var shown: issues.filter(function(issue) {
+        if (pendingFixes[issue.start + ":" + issue.end]) return false
         return filter === "all" || issue.category.toLowerCase() === filter
     })
+    onIssuesChanged: pendingFixes = ({})
+    function fixNow(issue, replacement) {
+        var rows = shown, next = -1
+        for (var i = 0; i < rows.length; ++i) if (rows[i].start === issue.start && rows[i].end === issue.end) { next = i + 1 < rows.length ? rows[i + 1].start : (i > 0 ? rows[i - 1].start : -1); break }
+        var pending = Object.assign({}, pendingFixes); pending[issue.start + ":" + issue.end] = true; pendingFixes = pending // a new object, so the binding re-evaluates
+        selectedStart = next
+        fixRequested(issue, replacement)
+    }
     readonly property color spellingInk: darkMode ? "#ff8a80" : "#d93025"
     readonly property color grammarInk: darkMode ? "#8ab4f8" : "#1a5fd0"
     readonly property color styleInk: darkMode ? "#a0a6b0" : "#5f6670"
@@ -271,7 +284,7 @@ Rectangle {
                                 darkMode: root.darkMode
                                 tonal: true
                                 width: Math.min(implicitWidth, row.width - 20)
-                                onClicked: root.fixRequested(row.modelData, modelData)
+                                onClicked: root.fixNow(row.modelData, modelData)
                             }
                         }
                     }

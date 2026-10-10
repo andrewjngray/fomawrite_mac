@@ -687,7 +687,20 @@ void Backend::answerSpellingRequest(int token, const QString &segmentsJson) {
         const QJsonObject segment = segments.at(i).toObject();
         const int from = segment.value(QStringLiteral("from")).toInt(-1);
         if (from < 0) continue;
-        request.segments.append({from, segment.value(QStringLiteral("text")).toString()});
+        // One line at a time, not the page's whole window: Harper reads a long
+        // run of lines without sentence punctuation as one sentence and then
+        // reports a single readability note and no spelling at all (a list of
+        // 60 short lines came back with nothing). Lines are also what the
+        // Source highlighter asks for, so the two surfaces share the cache.
+        const QString text = segment.value(QStringLiteral("text")).toString();
+        int lineStart = 0;
+        while (lineStart <= text.size()) {
+            int lineEnd = text.indexOf(QLatin1Char('\n'), lineStart);
+            if (lineEnd < 0) lineEnd = text.size();
+            const QString line = text.mid(lineStart, lineEnd - lineStart);
+            if (!line.trimmed().isEmpty()) request.segments.append({from + lineStart, line});
+            lineStart = lineEnd + 1;
+        }
     }
     spellingReplyJson(request.segments, &request.outstanding);
     if (request.outstanding.isEmpty()) {

@@ -156,6 +156,7 @@ private slots:
     void checkSpellingWhileTypingCommandTogglesTheSetting();
     void spellCheckServiceReportsGrammarIssuesWithCategory();
     void harperLintsInsideTheEditorPage();
+    void liveMarksALongListOfMisspellingsLineByLine();
     void harperBridgeAnswersLintRequestsFromTheHost();
     void harperEngineCachesDedupesAndMapsKinds();
     void harperEngineQueuesNewestFirstAndBoundsItsCache();
@@ -5309,3 +5310,4 @@ int main(int argc, char **argv) {
     return QTest::qExec(&test, argc, argv);
 }
 #include "tst_fomawrite.moc"
+#include "cycle147-harper-daily-use.inc"

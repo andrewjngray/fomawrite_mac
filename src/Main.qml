@@ -765,8 +765,17 @@ ApplicationWindow {
         } else backend.setOutputStyle(style);
         restorePublishingChecks();
     }
+    property var publishingNoticesShown: ({})
     function showPublishingThemeNotice(message) {
         if (!message) return;
+        // A missing optional font is advice, not an error: the quiet banner,
+        // once per message per session, with where to put the font.
+        if (message.indexOf("Missing optional theme fonts") === 0) {
+            if (publishingNoticesShown[message]) return;
+            var shown = publishingNoticesShown; shown[message] = true; publishingNoticesShown = shown;
+            win.showNavigationNotice(message + " Put the font file in the theme's folder (Output Style → Open Themes Folder) to use it.");
+            return;
+        }
         publishingThemeNotice.message = message;
         publishingThemeNotice.open();
     }
