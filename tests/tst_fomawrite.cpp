@@ -34,7 +34,6 @@
 #include <QStandardPaths>
 
 #include "backend.h"
-#include "sourceaccessibility.h"
 #include "spellcheck.h"
 #include "markdownhighlighter.h"
 
@@ -152,7 +151,6 @@ private slots:
     void footerCompactStylesRemainReachableAcrossModes();
     void footerViewControlsStayStationaryAcrossModes();
     void footerLiveOptionJoinsEditingCapsule();
-    void accessibilityProbeForWritingAssistants();
     void spellCheckServiceFindsWordsAndHonoursIgnoreAndSetting();
     void checkSpellingWhileTypingCommandTogglesTheSetting();
     void spellCheckServiceReportsGrammarIssuesWithCategory();
@@ -443,7 +441,6 @@ private slots:
     void publishingPreviewOwnsTemporaryFilesAndReportsErrors();
 
     void initTestCase() {
-        installSourceEditorAccessibility();
         QCoreApplication::setOrganizationName("FomawriteTests");
         // One app-data directory per test process: several suites can run at
         // once (worktrees, CI matrix) without their recovery snapshots and
@@ -5264,7 +5261,6 @@ private:
 #include "cycle134-live-editor.inc"
 #include "cycle134-footer-live.inc"
 #include "cycle140-typora-base.inc"
-#include "cycle142-accessibility-probe.inc"
 #include "cycle143-spellcheck.inc"
 #include "cycle143-source-spelling.inc"
 #include "cycle143-live-spelling.inc"

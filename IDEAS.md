@@ -22,7 +22,9 @@ Yes, 10 October 2026 (Andrew): spell check in the document first, in both surfac
 Source mode uses the native Qt text editor and its spell check; the Live page is Chromium and has none today. Qt WebEngine can spell check but needs bundled `.bdic` dictionaries, which Homebrew Qt does not ship. Options: bundle dictionaries for the languages Andrew writes in, or rely on an external checker (see Grammarly below).
 
 ### Grammarly in the editor
-Yes [ ]  No [ ]  Maybe [x]
+Yes [ ]  No [x]  Maybe [ ]
+
+No, 10 October 2026 (Andrew): a failed experiment. Grammarly Desktop cannot see Qt's text surfaces, its SDK is gone, and the Source-only accessibility adapter from build 142 was removed with the Harper decision. Harper is the engine instead ([docs/harper-plan.md](docs/harper-plan.md)).
 
 Ten-minute experiment script for Andrew: [research/overnight-2026-10-08/grammarly-experiment.md](research/overnight-2026-10-08/grammarly-experiment.md).
 

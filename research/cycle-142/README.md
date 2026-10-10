@@ -1,5 +1,7 @@
 # Cycle 142 — Grammarly experiment and the Source accessibility adapter
 
+**Closed 10 October 2026: a failed experiment.** The adapter (`src/sourceaccessibility.cpp`, the `quick-private` dependency and the probe test) was removed in the Harper cycle; Andrew never saw Grammarly's G in Source. This record stays as the account of why.
+
 Build 142 (`0.3.0-dev38`), 9 October 2026.
 
 ## What happened

@@ -28,7 +28,6 @@
 #include "workspace.h"
 
 #include "backend.h"
-#include "sourceaccessibility.h"
 #include "macbridge.h"
 #include "systemtheme.h"
 #include "documentviewcheck.h"
@@ -123,7 +122,6 @@ public:
 int main(int argc, char *argv[]) {
     QtWebEngineQuick::initialize();
     WriterApplication app(argc, argv);
-    installSourceEditorAccessibility();
     app.setApplicationName(QStringLiteral("fomawrite"));
     app.setDesktopFileName(QStringLiteral("fomawrite"));
 #ifdef Q_OS_MACOS

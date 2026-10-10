@@ -1,6 +1,4 @@
 QT += core gui widgets printsupport qml quick quickcontrols2 quickdialogs2
-# quick-private: QAccessibleQuickItem, subclassed for the Source editor's character geometry.
-QT += quick-private
 !macx: QT += dbus
 
 CONFIG += c++17 release
@@ -10,7 +8,6 @@ TEMPLATE = app
 HEADERS += \
     src/backend.h \
     src/documentviewcheck.h \
-    src/sourceaccessibility.h \
     src/spellcheck.h \
     src/markdownhighlighter.h \
     src/outputcss.h \
@@ -19,7 +16,6 @@ HEADERS += \
 SOURCES += \
     src/main.cpp \
     src/documentviewcheck.cpp \
-    src/sourceaccessibility.cpp \
     src/spellcheck.cpp \
     src/backend.cpp \
     src/markdownhighlighter.cpp \
