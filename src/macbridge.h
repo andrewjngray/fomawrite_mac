@@ -35,7 +35,6 @@ void macLearnWord(const QString &word);
 void macUnlearnWord(const QString &word);
 bool macHasLearnedWord(const QString &word);
 void macIgnoreWord(const QString &word);
-QVariantList macWritingIssues(const QString &text, const QString &language, bool grammar);
 void macSpeakText(const QString &text);
 void macStopSpeaking();
 bool shareMacFile(QWindow *window, const QString &path);

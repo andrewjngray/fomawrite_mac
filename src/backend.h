@@ -6,6 +6,8 @@
 #include <QByteArray>
 #include <QFileSystemWatcher>
 #include <QString>
+#include <QElapsedTimer>
+#include <QTextBlock>
 #include <QTimer>
 #include <QUrl>
 #include <QVariantList>
@@ -59,6 +61,10 @@ class Backend : public QObject, public PublishingSource {
     // the whole window as it does in Typora. Off: the Theme preset alone decides.
     Q_PROPERTY(bool appearanceFollowsOutputStyle READ appearanceFollowsOutputStyle WRITE setAppearanceFollowsOutputStyle NOTIFY appearanceFollowsOutputStyleChanged)
     Q_PROPERTY(SpellCheck *spellCheck READ spellCheck CONSTANT)
+    // Every spelling and grammar finding in the document, in order, for the
+    // Review pane (see rebuildReviewIssues). Capped; the flag says so.
+    Q_PROPERTY(QVariantList reviewIssues READ reviewIssues NOTIFY reviewIssuesChanged)
+    Q_PROPERTY(bool reviewIssuesTruncated READ reviewIssuesTruncated NOTIFY reviewIssuesChanged)
     Q_PROPERTY(qreal textScale READ textScale WRITE setTextScale NOTIFY textScaleChanged)
     Q_PROPERTY(QString themeBackground READ themeBackground NOTIFY themeColorsChanged)
     Q_PROPERTY(QString themeForeground READ themeForeground NOTIFY themeColorsChanged)
@@ -76,6 +82,18 @@ public:
     QObject *publisher() { return m_publisher.get(); }
     EditorBridge *editorBridge() { return m_editorBridge.get(); }
     SpellCheck *spellCheck() { return &m_spellCheck; }
+    QVariantList reviewIssues() const { return m_reviewIssues; }
+    bool reviewIssuesTruncated() const { return m_reviewIssuesTruncated; }
+    static constexpr int ReviewIssueLimit = 500;
+    static constexpr int ReviewTypingPause = 1500; // ms a word at the caret stays out of the list after an edit
+    // The first issue containing or touching a document position: {start, end,
+    // word, category, message, suggestions, context, wordOffset, blockNumber},
+    // computed from the block now (not from the debounced list), or an empty
+    // map. Same rules as the underline.
+    Q_INVOKABLE QVariantMap issueAt(int position);
+    // Start of the next (or, backwards, previous) issue strictly after (before)
+    // `from`, wrapping round the document; -1 when there are no issues.
+    Q_INVOKABLE int nextIssue(int from, bool backwards);
     // Push the current document, theme and appearance to the Live editor page.
     Q_INVOKABLE void syncLiveEditor(int cursor = -1);
     // Re-style the Live editor after a theme change without reloading the document.
@@ -240,8 +258,6 @@ public:
     Q_INVOKABLE void setStyleReviewWords(const QString &customWords,
                                          bool customEnabled,
                                          bool fillersEnabled);
-    Q_INVOKABLE QStringList writingLanguages() const;
-    Q_INVOKABLE QVariantList writingIssues(const QString &text, const QString &language, bool grammar);
     Q_INVOKABLE bool correctWriting(int start, int end, const QString &expected, const QString &replacement);
     // The word the Source editor underlines at (or touching) a document
     // position: {start, end, word} in UTF-16 units, or an empty map when the
@@ -291,6 +307,7 @@ signals:
     void modifiedChanged();
     void statusChanged();
     void documentStatisticsChanged();
+    void reviewIssuesChanged();
     void outputStyleChanged();
     void outputPageLayoutChanged();
     void outputCssChanged();
@@ -421,6 +438,17 @@ private:
     QPointer<QTextDocument> m_document;
     QPointer<QWindow> m_parentWindow;
     QPointer<MarkdownHighlighter> m_highlighter;
+    // Review pane model. Rebuilt 300 ms after the last text change and at once
+    // when the checker's setting, language or words change.
+    void rebuildReviewIssues();
+    QVariantMap issueMap(const QTextBlock &block, const SpellCheck::Issue &issue) const;
+    QVariantList m_reviewIssues;
+    bool m_reviewIssuesTruncated = false;
+    QTimer m_reviewTimer;
+    QElapsedTimer m_reviewEditClock;
+    QList<QMetaObject::Connection> m_reviewConnections;
+    int m_caret = -1;
+    bool m_reviewWithheldWord = false;
     QString m_lastDocumentText;
     QByteArray m_lastKnownFileContents;
     bool m_requiresExplicitSave = false;

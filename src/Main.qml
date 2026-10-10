@@ -334,7 +334,8 @@ ApplicationWindow {
             return;
         }
         var pane = region === "organizer" ? organizerPane
-            : region === "files" ? libraryPane : region === "preview" ? previewPane : null;
+            : region === "files" ? libraryPane : region === "preview" ? previewPane
+            : region === "review" ? reviewPane : null;
         var target = pane ? firstWorkspaceControl(pane) : null;
         if (target) target.forceActiveFocus(Qt.TabFocusReason);
         else { win.revealDocumentChrome(); topChrome.focusWorkspaceControl(); }
@@ -352,11 +353,13 @@ ApplicationWindow {
         if (filesSlot.visible) regions.push("files");
         if (editorPane.visible) regions.push("source");
         if (previewPane.visible) regions.push("preview");
+        if (reviewSlot.visible) regions.push("review");
         regions.push("toolbar");
         var current = isInside(activeFocusItem, organizerPane) ? "organizer"
             : isInside(activeFocusItem, libraryPane) ? "files"
             : isInside(activeFocusItem, editorPane) ? "source"
-            : isInside(activeFocusItem, previewPane) ? "preview" : "toolbar";
+            : isInside(activeFocusItem, previewPane) ? "preview"
+            : isInside(activeFocusItem, reviewPane) ? "review" : "toolbar";
         var index = regions.indexOf(current);
         focusWorkspaceRegion(regions[(index + (reverse ? regions.length - 1 : 1)) % regions.length]);
     }
@@ -417,6 +420,7 @@ ApplicationWindow {
         }
         function onEffectiveOrganizerVisibleChanged() { Qt.callLater(win.rescueHiddenWorkspaceFocus); }
         function onEffectiveFilesVisibleChanged() { Qt.callLater(win.rescueHiddenWorkspaceFocus); }
+        function onEffectiveReviewVisibleChanged() { Qt.callLater(win.rescueHiddenWorkspaceFocus); }
         function onEffectiveLayoutModeChanged() {
             if (workspaceLayout.effectiveLayoutMode === 2) win.sourceFormattingOwned = false;
             Qt.callLater(win.rescueHiddenWorkspaceFocus);
@@ -447,6 +451,43 @@ ApplicationWindow {
                 ? above : point.y;
         menu.y = Math.max(8, Math.min(win.contentItem.height - menuHeight - 8, top));
         menu.open();
+    }
+    // The Spelling and Grammar pane. Shown when asked for and when the layout
+    // has room (effectiveReviewVisible); the command ticks with what is on screen.
+    function toggleReviewPane() {
+        if (workspaceLayout.effectiveReviewVisible) { workspaceLayout.reviewVisible = false; focusWritingSurface(); }
+        else workspaceLayout.reviewVisible = true;
+    }
+    // A row was chosen: put the caret on the finding in the surface in use.
+    function jumpToIssue(start, end) {
+        if (workspaceLayout.liveEditEnabled && liveEditorLoader.item) {
+            // Stay in Live: the page places and reveals its own caret.
+            backend.editorBridge.placeCursor(start);
+            backend.editorBridge.noteCaretMovedByUser(); // the writer asked for this move
+            liveEditorLoader.item.focusLive();
+            return;
+        }
+        win.setEditingMode(false);
+        win.cancelDocumentViewportTransition();
+        win.lastWritingSurface = "source";
+        editor.select(start, end);
+        editor.forceActiveFocus();
+        Qt.callLater(editorFlick.ensureCursorVisible);
+    }
+    // Next / Previous Issue: the caret goes to the following (preceding) finding, wrapping.
+    function moveToIssue(backwards) {
+        var live = workspaceLayout.liveEditEnabled && liveEditorLoader.item;
+        var from;
+        if (live) from = backend.liveCursor();
+        else from = backwards ? Math.min(editor.selectionStart, editor.selectionEnd, editor.cursorPosition)
+                              : Math.max(editor.selectionStart, editor.selectionEnd, editor.cursorPosition);
+        // A caret at the very start of an empty selection has nothing before it to skip.
+        if (from === 0 && (live || editor.selectionStart === editor.selectionEnd)) from = backwards ? 0 : -1;
+        var start = backend.nextIssue(from, backwards);
+        if (start < 0) return;
+        if (live) { jumpToIssue(start, start); return; }
+        var found = backend.issueAt(start);
+        jumpToIssue(start, found.end !== undefined ? found.end : start);
     }
     function hideWorkspacePane(pane) {
         if (pane === "organizer") workspaceLayout.organizerVisible = false;
@@ -670,7 +711,9 @@ ApplicationWindow {
             case "exportPdf": win.openExportHub("pdf"); break;
             case "pageBreak": win.tryInsertSourceSnippet("\n\n<!-- pagebreak -->\n\n"); break;
             case "writingReview": analysisDialog.open(); break;
-            case "spelling": spellingDialog.open(); break;
+            case "spelling": win.toggleReviewPane(); break;
+            case "nextIssue": win.moveToIssue(false); break;
+            case "previousIssue": win.moveToIssue(true); break;
             case "authorship": authorshipDialog.ranges=backend.authorshipRanges(); authorshipDialog.open(); break;
             case "themeSystem": backend.themePreset="system"; break;
             case "themeLight": backend.themePreset="light"; break;
@@ -1952,46 +1995,6 @@ ApplicationWindow {
     }
 
     Dialog {
-        id: spellingDialog
-        objectName: "spellingDialog"
-        property var issues: []
-        property string snapshot: ""
-        title: "Spelling and Grammar"
-        modal: true
-        anchors.centerIn: parent
-        width: Math.min(640, win.width - 40)
-        height: Math.min(540, win.height - 60)
-        standardButtons: Dialog.Close
-        function refresh() { snapshot=editor.text; issues=backend.writingIssues(snapshot, writingLanguage.currentText, grammarReview.checked); }
-        onOpened: refresh()
-        ColumnLayout {
-            anchors.fill: parent
-            RowLayout {
-                ComboBox { id: writingLanguage; Accessible.name: "Review language"; model: ["System language"].concat(backend.writingLanguages()); onActivated: spellingDialog.refresh() }
-                CheckBox { id: grammarReview; text: "Grammar"; onToggled: spellingDialog.refresh() }
-                Button { text: "Refresh"; onClicked: spellingDialog.refresh() }
-            }
-            Label { Layout.fillWidth: true; wrapMode: Text.Wrap; text: "Suggestions use macOS dictionaries. Review before replacing. Code and URL destinations are excluded. First 50,000 characters / 100 issues; grammar support varies by language." }
-            Label { text: spellingDialog.issues.length ? spellingDialog.issues.length + " issues" : "No issues found in the checked text." }
-            ListView {
-                Layout.fillWidth: true; Layout.fillHeight: true; clip: true
-                model: spellingDialog.issues
-                delegate: ColumnLayout {
-                    required property var modelData
-                    width: ListView.view.width
-                    Label { Layout.fillWidth: true; wrapMode: Text.Wrap; text: modelData.word + " — " + modelData.label }
-                    RowLayout {
-                        ComboBox { id: correction; Layout.fillWidth: true; model: modelData.suggestions; Accessible.name: "Replacement for " + modelData.word }
-                        Button { text: "Replace"; enabled: correction.count > 0 && spellingDialog.snapshot === editor.text
-                            onClicked: { backend.correctWriting(modelData.start,modelData.end,modelData.word,correction.currentText); spellingDialog.refresh(); } }
-                    }
-                }
-                ScrollBar.vertical: ScrollBar {}
-            }
-        }
-    }
-
-    Dialog {
         id: commandPalette
         objectName: "commandPalette"
         title: "Command Palette"
@@ -2368,7 +2371,7 @@ ApplicationWindow {
         standardButtons: Dialog.Close
         anchors.centerIn: parent
         contentItem: Label {
-            text: win.isMac ? "⌘S  Save\n⇧⌘S  Save As\n⌘O  Open\n⌘N  New Window\n⌘W  Close Window\n⌘F  Find\n⌥⌘F  Find and Replace\n⌘B  Bold\n⌘I  Italic\n⌘K  Link\n⌘P  Print\n⌃⌘F  Fullscreen\nF6 / ⇧F6  Next / previous workspace pane\n⌘?  Shortcuts" : "Ctrl+S  Save\nCtrl+Shift+S  Save As\nCtrl+O  Open\nCtrl+N  New Window\nCtrl+F  Find\nCtrl+H  Find and Replace\nCtrl+B  Bold\nCtrl+I  Italic\nCtrl+K  Link\nCtrl+P  Print\nF11 / Super+F  Fullscreen\nF6 / Shift+F6  Next / previous workspace pane\nCtrl+?  Shortcuts"
+            text: win.isMac ? "⌘S  Save\n⇧⌘S  Save As\n⌘O  Open\n⌘N  New Window\n⌘W  Close Window\n⌘F  Find\n⌥⌘F  Find and Replace\n⌘B  Bold\n⌘I  Italic\n⌘K  Link\n⌘P  Print\n⌃⌘F  Fullscreen\n⌘:  Spelling and Grammar pane\n⌘;  Next issue    ⌥⌘;  Previous issue\nF6 / ⇧F6  Next / previous workspace pane\n⌘?  Shortcuts" : "Ctrl+S  Save\nCtrl+Shift+S  Save As\nCtrl+O  Open\nCtrl+N  New Window\nCtrl+F  Find\nCtrl+H  Find and Replace\nCtrl+B  Bold\nCtrl+I  Italic\nCtrl+K  Link\nCtrl+P  Print\nF11 / Super+F  Fullscreen\nF6 / Shift+F6  Next / previous workspace pane\nCtrl+?  Shortcuts"
             lineHeight: 1.5
         }
     }
@@ -2410,20 +2413,23 @@ ApplicationWindow {
         property var resizeStart: null
         onResizingChanged: {
             if (resizing) {
-                resizeStart = { organizer: organizerSlot.width, files: filesSlot.width, preview: previewPane.width };
+                resizeStart = { organizer: organizerSlot.width, files: filesSlot.width, preview: previewPane.width, review: reviewSlot.width };
             } else if (resizeStart) {
-                var actual = { organizer: organizerSlot.width, files: filesSlot.width, preview: previewPane.width };
+                var actual = { organizer: organizerSlot.width, files: filesSlot.width, preview: previewPane.width, review: reviewSlot.width };
                 if (organizerSlot.visible && Math.abs(actual.organizer - resizeStart.organizer) > 1)
                     workspaceLayout.updateWidth("organizer", actual.organizer);
                 if (filesSlot.visible && Math.abs(actual.files - resizeStart.files) > 1)
                     workspaceLayout.updateWidth("files", actual.files);
                 if (previewPane.visible && editorPane.visible && Math.abs(actual.preview - resizeStart.preview) > 1)
                     workspaceLayout.updateWidth("preview", actual.preview);
+                if (reviewSlot.visible && Math.abs(actual.review - resizeStart.review) > 1)
+                    workspaceLayout.updateWidth("review", actual.review);
                 resizeStart = null;
                 // SplitView replaces preferred-size bindings during an explicit drag.
                 organizerSlot.SplitView.preferredWidth = Qt.binding(function() { return workspaceLayout.effectiveOrganizerWidth; });
                 filesSlot.SplitView.preferredWidth = Qt.binding(function() { return workspaceLayout.effectiveFileWidth; });
                 previewPane.SplitView.preferredWidth = Qt.binding(function() { return workspaceLayout.effectivePreviewWidth; });
+                reviewSlot.SplitView.preferredWidth = Qt.binding(function() { return workspaceLayout.effectiveReviewWidth; });
             }
         }
         anchors.top: topChrome.bottom
@@ -3231,6 +3237,28 @@ ApplicationWindow {
                     win.requestOpen(resolved);
                 else
                     backend.openExternalUrl(resolved);
+            }
+        }
+        // Spelling and Grammar sits right of the document. The footer spans the
+        // window beneath it (the view controls stay where they are), so the pane
+        // stops above the footer instead of the footer stopping short of the pane.
+        Item {
+            id: reviewSlot
+            objectName: "reviewSlot"
+            visible: workspaceLayout.effectiveReviewVisible
+            SplitView.preferredWidth: workspaceLayout.effectiveReviewWidth
+            SplitView.minimumWidth: 240
+            SplitView.maximumWidth: 640
+            ReviewPane {
+                id: reviewPane
+                anchors.fill: parent
+                anchors.bottomMargin: documentFooter.height
+                darkMode: win.darkMode
+                onJumpRequested: function(start, end) { win.jumpToIssue(start, end); }
+                onFixRequested: function(issue, replacement) {
+                    win.performDocumentEdit(function() { backend.correctWriting(issue.start, issue.end, issue.word, replacement); });
+                }
+                onCloseRequested: win.toggleReviewPane()
             }
         }
     }

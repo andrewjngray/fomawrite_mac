@@ -110,7 +110,9 @@ Platform.MenuBar {
             Platform.MenuItem { objectName: "editFindPrevious"; text: "Find Previous"; enabled: win.searchOpen && win.searchMatches.length > 0; onTriggered: win.moveSearch(-1) }
             Platform.MenuItem { objectName: "editFindSelection"; text: "Use Selection for Find"; enabled: editor.selectedText.length > 0; onTriggered: win.openSearch(false, true) }
         }
-        Platform.MenuItem { objectName: "editSpelling"; text: "Spelling and Grammar…"; enabled: editor.length > 0; onTriggered: spellingDialog.open() }
+        NativeCommand { objectName: "editSpelling"; commandId: "spelling"; shortcut: "Ctrl+:" }
+        NativeCommand { objectName: "editNextIssue"; commandId: "nextIssue"; shortcut: "Ctrl+;" }
+        NativeCommand { objectName: "editPreviousIssue"; commandId: "previousIssue"; shortcut: "Ctrl+Alt+;" }
         NativeCommand { objectName: "editCheckSpellingWhileTyping"; commandId: "checkSpellingWhileTyping" }
         NativeCommand { objectName: "editCheckGrammarWhileTyping"; commandId: "checkGrammarWhileTyping" }
         Platform.Menu {

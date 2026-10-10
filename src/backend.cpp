@@ -552,6 +552,9 @@ Backend::Backend(QObject *parent, bool outputOnly) : QObject(parent), m_library(
             }
         }
     }
+    m_reviewTimer.setSingleShot(true);
+    m_reviewTimer.setInterval(300);
+    connect(&m_reviewTimer, &QTimer::timeout, this, &Backend::rebuildReviewIssues);
     m_recoveryTimer.setSingleShot(true);
     m_recoveryTimer.setInterval(750);
     connect(&m_recoveryTimer, &QTimer::timeout, this, &Backend::writeRecovery);
@@ -1607,6 +1610,11 @@ QPair<int, int> Backend::sentenceRange(const QString &text, int position) {
 void Backend::setFocusPosition(int position, bool enabled, bool sentence) {
     if (!m_document || !m_highlighter) return;
     m_highlighter->setCaret(position);
+    if (m_caret != position) {
+        m_caret = position;
+        // The word that was being typed becomes a finding once the caret leaves it.
+        if (m_reviewWithheldWord) m_reviewTimer.start();
+    }
     const auto block = m_document->findBlock(position);
     if (!enabled && !sentence) { m_highlighter->setFocusRange(-1, -1); return; }
     // Keep fenced code as a whole line; sentence boundaries are Unicode rules,
@@ -1750,6 +1758,21 @@ void Backend::attachDocument(QObject *textDocument) {
     // Misspellings underline as the writer types; the highlighter follows the
     // service's setting, language and learned/ignored words.
     m_highlighter->setSpellCheck(&m_spellCheck);
+
+    // The Review pane's list follows the document after a pause and the checker
+    // at once. Connected after the highlighter's own slots so its caches are
+    // already cleared when the list is rebuilt; earlier connections go with
+    // the previous document.
+    for (const auto &connection : std::as_const(m_reviewConnections)) disconnect(connection);
+    m_reviewConnections.clear();
+    const auto rebuildNow = [this] { rebuildReviewIssues(); };
+    m_reviewConnections << connect(&m_spellCheck, &SpellCheck::wordsChanged, this, rebuildNow)
+                        << connect(&m_spellCheck, &SpellCheck::enabledChanged, this, rebuildNow)
+                        << connect(&m_spellCheck, &SpellCheck::grammarEnabledChanged, this, rebuildNow)
+                        << connect(&m_spellCheck, &SpellCheck::languageChanged, this, rebuildNow)
+                        << connect(m_document, &QTextDocument::contentsChanged, this, [this] { m_reviewEditClock.start(); m_reviewTimer.start(); });
+    m_reviewTimer.stop();
+    rebuildReviewIssues();
 
     // Includes format-only authorship edits and their Undo/Redo paths. The QML
     // consumer debounces this signal before recomputing the displayed metrics.
@@ -4024,38 +4047,122 @@ void Backend::setStyleReviewWords(const QString &customWords,
     m_highlighter->setReviewSpans(spans);
 }
 
-QStringList Backend::writingLanguages() const {
-#ifdef Q_OS_MACOS
-    return macWritingLanguages();
-#else
-    return {};
-#endif
-}
-QVariantList Backend::writingIssues(const QString &text, const QString &language, bool grammar) {
-#ifdef Q_OS_MACOS
-    return macWritingIssues(proseForReview(text),language,grammar);
-#else
-    Q_UNUSED(text); Q_UNUSED(language); Q_UNUSED(grammar); return {};
-#endif
-}
 bool Backend::correctWriting(int start,int end,const QString &expected,const QString &replacement) {
     if(!m_document || start<0 || end<=start || end>currentDocumentText().size() ||
        currentDocumentText().mid(start,end-start)!=expected || replacement.size()>1000) return false;
     QTextCursor cursor(m_document); cursor.setPosition(start); cursor.setPosition(end,QTextCursor::KeepAnchor);
     cursor.beginEditBlock(); cursor.insertText(replacement); cursor.endEditBlock(); return true;
 }
+// The text of the sentence around [start, end) in a block, cut to about 120
+// characters with an ellipsis where it was cut. `wordOffset` receives where the
+// issue begins inside the returned string.
+static QString reviewContext(const QString &text, int start, int end, int *wordOffset) {
+    constexpr int Budget = 120;
+    int from = 0, to = int(text.size());
+    for (int i = start; i > 1; --i)
+        if (text.at(i - 2) == QLatin1Char('.') || text.at(i - 2) == QLatin1Char('!') || text.at(i - 2) == QLatin1Char('?')) {
+            if (text.at(i - 1).isSpace()) { from = i; break; }
+        }
+    for (int i = end; i < text.size(); ++i)
+        if ((text.at(i) == QLatin1Char('.') || text.at(i) == QLatin1Char('!') || text.at(i) == QLatin1Char('?'))
+            && (i + 1 == text.size() || text.at(i + 1).isSpace())) { to = i + 1; break; }
+    from = qMin(from, start); to = qMax(to, end);
+    bool cutLeft = false, cutRight = false;
+    if (to - from > Budget) {
+        const int side = qMax(20, (Budget - (end - start)) / 2);
+        if (start - from > side) { from = start - side; cutLeft = true; }
+        if (to - end > side) { to = end + side; cutRight = true; }
+    }
+    while (from < start && text.at(from).isSpace()) ++from;
+    while (to > end && text.at(to - 1).isSpace()) --to;
+    QString context = text.mid(from, to - from);
+    int offset = start - from;
+    if (cutLeft) { context.prepend(QChar(0x2026)); ++offset; }
+    if (cutRight) context.append(QChar(0x2026));
+    *wordOffset = offset;
+    return context;
+}
+
+QVariantMap Backend::issueMap(const QTextBlock &block, const SpellCheck::Issue &issue) const {
+    const QString text = block.text();
+    int wordOffset = 0;
+    const QString context = reviewContext(text, issue.start, issue.end, &wordOffset);
+    return {{QStringLiteral("start"), block.position() + issue.start},
+            {QStringLiteral("end"), block.position() + issue.end},
+            {QStringLiteral("word"), text.mid(issue.start, issue.end - issue.start)},
+            {QStringLiteral("category"), issue.category},
+            {QStringLiteral("message"), issue.message},
+            {QStringLiteral("suggestions"), issue.suggestions},
+            {QStringLiteral("context"), context},
+            {QStringLiteral("wordOffset"), wordOffset},
+            {QStringLiteral("blockNumber"), block.blockNumber()}};
+}
+
+void Backend::rebuildReviewIssues() {
+    m_reviewTimer.stop();
+    QVariantList list;
+    bool truncated = false;
+    m_reviewWithheldWord = false;
+    if (m_document && m_highlighter && m_spellCheck.available() && m_spellCheck.enabled()) {
+        for (QTextBlock block = m_document->begin(); block.isValid() && !truncated; block = block.next()) {
+            if (block.length() <= 1) continue;
+            for (const SpellCheck::Issue &issue : m_highlighter->issuesInBlock(block)) {
+                // A word the caret ends, typed within the last moment, is still
+                // being typed (the underline withholds it too): it is listed
+                // once the caret leaves or the writer pauses.
+                if (issue.category == QLatin1String("Spelling") && m_caret >= 0 && block.position() + issue.end == m_caret
+                    && m_reviewEditClock.isValid() && m_reviewEditClock.elapsed() < ReviewTypingPause) {
+                    m_reviewWithheldWord = true;
+                    continue;
+                }
+                if (list.size() >= ReviewIssueLimit) { truncated = true; break; }
+                list.append(issueMap(block, issue));
+            }
+        }
+    }
+    if (m_reviewWithheldWord) m_reviewTimer.start(int(qMax<qint64>(300, ReviewTypingPause - m_reviewEditClock.elapsed() + 20)));
+    if (list == m_reviewIssues && truncated == m_reviewIssuesTruncated) return;
+    m_reviewIssues = list;
+    m_reviewIssuesTruncated = truncated;
+    emit reviewIssuesChanged();
+}
+
+QVariantMap Backend::issueAt(int position) {
+    if (!m_document || !m_highlighter || position < 0 || !m_spellCheck.available() || !m_spellCheck.enabled()) return {};
+    const QTextBlock block = m_document->findBlock(position);
+    if (!block.isValid()) return {};
+    const int offset = position - block.position();
+    for (const SpellCheck::Issue &issue : m_highlighter->issuesInBlock(block))
+        if (offset >= issue.start && offset <= issue.end) return issueMap(block, issue);
+    return {};
+}
+
+int Backend::nextIssue(int from, bool backwards) {
+    if (m_reviewTimer.isActive()) rebuildReviewIssues();
+    if (m_reviewIssues.isEmpty()) return -1;
+    if (!backwards) {
+        for (const QVariant &entry : std::as_const(m_reviewIssues)) {
+            const int start = entry.toMap().value(QStringLiteral("start")).toInt();
+            if (start > from) return start;
+        }
+        return m_reviewIssues.first().toMap().value(QStringLiteral("start")).toInt();
+    }
+    for (qsizetype i = m_reviewIssues.size() - 1; i >= 0; --i) {
+        const int start = m_reviewIssues.at(i).toMap().value(QStringLiteral("start")).toInt();
+        if (start < from) return start;
+    }
+    return m_reviewIssues.last().toMap().value(QStringLiteral("start")).toInt();
+}
+
 QVariantMap Backend::misspelledWordAt(int position) {
     if (!m_document || !m_highlighter || position < 0) return {};
     const QTextBlock block = m_document->findBlock(position);
     if (!block.isValid()) return {};
     const int offset = position - block.position();
-    const QString text = block.text();
-    for (const auto &range : m_highlighter->misspellingsInBlock(block)) {
-        if (offset < range.start || offset > range.end) continue;
-        return {{QStringLiteral("start"), block.position() + range.start},
-                {QStringLiteral("end"), block.position() + range.end},
-                {QStringLiteral("word"), text.mid(range.start, range.end - range.start)}};
-    }
+    // Only spelling findings: the right-click menu offers corrections for words.
+    for (const SpellCheck::Issue &issue : m_highlighter->issuesInBlock(block))
+        if (issue.category == QLatin1String("Spelling") && offset >= issue.start && offset <= issue.end)
+            return issueMap(block, issue);
     return {};
 }
 QVariantMap Backend::grammarIssueAt(int position) {

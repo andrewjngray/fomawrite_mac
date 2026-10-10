@@ -12,7 +12,9 @@
 // Offsets are UTF-16 code units into the string given, the same units QString
 // and the page use, so a range can be mapped back without conversion.
 
+#include <QHash>
 #include <QObject>
+#include <QSet>
 #include <QString>
 #include <QStringList>
 #include <QVariantList>
@@ -67,6 +69,9 @@ public:
     Q_INVOKABLE void learnWord(const QString &word);
     Q_INVOKABLE void unlearnWord(const QString &word);
     Q_INVOKABLE void ignoreWord(const QString &word);
+    // Dismiss one grammar finding (the text it covers and the checker's
+    // message) for this run; grammarIssues() stops reporting it.
+    Q_INVOKABLE void ignoreGrammar(const QString &text, const QString &message);
     Q_INVOKABLE bool hasLearnedWord(const QString &word) const;
 
 signals:
@@ -79,4 +84,9 @@ private:
     bool m_enabled = true;
     bool m_grammarEnabled = true;
     QString m_language;
+    // Guesses are the slow part of a finding and the review list asks for
+    // every word's on each rebuild; keep them until the language or the
+    // learned/ignored words change.
+    mutable QHash<QString, QStringList> m_suggestionCache;
+    QSet<QString> m_ignoredGrammar;
 };
