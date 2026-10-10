@@ -28,6 +28,8 @@ Ten-minute experiment script for Andrew: [research/overnight-2026-10-08/grammarl
 
 Plan of inquiry for a Grammarly-like result by other means: [docs/grammarly-like-plan.md](docs/grammarly-like-plan.md).
 
+**Decision, 10 October 2026 (Andrew):** build Harper (Automattic, Apache-2.0, offline) into the tool as the grammar engine, with periodic update checks and a menu trigger. Plan: [docs/harper-plan.md](docs/harper-plan.md).
+
 **Result, 9 October 2026:** Grammarly Desktop attaches to nothing in Fomawrite (works in Word on the same Mac). Cause found by probe: neither Qt Quick nor Qt WebEngine reports character bounds to macOS Accessibility (upstream stubs), so an overlay cannot place its button or underlines. The SDK route closed in January 2024. Remaining options are in the experiment note: a Source-only accessibility fix in the app (unproven), nothing for Live short of patching Qt, or the system checker wired into Live with a toggle.
 
 Requirement from Andrew: it must be switchable on and off. The Grammarly overlay (the small moving icon) is distracting when writing and creating; the purity of the editor and the clean panes are a feature, not a bug. Andrew will supply screenshots of how it behaves on his other devices.
