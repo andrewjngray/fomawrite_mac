@@ -618,26 +618,17 @@ Backend::Backend(QObject *parent, bool outputOnly) : QObject(parent), m_library(
     // grammar setting, the language and the learned/ignored words all reach the
     // page as setSpellCheck, which makes it check again.
     connect(m_editorBridge.get(), &EditorBridge::spellingRequested, this, [this](int token, const QString &segmentsJson) {
-        QJsonArray ranges;
-        const QJsonDocument document = QJsonDocument::fromJson(segmentsJson.toUtf8());
-        const QJsonArray segments = document.isArray() ? document.array() : QJsonArray();
-        for (int i = 0; i < qMin(int(segments.size()), 5000); ++i) {
-            const QJsonObject segment = segments.at(i).toObject();
-            const int from = segment.value(QStringLiteral("from")).toInt(-1);
-            if (from < 0) continue;
-            // Spelling entries stay small (category only); a grammar entry also
-            // carries the checker's message and corrections for the page's menu.
-            for (const auto &issue : m_spellCheck.issues(segment.value(QStringLiteral("text")).toString())) {
-                QJsonObject entry{{QStringLiteral("from"), from + issue.start}, {QStringLiteral("to"), from + issue.end},
-                                  {QStringLiteral("category"), issue.category}};
-                if (issue.category == QLatin1String("Grammar")) {
-                    entry.insert(QStringLiteral("message"), issue.message);
-                    entry.insert(QStringLiteral("suggestions"), QJsonArray::fromStringList(issue.suggestions));
-                }
-                ranges.append(entry);
-            }
+        answerSpellingRequest(token, segmentsJson);
+    });
+    // Harper lives in the Live page, so the bridge is its only line to the host.
+    m_harper = std::make_unique<HarperEngine>(m_editorBridge.get());
+    m_spellCheck.setHarper(m_harper.get());
+    connect(&m_spellCheck, &SpellCheck::resultsReady, this, [this](const QString &text) {
+        for (const int token : m_pendingSpelling.keys()) {
+            auto it = m_pendingSpelling.find(token);
+            if (it != m_pendingSpelling.end() && it->outstanding.remove(text) && it->outstanding.isEmpty()) finishSpellingRequest(token);
         }
-        m_editorBridge->replySpelling(token, QString::fromUtf8(QJsonDocument(ranges).toJson(QJsonDocument::Compact)));
+        if (m_lateSpellingTexts.remove(text)) pushSpellCheckState();
     });
     connect(m_editorBridge.get(), &EditorBridge::suggestionsRequested, this, [this](int token, const QString &word) {
         m_editorBridge->replySuggestions(token, QString::fromUtf8(QJsonDocument(QJsonArray::fromStringList(m_spellCheck.suggestions(word))).toJson(QJsonDocument::Compact)));
@@ -650,12 +641,15 @@ Backend::Backend(QObject *parent, bool outputOnly) : QObject(parent), m_library(
         if (m_reviewWithheldWord) m_reviewTimer.start();
     });
     connect(m_editorBridge.get(), &EditorBridge::grammarIgnored, this, [this](const QString &text, const QString &message) { m_spellCheck.ignoreGrammar(text, message); });
-    const auto pushSpellCheck = [this]() { m_editorBridge->applySpellCheck(m_spellCheck.enabled() && m_spellCheck.available()); };
-    connect(&m_spellCheck, &SpellCheck::enabledChanged, this, pushSpellCheck);
-    connect(&m_spellCheck, &SpellCheck::languageChanged, this, pushSpellCheck);
-    connect(&m_spellCheck, &SpellCheck::wordsChanged, this, pushSpellCheck);
-    connect(&m_spellCheck, &SpellCheck::grammarEnabledChanged, this, pushSpellCheck); // the next reply carries (or omits) grammar
-    pushSpellCheck();
+    connect(&m_spellCheck, &SpellCheck::enabledChanged, this, &Backend::pushSpellCheckState);
+    connect(&m_spellCheck, &SpellCheck::languageChanged, this, &Backend::pushSpellCheckState);
+    connect(&m_spellCheck, &SpellCheck::wordsChanged, this, &Backend::pushSpellCheckState);
+    connect(&m_spellCheck, &SpellCheck::grammarEnabledChanged, this, &Backend::pushSpellCheckState); // the next reply carries (or omits) grammar
+    // The engine, dialect and style setting change what the next reply carries.
+    connect(&m_spellCheck, &SpellCheck::engineChanged, this, &Backend::pushSpellCheckState);
+    connect(&m_spellCheck, &SpellCheck::dialectChanged, this, &Backend::pushSpellCheckState);
+    connect(&m_spellCheck, &SpellCheck::styleEnabledChanged, this, &Backend::pushSpellCheckState);
+    pushSpellCheckState();
     // New installations start with the composed writing palette; a stored
     // choice, including System, always takes precedence.
     const auto preset = QSettings().value("appearance/theme", "studio").toString();
@@ -673,7 +667,68 @@ Backend::Backend(QObject *parent, bool outputOnly) : QObject(parent), m_library(
     });
 }
 
-Backend::~Backend() { liveBackends.remove(this); }
+Backend::~Backend() { liveBackends.remove(this); m_spellCheck.setHarper(nullptr); }
+
+void Backend::pushSpellCheckState() { m_editorBridge->applySpellCheck(m_spellCheck.enabled() && m_spellCheck.available()); }
+
+// The page sends the prose segments it wants checked; findings go back in
+// document offsets. With Harper some answers are not known yet: the request
+// then waits for them (the page is told once, with everything, rather than
+// in pieces that would flicker its marks) and gives up after two seconds.
+void Backend::answerSpellingRequest(int token, const QString &segmentsJson) {
+    PendingSpelling request;
+    const QJsonDocument document = QJsonDocument::fromJson(segmentsJson.toUtf8());
+    const QJsonArray segments = document.isArray() ? document.array() : QJsonArray();
+    for (int i = 0; i < qMin(int(segments.size()), 5000); ++i) {
+        const QJsonObject segment = segments.at(i).toObject();
+        const int from = segment.value(QStringLiteral("from")).toInt(-1);
+        if (from < 0) continue;
+        request.segments.append({from, segment.value(QStringLiteral("text")).toString()});
+    }
+    spellingReplyJson(request.segments, &request.outstanding);
+    if (request.outstanding.isEmpty()) {
+        m_editorBridge->replySpelling(token, spellingReplyJson(request.segments, nullptr));
+        return;
+    }
+    m_pendingSpelling.insert(token, request);
+    QTimer::singleShot(2000, this, [this, token] { finishSpellingRequest(token); });
+}
+
+void Backend::finishSpellingRequest(int token) {
+    const auto it = m_pendingSpelling.find(token);
+    if (it == m_pendingSpelling.end()) return;
+    const PendingSpelling request = it.value();
+    m_pendingSpelling.erase(it);
+    QSet<QString> unknown;
+    const QString reply = spellingReplyJson(request.segments, &unknown);
+    m_lateSpellingTexts.unite(unknown); // still pending after the limit: the page re-checks when they land
+    m_editorBridge->replySpelling(token, reply);
+}
+
+// Spelling entries stay small (category and the engine's kind); grammar and
+// style entries also carry the checker's message and corrections for the
+// page's menu. Style is included only while "Check Style While Typing" is on:
+// the page underlines whatever it is sent. `unknown` collects the texts whose
+// answer is still pending (their findings are left out).
+QString Backend::spellingReplyJson(const QList<SpellingSegment> &segments, QSet<QString> *unknown) const {
+    QJsonArray ranges;
+    for (const SpellingSegment &segment : segments) {
+        const auto issues = m_spellCheck.issuesIfKnown(segment.text);
+        if (!issues) { if (unknown) unknown->insert(segment.text); continue; }
+        for (const auto &issue : *issues) {
+            if (issue.category == QLatin1String("Style") && !m_spellCheck.styleEnabled()) continue;
+            QJsonObject entry{{QStringLiteral("from"), segment.from + issue.start}, {QStringLiteral("to"), segment.from + issue.end},
+                              {QStringLiteral("category"), issue.category}};
+            if (!issue.kind.isEmpty()) entry.insert(QStringLiteral("kind"), issue.kind);
+            if (issue.category != QLatin1String("Spelling") || !issue.suggestions.isEmpty()) {
+                if (issue.category != QLatin1String("Spelling")) entry.insert(QStringLiteral("message"), issue.message);
+                entry.insert(QStringLiteral("suggestions"), QJsonArray::fromStringList(issue.suggestions));
+            }
+            ranges.append(entry);
+        }
+    }
+    return QString::fromUtf8(QJsonDocument(ranges).toJson(QJsonDocument::Compact));
+}
 
 void Backend::installHarperScheme() { installHarperSchemeHandler(); }
 int Backend::documentRevision() const { return m_document ? m_document->revision() : 0; }
@@ -1778,6 +1833,11 @@ void Backend::attachDocument(QObject *textDocument) {
                         << connect(&m_spellCheck, &SpellCheck::enabledChanged, this, rebuildNow)
                         << connect(&m_spellCheck, &SpellCheck::grammarEnabledChanged, this, rebuildNow)
                         << connect(&m_spellCheck, &SpellCheck::languageChanged, this, rebuildNow)
+                        << connect(&m_spellCheck, &SpellCheck::engineChanged, this, rebuildNow)
+                        << connect(&m_spellCheck, &SpellCheck::dialectChanged, this, rebuildNow)
+                        << connect(&m_spellCheck, &SpellCheck::styleEnabledChanged, this, rebuildNow)
+                        // Harper's answers land after the text changed: the list follows, debounced.
+                        << connect(&m_spellCheck, &SpellCheck::resultsReady, this, [this] { m_reviewTimer.start(); })
                         << connect(m_document, &QTextDocument::contentsChanged, this, [this] { m_reviewEditClock.start(); m_reviewTimer.start(); });
     m_reviewTimer.stop();
     rebuildReviewIssues();
@@ -4100,6 +4160,7 @@ QVariantMap Backend::issueMap(const QTextBlock &block, const SpellCheck::Issue &
             {QStringLiteral("word"), text.mid(issue.start, issue.end - issue.start)},
             {QStringLiteral("category"), issue.category},
             {QStringLiteral("message"), issue.message},
+            {QStringLiteral("kind"), issue.kind},
             {QStringLiteral("suggestions"), issue.suggestions},
             {QStringLiteral("context"), context},
             {QStringLiteral("wordOffset"), wordOffset},

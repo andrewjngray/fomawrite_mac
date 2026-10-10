@@ -156,6 +156,12 @@ private slots:
     void checkSpellingWhileTypingCommandTogglesTheSetting();
     void spellCheckServiceReportsGrammarIssuesWithCategory();
     void harperLintsInsideTheEditorPage();
+    void harperEngineCachesDedupesAndMapsKinds();
+    void harperEngineQueuesNewestFirstAndBoundsItsCache();
+    void spellCheckEngineDialectAndStyleSettingsPersistAndFallBackUntilHarperIsReady();
+    void sourceHarperPendingAnswerKeepsOldMarksAndReplyRestylesWithoutARevision();
+    void sourceHarperReplyFindsItsBlockAfterLinesAreInsertedAbove();
+    void liveSpellingRequestWaitsForHarperAndRepliesOnce();
     void grammarChecksLongParagraphsInCachedChunks();
     void reviewPaneWithholdsTheWordBeingTypedInLive();
     void ignoreGrammarFromAnySurfaceReachesEverySurface();
@@ -5270,6 +5276,7 @@ private:
 #include "cycle144-source-grammar.inc"
 #include "cycle144-live-grammar.inc"
 #include "cycle144-review-pane.inc"
+#include "cycle145-harper-engine.inc"
 
 int main(int argc, char **argv) {
     registerHarperScheme();

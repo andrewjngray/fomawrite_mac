@@ -9,12 +9,14 @@ SOURCES += \
     ../src/backend.cpp \
     ../src/spellcheck.cpp \
     ../src/harperscheme.cpp \
+    ../src/harperengine.cpp \
     ../src/markdownhighlighter.cpp \
     ../src/outputcss.cpp
 HEADERS += \
     ../src/backend.h \
     ../src/spellcheck.h \
     ../src/harperscheme.h \
+    ../src/harperengine.h \
     ../src/markdownhighlighter.h \
     ../src/outputcss.h
 

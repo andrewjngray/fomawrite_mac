@@ -95,6 +95,15 @@ public slots:
     void learnWord(const QString &word);
     void ignoreWord(const QString &word);
     void ignoreGrammar(const QString &text, const QString &message);
+    // Harper (Cycle 145), the grammar and style engine that runs inside the
+    // page. The page announces it once loaded (harperReady with the engine's
+    // version) and answers each harperLint under the host's token with a JSON
+    // array of {start, end, kind, message, suggestions} (UTF-16 offsets into
+    // the text that was sent), or harperFailed with a reason. Plain
+    // pass-throughs; HarperEngine owns the meaning.
+    void harperReady(const QString &version);
+    void harperReply(int token, const QString &lintsJson);
+    void harperFailed(int token, const QString &error);
 
 signals:
     // Connected to by the page.
@@ -117,12 +126,21 @@ signals:
     void spellingReply(int token, const QString &rangesJson);
     void suggestionsReply(int token, const QString &wordsJson);
     void setSpellCheck(bool enabled);
+    // Harper: load the engine for a dialect (American, British, Australian,
+    // Canadian); lint one text under a token; replace the engine's custom
+    // dictionary with this JSON array of words.
+    void harperLoad(const QString &dialect);
+    void harperLint(int token, const QString &text);
+    void harperImportWords(const QString &wordsJson);
     // For the app.
     void spellingRequested(int token, const QString &segmentsJson);
     void suggestionsRequested(int token, const QString &word);
     void wordLearned(const QString &word);
     void wordIgnored(const QString &word);
     void grammarIgnored(const QString &text, const QString &message);
+    void harperReadied(const QString &version);
+    void harperReplied(int token, const QString &lintsJson);
+    void harperLintFailed(int token, const QString &error);
     void scrollFractionChanged(double fraction);
     void imageRequested(int token, const QString &src);
     void imageSaveRequested(int token, const QString &name, const QString &mime, const QString &base64);
