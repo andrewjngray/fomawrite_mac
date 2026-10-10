@@ -59,3 +59,13 @@ Stated plainly, as the reviewer asked: npm's integrity hash proves the download 
 - Parallel builders from a fixed contract, then one reviewer per cycle, again paid for itself: both cycles would have shipped with seam bugs the builders could not see.
 - CI had been red for a day because tests assumed this Mac; it is green now and I check it after every push.
 - Nothing was launched or hand-tested in the installed app; everything is offscreen tests plus captured frames.
+
+## Numbers
+
+| | |
+| --- | --- |
+| Installed everywhere | build 146 (`0.3.0-dev42`) |
+| Qt suite | 273 passed, 0 failed |
+| Page suite | 321 passed |
+| Last commit | d0dc016 on master, pushed; CI result recorded in the line below when it landed |
+| Agents | two builders and one reviewer per cycle (145, 146), one builder for the page lint service; Fable did the spike, the theme, merges, review fixes, installs and this report |
