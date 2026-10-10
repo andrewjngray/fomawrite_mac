@@ -10,7 +10,7 @@ Open by Path (Shift-Command-O) accepts absolute paths, ~/ paths and file URLs. O
 
 Aa → Theme offers System, Light, Dark and Warm paper. Go → Command Palette (Shift-Command-P) includes document, export, theme and review actions. Command-S saves the active document; Undo/Redo retain normal editing behavior.
 
-Edit → Spelling and Grammar checks the first 50,000 characters using a selected macOS dictionary. Review each suggestion, choose Replace, and Undo if needed. Code and link destinations are masked. Grammar is optional and language-dependent. Focus → Writing Review shows system word classes and review words, refreshing while open; it does not automatically rewrite prose. Speak Selection / Stop Speaking use the system voice.
+Edit → Spelling and Grammar (⌘:) opens the Review pane beside the document: every spelling and grammar finding in the document (first 500), each with its sentence, the checker's message, up to five one-click fixes, Ignore and Learn; click a row to go to it, filter by kind, choose the language in the pane header. Next Issue (⌘;) and Previous Issue (⌥⌘;) walk the findings in the writing surface in use. Code, links and front matter are not checked. Grammar is optional (Edit → Check Grammar While Typing) and language-dependent. Focus → Writing Review shows system word classes and review words, refreshing while open; it does not automatically rewrite prose. Speak Selection / Stop Speaking use the system voice.
 
 ## Read and export
 

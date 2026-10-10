@@ -163,6 +163,17 @@ private slots:
     void sourceSpellingContextMenuOffersSuggestionsAndCorrects();
     void sourceSpellingWithholdsTheCaretWordAndDimmedText();
     void liveSpellingUnderlinesMisspelledWordsAndFollowsTheSetting();
+    void reviewIssuesListSpellingAndGrammarInOrderWithDocumentOffsets();
+    void reviewIssuesAreCappedAndTheCapIsReported();
+    void reviewIssuesAreRebuiltAfterAPauseAndTypingCoalesces();
+    void reviewPaneTogglesWithTheCommandAndTheMenuTickFollows();
+    void reviewRowClickMovesTheSourceCaret();
+    void reviewSuggestionAppliesAsOneUndoableEdit();
+    void nextAndPreviousIssueWrapRoundTheDocument();
+    void reviewPaneResizesWithTheSplitViewAndItsWidthPersists();
+    void reviewPaneLeavesTheFooterControlsWhereTheyAre();
+    void reviewPaneFixesAndJumpsInTheLivePage();
+    void reviewPaneRendersInLightAndDarkThemes();
     void footerLayoutCapsuleNamesPreviewOnly();
     void footerViewCyclesPreserveDraftSelectionAndWidths();
     void footerModesAndTemplatesPreserveDraftAndUndo();
@@ -884,10 +895,15 @@ private slots:
         QCOMPARE(editor->property("text").toString(),QString("A misspelled word."));
         QVERIFY(QMetaObject::invokeMethod(editor,"undo")); QCOMPARE(editor->property("text").toString(),QString("A mispellled word."));
 #ifdef Q_OS_MACOS
-        QVERIFY(!backend.writingLanguages().isEmpty());
-        const auto issues=backend.writingIssues("A mispellled word. `mispellled`", "en_US",false);
-        bool found=false; for(const auto &entry:issues) { const auto issue=entry.toMap(); if(issue["word"]=="mispellled") { found=true; QCOMPARE(issue["start"].toInt(),2); QVERIFY(!issue["suggestions"].toStringList().isEmpty()); } }
-        QVERIFY(found);
+        QVERIFY(!backend.spellCheck()->languages().isEmpty());
+        // The finding the Review pane lists: where, which word, what kind, what to offer.
+        // ("recieve": no test ignores or learns it, and the checker's ignore list is process-wide)
+        editor->setProperty("text","A recieve word.");
+        const auto issue=backend.issueAt(3);
+        QCOMPARE(issue["word"].toString(),QString("recieve")); QCOMPARE(issue["start"].toInt(),2); QCOMPARE(issue["end"].toInt(),9);
+        QCOMPARE(issue["category"].toString(),QString("Spelling")); QVERIFY(!issue["suggestions"].toStringList().isEmpty());
+        QVERIFY(backend.issueAt(0).isEmpty()); // "A" is fine
+        editor->setProperty("text","A `recieve` word."); QVERIFY(backend.issueAt(5).isEmpty()); // code is not prose
 #endif
         backend.discardRecovery();
     }
@@ -5242,6 +5258,7 @@ private:
 #include "cycle143-spellcheck.inc"
 #include "cycle143-source-spelling.inc"
 #include "cycle143-live-spelling.inc"
+#include "cycle144-review-pane.inc"
 
 int main(int argc, char **argv) {
     QtWebEngineQuick::initialize();

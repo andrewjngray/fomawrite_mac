@@ -40,6 +40,7 @@ void SpellCheck::setLanguage(const QString &language) {
     const QString chosen = language.left(32);
     if (m_language == chosen) return;
     m_language = chosen;
+    m_suggestionCache.clear();
     QSettings().setValue(QStringLiteral("writing/spellingLanguage"), chosen);
     emit languageChanged();
 }
@@ -83,6 +84,8 @@ QList<SpellCheck::Issue> SpellCheck::grammarIssues(const QString &text) const {
         const QVariantMap map = entry.toMap();
         const int start = map.value(QStringLiteral("start")).toInt(), end = map.value(QStringLiteral("end")).toInt();
         if (start < 0 || end <= start || end > text.size()) continue;
+        if (!m_ignoredGrammar.isEmpty()
+            && m_ignoredGrammar.contains(text.mid(start, end - start) + QLatin1Char('\n') + map.value(QStringLiteral("message")).toString())) continue;
         issues.append({start, end, QStringLiteral("Grammar"), map.value(QStringLiteral("message")).toString(),
                        map.value(QStringLiteral("suggestions")).toStringList()});
     }
@@ -111,7 +114,10 @@ QVariantList SpellCheck::issueList(const QString &text) const {
 QStringList SpellCheck::suggestions(const QString &word) const {
     if (!available() || word.trimmed().isEmpty() || word.size() > 100) return {};
 #ifdef Q_OS_MACOS
-    return macSpellingGuesses(word, m_language);
+    const auto cached = m_suggestionCache.constFind(word);
+    if (cached != m_suggestionCache.constEnd()) return *cached;
+    if (m_suggestionCache.size() >= 4096) m_suggestionCache.clear();
+    return m_suggestionCache.insert(word, macSpellingGuesses(word, m_language)).value();
 #else
     return {};
 #endif
@@ -122,6 +128,7 @@ void SpellCheck::learnWord(const QString &word) {
 #ifdef Q_OS_MACOS
     macLearnWord(word);
 #endif
+    m_suggestionCache.clear();
     emit wordsChanged();
 }
 
@@ -130,6 +137,7 @@ void SpellCheck::unlearnWord(const QString &word) {
 #ifdef Q_OS_MACOS
     macUnlearnWord(word);
 #endif
+    m_suggestionCache.clear();
     emit wordsChanged();
 }
 
@@ -138,6 +146,13 @@ void SpellCheck::ignoreWord(const QString &word) {
 #ifdef Q_OS_MACOS
     macIgnoreWord(word);
 #endif
+    m_suggestionCache.clear();
+    emit wordsChanged();
+}
+
+void SpellCheck::ignoreGrammar(const QString &text, const QString &message) {
+    if (text.trimmed().isEmpty() || text.size() > 1000) return;
+    m_ignoredGrammar.insert(text + QLatin1Char('\n') + message);
     emit wordsChanged();
 }
 

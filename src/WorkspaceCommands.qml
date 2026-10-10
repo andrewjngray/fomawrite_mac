@@ -37,7 +37,9 @@ QtObject {
         { id: "exportPdf", title: "Export PDF…" },
         { id: "pageBreak", title: "Insert Page Break" },
         { id: "writingReview", title: "Writing Review…" },
-        { id: "spelling", title: "Spelling and Grammar…" },
+        { id: "spelling", title: "Spelling and Grammar", toggle: true },
+        { id: "nextIssue", title: "Next Issue" },
+        { id: "previousIssue", title: "Previous Issue" },
         { id: "authorship", title: "Authorship Annotations…" },
         { id: "themeSystem", title: "Theme: Follow System" },
         { id: "themeLight", title: "Theme: Light" },
@@ -130,7 +132,7 @@ QtObject {
         if (["strike", "inlineCode", "pageBreak"].indexOf(id) >= 0) return window.canFormatSource || window.canFormatLive;
         if (["duplicate", "rename", "move", "reveal"].indexOf(id) >= 0) return backend.fileUrl.toString() !== "";
         if (["quickOpen", "refreshTags"].indexOf(id) >= 0) return library.rootFolder.toString() !== "";
-        if (id === "spelling") return window.isMac && editor.length > 0;
+        if (id === "spelling" || id === "nextIssue" || id === "previousIssue") return backend.spellCheck.available;
         if (id === "checkSpellingWhileTyping") return backend.spellCheck.available;
         if (id === "checkGrammarWhileTyping") return backend.spellCheck.available && backend.spellCheck.enabled;
         if (id === "organizer") return true;
@@ -144,6 +146,7 @@ QtObject {
         switch (id) {
         case "library": return layoutState.effectiveFilesVisible;
         case "organizer": return layoutState.effectiveOrganizerVisible;
+        case "spelling": return layoutState.effectiveReviewVisible;
         case "sortBar": return libraryPane.showSortBar;
         case "filterBar": return libraryPane.showFilterBar;
         case "sortName": return library.sortMode === 0;
