@@ -107,8 +107,8 @@ void FomawriteTest::harperEngineCachesDedupesAndMapsKinds() {
     QCOMPARE(engine.suggestionsFor(QStringLiteral("recieve")), QStringList{QStringLiteral("receive")});
     // Every kind Harper has, and one it might add.
     const QStringList grammar{"Agreement", "BoundaryError", "Capitalization", "Eggcorn", "Grammar", "Malapropism", "Nonstandard", "Punctuation",
-                              "Repetition", "Typo", "Usage", "WordChoice", "WordOrder"};
-    const QStringList style{"Enhancement", "Formatting", "Miscellaneous", "Readability", "Redundancy", "Regionalism", "Style", "SomeFutureKind"};
+                              "Repetition", "Typo", "Usage", "WordOrder"};
+    const QStringList style{"Enhancement", "Formatting", "Miscellaneous", "Readability", "Redundancy", "Regionalism", "Style", "WordChoice", "SomeFutureKind"};
     QCOMPARE(HarperEngine::categoryForKind(QStringLiteral("Spelling")), QStringLiteral("Spelling"));
     for (const QString &kind : grammar) QCOMPARE(HarperEngine::categoryForKind(kind), QStringLiteral("Grammar"));
     for (const QString &kind : style) QCOMPARE(HarperEngine::categoryForKind(kind), QStringLiteral("Style"));
@@ -463,5 +463,274 @@ void FomawriteTest::liveSpellingRequestWaitsForHarperAndRepliesOnce() {
     QVERIFY(sent.last().second == never);
     bridge->harperReply(sent.last().first, QStringLiteral("[]"));
     QVERIFY(checks.count() >= 1);
+    backend.discardRecovery();
+}
+
+namespace {
+// The Edit menu's Writing Checker commands through the shared command surface.
+bool cycle145Checked(QObject *window, const char *command) {
+    QVariant value;
+    QMetaObject::invokeMethod(cycle144Commands(window), "isChecked", Q_RETURN_ARG(QVariant, value), Q_ARG(QVariant, QString::fromLatin1(command)));
+    return value.toBool();
+}
+bool cycle145Enabled(QObject *window, const char *command) {
+    QVariant value;
+    QMetaObject::invokeMethod(cycle144Commands(window), "isEnabled", Q_RETURN_ARG(QVariant, value), Q_ARG(QVariant, QString::fromLatin1(command)));
+    return value.toBool();
+}
+QString cycle145Label(QObject *window, const char *name) {
+    auto *item = window->findChild<QQuickItem *>(QString::fromLatin1(name));
+    return item ? item->property("text").toString() : QStringLiteral("<missing>");
+}
+QStringList cycle145RowTags(QObject *window) {
+    QStringList tags;
+    for (int i = 0; i < 12; ++i) {
+        auto *row = cycle144Row(window, i);
+        if (!row) break;
+        const auto labels = cycle103VisualItems(row, QStringLiteral("reviewTag"));
+        if (labels.isEmpty()) continue;
+        auto *label = labels.first()->findChild<QQuickItem *>("reviewTagLabel");
+        tags << (label ? label->property("text").toString() : QString());
+    }
+    return tags;
+}
+// The environment variable that defers the hidden Live page to first use is set for
+// the whole suite (initTestCase); the tests that want the warm-up clear it.
+struct Cycle145Prewarm {
+    QByteArray previous; bool had;
+    explicit Cycle145Prewarm(bool on) : previous(qgetenv("FOMAWRITE_NO_LIVE_PREWARM")), had(qEnvironmentVariableIsSet("FOMAWRITE_NO_LIVE_PREWARM")) {
+        if (on) qunsetenv("FOMAWRITE_NO_LIVE_PREWARM"); else qputenv("FOMAWRITE_NO_LIVE_PREWARM", "1");
+    }
+    ~Cycle145Prewarm() { if (had) qputenv("FOMAWRITE_NO_LIVE_PREWARM", previous); else qunsetenv("FOMAWRITE_NO_LIVE_PREWARM"); }
+};
+}
+
+// (g) The Edit menu's Writing Checker commands, and the pane: Style filter, kind
+// tags, the engine status line and the dialect list (Harper answers are given
+// by the test, as above; no page).
+void FomawriteTest::writingCheckerCommandsMenuAndPaneFollowTheEngine() {
+    Cycle103SettingsSnapshot settings;
+    Cycle117Window f; QVERIFY2(f.start(1200), qPrintable(f.error));
+    auto *spell = f.backend.spellCheck();
+    if (!spell->available()) QSKIP("the system spell checker exists only on macOS");
+    spell->setEnabled(true); spell->setGrammarEnabled(true); spell->setStyleEnabled(false);
+    QVERIFY(f.mode(0));
+    QObject *window = f.window.data();
+    // Menu: the submenu and its items exist (the two existing items kept their ids).
+    for (const char *name : {"editWritingChecker", "editWritingEngine", "editWritingDialect", "editEngineHarper", "editEngineMacos", "editDialectAustralian",
+                             "editDialectBritish", "editDialectAmerican", "editDialectCanadian", "editCheckSpellingWhileTyping",
+                             "editCheckGrammarWhileTyping", "editCheckStyleWhileTyping"})
+        QVERIFY2(window->findChild<QObject *>(QString::fromLatin1(name)), name);
+    // Ticks follow the settings; the dialects are Harper's, so they dim with the macOS engine.
+    QVERIFY(cycle145Checked(window, "engineHarper")); QVERIFY(!cycle145Checked(window, "engineMacos"));
+    QVERIFY(cycle145Checked(window, "dialectAustralian"));
+    QVERIFY(cycle144Run(window, "dialectBritish"));
+    QCOMPARE(spell->dialect(), QStringLiteral("British"));
+    QVERIFY(cycle145Checked(window, "dialectBritish") && !cycle145Checked(window, "dialectAustralian"));
+    QVERIFY(window->findChild<QObject *>("editDialectBritish")->property("checked").toBool());
+    QVERIFY(cycle145Enabled(window, "dialectAmerican") && cycle145Enabled(window, "checkStyleWhileTyping"));
+    QVERIFY(cycle144Run(window, "engineMacos"));
+    QCOMPARE(spell->engine(), QStringLiteral("macos"));
+    QVERIFY(cycle145Checked(window, "engineMacos") && !cycle145Checked(window, "engineHarper"));
+    QVERIFY(!cycle145Enabled(window, "dialectAmerican") && !cycle145Enabled(window, "checkStyleWhileTyping"));
+    QVERIFY(cycle144Run(window, "engineHarper"));
+    QCOMPARE(spell->engine(), QStringLiteral("harper"));
+    QVERIFY(!cycle145Checked(window, "checkStyleWhileTyping"));
+    QVERIFY(cycle144Run(window, "checkStyleWhileTyping"));
+    QVERIFY(spell->styleEnabled() && cycle145Checked(window, "checkStyleWhileTyping"));
+    QVERIFY(cycle144Run(window, "checkStyleWhileTyping"));
+    QVERIFY(cycle144Run(window, "dialectAustralian"));
+    // The pane with the macOS checker answering (Harper is not ready): status line and language list.
+    QVERIFY(cycle144Run(window, "spelling"));
+    QTRY_VERIFY(cycle144Control(window, "reviewFilterStyle"));
+    QCOMPARE(cycle145Label(window, "reviewEngine"), QStringLiteral("macOS checker (Harper is loading)"));
+    QCOMPARE(cycle144Control(window, "reviewLanguage")->property("text").toString(), QStringLiteral("System language"));
+    // Harper comes up and answers: three categories, kinds as tags, Style filter, version in the header.
+    auto *bridge = f.backend.editorBridge();
+    QList<QPair<int, QString>> sent;
+    QObject::connect(bridge, &EditorBridge::harperLint, bridge, [&](int token, const QString &text) { sent.append({token, text}); });
+    bridge->ready(); bridge->harperReady(QStringLiteral("2.10.0-test"));
+    QCOMPARE(spell->effectiveEngine(), QStringLiteral("harper"));
+    const QString text = QStringLiteral("We recieve the the mail and it is very unique.\n");
+    f.editor->setProperty("text", text);
+    QTRY_VERIFY(!sent.isEmpty());
+    const QString prose = text.chopped(1);
+    int token = -1; for (const auto &entry : sent) if (entry.second == prose) token = entry.first;
+    QVERIFY(token > 0);
+    const int recieve = prose.indexOf(QStringLiteral("recieve")), doubled = prose.indexOf(QStringLiteral("the the")), unique = prose.indexOf(QStringLiteral("very unique"));
+    bridge->harperReply(token, cycle145Json({cycle145Lint(recieve, recieve + 7, "Spelling", "Did you mean to spell `recieve` this way?", {"receive", "relieve"}),
+        cycle145Lint(doubled, doubled + 7, "Repetition", "Did you mean to repeat this word?", {"the"}),
+        cycle145Lint(unique, unique + 11, "WordChoice", "`Unique` is absolute.", {"unique"})}));
+    QTRY_COMPARE(f.backend.reviewIssues().size(), 3);
+    const QVariantList issues = f.backend.reviewIssues();
+    QCOMPARE(issues.at(0).toMap()["category"].toString(), QStringLiteral("Spelling"));
+    QCOMPARE(issues.at(1).toMap()["category"].toString(), QStringLiteral("Grammar"));
+    QCOMPARE(issues.at(1).toMap()["kind"].toString(), QStringLiteral("Repetition"));
+    QCOMPARE(issues.at(2).toMap()["category"].toString(), QStringLiteral("Style"));
+    QCOMPARE(issues.at(2).toMap()["kind"].toString(), QStringLiteral("WordChoice"));
+    QCOMPARE(issues.at(2).toMap()["word"].toString(), QStringLiteral("very unique"));
+    QCOMPARE(cycle145Label(window, "reviewCounts"), QStringLiteral("1 spelling · 1 grammar · 1 style"));
+    QCOMPARE(cycle145Label(window, "reviewEngine"), QStringLiteral("Harper 2.10.0-test"));
+    QCOMPARE(cycle144Control(window, "reviewLanguage")->property("text").toString(), QStringLiteral("Australian")); // the dialect, not a macOS language
+    QTRY_COMPARE(cycle145RowTags(window), (QStringList{"Spelling", "Repetition", "Word Choice"}));
+    // The Style filter shows the style row only; the underline setting does not matter to the pane.
+    QVERIFY(!spell->styleEnabled());
+    QVERIFY(cycle102Click(f.quick, cycle144Control(window, "reviewFilterStyle")));
+    QTRY_COMPARE(cycle145RowTags(window), (QStringList{"Word Choice"}));
+    QVERIFY(cycle102Click(f.quick, cycle144Control(window, "reviewFilterAll")));
+    QTRY_COMPARE(cycle145RowTags(window).size(), 3);
+    // Ignore on a style row goes to the one ignore list and the row goes.
+    auto *styleRow = cycle144Row(window, 2); QVERIFY(styleRow);
+    QVERIFY(cycle102Click(f.quick, cycle144RowButton(styleRow, QStringLiteral("reviewIgnore"))));
+    QTRY_COMPARE(f.backend.reviewIssues().size(), 2);
+    // Back to the macOS engine: the header says so and the language list returns.
+    spell->setEngine(QStringLiteral("macos"));
+    QTRY_COMPARE(cycle145Label(window, "reviewEngine"), QStringLiteral("macOS checker"));
+    QCOMPARE(cycle144Control(window, "reviewLanguage")->property("text").toString(), QStringLiteral("System language"));
+}
+
+// (h) The real engine in the real page. The window starts in Source and never
+// opens Live: the page exists because of the warm-up a second after the window
+// shows, and Harper loads in it. Source gets its marks from Harper, the pane lists
+// all three categories with Harper's kinds, a dialect change re-judges "colour",
+// and the Live page draws the same findings.
+void FomawriteTest::harperDrivesSourceTheLivePageAndThePaneInTheRealPage() {
+    // The page half of Cycle 145 (the bridge's harperLoad / harperLint / harperImportWords) is another
+    // builder's; until the bundle has it there is no engine to ask.
+    QFile pageBundle(QStringLiteral(":/editor/dist/editor.js"));
+    if (!pageBundle.open(QIODevice::ReadOnly) || !pageBundle.readAll().contains("harperLoad"))
+        QSKIP("the page bundle has no Harper bridge yet (the page half of Cycle 145)");
+    Cycle145Prewarm prewarm(true);
+    Cycle103SettingsSnapshot settings;
+    QElapsedTimer clock; clock.start();
+    Cycle117Window f; QVERIFY2(f.start(1200), qPrintable(f.error));
+    auto *spell = f.backend.spellCheck();
+    if (!spell->available()) QSKIP("the system spell checker exists only on macOS");
+    spell->setEnabled(true); spell->setGrammarEnabled(true); spell->setStyleEnabled(false);
+    QVERIFY(f.mode(0));
+    QObject *window = f.window.data();
+    QCOMPARE(spell->engine(), QStringLiteral("harper"));
+    QTRY_VERIFY_WITH_TIMEOUT(spell->harperReady(), 60000);
+    qInfo("harper: ready %lld ms after the window was created (Source only, Live never opened); version %s", clock.elapsed(), qPrintable(spell->harperVersion()));
+    QVERIFY(!f.layout->property("liveEditEnabled").toBool());
+    QCOMPARE(spell->effectiveEngine(), QStringLiteral("harper"));
+    auto *quickDocument = f.editor->property("textDocument").value<QQuickTextDocument *>(); QVERIFY(quickDocument);
+    QTextDocument &document = *quickDocument->textDocument();
+    const QString sentence = QStringLiteral("We recieve the the mail and it is very unique.");
+    f.editor->setProperty("text", sentence + QStringLiteral("\n"));
+    const int recieve = sentence.indexOf(QStringLiteral("recieve")), doubled = sentence.indexOf(QStringLiteral("the the")), unique = sentence.indexOf(QStringLiteral("very unique"));
+    QTRY_VERIFY_WITH_TIMEOUT(cycle143Underlined(document, recieve), 20000);
+    QTRY_VERIFY_WITH_TIMEOUT(cycle144IsBlue(document, doubled), 20000);
+    QVERIFY(cycle144IsBlue(document, doubled + 6));
+    QVERIFY(!cycle145Underline(document, unique).isValid()); // style findings are in the pane, not underlined, until asked for
+    // The pane lists all three, with Harper's kinds.
+    QTRY_COMPARE_WITH_TIMEOUT(f.backend.reviewIssues().size(), 3, 10000);
+    QStringList seen;
+    for (const QVariant &entry : f.backend.reviewIssues()) { const auto issue = entry.toMap(); seen << issue["category"].toString() + ":" + issue["kind"].toString() + ":" + issue["word"].toString(); }
+    QCOMPARE(seen, (QStringList{"Spelling:Spelling:recieve", "Grammar:Repetition:the the", "Style:WordChoice:very unique"}));
+    QVERIFY(!f.backend.reviewIssues().at(1).toMap()["message"].toString().isEmpty());
+    QVERIFY(f.backend.reviewIssues().at(0).toMap()["suggestions"].toStringList().contains(QStringLiteral("receive")));
+    QVERIFY(cycle144Run(window, "spelling"));
+    QTRY_COMPARE(cycle145RowTags(window), (QStringList{"Spelling", "Repetition", "Word Choice"}));
+    QVERIFY(cycle145Label(window, "reviewEngine").startsWith(QStringLiteral("Harper ")));
+    // Style goes on: grey under "very unique"; off: gone.
+    spell->setStyleEnabled(true);
+    QTRY_VERIFY(cycle145Underline(document, unique) == QColor("#8a8f98"));
+    spell->setStyleEnabled(false);
+    QTRY_VERIFY(!cycle145Underline(document, unique).isValid());
+    spell->setStyleEnabled(true);
+    // A dialect: "colour" is fine in Australian, a spelling finding in American, and fine again.
+    const QString colour = QStringLiteral("We like the colour red.");
+    f.editor->setProperty("text", sentence + QStringLiteral("\n\n") + colour + QStringLiteral("\n"));
+    const int where = sentence.size() + 2 + colour.indexOf(QStringLiteral("colour"));
+    QTRY_VERIFY_WITH_TIMEOUT(spell->issuesIfKnown(colour).has_value(), 20000);
+    QVERIFY(spell->issues(colour).isEmpty());
+    QVERIFY(!cycle143Underlined(document, where));
+    spell->setDialect(QStringLiteral("American"));
+    QTRY_VERIFY_WITH_TIMEOUT(cycle143Underlined(document, where), 20000);
+    QCOMPARE(f.backend.issueAt(where)["category"].toString(), QStringLiteral("Spelling"));
+    QVERIFY(f.backend.issueAt(where)["suggestions"].toStringList().contains(QStringLiteral("color")));
+    spell->setDialect(QStringLiteral("Australian"));
+    QTRY_VERIFY_WITH_TIMEOUT(!cycle143Underlined(document, where), 20000);
+    QVERIFY(f.backend.issueAt(where).isEmpty());
+    // Live: the same page now draws the same findings itself. The page asked the host (spellingRequested),
+    // and the host answered once, with Style because style is on.
+    QSignalSpy replies(f.backend.editorBridge(), &EditorBridge::spellingReply);
+    f.editor->setProperty("text", sentence + QStringLiteral("\n"));
+    QVERIFY(QMetaObject::invokeMethod(window, "selectWritingMode", Q_ARG(QVariant, QStringLiteral("live"))));
+    auto *view = window->findChild<QObject *>("liveEditorView"); QVERIFY(view);
+    QTRY_VERIFY_WITH_TIMEOUT(f.layout->property("liveEditEnabled").toBool(), 5000);
+    QTRY_COMPARE_WITH_TIMEOUT(cycle144PageText(f.backend.editorBridge()), sentence + QStringLiteral("\n"), 15000);
+    QTRY_VERIFY_WITH_TIMEOUT(cycle143Underlined(view).contains(QStringLiteral("recieve")), 20000);
+    QTRY_VERIFY_WITH_TIMEOUT(cycle144Texts(view, QStringLiteral(".fw-grammar")).join(QString()).contains(QStringLiteral("the the")), 20000);
+    // What the host sent the page, whatever the page does with it: findings with Harper's kind, Style among them.
+    const auto repliedWith = [&](const QString &needle) {
+        for (const auto &args : replies) if (args.at(1).toString().contains(needle)) return true;
+        return false;
+    };
+    QTRY_VERIFY_WITH_TIMEOUT(repliedWith(QStringLiteral("\"category\":\"Style\"")) && repliedWith(QStringLiteral("\"kind\":\"WordChoice\"")), 20000);
+    // The page draws Style as .fw-style when its bundle knows the category (the page half of Cycle 145).
+    QFile pageScript(QStringLiteral(":/editor/dist/editor.js"));
+    const bool pageDrawsStyle = pageScript.open(QIODevice::ReadOnly) && pageScript.readAll().contains("fw-style");
+    if (pageDrawsStyle) {
+        QTRY_VERIFY_WITH_TIMEOUT(cycle144Texts(view, QStringLiteral(".fw-style")).join(QString()).contains(QStringLiteral("very unique")), 20000);
+        // Style off: the page's grey underline goes, the red and blue stay.
+        spell->setStyleEnabled(false);
+        QTRY_VERIFY_WITH_TIMEOUT(cycle144Texts(view, QStringLiteral(".fw-style")).isEmpty(), 20000);
+        QVERIFY(cycle143Underlined(view).contains(QStringLiteral("recieve")));
+    } else {
+        qWarning("the page bundle has no .fw-style yet: the Live style underline was not asserted");
+    }
+}
+
+// (i) The warm-up: a second after the window shows the hidden Live page is created
+// (and Harper loads in it); with FOMAWRITE_TEST_PREWARM=0 it is not, as before.
+// Prints the numbers the cycle record quotes: time to first paint, the longest
+// stall of the event loop around the page's creation, and the memory of the
+// process tree. Run twice (with and without) to compare.
+void FomawriteTest::livePageWarmUpDoesNotDelayFirstPaintAndIsMeasured() {
+    const bool on = qgetenv("FOMAWRITE_TEST_PREWARM") != "0";
+    Cycle145Prewarm prewarm(on);
+    Cycle103SettingsSnapshot settings;
+    QElapsedTimer clock; clock.start();
+    Backend backend;
+    QQmlEngine engine; engine.rootContext()->setContextProperty("backend", &backend);
+    QQmlComponent component(&engine, QUrl(QStringLiteral("qrc:/Main.qml")));
+    QScopedPointer<QObject> window(component.create()); QVERIFY2(window, qPrintable(component.errorString()));
+    auto *quick = qobject_cast<QQuickWindow *>(window.data()); QVERIFY(quick);
+    const qint64 created = clock.elapsed();
+    QSignalSpy painted(quick, &QQuickWindow::frameSwapped);
+    quick->resize(1200, 800); quick->show();
+    QVERIFY(QTest::qWaitForWindowExposed(quick));
+    QTRY_VERIFY(!painted.isEmpty());
+    const qint64 firstPaint = clock.elapsed();
+    // Event loop stalls: a 10 ms timer that notes how late it fires.
+    qint64 worstStall = 0; QElapsedTimer tick; tick.start();
+    QTimer probe; probe.setInterval(10);
+    QObject::connect(&probe, &QTimer::timeout, [&] { worstStall = qMax(worstStall, tick.elapsed() - 10); tick.restart(); });
+    probe.start();
+    QTest::qWait(on ? 4000 : 2500);
+    probe.stop();
+    auto *view = window->findChild<QObject *>("liveEditorView");
+    QCOMPARE(view != nullptr, on); // the page exists only because of the warm-up
+    if (on) { QTRY_VERIFY_WITH_TIMEOUT(backend.editorBridge()->isReady(), 20000); }
+    // Memory: resident set of this process and its descendants (the WebEngine renderer and GPU processes).
+    QProcess ps; ps.start(QStringLiteral("ps"), {QStringLiteral("-axo"), QStringLiteral("pid=,ppid=,rss=,args=")});
+    QVERIFY(ps.waitForFinished(5000));
+    QHash<qint64, QList<qint64>> children; QHash<qint64, qint64> rss; QHash<qint64, QString> kind;
+    for (const QByteArray &line : ps.readAllStandardOutput().split('\n')) {
+        const auto parts = line.simplified().split(' ');
+        if (parts.size() < 3) continue;
+        children[parts.at(1).toLongLong()].append(parts.at(0).toLongLong()); rss[parts.at(0).toLongLong()] = parts.at(2).toLongLong();
+        const int type = line.indexOf("--type=");
+        kind[parts.at(0).toLongLong()] = type >= 0 ? QString::fromLatin1(line.mid(type + 7).split(' ').first()) : QStringLiteral("app");
+    }
+    qint64 total = 0; QList<qint64> stack{QCoreApplication::applicationPid()};
+    QStringList breakdown;
+    while (!stack.isEmpty()) { const qint64 pid = stack.takeLast(); total += rss.value(pid); breakdown << QStringLiteral("%1 %2 MB").arg(kind.value(pid)).arg(rss.value(pid) / 1024); stack += children.value(pid); }
+    qInfo() << "processes:" << breakdown;
+    qInfo("warm-up %s: window created in %lld ms, first paint %lld ms after that began (%lld ms after the window showed), worst event-loop stall %lld ms, resident %lld MB (process tree)",
+          on ? "ON" : "OFF", created, firstPaint, firstPaint - created, worstStall, total / 1024);
+    QVERIFY2(firstPaint < 15000, "the first paint is not held up by the page");
     backend.discardRecovery();
 }

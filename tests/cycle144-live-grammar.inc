@@ -21,6 +21,7 @@ void FomawriteTest::liveGrammarUnderlinesFollowTheGrammarSetting() {
     Cycle103SettingsSnapshot settings;
     Backend backend;
     backend.spellCheck()->setLanguage(QStringLiteral("en_US"));
+    backend.spellCheck()->setEngine(QStringLiteral("macos")); // this test is about the macOS checker (Harper: tests/cycle145-harper-engine.inc)
     CYCLE144_NEEDS_GRAMMAR((*backend.spellCheck()));
     QQmlEngine engine; engine.rootContext()->setContextProperty("backend", &backend);
     QQmlComponent component(&engine, QUrl(QStringLiteral("qrc:/Main.qml")));

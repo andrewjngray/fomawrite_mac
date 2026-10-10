@@ -19,12 +19,12 @@ QString HarperEngine::categoryForKind(const QString &kind) {
     static const QSet<QString> grammar{
         QStringLiteral("Agreement"), QStringLiteral("BoundaryError"), QStringLiteral("Capitalization"), QStringLiteral("Eggcorn"),
         QStringLiteral("Grammar"), QStringLiteral("Malapropism"), QStringLiteral("Nonstandard"), QStringLiteral("Punctuation"),
-        QStringLiteral("Repetition"), QStringLiteral("Typo"), QStringLiteral("Usage"), QStringLiteral("WordChoice"),
-        QStringLiteral("WordOrder")};
+        QStringLiteral("Repetition"), QStringLiteral("Typo"), QStringLiteral("Usage"), QStringLiteral("WordOrder")};
     if (kind == QLatin1String("Spelling")) return QStringLiteral("Spelling");
     if (grammar.contains(kind)) return QStringLiteral("Grammar");
     // Enhancement, Formatting, Miscellaneous, Readability, Redundancy,
-    // Regionalism, Style, and any kind a later Harper adds: a suggestion, not an error.
+    // Regionalism, Style, WordChoice ("very unique" is WordChoice in Harper, and
+    // reads as a suggestion, not an error) and any kind a later Harper adds.
     return QStringLiteral("Style");
 }
 

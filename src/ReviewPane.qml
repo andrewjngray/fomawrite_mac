@@ -137,7 +137,8 @@ Rectangle {
             }
         }
 
-        RowLayout {
+        // A Flow, not a row: four filters do not fit the narrowest pane (240 px) on one line.
+        Flow {
             Layout.fillWidth: true
             spacing: 4
             Repeater {
@@ -219,6 +220,7 @@ Rectangle {
                         color: Qt.rgba(tagLabel.color.r, tagLabel.color.g, tagLabel.color.b, 0.14)
                         Label {
                             id: tagLabel
+                            objectName: "reviewTagLabel"
                             anchors.centerIn: parent
                             text: root.tagFor(row.modelData)
                             color: row.ink

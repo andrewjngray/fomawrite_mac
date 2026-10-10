@@ -33,6 +33,7 @@ void FomawriteTest::liveSpellingUnderlinesMisspelledWordsAndFollowsTheSetting() 
     Backend backend;
     QSignalSpy asked(backend.editorBridge(), &EditorBridge::spellingRequested); // before the page exists: the first check is the one we want to see
     backend.spellCheck()->setLanguage(QStringLiteral("en_US"));
+    backend.spellCheck()->setEngine(QStringLiteral("macos")); // this test is about the macOS checker (Harper: tests/cycle145-harper-engine.inc)
     QQmlEngine engine; engine.rootContext()->setContextProperty("backend", &backend);
     QQmlComponent component(&engine, QUrl(QStringLiteral("qrc:/Main.qml")));
     QScopedPointer<QObject> window(component.create()); QVERIFY2(window, qPrintable(component.errorString()));
