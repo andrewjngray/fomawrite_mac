@@ -70,7 +70,9 @@ void FomawriteTest::liveSpellingUnderlinesMisspelledWordsAndFollowsTheSetting() 
     QTRY_VERIFY_WITH_TIMEOUT(cycle143Underlined(view).contains(QStringLiteral("zxqvplumb")), 15000);
 
     // Ignoring the word (Ignore Spelling in the menu) re-checks the page: the underline goes.
+    // Only the ignored word is asserted: "tomorow" is in the document too and
+    // its state depends on whether another test ignored it earlier in the run.
     backend.spellCheck()->ignoreWord(QStringLiteral("zxqvplumb"));
-    QTRY_VERIFY_WITH_TIMEOUT(cycle143Underlined(view).isEmpty(), 10000);
+    QTRY_VERIFY_WITH_TIMEOUT(!cycle143Underlined(view).contains(QStringLiteral("zxqvplumb")), 10000);
     backend.discardRecovery();
 }
