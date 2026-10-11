@@ -238,8 +238,8 @@ void FomawriteTest::rightClickingTheTopBarDocumentNameOpensTheLibraryMenu() {
 }
 
 // The folder button above the middle pane opened its chooser at the top of the
-// disk. It now starts in the folder that holds the current one, with the current
-// folder selected, as Show in Finder does.
+// disk (build 148), then one level up (build 149). It now opens inside the
+// current folder.
 void FomawriteTest::folderChooserStartsWhereTheCurrentFolderLives() {
     Cycle103SettingsSnapshot settings;
     QTemporaryDir directory;
@@ -253,8 +253,7 @@ void FomawriteTest::folderChooserStartsWhereTheCurrentFolderLives() {
     auto *pane = f.window->findChild<QObject *>("libraryPane"); QVERIFY(pane);
     auto *dialog = f.window->findChild<QObject *>("libraryFolderDialog"); QVERIFY(dialog);
     QVERIFY(QMetaObject::invokeMethod(pane, "chooseFolder"));
-    QCOMPARE(dialog->property("currentFolder").toUrl().toLocalFile(), cycle148Canonical(directory.filePath("repo")).toLocalFile());
-    QCOMPARE(dialog->property("selectedFolder").toUrl().toLocalFile(), ops.toLocalFile());
+    QCOMPARE(dialog->property("currentFolder").toUrl().toLocalFile(), ops.toLocalFile());
     QVERIFY(QMetaObject::invokeMethod(dialog, "reject"));
     QCOMPARE(library->rootFolder(), ops);
     f.backend.discardRecovery();

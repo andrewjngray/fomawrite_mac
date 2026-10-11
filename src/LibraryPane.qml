@@ -60,16 +60,11 @@ Rectangle {
     signal createRequested(string name, bool inNewWindow)
     color: backend.palette.library
     objectName: "libraryPane"
-    // The chooser starts where the current folder lives, with that folder selected
-    // (as Show in Finder does), instead of at the top of the disk.
+    // The chooser opens inside the current folder (not at the top of the disk, and
+    // not one level up), so Open keeps it and any subfolder is one click away.
     function chooseFolder() {
-        var current = library.rootFolder.toString().replace(/\/+$/, "");
-        if (current !== "") {
-            var slash = current.lastIndexOf("/");
-            var parent = slash > "file://".length ? current.slice(0, slash) : "file:///";
-            folderDialog.currentFolder = parent;
-            folderDialog.selectedFolder = current;
-        }
+        var current = library.rootFolder.toString();
+        if (current !== "") folderDialog.currentFolder = current;
         folderDialog.open();
     }
     function newDocument(inNewWindow) { newFileDialog.inNewWindow = !!inNewWindow; newFileDialog.open(); }

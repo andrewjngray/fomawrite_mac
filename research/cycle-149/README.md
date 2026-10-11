@@ -1,4 +1,4 @@
-# Cycle 149 — The folder chooser starts where the folder lives
+# Cycles 149–150 — The folder chooser opens in the current folder
 
 Build 149 (`0.3.0-dev45`), 12 October 2026. From Andrew trying build 148.
 
@@ -13,3 +13,7 @@ Assessed, not built (waiting for Andrew):
 - The middle pane already keeps its own folder history (every folder change, including Explore Folder, is a step), reachable only from Go → Back in Library / Forward in Library and the Workspace menu's Previous folder / Next folder. Back and forward buttons in the middle pane's header would expose it.
 
 Verified offscreen only; the native macOS panel's highlighting of the selected folder is up to macOS.
+
+## Build 150 (`0.3.0-dev46`), same day
+
+Andrew tried 149: the chooser opened one level up (repo_GROKBOT, with ops listed in it) and he expected to be inside ops itself. The macOS panel opens in the dialog's starting folder; 149 started it at the parent. `chooseFolder` now starts it in the current folder (Qt drops a selected folder equal to the starting folder, so only the starting folder is set). Open with nothing selected keeps the current folder; any subfolder is one click away. The test now expects the current folder.

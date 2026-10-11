@@ -4,6 +4,7 @@ One line per cycle, newest first. Each line links to the cycle's record under `r
 
 ## 0.3.0 development series (Cycles 97–)
 
+- **150** — The folder chooser opens inside the current folder (`0.3.0-dev46`, build 150, 12 Oct), not one level up as in 149. [Record](research/cycle-149/README.md)
 - **149** — The folder chooser starts where the folder lives (`0.3.0-dev45`, build 149, 12 Oct): the folder button above the middle pane opens its chooser in the folder that holds the current one, with that folder selected, instead of at the top of the disk. [Record](research/cycle-149/README.md)
 - **148** — Getting from the open document to its folder (`0.3.0-dev44`, build 148, 12 Oct): the top-bar document name shows the full path on hover and opens the file menu on a right-click (Show in Finder, Move to Trash and the rest); a new Explore Folder item, in every file menu, makes the file's folder the middle pane's folder with the file selected. [Record](research/cycle-148/README.md)
 - **147** — Harper in daily use (`0.3.0-dev43`, build 147, 11 Oct): Live underlines a long list of misspellings (the host lints the page's windows line by line; Harper went quiet on a 60-line run without sentence punctuation); a suggestion in the Review pane removes its row at once and selects the next; the missing-theme-font notice is a one-time banner with where to put the font. [Record](research/cycle-147/README.md)
