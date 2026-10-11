@@ -158,24 +158,124 @@ void FomawriteTest::libraryHeaderArrowsStepAsideBeforeTheyCanOverlap() {
     const bool mac = f.window->property("isMac").toBool();
     auto *arrows = f.window->findChild<QQuickItem *>("libraryHistoryControls"); QVERIFY(arrows);
     auto *folder = f.window->findChild<QQuickItem *>("workspaceFolderButton"); QVERIFY(folder);
-    // The arrows need 238 px of header content (66 arrows + 80 folder name + two 34 px buttons + 3 gaps of 8).
+    auto *newDocument = f.window->findChild<QQuickItem *>("newDocumentButton"); QVERIFY(newDocument);
+    // Narrow headers give way in order: New Document first (below 238 px of content),
+    // then the arrows (below 192), so the folder name keeps room beside them.
     // On macOS with the organizer hidden the window buttons take an 84 px inset instead of 12.
     for (bool organizer : {true, false}) {
         f.layout->setProperty("organizerVisible", organizer); f.layout->setProperty("filesVisible", true);
-        for (int width : {420, 360, 334, 333, 288, 232}) {
+        for (int width : {420, 360, 334, 333, 288, 287, 232}) {
             f.layout->setProperty("fileWidth", width);
             QTRY_COMPARE(f.layout->property("effectiveFileWidth").toReal(), double(width));
             auto *header = f.window->findChild<QQuickItem *>("filesHeader");
             QTRY_COMPARE(header->width(), double(width));
             const int content = width - ((mac && !organizer) ? 84 : 12) - 12;
-            const bool expected = content >= 238;
-            QTRY_COMPARE_WITH_TIMEOUT(arrows->isVisible(), expected, 3000);
-            QVERIFY(folder->width() >= (expected ? 80 : 32));
+            const bool arrowsExpected = content >= 192;
+            const bool newExpected = content >= 238 || !arrowsExpected;
+            QTRY_COMPARE_WITH_TIMEOUT(arrows->isVisible(), arrowsExpected, 3000);
+            QTRY_COMPARE_WITH_TIMEOUT(newDocument->isVisible(), newExpected, 3000);
+            QVERIFY2(folder->width() >= (arrowsExpected ? 76 : 32), qPrintable(QStringLiteral("organizer %1 width %2 folder %3").arg(organizer).arg(width).arg(folder->width())));
             QVERIFY2(cycle151FilesHeaderFits(f.window.data()), qPrintable(QStringLiteral("organizer %1 width %2").arg(organizer).arg(width)));
         }
     }
-    // The minimum column behind the macOS window buttons: 136 px of content holds the
-    // folder button (32 min), New and Hide (116 px) but not the arrows as well.
-    QVERIFY(232 - 84 - 12 >= 32 + 34 + 34 + 16);
+    // The default column behind the macOS window buttons keeps the arrows.
+    QVERIFY(288 - 84 - 12 >= 192);
+    f.backend.discardRecovery();
+}
+
+// Review fixes: an arrow that greys out keeps focus in the middle pane; a disabled arrow
+// or a double-click never reaches the header's window drag/zoom; deleted folders drop
+// out of the history; Cmd+Up works inside the Files drawer.
+void FomawriteTest::folderArrowsKeepFocusAndClicksInsideTheGroup() {
+    Cycle103SettingsSnapshot settings;
+    QTemporaryDir directory;
+    QVERIFY(directory.isValid());
+    cycle148Make(directory.filePath("top/one/Note.md"));
+    cycle148Make(directory.filePath("top/two/Note.md"));
+    Cycle117Window f; QVERIFY2(f.start(), qPrintable(f.error));
+    auto *library = qobject_cast<FileLibrary *>(f.backend.library()); QVERIFY(library);
+    f.layout->setProperty("organizerVisible", true); f.layout->setProperty("filesVisible", true);
+    f.layout->setProperty("fileWidth", 288);
+    QTRY_COMPARE(f.layout->property("effectiveFileWidth").toReal(), 288.0);
+    auto *back = f.window->findChild<QQuickItem *>("libraryBackButton"); QVERIFY(back);
+    auto *pane = f.window->findChild<QQuickItem *>("libraryPane"); QVERIFY(pane);
+    const QUrl one = cycle148Canonical(directory.filePath("top/one")), two = cycle148Canonical(directory.filePath("top/two"));
+    library->setRootFolder(QUrl::fromLocalFile(directory.filePath("top/one")));
+    // Start from a fresh history: two steps, so one Back reaches the start.
+    while (library->navigateHistory(-1)) {}
+    library->setRootFolder(QUrl::fromLocalFile(directory.filePath("top/two")));
+    QTRY_VERIFY(back->isVisible() && back->isEnabled());
+    f.quick->requestActivate(); QTRY_VERIFY(f.quick->isActive());
+    const auto visibility = f.quick->visibility();
+    // Double-click Back: the first click goes back and greys the arrow; the second
+    // must not zoom the window.
+    const QPoint centre = back->mapToScene(QPointF(back->width() / 2, back->height() / 2)).toPoint();
+    QTest::mouseDClick(f.quick, Qt::LeftButton, Qt::NoModifier, centre);
+    QTRY_COMPARE(library->rootFolder(), one);
+    QTRY_VERIFY(!back->isEnabled());
+    QCOMPARE(f.quick->visibility(), visibility);
+    // Focus is back in the middle pane, so Cmd+Up still goes up.
+    QTRY_VERIFY(f.window->property("libraryOwnsKeyboard").toBool());
+    QTest::keyClick(f.quick, Qt::Key_Up, Qt::ControlModifier);
+    QTRY_COMPARE(library->rootFolder(), cycle148Canonical(directory.filePath("top")));
+    Q_UNUSED(two); Q_UNUSED(pane);
+    f.backend.discardRecovery();
+}
+
+void FomawriteTest::deletedFoldersDropOutOfTheFolderHistory() {
+    Cycle103SettingsSnapshot settings;
+    QTemporaryDir directory;
+    QVERIFY(directory.isValid());
+    for (const char *name : {"one", "gone", "three"}) cycle148Make(directory.filePath(QStringLiteral("%1/Note.md").arg(QLatin1String(name))));
+    FileLibrary library;
+    library.setRootFolder(QUrl::fromLocalFile(directory.filePath("one")));
+    library.setRootFolder(QUrl::fromLocalFile(directory.filePath("gone")));
+    library.setRootFolder(QUrl::fromLocalFile(directory.filePath("three")));
+    QVERIFY(QDir(directory.filePath("gone")).removeRecursively());
+    // Back skips the deleted folder and lands on the one before it.
+    QVERIFY(library.navigateHistory(-1));
+    QCOMPARE(library.rootFolder(), cycle148Canonical(directory.filePath("one")));
+    // Forward goes straight to the last folder; the deleted one is gone from the history.
+    QVERIFY(library.navigateHistory(1));
+    QCOMPARE(library.rootFolder(), cycle148Canonical(directory.filePath("three")));
+    QVERIFY(library.navigateHistory(-1));
+    QCOMPARE(library.rootFolder(), cycle148Canonical(directory.filePath("one")));
+    // With only deleted folders ahead, Forward reports why and the arrow greys out.
+    QVERIFY(QDir(directory.filePath("three")).removeRecursively());
+    QVERIFY(library.canGoForward());
+    QVERIFY(!library.navigateHistory(1));
+    QVERIFY(!library.canGoForward());
+    QVERIFY(library.error().contains(QStringLiteral("no longer available")));
+    QCOMPARE(library.rootFolder(), cycle148Canonical(directory.filePath("one")));
+}
+
+void FomawriteTest::cmdUpWorksInsideTheFilesDrawer() {
+    Cycle103SettingsSnapshot settings;
+    QTemporaryDir directory;
+    QVERIFY(directory.isValid());
+    cycle148Make(directory.filePath("top/nested/Inner.md"));
+    Cycle117Window f; QVERIFY2(f.start(), qPrintable(f.error));
+    auto *library = qobject_cast<FileLibrary *>(f.backend.library()); QVERIFY(library);
+    library->setNavigationMode(1);
+    library->setRootFolder(QUrl::fromLocalFile(directory.filePath("top/nested")));
+    f.layout->setProperty("filesVisible", false);
+    f.quick->resize(480, 720);
+    QTRY_COMPARE(f.layout->property("availableWidth").toReal(), 477.0);
+    QVariant index;
+    QVERIFY(QMetaObject::invokeMethod(f.window.data(), "exploreFolderOf", Q_RETURN_ARG(QVariant, index), Q_ARG(QVariant, QUrl::fromLocalFile(directory.filePath("top/nested/Inner.md")))));
+    auto *drawer = f.window->findChild<QObject *>("workspaceNavigationDrawer"); QVERIFY(drawer);
+    QTRY_VERIFY(drawer->property("opened").toBool());
+    auto *pane = f.window->findChild<QQuickItem *>("libraryPane"); QVERIFY(pane);
+    QTRY_VERIFY(pane->property("inDrawer").toBool());
+    QQuickItem *row = nullptr;
+    QTRY_VERIFY((row = cycle117Entry(pane, QStringLiteral("Inner.md"))) != nullptr);
+    f.quick->requestActivate(); QTRY_VERIFY(f.quick->isActive());
+    row->forceActiveFocus(); QTRY_VERIFY(row->hasActiveFocus());
+    QTRY_VERIFY(pane->property("ownsKeyboard").toBool());
+    QTest::keyClick(f.quick, Qt::Key_Up, Qt::ControlModifier);
+    QTRY_COMPARE(library->rootFolder(), cycle148Canonical(directory.filePath("top")));
+    QVERIFY(QMetaObject::invokeMethod(drawer, "close"));
+    QTRY_VERIFY(!drawer->property("visible").toBool());
+    QVERIFY(!pane->property("inDrawer").toBool());
     f.backend.discardRecovery();
 }

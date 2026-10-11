@@ -167,11 +167,13 @@ Item {
             anchors.fill: parent; anchors.leftMargin: root.window.isMac && !organizerHeader.visible ? 84 : 12; anchors.rightMargin: 12; spacing: 8
             visible: root.toolbarContentVisible; opacity: root.settings.toolbarVisibilityMode === 1 || root.revealRequested ? 1 : 0; enabled: opacity > 0
             id: filesHeaderRow
-            // The folder arrows need room for the folder name beside them: below this
-            // content width (the 232 px minimum column behind the macOS window buttons
-            // is 136) they step aside rather than crowd or overlap the name. The Go
-            // menu and workspace menu keep the same commands at any width.
-            readonly property bool historyFits: width >= 66 + 8 + 80 + 8 + 34 + 8 + 34
+            // Narrow headers give way in order: first New Document (Cmd+N and the file
+            // menus still create documents), then the folder arrows, so the folder name
+            // always keeps room beside them. The default 288 px column behind the macOS
+            // window buttons (192 px of content) keeps the arrows; the 232 px minimum
+            // (136 px) does not. The Go menu keeps the same commands at any width.
+            readonly property bool historyFits: width >= 66 + 8 + 76 + 8 + 34
+            readonly property bool newDocumentFits: width >= 66 + 8 + 80 + 8 + 34 + 8 + 34 || !historyFits
             ToolbarGroup {
                 objectName: "libraryHistoryControls"
                 visible: filesHeaderRow.historyFits
@@ -191,7 +193,7 @@ Item {
                 Layout.minimumWidth: 32
                 onClicked: root.actionRequested("chooseFolder", this)
             }
-            ToolbarButton { objectName: "newDocumentButton"; iconName: "compose"; hint: "New document"; onClicked: root.actionRequested("newDocument", this) }
+            ToolbarButton { objectName: "newDocumentButton"; visible: filesHeaderRow.newDocumentFits; iconName: "compose"; hint: "New document"; onClicked: root.actionRequested("newDocument", this) }
             ToolbarButton { objectName: "collapseFilesButton"; iconName: "panel-left-close"; hint: "Hide library"; onClicked: root.actionRequested("hideFiles", this) }
         }
         Rectangle { objectName: "filesHeaderDivider"; x: parent.width; width: 1; height: parent.height; color: backend.palette.border }

@@ -594,11 +594,25 @@ QVariantMap FileLibrary::documentSummary(const QUrl &url) const {
 
 bool FileLibrary::navigateHistory(int direction) {
     if (direction != -1 && direction != 1) return false;
-    const int target = m_historyIndex + direction;
-    if (target < 0 || target >= m_history.size() || !QFileInfo(m_history.at(target).toLocalFile()).isDir()) return false;
+    // Folders deleted since they were visited drop out of the history, so an arrow
+    // is never left enabled with nowhere to go.
+    int target = m_historyIndex + direction;
+    bool pruned = false;
+    while (target >= 0 && target < m_history.size() && !QFileInfo(m_history.at(target).toLocalFile()).isDir()) {
+        m_history.removeAt(target);
+        pruned = true;
+        if (direction < 0) { --m_historyIndex; target = m_historyIndex + direction; }
+    }
+    if (target < 0 || target >= m_history.size()) {
+        if (pruned) { setError(QStringLiteral("That folder is no longer available.")); emit historyChanged(); }
+        return false;
+    }
+    const QUrl folder = m_history.at(target);
     m_navigatingHistory = true;
-    setRootFolder(m_history.at(target));
+    setRootFolder(folder);
     m_navigatingHistory = false;
+    // A folder that exists but cannot be read leaves the history where it was.
+    if (m_rootFolder != folder) { if (pruned) emit historyChanged(); return false; }
     m_historyIndex = target;
     emit historyChanged();
     return true;

@@ -17,6 +17,10 @@ Item {
             border.color: backend.palette.toolbarBorder || backend.palette.border
             border.width: 1
         },
+        // A disabled segment (an arrow at the end of its history) passes presses to
+        // what lies beneath; this keeps them, and double-clicks, off the header's
+        // window-drag and zoom area.
+        MouseArea { anchors.fill: parent; acceptedButtons: Qt.LeftButton },
         Row {
             id: contentRow
             anchors.verticalCenter: parent.verticalCenter

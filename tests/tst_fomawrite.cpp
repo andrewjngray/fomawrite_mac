@@ -168,6 +168,9 @@ private slots:
     void exploreFolderCanBeUndoneWithTheBackArrow();
     void cmdUpGoesToTheEnclosingFolderOnlyFromTheMiddlePane();
     void libraryHeaderArrowsStepAsideBeforeTheyCanOverlap();
+    void folderArrowsKeepFocusAndClicksInsideTheGroup();
+    void deletedFoldersDropOutOfTheFolderHistory();
+    void cmdUpWorksInsideTheFilesDrawer();
     void harperBridgeAnswersLintRequestsFromTheHost();
     void harperEngineCachesDedupesAndMapsKinds();
     void harperEngineQueuesNewestFirstAndBoundsItsCache();

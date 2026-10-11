@@ -833,8 +833,12 @@ ApplicationWindow {
             case "toggleOrganizer": workspaceCommands.run("organizer"); break;
             case "toggleFiles": workspaceCommands.run("library"); break;
             case "chooseFolder": libraryPane.chooseFolder(); break;
-            case "libraryBack": backend.library.navigateHistory(-1); break;
-            case "libraryForward": backend.library.navigateHistory(1); break;
+            case "libraryBack":
+            case "libraryForward":
+                backend.library.navigateHistory(action === "libraryBack" ? -1 : 1);
+                // An arrow that greys out drops focus to the window; keep it in the middle pane.
+                Qt.callLater(function() { if (anchor && !anchor.enabled) libraryPane.focusList(); });
+                break;
             case "newDocument": libraryPane.newDocument(); break;
             case "libraryOptions": win.openAnchoredMenu(libraryActions, anchor); break;
             case "back": win.requestHistory(-1); break;
@@ -1295,11 +1299,13 @@ ApplicationWindow {
             previousFocusItem = win.activeFocusItem;
             var pane = paneName === "organizer" ? organizerPane : libraryPane;
             pane.parent = navigationBody;
+            libraryPane.inDrawer = pane === libraryPane;
         }
         onOpened: navigationCloseButton.forceActiveFocus(Qt.PopupFocusReason)
         onClosed: {
             organizerPane.parent = organizerSlot;
             libraryPane.parent = filesSlot;
+            libraryPane.inDrawer = false;
             if (previousFocusItem && previousFocusItem.visible && previousFocusItem.enabled)
                 previousFocusItem.forceActiveFocus(Qt.PopupFocusReason);
             else win.focusWritingSurface();

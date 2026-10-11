@@ -4,6 +4,7 @@ One line per cycle, newest first. Each line links to the cycle's record under `r
 
 ## 0.3.0 development series (Cycles 97–)
 
+- **151** — Back and forward for folders (`0.3.0-dev47`, build 151, 12 Oct): arrows before the folder name in the middle pane step through the folders it has shown (Explore Folder can be undone); ⌘↑ goes to the enclosing folder while the middle pane has focus (Source and Live keep ⌘↑ for the top of the document). [Record](research/cycle-151/README.md)
 - **150** — The folder chooser opens inside the current folder (`0.3.0-dev46`, build 150, 12 Oct), not one level up as in 149. [Record](research/cycle-149/README.md)
 - **149** — The folder chooser starts where the folder lives (`0.3.0-dev45`, build 149, 12 Oct): the folder button above the middle pane opens its chooser in the folder that holds the current one, with that folder selected, instead of at the top of the disk. [Record](research/cycle-149/README.md)
 - **148** — Getting from the open document to its folder (`0.3.0-dev44`, build 148, 12 Oct): the top-bar document name shows the full path on hover and opens the file menu on a right-click (Show in Finder, Move to Trash and the rest); a new Explore Folder item, in every file menu, makes the file's folder the middle pane's folder with the file selected. [Record](research/cycle-148/README.md)

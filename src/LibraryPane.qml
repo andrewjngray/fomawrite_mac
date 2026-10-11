@@ -67,6 +67,21 @@ Rectangle {
         if (current !== "") folderDialog.currentFolder = current;
         folderDialog.open();
     }
+    function focusList() { fileList.forceActiveFocus(Qt.OtherFocusReason); }
+    // In the Files drawer (narrow windows) the window's Cmd+Up shortcut is blocked by
+    // the open drawer; this one lives inside the drawer, so it is allowed there.
+    property bool inDrawer: false
+    readonly property bool ownsKeyboard: {
+        var item = Window.activeFocusItem;
+        if (!item || typeof item.selectAll === "function") return false;
+        for (; item; item = item.parent) if (item === root) return true;
+        return false;
+    }
+    Shortcut {
+        objectName: "drawerEnclosingFolderShortcut"
+        sequence: "Ctrl+Up"; context: Qt.WindowShortcut; enabled: root.inDrawer && root.ownsKeyboard
+        onActivated: root.library.enclosingFolder()
+    }
     function newDocument(inNewWindow) { newFileDialog.inNewWindow = !!inNewWindow; newFileDialog.open(); }
     function newFolder() { newFolderDialog.open(); }
     function showCurrentFile() {

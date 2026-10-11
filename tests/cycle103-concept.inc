@@ -223,7 +223,14 @@ void FomawriteTest::referenceWorkspaceCompositionMatchesConcept() {
         QVERIFY(c.bottom() < card->height());
         if (label->property("text").toString() == names[1] + ".md") secondCard = card;
     }
-    for (const char *name : {"collapseOrganizerButton", "collapseFilesButton", "newDocumentButton", "documentSearchButton", "topChromeLibraryButton"}) {
+    // Cycle 151: at the reference 232 px Library column the folder arrows and the folder
+    // name keep their room and New Document steps aside (Cmd+N still creates documents).
+    {
+        auto *newDocument = window->findChild<QQuickItem *>("newDocumentButton"); QVERIFY(newDocument && !newDocument->isVisible());
+        auto *arrows = window->findChild<QQuickItem *>("libraryHistoryControls"); QVERIFY(arrows && arrows->isVisible());
+        auto *folder = window->findChild<QQuickItem *>("workspaceFolderButton"); QVERIFY(folder && folder->width() >= 76);
+    }
+    for (const char *name : {"collapseOrganizerButton", "collapseFilesButton", "documentSearchButton", "topChromeLibraryButton"}) {
         auto *button = window->findChild<QQuickItem *>(name); QVERIFY(button && button->isVisible());
         QCOMPARE(button->width(), button->height());
         QVERIFY(button->width() >= 32);
