@@ -60,7 +60,18 @@ Rectangle {
     signal createRequested(string name, bool inNewWindow)
     color: backend.palette.library
     objectName: "libraryPane"
-    function chooseFolder() { folderDialog.open(); }
+    // The chooser starts where the current folder lives, with that folder selected
+    // (as Show in Finder does), instead of at the top of the disk.
+    function chooseFolder() {
+        var current = library.rootFolder.toString().replace(/\/+$/, "");
+        if (current !== "") {
+            var slash = current.lastIndexOf("/");
+            var parent = slash > "file://".length ? current.slice(0, slash) : "file:///";
+            folderDialog.currentFolder = parent;
+            folderDialog.selectedFolder = current;
+        }
+        folderDialog.open();
+    }
     function newDocument(inNewWindow) { newFileDialog.inNewWindow = !!inNewWindow; newFileDialog.open(); }
     function newFolder() { newFolderDialog.open(); }
     function showCurrentFile() {
@@ -376,7 +387,7 @@ Rectangle {
             CompactMenuItem { text: "New File…"; enabled: root.library.rootFolder.toString() !== ""; onTriggered: root.newDocument(false) }
             CompactMenuItem { text: "New Folder…"; enabled: root.library.rootFolder.toString() !== ""; onTriggered: root.newFolder() }
             MenuSeparator {}
-            CompactMenuItem { text: "Choose Folder…"; onTriggered: folderDialog.open() }
+            CompactMenuItem { text: "Choose Folder…"; onTriggered: root.chooseFolder() }
             CompactMenuItem { text: "Refresh"; onTriggered: root.library.refresh() }
         }
     }
@@ -416,11 +427,12 @@ Rectangle {
         CompactMenuItem { objectName: "toggleSortBar"; iconName: "sort"; text: displaySettings.showSortBar ? "Hide Sort Bar" : "Show Sort Bar"; onTriggered: root.commands.run("sortBar") }
         CompactMenuItem { objectName: "toggleFilterBar"; iconName: "filter"; text: displaySettings.showFilterBar ? "Hide Filter Bar" : "Show Filter Bar"; onTriggered: root.commands.run("filterBar") }
         MenuSeparator {}
-        CompactMenuItem { text: "Choose Folder…"; onTriggered: folderDialog.open() }
+        CompactMenuItem { text: "Choose Folder…"; onTriggered: root.chooseFolder() }
         CompactMenuItem { text: "Refresh"; onTriggered: root.library.refresh() }
     }
     Dialogs.FolderDialog {
         id: folderDialog
+        objectName: "libraryFolderDialog"
         title: "Choose your writing folder"
         onAccepted: root.library.rootFolder = selectedFolder
     }

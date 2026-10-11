@@ -163,6 +163,7 @@ private slots:
     void backendFilePathIsEmptyUntilADocumentIsOpened();
     void topBarDocumentNameShowsThePathAndOpensTheLibraryMenu();
     void rightClickingTheTopBarDocumentNameOpensTheLibraryMenu();
+    void folderChooserStartsWhereTheCurrentFolderLives();
     void harperBridgeAnswersLintRequestsFromTheHost();
     void harperEngineCachesDedupesAndMapsKinds();
     void harperEngineQueuesNewestFirstAndBoundsItsCache();

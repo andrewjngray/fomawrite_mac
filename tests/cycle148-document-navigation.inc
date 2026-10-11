@@ -236,3 +236,26 @@ void FomawriteTest::rightClickingTheTopBarDocumentNameOpensTheLibraryMenu() {
     QVERIFY(QMetaObject::invokeMethod(menu, "close"));
     f.backend.discardRecovery();
 }
+
+// The folder button above the middle pane opened its chooser at the top of the
+// disk. It now starts in the folder that holds the current one, with the current
+// folder selected, as Show in Finder does.
+void FomawriteTest::folderChooserStartsWhereTheCurrentFolderLives() {
+    Cycle103SettingsSnapshot settings;
+    QTemporaryDir directory;
+    QVERIFY(directory.isValid());
+    cycle148Make(directory.filePath("repo/ops/BOARD.md"));
+    Cycle117Window f; QVERIFY2(f.start(), qPrintable(f.error));
+    auto *library = qobject_cast<FileLibrary *>(f.backend.library()); QVERIFY(library);
+    library->setRootFolder(QUrl::fromLocalFile(directory.filePath("repo/ops")));
+    const QUrl ops = cycle148Canonical(directory.filePath("repo/ops"));
+    QCOMPARE(library->rootFolder(), ops);
+    auto *pane = f.window->findChild<QObject *>("libraryPane"); QVERIFY(pane);
+    auto *dialog = f.window->findChild<QObject *>("libraryFolderDialog"); QVERIFY(dialog);
+    QVERIFY(QMetaObject::invokeMethod(pane, "chooseFolder"));
+    QCOMPARE(dialog->property("currentFolder").toUrl().toLocalFile(), cycle148Canonical(directory.filePath("repo")).toLocalFile());
+    QCOMPARE(dialog->property("selectedFolder").toUrl().toLocalFile(), ops.toLocalFile());
+    QVERIFY(QMetaObject::invokeMethod(dialog, "reject"));
+    QCOMPARE(library->rootFolder(), ops);
+    f.backend.discardRecovery();
+}
