@@ -484,13 +484,26 @@ int FileLibrary::showFile(const QUrl &url) {
 
 int FileLibrary::exploreFolder(const QUrl &file) {
     const QFileInfo info(file.toLocalFile());
-    if (!file.isLocalFile() || !info.isFile() || !isTextFile(info.fileName())) {
-        setError(QStringLiteral("This document is no longer available in the library."));
+    if (!file.isLocalFile() || !info.isFile()) {
+        setError(QStringLiteral("This document is no longer available."));
+        return -1;
+    }
+    if (!isTextFile(info.fileName())) {
+        setError(QStringLiteral("The library lists only Markdown and text files, so it cannot show this file."));
+        return -1;
+    }
+    if (info.fileName().startsWith(QLatin1Char('.'))) {
+        setError(QStringLiteral("The library does not list hidden files, so it cannot show this file."));
         return -1;
     }
     const QString path = info.canonicalFilePath();
     // The file's own folder becomes the current folder in tree and list modes alike.
-    setRootFolder(QUrl::fromLocalFile(QFileInfo(path).absolutePath()));
+    const QUrl parent = QUrl::fromLocalFile(QFileInfo(path).absolutePath());
+    setRootFolder(parent);
+    if (m_rootFolder != parent) {
+        setError(QStringLiteral("This file's folder could not be opened."));
+        return -1;
+    }
     setFilter(QString());
     revealFile(QUrl::fromLocalFile(path));
     for (int i = 0; i < m_entries.size(); ++i)

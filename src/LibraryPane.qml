@@ -14,6 +14,11 @@ Rectangle {
     property alias dateMode: displaySettings.dateMode
     property alias showExcerpts: displaySettings.showExcerpts
     property url currentFile
+    // Explore Folder selects a file that need not be the open document; that row
+    // carries the selection until another folder or document takes over.
+    property url exploredFile
+    onCurrentFileChanged: exploredFile = ""
+    Connections { target: root.library; function onRootFolderChanged() { root.exploredFile = "" } }
     property bool darkMode: false
     Settings {
         id: displaySettings
@@ -64,6 +69,8 @@ Rectangle {
         return index >= 0;
     }
     function selectRow(index) {
+        var entry = library.entries[index];
+        exploredFile = entry && !entry.directory && entry.url.toString() !== currentFile.toString() ? entry.url : "";
         Qt.callLater(function() {
             fileList.currentIndex = index;
             fileList.positionViewAtIndex(index, ListView.Contain);
@@ -171,7 +178,7 @@ Rectangle {
                 focusPolicy: Qt.StrongFocus
                 // The model carries real tree depth; flat browsing keeps sibling rows aligned.
                 leftPadding: 8 + modelData.depth * 18
-                highlighted: !modelData.directory && modelData.url.toString() === root.currentFile.toString()
+                highlighted: !modelData.directory && modelData.url.toString() === (root.exploredFile.toString() !== "" ? root.exploredFile : root.currentFile).toString()
                 Accessible.name: modelData.name
                 Accessible.selected: highlighted
                 Accessible.description: modelData.directory ? "Folder" : modelData.name

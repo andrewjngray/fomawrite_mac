@@ -76,6 +76,11 @@ void FomawriteTest::exploreFolderRefusesMissingRemoteFolderAndNonTextTargets() {
     QCOMPARE(library.exploreFolder(QUrl(QStringLiteral("https://example.com/note.md"))), -1);
     QCOMPARE(library.exploreFolder(QUrl::fromLocalFile(directory.path())), -1);
     QCOMPARE(library.exploreFolder(QUrl::fromLocalFile(directory.filePath("picture.png"))), -1);
+    QVERIFY(library.error().contains(QStringLiteral("only Markdown and text files")));
+    // A hidden file fails before the folder changes, with its own reason.
+    cycle148Make(directory.filePath("elsewhere/.hidden.md"));
+    QCOMPARE(library.exploreFolder(QUrl::fromLocalFile(directory.filePath("elsewhere/.hidden.md"))), -1);
+    QVERIFY(library.error().contains(QStringLiteral("hidden files")));
     QCOMPARE(library.rootFolder(), root);
 }
 
@@ -143,17 +148,50 @@ void FomawriteTest::topBarDocumentNameShowsThePathAndOpensTheLibraryMenu() {
     QVERIFY(QMetaObject::invokeMethod(menu, "close"));
     QTRY_VERIFY(!menu->property("opened").toBool());
 
-    // Explore Folder: the file's folder becomes current, the Library column shows, the row is selected.
+    // Explore Folder from the menu item: the file's folder becomes current, the Library
+    // column shows, and the file's row (not the first row) is selected.
+    library->setSortMode(0); library->setAscending(true);
     f.layout->setProperty("filesVisible", false);
-    QVariant index;
-    QVERIFY(QMetaObject::invokeMethod(f.window.data(), "exploreFolderOf", Q_RETURN_ARG(QVariant, index), Q_ARG(QVariant, f.backend.fileUrl())));
-    QVERIFY(index.toInt() >= 0);
-    QCOMPARE(library->rootFolder(), cycle148Canonical(directory.filePath("ops/nested")));
+    auto *list = f.window->findChild<QQuickItem *>("libraryFiles"); QVERIFY(list);
+    QVERIFY(QMetaObject::invokeMethod(topChrome, "documentMenuRequested", Q_ARG(QVariant, QVariant::fromValue(static_cast<QObject *>(identity))), Q_ARG(QPointF, QPointF(4, 4))));
+    QTRY_VERIFY(menu->property("opened").toBool());
+    QVERIFY(QMetaObject::invokeMethod(explore, "click"));
+    QTRY_COMPARE(library->rootFolder(), cycle148Canonical(directory.filePath("ops/nested")));
     QVERIFY(library->filter().isEmpty());
     QVERIFY(f.layout->property("filesVisible").toBool());
-    auto *list = f.window->findChild<QQuickItem *>("libraryFiles"); QVERIFY(list);
+    int row = -1;
+    for (int i = 0; i < library->entries().size(); ++i)
+        if (library->entries().at(i).toMap().value("name").toString() == QStringLiteral("CATCH-UP.md")) row = i;
+    QCOMPARE(row, 1); // Aardvark.md sorts first
+    QTRY_COMPARE(list->property("currentIndex").toInt(), row);
+    auto currentRow = [&] { return list->property("currentItem").value<QQuickItem *>(); };
+    QTRY_VERIFY(currentRow() && currentRow()->property("highlighted").toBool());
+
+    // Exploring a file that is not the open document selects that file's row instead.
+    QVariant index;
+    QVERIFY(QMetaObject::invokeMethod(f.window.data(), "exploreFolderOf", Q_RETURN_ARG(QVariant, index), Q_ARG(QVariant, QUrl::fromLocalFile(directory.filePath("ops/Other.md")))));
+    QVERIFY(index.toInt() >= 0);
+    QCOMPARE(library->rootFolder(), cycle148Canonical(directory.filePath("ops")));
     QTRY_COMPARE(list->property("currentIndex").toInt(), index.toInt());
-    QCOMPARE(library->entries().at(index.toInt()).toMap().value("name").toString(), QStringLiteral("CATCH-UP.md"));
+    QTRY_VERIFY(currentRow() && currentRow()->property("highlighted").toBool());
+    QCOMPARE(currentRow()->property("modelData").toMap().value("name").toString(), QStringLiteral("Other.md"));
+    int highlightedRows = 0;
+    auto *content = list->property("contentItem").value<QQuickItem *>(); QVERIFY(content);
+    for (auto *row : content->childItems()) if (row->objectName() == QLatin1String("libraryEntry") && row->isVisible() && row->property("highlighted").toBool()) ++highlightedRows;
+    QCOMPARE(highlightedRows, 1);
+
+    // A window too narrow to dock the Library opens the Files drawer instead.
+    f.layout->setProperty("filesVisible", false);
+    f.quick->resize(480, 720);
+    // The window geometry notifies asynchronously offscreen; wait until the layout has the new width.
+    QTRY_COMPARE(f.layout->property("availableWidth").toReal(), 477.0);
+    auto *drawer = f.window->findChild<QObject *>("workspaceNavigationDrawer"); QVERIFY(drawer);
+    QVERIFY(QMetaObject::invokeMethod(f.window.data(), "exploreFolderOf", Q_RETURN_ARG(QVariant, index), Q_ARG(QVariant, f.backend.fileUrl())));
+    QVERIFY(index.toInt() >= 0);
+    QTRY_VERIFY(drawer->property("opened").toBool() || drawer->property("visible").toBool());
+    QVERIFY(QMetaObject::invokeMethod(drawer, "close"));
+    QTRY_VERIFY(!drawer->property("visible").toBool());
+    f.quick->resize(1400, 720);
 
     // A folder target never offers Explore Folder.
     const QVariantMap folderEntry{{"url", QUrl::fromLocalFile(directory.filePath("ops"))}, {"name", "ops"}, {"directory", true}};
@@ -177,14 +215,20 @@ void FomawriteTest::rightClickingTheTopBarDocumentNameOpensTheLibraryMenu() {
     auto *identity = f.item("previewDocumentIdentity"); QVERIFY(identity);
     auto *menu = f.window->findChild<QObject *>("documentContextMenu"); QVERIFY(menu);
     QVERIFY(f.mode(1)); QTRY_VERIFY(identity->isVisible());
+    auto *name = f.item("previewDocumentName"); QVERIFY(name);
     const auto rightClick = [&] {
-        const QPointF centre = identity->mapToScene(QPointF(identity->width() / 2, identity->height() / 2));
+        const QPointF centre = name->mapToScene(QPointF(name->width() / 2, name->height() / 2));
         QTest::mouseClick(f.quick, Qt::RightButton, Qt::NoModifier, centre.toPoint());
     };
     rightClick(); QTest::qWait(250);
     QVERIFY(!menu->property("opened").toBool()); // untitled
     QVERIFY(f.backend.open(QUrl::fromLocalFile(path)));
     QTRY_COMPARE(identity->property("tooltipText").toString(), f.backend.filePath());
+    // Empty header space to the right of the name does not open the menu.
+    QTRY_VERIFY(identity->width() > name->mapToItem(identity, QPointF(name->width(), 0)).x() + 40);
+    QTest::mouseClick(f.quick, Qt::RightButton, Qt::NoModifier, identity->mapToScene(QPointF(identity->width() - 10, identity->height() / 2)).toPoint());
+    QTest::qWait(250);
+    QVERIFY(!menu->property("opened").toBool());
     rightClick();
     QTRY_VERIFY(menu->property("opened").toBool());
     auto *explore = menu->findChild<QObject *>("exploreFolderItem"); QVERIFY(explore);

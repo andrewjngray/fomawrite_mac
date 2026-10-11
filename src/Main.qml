@@ -55,7 +55,7 @@ ApplicationWindow {
     property bool documentChromeHidden: false
     readonly property bool documentChromeMenuOpen: sourceAppearanceMenu.opened || previewTemplateMenu.opened
         || writingOptions.opened || workspaceMenu.opened || formatQuickMenu.opened || libraryActions.opened
-        || topChrome.zoomMenuOpen
+        || topChrome.zoomMenuOpen || documentContextMenu.opened
     function writingActivity() {
         if (!workspaceSettings.autoHideChrome || documentChromeMenuOpen) return;
         var item = activeFocusItem;
@@ -1588,16 +1588,26 @@ ApplicationWindow {
         else completePendingAction();
     }
 
-    function exploreFolderOf(fileUrl) {
+    // In a window too narrow to dock the Library column, the Files drawer shows it instead.
+    function revealFilesPane() {
         workspaceLayout.filesVisible = true;
+        Qt.callLater(function() {
+            if (workspaceLayout.filesVisible && !workspaceLayout.effectiveFilesVisible) {
+                navigationDrawer.paneName = "files";
+                navigationDrawer.open();
+            }
+        });
+    }
+
+    function exploreFolderOf(fileUrl) {
         var index = backend.library.exploreFolder(fileUrl);
-        if (index >= 0) libraryPane.selectRow(index);
+        if (index >= 0) { revealFilesPane(); libraryPane.selectRow(index); }
         else win.showNavigationNotice(backend.library.error);
         return index;
     }
 
     function showCurrentFileInLibrary() {
-        workspaceLayout.filesVisible = true;
+        revealFilesPane();
         libraryPane.showCurrentFile();
     }
 

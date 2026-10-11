@@ -64,15 +64,6 @@ Item {
         ToolTip.visible: identityHover.hovered
         ToolTip.delay: 700
         ToolTip.text: tooltipText
-        HoverHandler { id: identityHover }
-        // Right-click opens the Library's own file menu for the open document. The header's
-        // window-drag MouseArea only takes the left button, so this never competes with it.
-        TapHandler {
-            objectName: identity.identityPrefix + "MenuTap"
-            acceptedButtons: Qt.RightButton
-            enabled: root.documentPath.length > 0
-            onTapped: (eventPoint) => root.documentMenuRequested(identity, eventPoint.position)
-        }
         RowLayout {
             id: identityRow
             anchors.left: parent.left
@@ -80,6 +71,15 @@ Item {
             width: Math.min(parent.width, implicitWidth)
             height: parent.height
             spacing: 6
+            HoverHandler { id: identityHover }
+            // Right-click opens the Library's own file menu for the open document. The header's
+            // window-drag MouseArea only takes the left button, so this never competes with it.
+            TapHandler {
+                objectName: identity.identityPrefix + "MenuTap"
+                acceptedButtons: Qt.RightButton
+                enabled: root.documentPath.length > 0
+                onTapped: (eventPoint) => root.documentMenuRequested(identity, eventPoint.position)
+            }
             LineIcon {
                 objectName: identity.identityPrefix + "Icon"
                 name: "document"
