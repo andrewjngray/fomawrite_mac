@@ -382,6 +382,18 @@ ApplicationWindow {
         sequence: "Shift+F6"; context: Qt.WindowShortcut; enabled: win.workspaceOwnsKeyboard
         onActivated: win.cycleWorkspaceFocus(true)
     }
+    // Cmd+Up (Ctrl+Up in Qt on macOS) goes to the enclosing folder only while
+    // keyboard focus is in the middle pane or its header. Elsewhere it is not claimed:
+    // Source and Live read it as "start of document", and a text field (the filter)
+    // reads it as "start of text".
+    readonly property bool libraryOwnsKeyboard: !navigationDrawer.visible && !!activeFocusItem
+        && (isInside(activeFocusItem, libraryPane) || isInside(activeFocusItem, topChrome.filesHeaderItem))
+        && typeof activeFocusItem.selectAll !== "function"
+    Shortcut {
+        objectName: "enclosingFolderShortcut"
+        sequence: "Ctrl+Up"; context: Qt.WindowShortcut; enabled: win.libraryOwnsKeyboard
+        onActivated: backend.library.enclosingFolder()
+    }
     Shortcut {
         sequence: "Alt+M"; context: Qt.WindowShortcut
         onActivated: { win.revealDocumentChrome(); topChrome.focusWorkspaceControl(); }
@@ -821,6 +833,8 @@ ApplicationWindow {
             case "toggleOrganizer": workspaceCommands.run("organizer"); break;
             case "toggleFiles": workspaceCommands.run("library"); break;
             case "chooseFolder": libraryPane.chooseFolder(); break;
+            case "libraryBack": backend.library.navigateHistory(-1); break;
+            case "libraryForward": backend.library.navigateHistory(1); break;
             case "newDocument": libraryPane.newDocument(); break;
             case "libraryOptions": win.openAnchoredMenu(libraryActions, anchor); break;
             case "back": win.requestHistory(-1); break;

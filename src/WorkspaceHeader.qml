@@ -154,6 +154,8 @@ Item {
         }
         Rectangle { objectName: "organizerHeaderDivider"; x: parent.width; width: 1; height: parent.height; color: backend.palette.border }
     }
+    // Lets the window tell whether keyboard focus is on a middle-pane header control.
+    readonly property alias filesHeaderItem: filesHeader
     Rectangle {
         id: filesHeader
         objectName: "filesHeader"
@@ -164,6 +166,18 @@ Item {
         RowLayout {
             anchors.fill: parent; anchors.leftMargin: root.window.isMac && !organizerHeader.visible ? 84 : 12; anchors.rightMargin: 12; spacing: 8
             visible: root.toolbarContentVisible; opacity: root.settings.toolbarVisibilityMode === 1 || root.revealRequested ? 1 : 0; enabled: opacity > 0
+            id: filesHeaderRow
+            // The folder arrows need room for the folder name beside them: below this
+            // content width (the 232 px minimum column behind the macOS window buttons
+            // is 136) they step aside rather than crowd or overlap the name. The Go
+            // menu and workspace menu keep the same commands at any width.
+            readonly property bool historyFits: width >= 66 + 8 + 80 + 8 + 34 + 8 + 34
+            ToolbarGroup {
+                objectName: "libraryHistoryControls"
+                visible: filesHeaderRow.historyFits
+                ToolbarButton { objectName: "libraryBackButton"; grouped: true; iconName: "back"; hint: "Previous folder"; enabled: backend.library.canGoBack; onClicked: root.actionRequested("libraryBack", this) }
+                ToolbarButton { objectName: "libraryForwardButton"; grouped: true; showDivider: true; iconName: "forward"; hint: "Next folder"; enabled: backend.library.canGoForward; onClicked: root.actionRequested("libraryForward", this) }
+            }
             ChromeButton {
                 objectName: "workspaceFolderButton"
                 text: backend.library.rootName || "Folder"

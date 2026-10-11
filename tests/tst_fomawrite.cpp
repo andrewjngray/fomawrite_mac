@@ -164,6 +164,10 @@ private slots:
     void topBarDocumentNameShowsThePathAndOpensTheLibraryMenu();
     void rightClickingTheTopBarDocumentNameOpensTheLibraryMenu();
     void folderChooserStartsWhereTheCurrentFolderLives();
+    void libraryHeaderHasFolderBackAndForwardArrows();
+    void exploreFolderCanBeUndoneWithTheBackArrow();
+    void cmdUpGoesToTheEnclosingFolderOnlyFromTheMiddlePane();
+    void libraryHeaderArrowsStepAsideBeforeTheyCanOverlap();
     void harperBridgeAnswersLintRequestsFromTheHost();
     void harperEngineCachesDedupesAndMapsKinds();
     void harperEngineQueuesNewestFirstAndBoundsItsCache();
@@ -5319,3 +5323,4 @@ int main(int argc, char **argv) {
 #include "tst_fomawrite.moc"
 #include "cycle147-harper-daily-use.inc"
 #include "cycle148-document-navigation.inc"
+#include "cycle151-folder-history.inc"
