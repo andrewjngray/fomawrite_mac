@@ -53,6 +53,7 @@ class Backend : public QObject, public PublishingSource {
     Q_PROPERTY(QUrl fileUrl READ fileUrl NOTIFY fileUrlChanged)
     Q_PROPERTY(QString publishingDocumentIdentity READ publishingDocumentIdentity NOTIFY publishingDocumentIdentityChanged)
     Q_PROPERTY(QString fileName READ fileName NOTIFY fileUrlChanged)
+    Q_PROPERTY(QString filePath READ filePath NOTIFY fileUrlChanged)
     Q_PROPERTY(bool modified READ modified NOTIFY modifiedChanged)
     Q_PROPERTY(QString status READ status NOTIFY statusChanged)
     Q_PROPERTY(QString themePreset READ themePreset WRITE setThemePreset NOTIFY themePresetChanged)
@@ -139,6 +140,7 @@ public:
 
     QUrl fileUrl() const { return m_fileUrl; }
     QString fileName() const;
+    QString filePath() const;
 
     bool modified() const { return m_modified; }
     QString status() const { return m_status; }

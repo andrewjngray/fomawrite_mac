@@ -74,6 +74,7 @@ public:
     Q_INVOKABLE bool createFolder(const QString &name);
     Q_INVOKABLE void revealFile(const QUrl &url);
     Q_INVOKABLE int showFile(const QUrl &url);
+    Q_INVOKABLE int exploreFolder(const QUrl &file);
     bool canGoBack() const { return m_historyIndex > 0; }
     bool canGoForward() const { return m_historyIndex + 1 < m_history.size(); }
     QVariantList quickResults() const { return m_quickResults; }

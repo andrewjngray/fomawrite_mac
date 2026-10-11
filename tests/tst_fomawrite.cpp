@@ -157,6 +157,12 @@ private slots:
     void spellCheckServiceReportsGrammarIssuesWithCategory();
     void harperLintsInsideTheEditorPage();
     void liveMarksALongListOfMisspellingsLineByLine();
+    void exploreFolderMakesTheFilesFolderCurrentInTreeAndListModes();
+    void exploreFolderInsideALocationAddsNoLocation();
+    void exploreFolderRefusesMissingRemoteFolderAndNonTextTargets();
+    void backendFilePathIsEmptyUntilADocumentIsOpened();
+    void topBarDocumentNameShowsThePathAndOpensTheLibraryMenu();
+    void rightClickingTheTopBarDocumentNameOpensTheLibraryMenu();
     void harperBridgeAnswersLintRequestsFromTheHost();
     void harperEngineCachesDedupesAndMapsKinds();
     void harperEngineQueuesNewestFirstAndBoundsItsCache();
@@ -5311,3 +5317,4 @@ int main(int argc, char **argv) {
 }
 #include "tst_fomawrite.moc"
 #include "cycle147-harper-daily-use.inc"
+#include "cycle148-document-navigation.inc"

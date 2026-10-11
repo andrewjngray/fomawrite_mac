@@ -482,6 +482,24 @@ int FileLibrary::showFile(const QUrl &url) {
     return -1;
 }
 
+int FileLibrary::exploreFolder(const QUrl &file) {
+    const QFileInfo info(file.toLocalFile());
+    if (!file.isLocalFile() || !info.isFile() || !isTextFile(info.fileName())) {
+        setError(QStringLiteral("This document is no longer available in the library."));
+        return -1;
+    }
+    const QString path = info.canonicalFilePath();
+    // The file's own folder becomes the current folder in tree and list modes alike.
+    setRootFolder(QUrl::fromLocalFile(QFileInfo(path).absolutePath()));
+    setFilter(QString());
+    revealFile(QUrl::fromLocalFile(path));
+    for (int i = 0; i < m_entries.size(); ++i)
+        if (m_entries.at(i).toMap().value("url").toUrl() == QUrl::fromLocalFile(path))
+            return i;
+    setError(QStringLiteral("This document could not be shown within the library's scan limits."));
+    return -1;
+}
+
 QString FileLibrary::excerpt(const QUrl &url) const {
     if (!url.isLocalFile()) return {};
     const QFileInfo info(url.toLocalFile());

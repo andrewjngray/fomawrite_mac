@@ -777,6 +777,10 @@ QString Backend::applicationPath() const {
     return QCoreApplication::applicationFilePath();
 }
 
+QString Backend::filePath() const {
+    return m_fileUrl.isLocalFile() ? QDir::toNativeSeparators(m_fileUrl.toLocalFile()) : QString();
+}
+
 QString Backend::fileName() const {
     if (!m_fileUrl.isValid() || m_fileUrl.isEmpty())
         return QStringLiteral("Untitled.md");
