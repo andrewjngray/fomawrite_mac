@@ -128,6 +128,8 @@ QtObject {
             if (entries[i].id === id) return entries[i];
         return null;
     }
+    // Make the file's own folder the Library's current folder and select the file there.
+    function exploreFolder(fileUrl) { return window.exploreFolderOf(fileUrl); }
     function label(id) {
         if (id === "fullscreen")
             return window.visibility === Window.FullScreen ? "Exit Full Screen" : "Enter Full Screen";

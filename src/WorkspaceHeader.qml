@@ -18,6 +18,9 @@ Item {
     // per-engine Backend identity used by existing component fixtures.
     property string documentName: backend.fileName
     property bool documentModified: backend.modified
+    // Full native path of the open document ("" while untitled); the identity tooltip and
+    // the right-click document menu are built from it.
+    property string documentPath: backend.filePath
     readonly property bool fullPreview: !editorPane.visible && previewPane.visible
     property bool keyboardReveal: false
     // Edge entry reveals until the next editing or scrolling gesture.
@@ -34,6 +37,7 @@ Item {
         - (paneRestoreControls.visible ? paneRestoreControls.implicitWidth + 8 : 0)
     readonly property bool writingClusterExpanded: writingControlsWidth >= 580
     signal actionRequested(string action, var anchor)
+    signal documentMenuRequested(var anchor, point position)
     function focusWorkspaceControl() {
         keyboardReveal = true;
         // F6 from Source can enter formatting without first transferring its
@@ -50,6 +54,7 @@ Item {
         required property string identityPrefix
         readonly property string displayName: root.documentName.length > 0 ? root.documentName : "Untitled.md"
         readonly property string accessibleTitle: displayName + (root.documentModified ? " — Edited" : "")
+        readonly property string tooltipText: (root.documentPath.length > 0 ? root.documentPath : displayName) + (root.documentModified ? " — Edited" : "")
         objectName: identityPrefix + "Identity"
         implicitWidth: identityRow.implicitWidth
         implicitHeight: 20
@@ -58,8 +63,16 @@ Item {
         Accessible.name: accessibleTitle
         ToolTip.visible: identityHover.hovered
         ToolTip.delay: 700
-        ToolTip.text: accessibleTitle
+        ToolTip.text: tooltipText
         HoverHandler { id: identityHover }
+        // Right-click opens the Library's own file menu for the open document. The header's
+        // window-drag MouseArea only takes the left button, so this never competes with it.
+        TapHandler {
+            objectName: identity.identityPrefix + "MenuTap"
+            acceptedButtons: Qt.RightButton
+            enabled: root.documentPath.length > 0
+            onTapped: (eventPoint) => root.documentMenuRequested(identity, eventPoint.position)
+        }
         RowLayout {
             id: identityRow
             anchors.left: parent.left

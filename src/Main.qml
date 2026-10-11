@@ -809,6 +809,10 @@ ApplicationWindow {
         filesSlot: filesSlot
         editorPane: editorPane
         previewPane: previewPane
+        onDocumentMenuRequested: function(anchor, position) {
+            if (backend.fileUrl.toString() === "") return;
+            documentContextMenu.showFor(anchor, {url: backend.fileUrl, name: backend.fileName, directory: false, available: true}, false, position);
+        }
         onActionRequested: function(action, anchor) {
             switch (action) {
             case "addLocation": organizerPane.chooseLocation(); break;
@@ -835,6 +839,10 @@ ApplicationWindow {
             }
         }
     }
+
+    // The Library's file menu for the open document (right-click on its name in the top bar);
+    // a popup, so it works whether or not the Library column is showing.
+    LibraryContextMenu { id: documentContextMenu; objectName: "documentContextMenu"; library: backend.library; commands: workspaceCommands; darkMode: win.darkMode }
 
     Timer { id: navigationNoticeTimer; interval: 7000; onTriggered: win.navigationNotice = "" }
 
@@ -1578,6 +1586,14 @@ ApplicationWindow {
         pendingAction = "create";
         if (backend.modified) unsavedChangesDialog.open();
         else completePendingAction();
+    }
+
+    function exploreFolderOf(fileUrl) {
+        workspaceLayout.filesVisible = true;
+        var index = backend.library.exploreFolder(fileUrl);
+        if (index >= 0) libraryPane.selectRow(index);
+        else win.showNavigationNotice(backend.library.error);
+        return index;
     }
 
     function showCurrentFileInLibrary() {

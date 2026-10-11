@@ -60,11 +60,14 @@ Rectangle {
     function newFolder() { newFolderDialog.open(); }
     function showCurrentFile() {
         var index = library.showFile(currentFile);
-        if (index >= 0) Qt.callLater(function() {
+        if (index >= 0) selectRow(index);
+        return index >= 0;
+    }
+    function selectRow(index) {
+        Qt.callLater(function() {
             fileList.currentIndex = index;
             fileList.positionViewAtIndex(index, ListView.Contain);
         });
-        return index >= 0;
     }
     function showOptions(anchor) { folderMenu.parent = anchor; folderMenu.x = anchor.width - folderMenu.width; folderMenu.y = anchor.height + 3; folderMenu.open(); }
 

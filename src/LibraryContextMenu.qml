@@ -59,6 +59,7 @@ CompactMenu {
             if (!ok) { messageDialog.title = "Open Document"; message.text = backend.status; messageDialog.open(); }
         }
         else if (action === "open") library.rootFolder = target.url;
+        else if (action === "explore") menu.commands.exploreFolder(target.url);
         else run(action);
     }
     CompactMenuItem { text: "Rename Folder…"; visible: menu.location; height: visible ? implicitHeight : 0; enabled: !!menu.target.available; onTriggered: menu.later("rename") }
@@ -66,6 +67,7 @@ CompactMenu {
     CompactMenuItem { text: "Open"; visible: !menu.location && menu.folder; height: visible ? implicitHeight : 0; enabled: !!menu.target.available; onTriggered: menu.later("open") }
     CompactMenuItem { text: "Open in New Tab"; visible: !menu.location && !menu.folder; height: visible ? implicitHeight : 0; enabled: !!menu.target.available; onTriggered: menu.later("tab") }
     CompactMenuItem { text: "Open in New Window"; visible: !menu.location && !menu.folder; height: visible ? implicitHeight : 0; enabled: !!menu.target.available; onTriggered: menu.later("window") }
+    CompactMenuItem { objectName: "exploreFolderItem"; text: "Explore Folder"; visible: !menu.location && !menu.folder; height: visible ? implicitHeight : 0; enabled: !!menu.target.available; onTriggered: menu.later("explore") }
     MenuSeparator {}
     CompactMenuItem { text: "Get Info"; visible: !menu.location; height: visible ? implicitHeight : 0; enabled: !!menu.target.available; onTriggered: menu.later("info") }
     CompactMenuItem { text: menu.target.favorite ? "Remove Favorite" : "Favorite"; visible: !menu.location; height: visible ? implicitHeight : 0; enabled: !!menu.target.available; onTriggered: menu.later("favorite") }
