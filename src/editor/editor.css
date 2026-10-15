@@ -150,7 +150,8 @@ html.dark, html.dark body { color-scheme: dark; }
 .fw-link { color: var(--fw-accent); }
 .fw-quote { color: var(--fw-muted); }
 .fw-list-mark { color: var(--fw-accent); }
-.fw-mark { color: var(--fw-muted); }
+/* A theme may colour the Markdown marks themselves (Typora's --md-char-color); otherwise the editor's muted ink. */
+.fw-mark { color: var(--md-char-color, var(--fw-muted)); }
 
 /* ---------------------------------------------------------------- live mode (proportional) */
 /* The host face and line height are FALLBACKS, declared on <html> at zero specificity (html.fw-live-root is set

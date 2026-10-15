@@ -52,6 +52,9 @@ ApplicationWindow {
     readonly property color sourceSelectionColor: omawriteSurface ? (darkMode ? "#186a9a" : "#2077b2") : selectionFill
     readonly property color sourceSelectedTextColor: omawriteSurface && darkMode ? "#eeeeee" : "#ffffff"
     readonly property int editorFontPixelSize: scaledSize(writingBasePixelSize * paneZoom.sourceZoom / 100)
+    // Omawrite's Output Style sets Live's base size (20 px, as in Omawrite); other styles use the Source preset's.
+    readonly property int liveFontPixelSize: backend.publishingThemeId === "omawrite"
+        ? scaledSize(20 * paneZoom.sourceZoom / 100) : editorFontPixelSize
     // Omawrite: at most 65 characters, narrowing to the pane width minus 20 characters (and the usual margins).
     readonly property real omawriteCharWidth: Math.max(1, writerFontMetrics.averageCharacterWidth)
     readonly property int editorWidth: codeAppearance ? Math.max(180, editorPane.width - 112)
@@ -2636,7 +2639,7 @@ ApplicationWindow {
                         visible: modelData.fenced
                         x: modelData.margin - 6; y: 0
                         width: parent.width - x + 6; height: parent.height + 0.5
-                        color: win.darkMode ? "#252A32" : "#EAECF0"
+                        color: win.omawriteSurface ? (win.darkMode ? "#1d1d1d" : "#f2f2f2") : win.darkMode ? "#252A32" : "#EAECF0"
                     }
                     Text {
                         visible: win.codeAppearance
@@ -3256,7 +3259,7 @@ ApplicationWindow {
                 paletteBackground: backend.palette.editor
                 paletteText: backend.palette.text
                 fontFamily: win.editorFontFamily
-                fontSize: win.editorFontPixelSize
+                fontSize: win.liveFontPixelSize
                 typewriter: workspaceSettings.typewriter
                 focusMode: workspaceSettings.paragraphFocus || workspaceSettings.sentenceFocus
                 dark: win.darkMode
@@ -3433,6 +3436,7 @@ ApplicationWindow {
 
     DocumentFooter {
         id: documentFooter
+        sourceSurfaceColor: editorPane.color
         activityHidden: workspaceSettings.autoHideChrome && win.documentChromeHidden
         menuOpen: win.documentChromeMenuOpen
         objectName: "documentFooter"

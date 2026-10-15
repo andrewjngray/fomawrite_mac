@@ -47,6 +47,8 @@ WorkspaceFooter {
     readonly property bool statusVisible: statusLabel.visible
     signal publishingFormatRequested(string format)
     signal sourceEditingRequested()
+    // The strip under the Source page matches it (the Omawrite preset paints its own page colour).
+    property color sourceSurfaceColor: backend.palette.editor
     signal liveEditingRequested()
     signal layoutRequested(int mode)
     signal appearanceMenuRequested(var anchor)
@@ -56,7 +58,7 @@ WorkspaceFooter {
     Rectangle {
         x: 0; y: 1; width: root.sourcePaneWidth; height: parent.height - 1
         visible: root.layoutMode !== 2
-        color: backend.palette.editor
+        color: root.sourceSurfaceColor
     }
     Rectangle {
         objectName: "documentFooterPaneDivider"

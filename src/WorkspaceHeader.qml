@@ -208,7 +208,8 @@ Item {
         x: root.editorPane.visible ? root.editorPane.x : root.previewPane.x
         width: root.editorPane.visible ? root.editorPane.width : root.previewPane.width
         height: root.height
-        color: root.editorPane.visible ? backend.palette.editor : backend.palette.page
+        // The Source page can carry its own colour (the Omawrite preset); the band above it matches.
+        color: root.editorPane.visible ? root.editorPane.color : backend.palette.page
         MouseArea { anchors.fill: parent; enabled: root.documentChromeVisible; onPressed: root.window.startSystemMove(); onDoubleClicked: root.window.visibility === Window.Maximized ? root.window.showNormal() : root.window.showMaximized() }
         RowLayout {
             anchors.fill: parent; anchors.leftMargin: documentHeader.nativeInset; anchors.rightMargin: 12; spacing: 8

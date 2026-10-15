@@ -4,6 +4,7 @@ One line per cycle, newest first. Each line links to the cycle's record under `r
 
 ## 0.3.0 development series (Cycles 97–)
 
+- **152** — The Omawrite-like look (`0.3.0-dev48`, build 152, 15 Oct): IBM Plex Mono at 20 px, 140% lines, a 65-character column and Omawrite's dark and light colours, as a Source Writing appearance and as a built-in Output Style for Live, Preview and exports. [Record](research/cycle-152/README.md)
 - **151** — Back and forward for folders (`0.3.0-dev47`, build 151, 12 Oct): arrows before the folder name in the middle pane step through the folders it has shown (Explore Folder can be undone); ⌘↑ goes to the enclosing folder while the middle pane has focus (Source and Live keep ⌘↑ for the top of the document). [Record](research/cycle-151/README.md)
 - **150** — The folder chooser opens inside the current folder (`0.3.0-dev46`, build 150, 12 Oct), not one level up as in 149. [Record](research/cycle-149/README.md)
 - **149** — The folder chooser starts where the folder lives (`0.3.0-dev45`, build 149, 12 Oct): the folder button above the middle pane opens its chooser in the folder that holds the current one, with that folder selected, instead of at the top of the disk. [Record](research/cycle-149/README.md)

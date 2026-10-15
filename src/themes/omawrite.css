@@ -30,6 +30,7 @@
     --primary-color: #2077b2;
     --accent-color: #2077b2;
     --marker-color: #aeb1b5;
+    --md-char-color: var(--marker-color);
     --border-color: #aeb1b5;
     --rule-color: #aeb1b5;
     --code-bg-color: #f2f2f2;

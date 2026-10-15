@@ -213,9 +213,14 @@ void FomawriteTest::omawriteShowsInBothOutputStyleMenusAndApplies() {
     QVERIFY(!previewClaude->property("checked").toBool());
     QVERIFY(QMetaObject::invokeMethod(previewClaude, "triggered"));
     QTRY_COMPARE(backend.publishingThemeId(), QStringLiteral("claude-like"));
+    // Live's text size: Claude Like follows the Source preset's size; Omawrite sets 20 px (x zoom and text scale).
+    QTRY_COMPARE(window->property("liveFontPixelSize").toInt(), window->property("editorFontPixelSize").toInt());
     QTRY_VERIFY(previewClaude->property("checked").toBool());
     QVERIFY(QMetaObject::invokeMethod(previewOmawrite, "triggered"));
     QTRY_COMPARE(backend.publishingThemeId(), QStringLiteral("omawrite"));
+    QVariant twenty;
+    QVERIFY(QMetaObject::invokeMethod(window.data(), "scaledSize", Q_RETURN_ARG(QVariant, twenty), Q_ARG(QVariant, 20)));
+    QTRY_COMPARE(window->property("liveFontPixelSize").toInt(), twenty.toInt());
     QTRY_VERIFY(nativeOmawrite->property("checked").toBool());
     // The theme error line stays empty: nothing is missing.
     QVERIFY2(backend.publishingThemeError().isEmpty(), qPrintable(backend.publishingThemeError()));

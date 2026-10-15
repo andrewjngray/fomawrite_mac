@@ -22,6 +22,14 @@ bool cycle152RegisterPlexMono() {
     return families.contains(QStringLiteral("IBM Plex Mono"));
 }
 QColor cycle152Colour(QObject *object, const char *property) { return qvariant_cast<QColor>(object->property(property)); }
+// Repeater and ListView delegates are visual children only; findChildren does not reach them.
+QList<QQuickItem *> cycle152VisualItems(QQuickItem *root, const char *name) {
+    QList<QQuickItem *> found;
+    if (!root) return found;
+    if (root->objectName() == QLatin1String(name)) found << root;
+    for (auto *child : root->childItems()) found << cycle152VisualItems(child, name);
+    return found;
+}
 }
 
 void FomawriteTest::omawriteSourcePresetIsInTheMenuAndSelectsPlexMono() {
@@ -138,6 +146,17 @@ void FomawriteTest::omawriteSourceUsesItsPaletteInDarkAndLightAndManuscriptComes
         const int inlineCode = source.indexOf("`code`");
         QCOMPARE(cycle152FormatAt(document, inlineCode + 1).background().color(), QColor(p.panel));
         QCOMPARE(document->findBlock(source.indexOf("const value")).blockFormat().background().color(), QColor(p.panel));
+        // The panel actually drawn behind a fenced block (a QML rectangle, not the block format) matches.
+        QTRY_VERIFY([&] {
+            for (auto *panel : cycle152VisualItems(f.quick->contentItem(), "sourceCodeBlockBackground"))
+                if (panel->isVisible()) return cycle152Colour(panel, "color") == QColor(p.panel);
+            return false;
+        }());
+        // The header band above the page and the footer strip below it match the page.
+        auto *header = f.window->findChild<QQuickItem *>("documentHeader"); QVERIFY(header);
+        QTRY_COMPARE(cycle152Colour(header, "color"), QColor(p.background));
+        auto *footer = f.window->findChild<QObject *>("documentFooter"); QVERIFY(footer);
+        QTRY_COMPARE(footer->property("sourceSurfaceColor").value<QColor>(), QColor(p.background));
         QCOMPARE(document->toPlainText(), source);
         QVERIFY(!f.backend.modified()); QVERIFY(!document->isUndoAvailable());
     }
