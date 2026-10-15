@@ -1,0 +1,452 @@
+---
+import Layout from '../layouts/Layout.astro';
+import Nav from '../components/Nav.astro';
+import Footer from '../components/Footer.astro';
+---
+
+<Layout title="Fomawrite - A Calm Markdown Editor for macOS" description="A calm, local-file Markdown editor for macOS. Write in Source, Live, or preview mode. Export to Web and PDF with Typora CSS themes.">
+  <Nav />
+  
+  <main>
+    <section class="hero">
+      <div class="container">
+        <h1>A calm, local-file<br/>Markdown editor for macOS</h1>
+        <p class="hero-subtitle">
+          Write in Source, Live, or preview mode. Your plain `.md` files stay byte-exact.<br/>
+          Export with Typora CSS themes. Built with Qt and open source.
+        </p>
+        <div class="hero-cta">
+          <a href="/waitlist" class="button primary">Join the Waitlist</a>
+          <a href="https://github.com/andrewjngray/fomawrite_mac" class="button secondary" target="_blank" rel="noopener noreferrer">View on GitHub</a>
+        </div>
+        <div class="hero-meta">
+          <div class="meta-item">
+            <span class="meta-label">Current Build</span>
+            <span class="meta-value">0.3.0-dev47</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">License</span>
+            <span class="meta-value">MIT</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">Platform</span>
+            <span class="meta-value">macOS 14+</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="features">
+      <div class="container">
+        <div class="feature">
+          <div class="feature-icon">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </div>
+          <h2>The file is the truth</h2>
+          <p>Documents are saved byte-exactly with no hidden state, no proprietary format. Anything another Markdown tool wrote can be opened, edited, and saved without being rewritten. CRLF, BOM, and special characters are preserved.</p>
+        </div>
+
+        <div class="feature">
+          <div class="feature-icon">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </div>
+          <h2>Three ways to work on one text</h2>
+          <p>Edit as literal source with syntax highlighting, edit with Live rendering (Typora-style in-place editing), or read as the published result. Switch between them instantly without losing the caret, selection, or a byte.</p>
+        </div>
+
+        <div class="feature">
+          <div class="feature-icon">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </div>
+          <h2>Publishing is first class</h2>
+          <p>Real Web output and real PDF with Typora CSS themes. Preview exactly what you'll export. Import custom themes with local fonts and images. The Claude Like theme ships with the app.</p>
+        </div>
+
+        <div class="feature">
+          <div class="feature-icon">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </div>
+          <h2>Grammar and style checking with Harper</h2>
+          <p>Automattic's offline Harper engine checks grammar and style as you type in Source and Live modes. The Review pane lists every finding with suggestions. Switches between Harper and macOS dictionaries, with support for Australian, British, American, and Canadian dialects.</p>
+        </div>
+
+        <div class="feature">
+          <div class="feature-icon">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </div>
+          <h2>Calm and focused</h2>
+          <p>Document bars fade while typing or scrolling. Choose between Studio, Light, Dark, and Warm paper themes. Source offers Manuscript, Editorial, Book, and Code appearances. Typography comes before chrome.</p>
+        </div>
+
+        <div class="feature">
+          <div class="feature-icon">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </div>
+          <h2>Small enough to trust</h2>
+          <p>288 regression tests. Every behavioral fix ships with a test that fails before and passes after. The whole test suite runs in seconds. The mission is clear: a personal writing app where plain Markdown files are the only truth.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="screenshots">
+      <div class="container">
+        <h2>Built for writing</h2>
+        <p class="section-subtitle">
+          The left pane edits. The right pane shows read-only publishing output.<br/>
+          Switch between Source and Live editing. Preview as Web or PDF.
+        </p>
+        <div class="screenshot-placeholder">
+          <div class="placeholder-content">
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            <p>Screenshots from the actual app coming soon</p>
+            <span class="note">The app is in active development. Build 0.3.0-dev47 ships with Live editing, Source appearances, Harper grammar checking, and Typora theme support.</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="status">
+      <div class="container">
+        <h2>Development Status</h2>
+        <p class="section-subtitle">
+          Fomawrite is under active development. The current measure is: <strong>is Live good enough to be the daily editor?</strong>
+        </p>
+        <div class="status-grid">
+          <div class="status-item">
+            <h3>✓ Implemented</h3>
+            <ul>
+              <li>Live editor with CodeMirror 6 (byte-exact mirroring)</li>
+              <li>Source mode with Manuscript, Editorial, Book, Code appearances</li>
+              <li>Typora CSS theme support with local resources</li>
+              <li>Harper offline grammar and style checking</li>
+              <li>Web and PDF export with real Chromium rendering</li>
+              <li>Focus and typewriter modes</li>
+              <li>Recovery and unsaved-change protection</li>
+              <li>Byte-exact persistence (CRLF, BOM, special chars)</li>
+            </ul>
+          </div>
+          <div class="status-item">
+            <h3>⚙ In Progress</h3>
+            <ul>
+              <li>Live editor friction fixes (View menu ticks, Preview button)</li>
+              <li>Physical input testing with the Live page</li>
+              <li>Mermaid diagram support</li>
+              <li>Theme contrast checking</li>
+              <li>Live page selection coordination</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="cta">
+      <div class="container">
+        <h2>Ready when you are</h2>
+        <p>Join the waitlist to be notified when Fomawrite is ready for download.</p>
+        <a href="/waitlist" class="button primary large">Join the Waitlist</a>
+      </div>
+    </section>
+  </main>
+  
+  <Footer />
+</Layout>
+
+<style>
+  main {
+    min-height: calc(100vh - 64px);
+  }
+
+  .container {
+    max-width: var(--max-width);
+    margin: 0 auto;
+    padding: 0 var(--spacing-md);
+  }
+
+  .hero {
+    padding: var(--spacing-3xl) 0;
+    text-align: center;
+  }
+
+  .hero h1 {
+    font-size: clamp(2.5rem, 5vw, 4rem);
+    font-weight: 600;
+    margin-bottom: var(--spacing-md);
+    line-height: 1.1;
+    background: linear-gradient(135deg, var(--color-text) 0%, var(--color-text-muted) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .hero-subtitle {
+    font-size: clamp(1.125rem, 2vw, 1.25rem);
+    color: var(--color-text-muted);
+    margin-bottom: var(--spacing-xl);
+    line-height: 1.6;
+  }
+
+  .hero-cta {
+    display: flex;
+    gap: var(--spacing-sm);
+    justify-content: center;
+    flex-wrap: wrap;
+    margin-bottom: var(--spacing-xl);
+  }
+
+  .button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.75rem 1.5rem;
+    border-radius: var(--radius-md);
+    font-weight: 500;
+    font-size: 0.9375rem;
+    text-decoration: none;
+    transition: all 0.2s ease;
+  }
+
+  .button.primary {
+    background: var(--color-accent);
+    color: white;
+  }
+
+  .button.primary:hover {
+    background: var(--color-accent-hover);
+    transform: translateY(-1px);
+  }
+
+  .button.secondary {
+    background: var(--color-surface);
+    color: var(--color-text);
+    border: 1px solid var(--color-border);
+  }
+
+  .button.secondary:hover {
+    background: var(--color-surface-hover);
+    border-color: var(--color-accent);
+  }
+
+  .button.large {
+    padding: 1rem 2rem;
+    font-size: 1.0625rem;
+  }
+
+  .hero-meta {
+    display: flex;
+    gap: var(--spacing-lg);
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+
+  .meta-item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+
+  .meta-label {
+    font-size: 0.75rem;
+    color: var(--color-text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .meta-value {
+    font-size: 0.9375rem;
+    color: var(--color-text-muted);
+    font-weight: 500;
+  }
+
+  .features {
+    padding: var(--spacing-3xl) 0;
+    background: var(--color-surface);
+  }
+
+  .features .container {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: var(--spacing-xl);
+  }
+
+  .feature {
+    padding: var(--spacing-lg);
+    border-radius: var(--radius-lg);
+    background: var(--color-bg);
+    border: 1px solid var(--color-border);
+    transition: all 0.3s ease;
+  }
+
+  .feature:hover {
+    border-color: var(--color-accent);
+    transform: translateY(-2px);
+  }
+
+  .feature-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: var(--radius-md);
+    background: var(--color-surface);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: var(--spacing-sm);
+    color: var(--color-accent);
+  }
+
+  .feature h2 {
+    font-size: 1.25rem;
+    margin-bottom: var(--spacing-xs);
+    color: var(--color-text);
+  }
+
+  .feature p {
+    font-size: 0.9375rem;
+    color: var(--color-text-muted);
+    line-height: 1.6;
+  }
+
+  .screenshots {
+    padding: var(--spacing-3xl) 0;
+  }
+
+  .screenshots h2 {
+    font-size: clamp(2rem, 4vw, 3rem);
+    text-align: center;
+    margin-bottom: var(--spacing-sm);
+  }
+
+  .section-subtitle {
+    text-align: center;
+    color: var(--color-text-muted);
+    font-size: 1.125rem;
+    margin-bottom: var(--spacing-xl);
+    line-height: 1.6;
+  }
+
+  .screenshot-placeholder {
+    background: var(--color-surface);
+    border: 2px dashed var(--color-border);
+    border-radius: var(--radius-lg);
+    padding: var(--spacing-3xl) var(--spacing-lg);
+    text-align: center;
+  }
+
+  .placeholder-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--spacing-sm);
+  }
+
+  .placeholder-content svg {
+    color: var(--color-text-dim);
+    opacity: 0.5;
+  }
+
+  .placeholder-content p {
+    font-size: 1.125rem;
+    color: var(--color-text-muted);
+  }
+
+  .placeholder-content .note {
+    font-size: 0.875rem;
+    color: var(--color-text-dim);
+    max-width: 600px;
+  }
+
+  .status {
+    padding: var(--spacing-3xl) 0;
+    background: var(--color-surface);
+  }
+
+  .status h2 {
+    font-size: clamp(2rem, 4vw, 3rem);
+    text-align: center;
+    margin-bottom: var(--spacing-sm);
+  }
+
+  .status-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: var(--spacing-xl);
+    margin-top: var(--spacing-xl);
+  }
+
+  .status-item {
+    background: var(--color-bg);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    padding: var(--spacing-lg);
+  }
+
+  .status-item h3 {
+    font-size: 1.125rem;
+    margin-bottom: var(--spacing-sm);
+    color: var(--color-text);
+  }
+
+  .status-item ul {
+    list-style: none;
+  }
+
+  .status-item li {
+    padding: 0.5rem 0;
+    padding-left: 1.5rem;
+    position: relative;
+    color: var(--color-text-muted);
+    font-size: 0.9375rem;
+    line-height: 1.6;
+  }
+
+  .status-item li::before {
+    content: '•';
+    position: absolute;
+    left: 0;
+    color: var(--color-accent);
+  }
+
+  .cta {
+    padding: var(--spacing-3xl) 0;
+    text-align: center;
+  }
+
+  .cta h2 {
+    font-size: clamp(2rem, 4vw, 3rem);
+    margin-bottom: var(--spacing-sm);
+  }
+
+  .cta p {
+    font-size: 1.125rem;
+    color: var(--color-text-muted);
+    margin-bottom: var(--spacing-xl);
+  }
+
+  @media (max-width: 768px) {
+    .hero {
+      padding: var(--spacing-xl) 0;
+    }
+
+    .features, .screenshots, .status, .cta {
+      padding: var(--spacing-xl) 0;
+    }
+
+    .features .container,
+    .status-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>
