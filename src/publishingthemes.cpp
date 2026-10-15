@@ -200,9 +200,51 @@ QString displayName(QString id) {
 bool validId(const QString &id) {
     return QRegularExpression(QStringLiteral("^[a-z0-9][a-z0-9-]{0,100}$")).match(id).hasMatch();
 }
+// The themes that ship inside the app, in catalog order. An imported or folder
+// file with one of these ids never takes the id (it is listed as "file:<name>").
+struct BundledTheme { const char *id; const char *name; const char *resource; };
+const QList<BundledTheme> &bundledThemes() {
+    static const QList<BundledTheme> themes{
+        {"claude-like", "Claude Like", ":/themes/claude-like.css"},
+        {"omawrite", "Omawrite", ":/themes/omawrite.css"},
+    };
+    return themes;
+}
+const BundledTheme *bundledTheme(const QString &id) {
+    for (const BundledTheme &theme : bundledThemes()) if (id == QLatin1String(theme.id)) return &theme;
+    return nullptr;
+}
+// A bundled theme names the fonts it needs as url("fonts/<File>.woff2"), resolved against the app's
+// own fonts (qrc:/fonts). They are embedded as data: URLs before the sanitizer runs, so the CSS is
+// self-contained: Live (font-src data: qrc:), Web and PDF output (font-src data:) all load them
+// without the font being installed. The encoded text is kept; the files never change at run time.
+bool embedBundledFonts(QString &source, QString *failure) {
+    static const QRegularExpression reference(QStringLiteral("url\\(\\s*([\"']?)fonts/([A-Za-z0-9_-]+\\.woff2)\\1\\s*\\)"));
+    static QMap<QString, QString> encoded;
+    QString out;
+    qsizetype last = 0;
+    auto matches = reference.globalMatch(source);
+    while (matches.hasNext()) {
+        const auto match = matches.next();
+        const QString name = match.captured(2);
+        if (!encoded.contains(name)) {
+            QFile font(QStringLiteral(":/fonts/") + name);
+            if (!font.open(QIODevice::ReadOnly)) {
+                if (failure) *failure = QStringLiteral("Bundled publishing theme font is missing: %1").arg(name);
+                return false;
+            }
+            encoded.insert(name, QStringLiteral("url(\"data:font/woff2;base64,%1\")").arg(QString::fromLatin1(font.readAll().toBase64())));
+        }
+        out += source.mid(last, match.capturedStart() - last) + encoded.value(name);
+        last = match.capturedEnd();
+    }
+    if (last == 0) return true;
+    source = out + source.mid(last);
+    return true;
+}
 QString fileId(const QString &file) {
     const QString stem = QFileInfo(file).completeBaseName();
-    return validId(stem) && stem != QStringLiteral("claude-like") && file.endsWith(".css")
+    return validId(stem) && !bundledTheme(stem) && file.endsWith(".css")
         ? stem : QStringLiteral("file:") + file;
 }
 QStringList themeFiles() {
@@ -216,10 +258,12 @@ QStringList themeFiles() {
 namespace PublishingThemes {
 QString directory() { return QStandardPaths::writableLocation(QStandardPaths::AppDataLocation) + QStringLiteral("/publishing-themes"); }
 QVariantList catalog() {
-    QVariantList result{QVariantMap{{"id", "claude-like"}, {"name", "Claude Like"}, {"imported", false}}};
+    QVariantList result;
+    for (const BundledTheme &theme : bundledThemes())
+        result.append(QVariantMap{{"id", QString::fromLatin1(theme.id)}, {"name", QString::fromLatin1(theme.name)}, {"imported", false}});
     for (const QString &file : themeFiles()) {
         const QString stem = QFileInfo(file).completeBaseName();
-        const QString name = displayName(stem) + (stem == "claude-like" ? QStringLiteral(" (Folder)") : QString());
+        const QString name = displayName(stem) + (bundledTheme(stem) ? QStringLiteral(" (Folder)") : QString());
         result.append(QVariantMap{{"id", fileId(file)}, {"name", name}, {"imported", true}});
     }
     return result;
@@ -261,10 +305,12 @@ std::optional<QString> css(QString id, QString *error, QString *advisory) {
     auto fail = [&](QString message) -> std::optional<QString> { if (error) *error = message; return std::nullopt; };
     Import validator;
     QString sanitized;
-    if (id == QStringLiteral("claude-like")) {
-        QFile file(QStringLiteral(":/themes/claude-like.css"));
+    if (const BundledTheme *bundled = bundledTheme(id)) {
+        QFile file(QString::fromLatin1(bundled->resource));
         if (!file.open(QIODevice::ReadOnly)) return fail(QStringLiteral("Bundled publishing theme is missing."));
-        if (!validator.transform(QString::fromUtf8(file.readAll()), QString(), sanitized, 0)) return fail(validator.failure);
+        QString source = QString::fromUtf8(file.readAll()), failure;
+        if (!embedBundledFonts(source, &failure)) return fail(failure);
+        if (!validator.transform(source, QString(), sanitized, 0)) return fail(validator.failure);
     } else {
         QString filename;
         for (const QString &file : themeFiles()) if (fileId(file) == id) { filename = file; break; }

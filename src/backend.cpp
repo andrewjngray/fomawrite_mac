@@ -2863,15 +2863,23 @@ void Backend::loadOmarchyTheme() {
     // Appearance follows the Output Style: a theme that paints its page (Typora's
     // --bg-color) also paints the window, and its luminance decides dark mode.
     if (m_appearanceFollowsOutputStyle && m_publisher) {
-        const QColor pageBackground = cssColour(themeBackgroundColor());
+        // A theme with a dark twin (--dark-bg-color on :root, as in the Omawrite theme) does not decide
+        // light or dark: it follows the app's own mode, and the window takes the page colours of the
+        // matching variant. Its html.dark rule (Live adds the class) swaps the same variables in the page.
+        const bool twin = !m_publisher->themeVariable(QStringLiteral("--dark-bg-color")).isEmpty();
+        const bool useDark = twin && m_darkMode;
+        const auto variable = [&](const char *name, const char *darkName) {
+            return m_publisher->themeVariable(QString::fromLatin1(useDark ? darkName : name));
+        };
+        const QColor pageBackground = cssColour(variable("--bg-color", "--dark-bg-color"));
         if (pageBackground.isValid()) {
             m_appearanceOverridden = true;
             const double luminance = 0.299 * pageBackground.redF() + 0.587 * pageBackground.greenF() + 0.114 * pageBackground.blueF();
-            m_darkMode = luminance < 0.5;
+            if (!twin) m_darkMode = luminance < 0.5;
             m_themeBackground = pageBackground.name(QColor::HexRgb);
-            const QColor pageText = cssColour(m_publisher->themeVariable(QStringLiteral("--text-color")));
+            const QColor pageText = cssColour(variable("--text-color", "--dark-text-color"));
             m_themeForeground = pageText.isValid() ? pageText.name(QColor::HexRgb) : (m_darkMode ? QStringLiteral("#ECEEF2") : QStringLiteral("#34363A"));
-            const QColor accent = cssColour(m_publisher->themeVariable(QStringLiteral("--primary-color")));
+            const QColor accent = cssColour(variable("--primary-color", "--dark-primary-color"));
             if (accent.isValid()) m_themeAccent = accent.name(QColor::HexRgb);
         }
     }

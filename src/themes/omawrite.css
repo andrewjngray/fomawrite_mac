@@ -1,0 +1,244 @@
+/* Omawrite — the look of Omawrite (github.com/omacom/omawrite), a minimal Markdown editor:
+   IBM Plex Mono at one size for everything (headings are bold, not larger), a line and a
+   half of air between lines, a 65-character measure, and a handful of dim greys and one blue.
+   Added 15 October 2026 (Cycle 152). The same look is the Omawrite writing appearance in Source.
+
+   Light and dark. The light colours are the defaults on :root, so Web and PDF output (which
+   never sets a mode) and print always come out light. The Live page adds class "dark" to
+   <html> when the app is dark, and the html.dark rule swaps the variables. The --dark-*
+   variables are read by the host too: with Appearance Follows Output Style on, the window
+   takes the page colours of the variant that matches the app's own light/dark mode.
+
+   Plex Mono ships with Fomawrite (fonts/IBMPlexMono-*.woff2, SIL OFL 1.1, from IBM/plex).
+   The four url("fonts/...") references below are replaced with data: URLs when the theme is
+   loaded (src/publishingthemes.cpp), so the font works in Live, Preview, PDF and exported
+   HTML without being installed. */
+@font-face { font-family: "IBM Plex Mono"; font-style: normal; font-weight: 400;
+    src: url("fonts/IBMPlexMono-Regular.woff2") format("woff2"); }
+@font-face { font-family: "IBM Plex Mono"; font-style: italic; font-weight: 400;
+    src: url("fonts/IBMPlexMono-Italic.woff2") format("woff2"); }
+@font-face { font-family: "IBM Plex Mono"; font-style: normal; font-weight: 700;
+    src: url("fonts/IBMPlexMono-Bold.woff2") format("woff2"); }
+@font-face { font-family: "IBM Plex Mono"; font-style: italic; font-weight: 700;
+    src: url("fonts/IBMPlexMono-BoldItalic.woff2") format("woff2"); }
+
+:root {
+    --bg-color: #ffffff;
+    --text-color: #222324;
+    --heading-color: #222324;
+    --control-text-color: #aeb1b5;
+    --primary-color: #2077b2;
+    --accent-color: #2077b2;
+    --marker-color: #aeb1b5;
+    --border-color: #aeb1b5;
+    --rule-color: #aeb1b5;
+    --code-bg-color: #f2f2f2;
+    --block-bg-color: #f2f2f2;
+    --code-text-color: #222324;
+    --inline-code-color: #222324;
+    --inline-code-bg-color: #f2f2f2;
+    --quote-border-color: #aeb1b5;
+    --quote-text-color: #222324;
+    --table-head-color: #222324;
+    --table-row-border-color: #aeb1b5;
+    --highlight-color: #ffe58a;
+    --select-text-bg-color: #2077b2;
+    --select-text-color: #ffffff;
+    --font-body: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Monaco, Consolas, monospace;
+    --line: 1.82;
+    /* The same colours for a dark app. */
+    --dark-bg-color: #101010;
+    --dark-text-color: #eeeeee;
+    --dark-primary-color: #5584aa;
+    --dark-marker-color: #4f525a;
+    --dark-muted-color: #909191;
+    --dark-code-bg-color: #1d1d1d;
+    --dark-highlight-color: #725b18;
+    --dark-select-bg-color: #186a9a;
+}
+
+html.dark {
+    --bg-color: var(--dark-bg-color);
+    --text-color: var(--dark-text-color);
+    --heading-color: var(--dark-text-color);
+    --control-text-color: var(--dark-muted-color);
+    --primary-color: var(--dark-primary-color);
+    --accent-color: var(--dark-primary-color);
+    --marker-color: var(--dark-marker-color);
+    --border-color: var(--dark-marker-color);
+    --rule-color: var(--dark-marker-color);
+    --code-bg-color: var(--dark-code-bg-color);
+    --block-bg-color: var(--dark-code-bg-color);
+    --code-text-color: var(--dark-text-color);
+    --inline-code-color: var(--dark-text-color);
+    --inline-code-bg-color: var(--dark-code-bg-color);
+    --quote-border-color: var(--dark-marker-color);
+    --quote-text-color: var(--dark-text-color);
+    --table-head-color: var(--dark-text-color);
+    --table-row-border-color: var(--dark-marker-color);
+    --highlight-color: var(--dark-highlight-color);
+    --select-text-bg-color: var(--dark-select-bg-color);
+    --select-text-color: #eeeeee;
+    --fw-highlight-fg: #eeeeee;
+}
+
+html {
+    font-size: 20px;
+    -webkit-font-smoothing: antialiased;
+    background-color: var(--bg-color);
+}
+
+body {
+    font-family: var(--font-body);
+    color: var(--text-color);
+    background-color: var(--bg-color);
+    line-height: var(--line);
+    letter-spacing: 0;
+    font-weight: 400;
+}
+
+/* 65 characters, centred; on a narrow window the page is 20 characters narrower than the window. */
+#write {
+    box-sizing: content-box;
+    max-width: min(65ch, max(20ch, calc(100% - 20ch)));
+    margin: 0 auto;
+    padding: 2.2em 0 5em;
+}
+
+#write > *:first-child { margin-top: 0; }
+
+::selection { background: var(--select-text-bg-color); color: var(--select-text-color); }
+
+#write .cm-cursor, #write .cm-dropCursor { border-left-width: 1px; }
+
+a {
+    color: var(--primary-color);
+    text-decoration: underline;
+    text-underline-offset: 0.2em;
+}
+
+/* Headings are bold text at the size of the body; the blank line around them is the only structure. */
+h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-body);
+    font-size: 1em;
+    font-weight: 700;
+    line-height: var(--line);
+    color: var(--heading-color);
+    margin: 0 0 1.82em;
+}
+
+h1 tt, h1 code, h2 tt, h2 code, h3 tt, h3 code, h4 tt, h4 code, h5 tt, h5 code, h6 tt, h6 code {
+    font-size: inherit;
+}
+
+/* A paragraph is followed by one blank line, as in the Markdown. */
+p, blockquote, ul, ol, dl, table, pre, figure {
+    margin: 0 0 1.82em;
+}
+
+strong, b { font-weight: 700; }
+em, i { font-style: italic; }
+
+hr {
+    height: 1px;
+    padding: 0;
+    margin: 0 0 1.82em;
+    background-color: var(--rule-color);
+    border: 0 none;
+    overflow: hidden;
+    box-sizing: content-box;
+}
+
+ul, ol { padding-left: 3ch; }
+li { margin: 0; padding: 0; }
+li > ol, li > ul { margin: 0; }
+ul li::marker, ol li::marker { color: var(--marker-color); }
+li > p { margin: 0; }
+ul:last-child, ol:last-child, p:last-child, blockquote:last-child, pre:last-child, table:last-child { margin-bottom: 0; }
+#write > *:last-child { margin-bottom: 0; }
+
+blockquote {
+    border-left: 2px solid var(--quote-border-color);
+    background: transparent;
+    padding: 0 0 0 1ch;
+    margin-left: 0;
+    color: var(--quote-text-color);
+}
+
+blockquote > *:last-child { margin-bottom: 0; }
+
+table {
+    padding: 0;
+    width: 100%;
+    border-collapse: collapse;
+    background-color: transparent;
+    word-break: initial;
+}
+
+table tr { border: 0; margin: 0; padding: 0; }
+table thead tr { border-bottom: 1px solid var(--table-row-border-color); }
+table tbody tr { border-bottom: 1px solid var(--table-row-border-color); }
+table tbody tr:last-child { border-bottom: 0; }
+
+table th {
+    font-family: var(--font-body);
+    font-weight: 700;
+    border: 0;
+    margin: 0;
+    padding: 0 2ch 0 0;
+    text-align: left;
+    color: var(--table-head-color);
+}
+
+table td {
+    border: 0;
+    margin: 0;
+    padding: 0 2ch 0 0;
+    vertical-align: top;
+    font-family: var(--font-body);
+}
+
+table th:last-child, table td:last-child { padding-right: 0; }
+
+/* Code is the same face on a panel. */
+pre {
+    font-family: var(--font-body);
+    font-size: 1em;
+    border: 0;
+    background-color: var(--code-bg-color);
+    color: var(--code-text-color);
+    border-radius: 0;
+    padding: 0.91em 1ch;
+    overflow-x: auto;
+}
+
+code, tt {
+    font-family: var(--font-body);
+    font-size: 1em;
+    background-color: var(--inline-code-bg-color);
+    color: var(--inline-code-color);
+    border: 0;
+    border-radius: 0;
+    padding: 0;
+}
+
+pre code, pre tt {
+    font-size: inherit;
+    color: inherit;
+    border: 0;
+    background: transparent;
+    padding: 0;
+}
+
+mark, .highlight { background: var(--highlight-color); color: var(--text-color); border-radius: 0; padding: 0; }
+
+input[type="checkbox"] { accent-color: var(--accent-color); }
+
+img { max-width: 100%; height: auto; }
+
+/* Print and PDF are always the light colours; Plex Mono is wide, so the page is set smaller than the screen. */
+@media print {
+    html { font-size: 14px; }
+    #write { max-width: none; padding: 0; }
+    pre { page-break-inside: avoid; white-space: pre-wrap; overflow-wrap: break-word; }
+}

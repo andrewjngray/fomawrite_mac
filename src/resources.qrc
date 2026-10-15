@@ -1,6 +1,11 @@
 <RCC>
     <qresource prefix="/">
         <file>themes/claude-like.css</file>
+        <file>themes/omawrite.css</file>
+        <file alias="fonts/IBMPlexMono-Regular.woff2">../fonts/IBMPlexMono-Regular.woff2</file>
+        <file alias="fonts/IBMPlexMono-Italic.woff2">../fonts/IBMPlexMono-Italic.woff2</file>
+        <file alias="fonts/IBMPlexMono-Bold.woff2">../fonts/IBMPlexMono-Bold.woff2</file>
+        <file alias="fonts/IBMPlexMono-BoldItalic.woff2">../fonts/IBMPlexMono-BoldItalic.woff2</file>
         <file>LibraryPane.qml</file>
         <file>LibraryContextMenu.qml</file>
         <file>WorkspaceCommands.qml</file>

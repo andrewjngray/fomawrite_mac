@@ -201,7 +201,7 @@ Dialog {
                         var themes = backend.publishingThemes
                         var selectedFound = backend.publishingThemeId.length === 0
                         for (var i = 0; i < themes.length; ++i) {
-                            choices.push({ id: themes[i].id, name: themes[i].id === "claude-like" ? "Claude Like" : themes[i].name })
+                            choices.push({ id: themes[i].id, name: themes[i].name })
                             if (themes[i].id === backend.publishingThemeId) selectedFound = true
                         }
                         if (!selectedFound) choices.push({ id: backend.publishingThemeId, name: "Unavailable: " + backend.publishingThemeName })

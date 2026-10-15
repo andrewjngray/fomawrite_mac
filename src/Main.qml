@@ -1224,7 +1224,7 @@ ApplicationWindow {
                 delegate: PublishingMenuItem {
                     required property var modelData
                     objectName: "previewPublishingTheme_" + modelData.id
-                    text: modelData.id === "claude-like" ? "Claude Like" : modelData.name
+                    text: modelData.name
                     publishingId: modelData.id
                 }
                 onObjectAdded: function(index, object) { previewCustomThemesMenu.insertItem(index, object); }

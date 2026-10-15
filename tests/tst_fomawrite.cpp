@@ -157,6 +157,13 @@ private slots:
     void spellCheckServiceReportsGrammarIssuesWithCategory();
     void harperLintsInsideTheEditorPage();
     void liveMarksALongListOfMisspellingsLineByLine();
+    void omawriteIsASecondBuiltInOutputStyle();
+    void omawriteWindowFollowsTheAppsLightAndDarkMode();
+    void omawriteShowsInBothOutputStyleMenusAndApplies();
+    void omawriteIsListedInTheExportHubStyleChoice();
+    void liveOmawriteLoadsPlexMonoAndFollowsLightAndDark();
+    void omawriteHtmlExportIsLightEmbedsPlexMonoAndLoadsIt();
+    void omawritePdfExportIsLightAndEmbedsPlexMono();
     void exploreFolderMakesTheFilesFolderCurrentInTreeAndListModes();
     void exploreFolderInsideALocationAddsNoLocation();
     void exploreFolderRefusesMissingRemoteFolderAndNonTextTargets();
@@ -5331,3 +5338,4 @@ int main(int argc, char **argv) {
 #include "cycle148-document-navigation.inc"
 #include "cycle151-folder-history.inc"
 #include "cycle152-omawrite-source.inc"
+#include "cycle152-omawrite-style.inc"
