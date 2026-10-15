@@ -171,6 +171,9 @@ private slots:
     void folderArrowsKeepFocusAndClicksInsideTheGroup();
     void deletedFoldersDropOutOfTheFolderHistory();
     void cmdUpWorksInsideTheFilesDrawer();
+    void omawriteSourcePresetIsInTheMenuAndSelectsPlexMono();
+    void omawriteSourceUsesItsPaletteInDarkAndLightAndManuscriptComesBack();
+    void omawriteSourceKeepsAtMostSixtyFiveCharactersAndCentres();
     void harperBridgeAnswersLintRequestsFromTheHost();
     void harperEngineCachesDedupesAndMapsKinds();
     void harperEngineQueuesNewestFirstAndBoundsItsCache();
@@ -5327,3 +5330,4 @@ int main(int argc, char **argv) {
 #include "cycle147-harper-daily-use.inc"
 #include "cycle148-document-navigation.inc"
 #include "cycle151-folder-history.inc"
+#include "cycle152-omawrite-source.inc"

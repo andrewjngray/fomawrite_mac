@@ -34,18 +34,30 @@ ApplicationWindow {
     // `omarchy display text size` drives) anchored so its 12px default leaves
     // the app at the sizes it was designed around.
     readonly property real textScale: backend.textScale
-    readonly property string activeWritingAppearance: ["editorial", "book", "code"].indexOf(workspaceSettings.writingAppearance) >= 0
+    readonly property string activeWritingAppearance: ["editorial", "book", "code", "omawrite"].indexOf(workspaceSettings.writingAppearance) >= 0
         ? workspaceSettings.writingAppearance : "manuscript"
     readonly property bool codeAppearance: activeWritingAppearance === "code"
     onActiveWritingAppearanceChanged: Qt.callLater(function() { backend.setSourceAppearance(activeWritingAppearance); codeDecorationsTimer.restart(); editorFlick.contentX = 0; })
     onDarkModeChanged: Qt.callLater(function() { backend.setSourceAppearance(activeWritingAppearance); })
     readonly property string editorFontFamily: activeWritingAppearance === "editorial" ? Qt.application.font.family
-        : activeWritingAppearance === "book" ? "Georgia" : codeAppearance ? "Menlo" : "iA Writer Mono S"
-    readonly property int writingBasePixelSize: codeAppearance ? 15 : activeWritingAppearance === "manuscript" ? 18 : activeWritingAppearance === "book" ? 20 : 19
+        : activeWritingAppearance === "book" ? "Georgia" : codeAppearance ? "Menlo"
+        : activeWritingAppearance === "omawrite" ? "IBM Plex Mono" : "iA Writer Mono S"
+    readonly property int writingBasePixelSize: codeAppearance ? 15 : activeWritingAppearance === "manuscript" ? 18
+        : activeWritingAppearance === "book" || activeWritingAppearance === "omawrite" ? 20 : 19
+    // The Omawrite preset paints the Source writing surface in its own palette (following dark/light);
+    // window chrome and the other panes keep the app palette. Live follows the Output Style instead.
+    readonly property bool omawriteSurface: activeWritingAppearance === "omawrite" && !workspaceLayout.liveEditEnabled
+    readonly property color sourceSurfaceColor: omawriteSurface ? (darkMode ? "#101010" : "#ffffff") : backend.palette.editor
+    readonly property color sourceTextColor: omawriteSurface ? (darkMode ? "#eeeeee" : "#222324") : textColor
+    readonly property color sourceSelectionColor: omawriteSurface ? (darkMode ? "#186a9a" : "#2077b2") : selectionFill
+    readonly property color sourceSelectedTextColor: omawriteSurface && darkMode ? "#eeeeee" : "#ffffff"
     readonly property int editorFontPixelSize: scaledSize(writingBasePixelSize * paneZoom.sourceZoom / 100)
-    readonly property int editorWidth: codeAppearance ? Math.max(180, editorPane.width - 112) : Math.min(
-        scaledSize(680),
-        Math.max(180, editorPane.width - 64))
+    // Omawrite: at most 65 characters, narrowing to the pane width minus 20 characters (and the usual margins).
+    readonly property real omawriteCharWidth: Math.max(1, writerFontMetrics.averageCharacterWidth)
+    readonly property int editorWidth: codeAppearance ? Math.max(180, editorPane.width - 112)
+        : activeWritingAppearance === "omawrite" ? Math.max(180, Math.floor(Math.min(65 * omawriteCharWidth,
+            editorPane.width - 20 * omawriteCharWidth, editorPane.width - 48)))
+        : Math.min(scaledSize(680), Math.max(180, editorPane.width - 64))
     property int tabInset: 0
     Timer { interval: 250; repeat: true; running: win.visible && win.isMac; onTriggered: win.tabInset = backend.nativeTabInset() }
     readonly property int workspaceCursor: editor.cursorPosition
@@ -1144,6 +1156,7 @@ ApplicationWindow {
             CompactMenuItem { text: "Editorial"; checkable: true; checked: win.activeWritingAppearance === "editorial"; onTriggered: workspaceCommands.run("writingEditorial") }
             CompactMenuItem { text: "Book"; checkable: true; checked: win.activeWritingAppearance === "book"; onTriggered: workspaceCommands.run("writingBook") }
             CompactMenuItem { text: "Code"; checkable: true; checked: win.activeWritingAppearance === "code"; onTriggered: workspaceCommands.run("writingCode") }
+            CompactMenuItem { text: "Omawrite"; checkable: true; checked: win.activeWritingAppearance === "omawrite"; onTriggered: workspaceCommands.run("writingOmawrite") }
         }
         MenuSeparator {}
         CompactMenuItem { text: "Paragraph focus"; checkable: true; checked: workspaceSettings.paragraphFocus; onTriggered: workspaceCommands.run("paragraph") }
@@ -1166,6 +1179,7 @@ ApplicationWindow {
         CompactMenuItem { objectName: "sourceAppearanceEditorial"; text: "Editorial"; checkable: true; autoExclusive: true; checked: win.activeWritingAppearance === "editorial"; onTriggered: workspaceCommands.run("writingEditorial") }
         CompactMenuItem { objectName: "sourceAppearanceBook"; text: "Book"; checkable: true; autoExclusive: true; checked: win.activeWritingAppearance === "book"; onTriggered: workspaceCommands.run("writingBook") }
         CompactMenuItem { objectName: "sourceAppearanceCode"; text: "Code"; checkable: true; autoExclusive: true; checked: !workspaceLayout.liveEditEnabled && win.activeWritingAppearance === "code"; onTriggered: workspaceCommands.run("writingCode") }
+        CompactMenuItem { objectName: "sourceAppearanceOmawrite"; text: "Omawrite"; checkable: true; autoExclusive: true; checked: win.activeWritingAppearance === "omawrite"; onTriggered: workspaceCommands.run("writingOmawrite") }
         MenuSeparator {}
         CompactMenuItem { objectName: "sourceAppearanceLarger"; text: "Larger text"; enabled: paneZoom.sourceZoom < paneZoom.maximumZoom; onTriggered: paneZoom.adjustZoom("source", 10) }
         CompactMenuItem { objectName: "sourceAppearanceSmaller"; text: "Smaller text"; enabled: paneZoom.sourceZoom > paneZoom.minimumZoom; onTriggered: paneZoom.adjustZoom("source", -10) }
@@ -2562,7 +2576,7 @@ ApplicationWindow {
             id: editorPane
             objectName: "editorPane"
             onVisibleChanged: if (!visible && win.searchOpen) win.closeSearch(false)
-            color: backend.palette.editor
+            color: win.sourceSurfaceColor
             visible: workspaceLayout.effectiveLayoutMode !== 2
             SplitView.fillWidth: true
             SplitView.minimumWidth: workspaceLayout.effectiveLayoutMode === 1 ? 480 : 320
@@ -2871,9 +2885,9 @@ ApplicationWindow {
                 selectByMouse: true
                 persistentSelection: true
                 activeFocusOnPress: true
-                color: win.textColor
-                selectedTextColor: "#ffffff"
-                selectionColor: win.selectionFill
+                color: win.sourceTextColor
+                selectedTextColor: win.sourceSelectedTextColor
+                selectionColor: win.sourceSelectionColor
                 font.family: win.editorFontFamily
                 font.pixelSize: win.editorFontPixelSize
                 font.weight: Font.Normal
@@ -2887,7 +2901,7 @@ ApplicationWindow {
                 renderType: Screen.devicePixelRatio % 1 === 0 ? TextEdit.NativeRendering : TextEdit.QtRendering
                 cursorDelegate: Rectangle {
                     width: 1
-                    color: win.strongTextColor
+                    color: win.sourceTextColor
                 }
                 // Reflowing an inactive Source pane must not pull the preview
                 // back to an old caret through synchronized scrolling.
@@ -3431,7 +3445,7 @@ ApplicationWindow {
         canSplit: workspaceLayout.availableWidth >= 800
         sourcePaneWidth: editorPane.visible ? editorPane.width : 0
         previewPaneStart: previewPane.visible ? previewPane.x - x : width
-        writingAppearance: workspaceLayout.liveEditEnabled ? backend.publishingThemeName : win.codeAppearance ? "Code" : win.activeWritingAppearance === "editorial" ? "Editorial" : win.activeWritingAppearance === "book" ? "Book" : "Manuscript"
+        writingAppearance: workspaceLayout.liveEditEnabled ? backend.publishingThemeName : win.codeAppearance ? "Code" : win.activeWritingAppearance === "editorial" ? "Editorial" : win.activeWritingAppearance === "book" ? "Book" : win.activeWritingAppearance === "omawrite" ? "Omawrite" : "Manuscript"
         previewTemplate: backend.publishingThemeName
         statusText: backend.status
         showStatus: !workspaceLayout.effectiveOrganizerVisible

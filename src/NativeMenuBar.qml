@@ -297,6 +297,7 @@ Platform.MenuBar {
             NativeCommand { commandId: "writingEditorial"; text: "Editorial (Sans)" }
             NativeCommand { commandId: "writingBook"; text: "Book (Serif)" }
             NativeCommand { commandId: "writingCode"; text: "Code" }
+            NativeCommand { commandId: "writingOmawrite"; text: "Omawrite (Mono)" }
         }
         Platform.MenuItem {
             objectName: "native_showCompletions"

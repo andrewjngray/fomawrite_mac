@@ -1710,10 +1710,11 @@ void Backend::setFocusPosition(int position, bool enabled, bool sentence) {
 }
 
 void Backend::setSourceAppearance(const QString &appearance) {
-    const QString normalized = QStringList{"manuscript", "editorial", "book", "code"}.contains(appearance) ? appearance : "manuscript";
+    const QString normalized = QStringList{"manuscript", "editorial", "book", "code", "omawrite"}.contains(appearance) ? appearance : "manuscript";
     m_sourceAppearance = normalized;
     if (m_highlighter) {
         m_highlighter->setCodeStyle(normalized == "code");
+        m_highlighter->setOmawrite(normalized == "omawrite");
         m_highlighter->setCodeLanguage(QFileInfo(m_fileUrl.toLocalFile()).suffix());
     }
     if (m_document) {
@@ -1837,6 +1838,7 @@ void Backend::attachDocument(QObject *textDocument) {
     m_highlighter->setDarkMode(m_darkMode);
     m_highlighter->setShowMarkup(m_showMarkup);
     m_highlighter->setCodeStyle(m_sourceAppearance == "code");
+    m_highlighter->setOmawrite(m_sourceAppearance == "omawrite");
     m_highlighter->setCodeLanguage(QFileInfo(m_fileUrl.toLocalFile()).suffix());
     m_highlighter->setColors(palette().value("editor").toString(), m_themeForeground, m_themeAccent);
     // Misspellings underline as the writer types; the highlighter follows the
@@ -2966,8 +2968,11 @@ bool Backend::refreshSourceTypography() {
         return false;
 
     QList<SourceBlockStyle> changed;
-    const qreal lineHeight = m_sourceAppearance == "code" ? 135 : sourceLineHeightPercent;
-    const QBrush codeBackground(QColor(m_darkMode ? "#252A32" : "#EAECF0"));
+    const bool omawrite = m_sourceAppearance == "omawrite";
+    // Omawrite: 140% of the font's natural line spacing (Plex Mono's is 1.3 em).
+    const qreal lineHeight = m_sourceAppearance == "code" ? 135 : omawrite ? 140 : sourceLineHeightPercent;
+    const QBrush codeBackground(omawrite ? QColor(m_darkMode ? "#1d1d1d" : "#f2f2f2")
+                                         : QColor(m_darkMode ? "#252A32" : "#EAECF0"));
     for (const auto &item : sourceHangingOffsets(m_document, m_sourceAppearance == "manuscript", m_sourceAppearance == "code")) {
         const QTextBlockFormat format = item.block.blockFormat();
         if (format.lineHeightType() != QTextBlockFormat::ProportionalHeight

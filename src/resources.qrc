@@ -76,5 +76,9 @@
         <file alias="fonts/iAWriterMonoS-Italic.ttf">../fonts/iAWriterMonoS-Italic.ttf</file>
         <file alias="fonts/iAWriterMonoS-Bold.ttf">../fonts/iAWriterMonoS-Bold.ttf</file>
         <file alias="fonts/iAWriterMonoS-BoldItalic.ttf">../fonts/iAWriterMonoS-BoldItalic.ttf</file>
+        <file alias="fonts/IBMPlexMono-Regular.ttf">../fonts/IBMPlexMono-Regular.ttf</file>
+        <file alias="fonts/IBMPlexMono-Italic.ttf">../fonts/IBMPlexMono-Italic.ttf</file>
+        <file alias="fonts/IBMPlexMono-Bold.ttf">../fonts/IBMPlexMono-Bold.ttf</file>
+        <file alias="fonts/IBMPlexMono-BoldItalic.ttf">../fonts/IBMPlexMono-BoldItalic.ttf</file>
     </qresource>
 </RCC>

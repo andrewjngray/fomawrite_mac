@@ -24,6 +24,8 @@ public:
     void setColors(const QString &background, const QString &foreground, const QString &accent);
     void setSearch(const QString &query, int currentMatchStart);
     void setCodeStyle(bool enabled);
+    // The Omawrite Source preset: its own palette for text, markers, links and the code panel.
+    void setOmawrite(bool enabled);
     void setCodeLanguage(const QString &language);
 
     struct Span {
@@ -164,6 +166,7 @@ private:
     bool m_showMarkup = false;
     bool m_darkMode = true;
     bool m_codeStyle = false;
+    bool m_omawrite = false;
     QString m_codeLanguage;
     QString m_customBackground;
     QString m_customForeground;

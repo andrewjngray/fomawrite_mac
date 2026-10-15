@@ -133,6 +133,13 @@ void MarkdownHighlighter::setCodeStyle(bool enabled) {
     rehighlight();
 }
 
+void MarkdownHighlighter::setOmawrite(bool enabled) {
+    if (m_omawrite == enabled) return;
+    m_omawrite = enabled;
+    rebuildFormats();
+    rehighlight();
+}
+
 void MarkdownHighlighter::setCodeLanguage(const QString &language) {
     const QString normalized = normalizedLanguage(language);
     if (m_codeLanguage == normalized) return;
@@ -159,17 +166,25 @@ void MarkdownHighlighter::setReviewSpans(const QList<Span> &spans) {
 }
 
 void MarkdownHighlighter::rebuildFormats() {
-    const QColor marker = m_darkMode ? QColor(QStringLiteral("#A4ABB7"))
-                                     : QColor(QStringLiteral("#68707B"));
-    const QColor background = !m_customBackground.isEmpty() ? QColor(m_customBackground)
+    QColor marker = m_darkMode ? QColor(QStringLiteral("#A4ABB7"))
+                               : QColor(QStringLiteral("#68707B"));
+    QColor background = !m_customBackground.isEmpty() ? QColor(m_customBackground)
         : (m_darkMode ? QColor(QStringLiteral("#101010")) : QColor(QStringLiteral("#ffffff")));
-    const QColor text = !m_customForeground.isEmpty() ? QColor(m_customForeground)
+    QColor text = !m_customForeground.isEmpty() ? QColor(m_customForeground)
         : (m_darkMode ? QColor(QStringLiteral("#eeeeee")) : QColor(QStringLiteral("#222324")));
-    const QColor link = !m_customAccent.isEmpty() ? QColor(m_customAccent)
+    QColor link = !m_customAccent.isEmpty() ? QColor(m_customAccent)
         : (m_darkMode ? QColor(QStringLiteral("#5584aa")) : QColor(QStringLiteral("#2077b2")));
+    QColor codeBackground = m_darkMode ? QColor(QStringLiteral("#252A32"))
+                                       : QColor(QStringLiteral("#EAECF0"));
+    if (m_omawrite) {
+        // Omawrite's own palette, whatever the app theme (it still follows dark/light).
+        marker = m_darkMode ? QColor(QStringLiteral("#4f525a")) : QColor(QStringLiteral("#aeb1b5"));
+        background = m_darkMode ? QColor(QStringLiteral("#101010")) : QColor(QStringLiteral("#ffffff"));
+        text = m_darkMode ? QColor(QStringLiteral("#eeeeee")) : QColor(QStringLiteral("#222324"));
+        link = m_darkMode ? QColor(QStringLiteral("#5584aa")) : QColor(QStringLiteral("#2077b2"));
+        codeBackground = m_darkMode ? QColor(QStringLiteral("#1d1d1d")) : QColor(QStringLiteral("#f2f2f2"));
+    }
     const QColor quote = marker;
-    const QColor codeBackground = m_darkMode ? QColor(QStringLiteral("#252A32"))
-                                             : QColor(QStringLiteral("#EAECF0"));
 
     m_markerFormat = QTextCharFormat();
     m_markerFormat.setForeground(marker);

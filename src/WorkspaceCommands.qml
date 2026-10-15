@@ -69,6 +69,7 @@ QtObject {
         { id: "writingManuscript", title: "Manuscript (Mono)", toggle: true },
         { id: "writingEditorial", title: "Editorial (Sans)", toggle: true },
         { id: "writingBook", title: "Book (Serif)", toggle: true },
+        { id: "writingOmawrite", title: "Omawrite (Mono)", toggle: true },
         { id: "writingCode", title: "Code", toggle: true },
         { id: "sourceEditing", title: "Source", toggle: true },
         { id: "liveEditing", title: "Live", toggle: true },
@@ -210,6 +211,7 @@ QtObject {
         case "writingManuscript": return settings.writingAppearance === "manuscript";
         case "writingEditorial": return settings.writingAppearance === "editorial";
         case "writingBook": return settings.writingAppearance === "book";
+        case "writingOmawrite": return settings.writingAppearance === "omawrite";
         case "writingCode": return settings.writingAppearance === "code";
         case "sentence": return settings.sentenceFocus;
         case "paragraph": return settings.paragraphFocus;
@@ -258,6 +260,7 @@ QtObject {
         case "writingManuscript": settings.writingAppearance = "manuscript"; break;
         case "writingEditorial": settings.writingAppearance = "editorial"; break;
         case "writingBook": settings.writingAppearance = "book"; break;
+        case "writingOmawrite": settings.writingAppearance = "omawrite"; break;
         case "writingCode": window.selectWritingMode("source"); settings.writingAppearance = "code"; break;
         case "sourceEditing": window.selectWritingMode("source"); break;
         case "liveEditing": window.selectWritingMode("live"); break;
