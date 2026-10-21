@@ -84,7 +84,7 @@ The retired Visual Edit projection (`VisualEditPane.qml`, `sourcevisualmapping.*
 None of these is a header. All three are raw text splices and all three are candidates for the structural pass.
 
 1. **Product code split by `#include`** — *gone since Cycle 133*: `src/backendpublishing.inc` became the `Publisher` class in `src/publisher.{h,cpp}`.
-2. **Acceptance-check bodies inside the product binary** — `src/editoracceptancecheck.inc`, `panechromeacceptancecheck.inc`, `editinglayoutacceptancecheck.inc`, `publishingthemeacceptancecheck.inc` (which itself includes `publishingfolderacceptancecheck.inc` and `publishingpreviewacceptancecheck.inc`) are `#include`d *inside function bodies* of `src/documentviewcheck.cpp`, which is in the app's `SOURCES` and ships in every bundle. `bin/check-document-views` drives it against an actual `.app`. Target: a separate `fomawrite-viewcheck` executable.
+2. **Acceptance-check bodies inside the product binary** — `src/editoracceptancecheck.inc`, `liveacceptancecheck.inc`, `panechromeacceptancecheck.inc`, `editinglayoutacceptancecheck.inc`, `publishingthemeacceptancecheck.inc` (which itself includes `publishingfolderacceptancecheck.inc` and `publishingpreviewacceptancecheck.inc`) are `#include`d *inside function bodies* of `src/documentviewcheck.cpp`, which is in the app's `SOURCES` and ships in every bundle. `bin/check-document-views` drives it against an actual `.app`. Target: a separate `fomawrite-viewcheck` executable.
 3. **Test slots and harnesses** — `tests/cycle*.inc` are QtTest slot bodies `#include`d into the single translation unit `tests/tst_fomawrite.cpp` (every test links WebEngine; files are named by the cycle that added them, not by feature). Separately, `tests/startup-preview-setup.inc`, `startup-preview-check.inc`, `window-routing-smoke.inc`, `cycle103-migration-seed.inc` and `cycle103-migration.inc` are `#include`d into `src/main.cpp` under `#ifdef FOMAWRITE_STARTUP_PREVIEW_CHECK` / `FOMAWRITE_CONTEXT_SMOKE`; `bin/check-publishing-startup` and `bin/test-window-routing` rebuild the whole app into a temporary directory with those defines.
 
 The editor page has its own test suite (`cd src/editor && npm test`, node:test, DOM-free) beside the QtTest suite.
@@ -121,7 +121,7 @@ Native checks need a logged-in desktop session and a fresh output directory:
 ./bin/test-window-routing                                                             # lifecycle/activation harness (not recertified since 128)
 ```
 
-CI ([.github/workflows/ci.yml](.github/workflows/ci.yml)) runs `./bin/build` and `./bin/test` on a macOS runner with pinned Qt; it cannot run the native checks. Bundles are ad-hoc signed, not notarized; the version string lives in both `src/main.cpp` (`setApplicationVersion`) and `macos/Info.plist`.
+CI ([.github/workflows/ci.yml](.github/workflows/ci.yml)) runs `./bin/build` and `./bin/test` on a macOS runner with pinned Qt. An independent editor job installs the lockfile with `npm ci`, runs `npm test` and `npm run typecheck`, rebuilds the editor assets, and rejects differences from the committed bundle. The native Cocoa acceptance checks run locally against each actual app bundle. Bundles are ad-hoc signed, not notarized; the version string lives in both `src/main.cpp` (`setApplicationVersion`) and `macos/Info.plist`.
 
 ## 8. Data on disk (macOS)
 

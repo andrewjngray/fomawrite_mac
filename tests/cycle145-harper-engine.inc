@@ -739,3 +739,24 @@ void FomawriteTest::livePageWarmUpDoesNotDelayFirstPaintAndIsMeasured() {
     QVERIFY2(firstPaint < 15000, "the first paint is not held up by the page");
     backend.discardRecovery();
 }
+
+// A late Harper readiness signal changes the active checker while the writer
+// may be looking at another pane. Restyling its Source marks is presentation.
+void FomawriteTest::sourceSpellingRefreshDoesNotAdvanceDocumentRevision() {
+    Cycle103SettingsSnapshot isolatedSettings;
+    SpellCheck spell;
+    spell.setEnabled(true);
+    QTextDocument document;
+    const QString source = QStringLiteral("We recieve the the mail today.\n\nAnother paragraph stays intact.");
+    document.setPlainText(source);
+    MarkdownHighlighter highlighter(&document);
+    highlighter.setSpellCheck(&spell);
+    highlighter.rehighlight();
+    const int revision = document.revision();
+    highlighter.refreshSpelling();
+    QCOMPARE(document.toPlainText(), source);
+    QCOMPARE(document.revision(), revision);
+    spell.setEngine(spell.engine() == QStringLiteral("harper") ? QStringLiteral("macos") : QStringLiteral("harper"));
+    QCOMPARE(document.toPlainText(), source);
+    QCOMPARE(document.revision(), revision);
+}

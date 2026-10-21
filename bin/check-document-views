@@ -63,7 +63,10 @@ else:
         failures.append('The shipped app did not pass all daily-writing checks')
     if len(zoom_checks) < 5 or any(not check.get('passed') for check in zoom_checks):
         failures.append('The shipped app did not pass all independent-pane zoom checks')
-    if len(acceptance_checks) < 5 or any(not check.get('passed') for check in acceptance_checks):
+    live_checks = {'live-window-typing-source-switch-save-and-reopen', 'live-window-keyboard-undo-and-redo'}
+    if not live_checks.issubset({check.get('name') for check in acceptance_checks}):
+        failures.append('The shipped app did not exercise Live keyboard input, persistence and history')
+    if len(acceptance_checks) < 7 or any(not check.get('passed') for check in acceptance_checks):
         failures.append('The shipped app did not pass all editor acceptance checks')
     if len(chrome_checks) < 3 or any(not check.get('passed') for check in chrome_checks):
         failures.append('The shipped app did not pass all pane/footer/library checks')
@@ -106,6 +109,8 @@ for name, actual in report.get('resourceSha256', {}).items():
     if actual != expected:
         failures.append(f'Embedded {name} differs from checkout')
 for name in ('PublishingPreview.qml', 'LiveEditorPane.qml', 'NativeMenuBar.qml', 'Main.qml', 'DocumentFooter.qml', 'WorkspaceLayout.qml', 'WorkspaceCommands.qml',
+             'editor/index.html', 'editor/editor.css', 'editor/blocks.css', 'editor/dist/editor.js',
+             'themes/claude-like.css', 'themes/omawrite.css',
              'DocumentFindBar.qml', 'DocumentOutline.qml', 'PaneZoomState.qml',
              'PaneZoomControls.qml', 'WorkspaceHeader.qml', 'LibraryPane.qml', 'LinkEditor.qml', 'LinkSyntax.js', 'ExportHub.qml', 'SquareDialogButton.qml'):
     if name not in report.get('resourceSha256', {}):

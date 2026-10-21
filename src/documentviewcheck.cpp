@@ -298,7 +298,9 @@ int runDocumentViewCheck(QApplication &app, const QString &outputDirectory) {
             QStringLiteral("FooterButton.qml"), QStringLiteral("PublishingPreview.qml"), QStringLiteral("LiveEditorPane.qml"), QStringLiteral("NativeMenuBar.qml"), QStringLiteral("LibraryPane.qml"),
             QStringLiteral("WorkspaceLayout.qml"), QStringLiteral("WorkspaceCommands.qml"), QStringLiteral("AboutDialog.qml"),
             QStringLiteral("DocumentFindBar.qml"), QStringLiteral("DocumentOutline.qml"),
-            QStringLiteral("PaneZoomState.qml"), QStringLiteral("PaneZoomControls.qml"), QStringLiteral("WorkspaceHeader.qml"), QStringLiteral("LinkEditor.qml"), QStringLiteral("LinkSyntax.js"), QStringLiteral("ExportHub.qml"), QStringLiteral("SquareDialogButton.qml")}) {
+            QStringLiteral("PaneZoomState.qml"), QStringLiteral("PaneZoomControls.qml"), QStringLiteral("WorkspaceHeader.qml"), QStringLiteral("LinkEditor.qml"), QStringLiteral("LinkSyntax.js"), QStringLiteral("ExportHub.qml"), QStringLiteral("SquareDialogButton.qml"),
+            QStringLiteral("editor/index.html"), QStringLiteral("editor/editor.css"), QStringLiteral("editor/blocks.css"),
+            QStringLiteral("editor/dist/editor.js"), QStringLiteral("themes/claude-like.css"), QStringLiteral("themes/omawrite.css")}) {
         const QString hash = fileHash(":/" + name);
         check(!hash.isEmpty(), "Bundled resource missing: " + name);
         resources.insert(name, hash);
@@ -1106,6 +1108,7 @@ int runDocumentViewCheck(QApplication &app, const QString &outputDirectory) {
     }
 
 #include "editoracceptancecheck.inc"
+#include "liveacceptancecheck.inc"
 #include "panechromeacceptancecheck.inc"
 #include "editinglayoutacceptancecheck.inc"
 

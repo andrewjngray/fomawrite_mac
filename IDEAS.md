@@ -19,7 +19,7 @@ Yes [x]  No [ ]  Maybe [ ]
 
 Yes, 10 October 2026 (Andrew): spell check in the document first, in both surfaces, from the macOS checker, with a toggle; the review dialog is reworked after. Cycle 143.
 
-Source mode uses the native Qt text editor and its spell check; the Live page is Chromium and has none today. Qt WebEngine can spell check but needs bundled `.bdic` dictionaries, which Homebrew Qt does not ship. Options: bundle dictionaries for the languages Andrew writes in, or rely on an external checker (see Grammarly below).
+Shipped in Cycle 143: the native macOS checker supplies spelling in Source and Live through the host bridge. Harper supplies offline grammar and extended checking (Cycles 145–147); no Chromium `.bdic` download is required. The earlier alternatives below are historical investigation notes.
 
 ### Grammarly in the editor
 Yes [ ]  No [x]  Maybe [ ]

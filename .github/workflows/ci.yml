@@ -1,6 +1,7 @@
 # Continuous integration for Fomawrite.
 #
-# One macOS job (Apple Silicon runner) installs a pinned Qt 6 through
+# The editor job checks the committed CodeMirror bundle independently.
+# A macOS job (Apple Silicon runner) installs a pinned Qt 6 through
 # jurplel/install-qt-action (aqtinstall) and runs the same two scripts a
 # developer runs locally: ./bin/build and ./bin/test. The test run is
 # offscreen (bin/test sets QT_QPA_PLATFORM=offscreen itself).
@@ -89,3 +90,41 @@ jobs:
           path: build-tests/test.log
           if-no-files-found: ignore
           retention-days: 14
+
+  editor:
+    name: Editor tests and committed bundle
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: src/editor
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js LTS
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.16.0'
+          cache: npm
+          cache-dependency-path: src/editor/package-lock.json
+
+      - name: Install editor dependencies
+        run: npm ci
+
+      - name: Run editor tests
+        run: npm test
+
+      - name: Typecheck editor
+        run: npm run typecheck
+
+      - name: Build committed editor assets
+        run: npm run build
+
+      - name: Verify committed editor assets are current
+        run: |
+          if [[ -n "$(git status --porcelain -- dist/)" ]]; then
+            echo "Editor build changed committed assets; run npm run build in src/editor and commit dist/."
+            git status --short -- dist/
+            exit 1
+          fi

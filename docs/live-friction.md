@@ -1,15 +1,16 @@
 # Live friction list
 
-What Andrew finds while using Live as the daily editor. This list is the input to the next cycle (see [MISSION.md](../MISSION.md): the current measure of progress). Newest first. Each item: what happened, where, status.
+Findings from Andrew's daily use and the native acceptance runs. This list is the input to the next cycle (see [MISSION.md](../MISSION.md): the current measure of progress). Newest first. Each item: what happened, where, status.
 
 | Date | What happened | Where | Status |
 | --- | --- | --- | --- |
-| 9 Oct 2026 | A document opened in **Preview Only** shows no way into Source or Live: the editing capsule is hidden in that layout and nothing hints that it exists. | Footer, Preview Only | Fixed in source (option 1): the layout capsule is **Single \| Split \| Preview**; one click each way. Test `footerLayoutCapsuleNamesPreviewOnly`. |
-| 9 Oct 2026 | From Single or Split there is no visible way back to Preview Only; it exists only in **View → Preview Only**. | Footer | Fixed in source with the item above. |
-| 9 Oct 2026 | **Lapis Dark** showed pale text on a white page in Live (and in Web/PDF): Typora themes set their colours as `:root` variables and rely on Typora's base stylesheet to paint the page. | Live, Web/PDF | Fixed in source (Cycle 140): a Typora base shim paints the page from the theme's variables ahead of the theme CSS. |
-| 9 Oct 2026 | In Typora a dark theme darkens the whole app; Fomawrite's chrome stayed light. | Window chrome | Fixed in source (Cycle 140): Appearance Follows Output Style, default on. |
-| 9 Oct 2026 | `==highlighted text==` kept a pale yellow background under a dark theme's light text (reviewer finding). | Live, Web/PDF | Fixed in source (build 141): highlight takes the theme's `--highlight-color` with a contrast-chosen text colour. |
-| 9 Oct 2026 | After opening in Preview Only and choosing Split, **View → Editing** showed neither Source nor Live checked until Live was toggled once. | Native View menu | Fixed in source, not yet installed: the QML state was right all along (test `nativeEditingMenuChecksFollowTheLayoutFromTheStart`), the native Cocoa item showed a stale tick; the Editing and Layout submenus now re-assert their ticks when they open. Needs Andrew's confirmation on the next build. |
+| 22 Oct 2026 | First Live use could advance the source revision without changing text when Harper became ready. | Native stability check | Fixed in Cycle 153: spelling/grammar refresh restyles layout marks without a document revision. Direct regression fails before the fix and passes afterward; the full Dev footer matrix passes. |
+| 9 Oct 2026 | A document opened in **Preview Only** shows no way into Source or Live: the editing capsule is hidden in that layout and nothing hints that it exists. | Footer, Preview Only | Shipped (option 1): the layout capsule is **Single \| Split \| Preview**; one click each way. Test `footerLayoutCapsuleNamesPreviewOnly`. |
+| 9 Oct 2026 | From Single or Split there is no visible way back to Preview Only; it exists only in **View → Preview Only**. | Footer | Shipped with the item above. |
+| 9 Oct 2026 | **Lapis Dark** showed pale text on a white page in Live (and in Web/PDF): Typora themes set their colours as `:root` variables and rely on Typora's base stylesheet to paint the page. | Live, Web/PDF | Shipped (Cycle 140): a Typora base shim paints the page from the theme's variables ahead of the theme CSS. |
+| 9 Oct 2026 | In Typora a dark theme darkens the whole app; Fomawrite's chrome stayed light. | Window chrome | Shipped (Cycle 140): Appearance Follows Output Style, default on. |
+| 9 Oct 2026 | `==highlighted text==` kept a pale yellow background under a dark theme's light text (reviewer finding). | Live, Web/PDF | Shipped (build 141): highlight takes the theme's `--highlight-color` with a contrast-chosen text colour. |
+| 9 Oct 2026 | After opening in Preview Only and choosing Split, **View → Editing** showed neither Source nor Live checked until Live was toggled once. | Native View menu | Shipped; physical Cocoa menu confirmation remains open: the QML state was right all along (test `nativeEditingMenuChecksFollowTheLayoutFromTheStart`), the native Cocoa item showed a stale tick; the Editing and Layout submenus now re-assert their ticks when they open. Keep this distinct from automated QML state coverage. |
 
 ## Design options for the Preview Only routes (for Andrew to choose)
 

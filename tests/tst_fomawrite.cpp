@@ -152,6 +152,7 @@ private slots:
     void footerCompactStylesRemainReachableAcrossModes();
     void footerViewControlsStayStationaryAcrossModes();
     void footerLiveOptionJoinsEditingCapsule();
+    void sourceSpellingRefreshDoesNotAdvanceDocumentRevision();
     void spellCheckServiceFindsWordsAndHonoursIgnoreAndSetting();
     void checkSpellingWhileTypingCommandTogglesTheSetting();
     void spellCheckServiceReportsGrammarIssuesWithCategory();

@@ -126,7 +126,7 @@
                                "Theme click did not retain exactly one authoritative checkmark")) return;
                     if (!check(themeReady("web"), "Folder theme Web preview did not settle")) return;
                     const QString expected = id == firstId ? "rgb(12, 34, 56)" : "rgb(65, 43, 21)";
-                    check(publishingDomResult(web, "getComputedStyle(document.querySelector('#write h1')).color").toString() == expected,
+                    check(publishingDomResult(web, "(() => { const heading = document.querySelector('#write h1'); return heading ? getComputedStyle(heading).color : ''; })()").toString() == expected,
                           "Theme checkmark changed without applying selected CSS");
                 }
                 if (!chooseItem("previewPublishingTheme_" + badId)) return;
@@ -144,7 +144,7 @@
                 if (!check(backend.selectPublishingTheme(firstId), "Cannot restore folder fixture theme")) return;
                 if (!check(writeTheme(firstId, "#write h1{color:rgb(76,54,32)!important}"), "Cannot atomically edit a folder theme")) return;
                 check(waitUntil([&] {
-                    return publishingDomResult(web, "getComputedStyle(document.querySelector('#write h1')).color").toString() == "rgb(76, 54, 32)";
+                    return publishingDomResult(web, "(() => { const heading = document.querySelector('#write h1'); return heading ? getComputedStyle(heading).color : ''; })()").toString() == "rgb(76, 54, 32)";
                 }, 10000), "Edited folder CSS did not refresh the actual preview automatically");
                 if (!chooseItem("previewThemesReload")) return;
                 check(backend.publishingThemeId() == firstId && soleSelection("preview") && soleSelection("native"),

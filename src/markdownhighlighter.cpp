@@ -523,7 +523,12 @@ void MarkdownHighlighter::refreshSpelling() {
     m_grammarCache.clear();
     m_harperCache.clear();
     m_pendingProse.clear();
-    rehighlight();
+    // Engine readiness and settings can change while the writer is reading or
+    // switching views. Restyle only this layer through the layout: Qt's full
+    // rehighlight() increments QTextDocument::revision even when text is equal.
+    if (!document()) return;
+    for (QTextBlock block = document()->firstBlock(); block.isValid(); block = block.next())
+        restyleSpelling(block);
 }
 
 // Blank what is syntax rather than prose, keeping every UTF-16 offset.

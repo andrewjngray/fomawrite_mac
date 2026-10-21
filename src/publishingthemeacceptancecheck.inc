@@ -1,4 +1,6 @@
-    // Cycle124: synthetic content only; never loads or captures private writing.
+    // Synthetic content only; never loads or captures private writing.
+    // Claude Like became sans-serif on near-white on 11 October 2026. Check
+    // that approved appearance; the earlier cream/Georgia theme is archived.
     {
         const auto themeCheck = [&](const QString &name, const std::function<void()> &exercise) {
             const qsizetype before = failures.size();
@@ -100,11 +102,11 @@
                 })())JS")).toMap();
                 report.insert("publishingThemeDom", QJsonObject::fromVariantMap(dom));
                 const QVariantList rows = dom.value("rows").toList();
-                check(dom.value("title").toString() == "Synthetic NPS review" && dom.value("background").toString() == "rgb(250, 249, 245)"
-                    && dom.value("family").toString().startsWith("Georgia") && dom.value("headingFamily") == dom.value("family"),
-                    "Claude Like Web preview lost its cream surface or serif typography");
+                check(dom.value("title").toString() == "Synthetic NPS review" && dom.value("background").toString() == "rgb(253, 253, 252)"
+                    && dom.value("family").toString().contains("sans-serif") && dom.value("headingFamily") == dom.value("family"),
+                    "Claude Like Web preview lost its near-white surface or sans-serif typography");
                 check(dom.value("quote").toString().startsWith("Synthetic observation:")
-                    && dom.value("quoteBackground").toString() == "rgb(243, 237, 229)" && dom.value("quoteBorder").toString() == "2px"
+                    && dom.value("quoteBackground").toString() == "rgba(0, 0, 0, 0)" && dom.value("quoteBorder").toString() == "3px"
                     && rows.size() == 3 && rows.first().toList() == QVariantList{QString("Segment"), QString("Responses"), QString("NPS")}
                     && rows.at(1).toList() == QVariantList{QString("Example North"), QString("120"), QString("+38")}
                     && dom.value("tableCollapse").toString() == "collapse" && dom.value("tableBorder").toString() == "1px"
@@ -128,8 +130,8 @@
                                             qBound(0, qRound((area.top() + 5) * sy), frame.height() - 1));
                         const QColor color = frame.pixelColor(sample);
                         paintedColors.append(color.name());
-                        painted = painted && qAbs(color.red() - 250) <= 2 && qAbs(color.green() - 249) <= 2
-                            && qAbs(color.blue() - 245) <= 2;
+                        painted = painted && qAbs(color.red() - 253) <= 2 && qAbs(color.green() - 253) <= 2
+                            && qAbs(color.blue() - 252) <= 2;
                     }
                 }
                 report.insert("publishingThemeWebPaint", QJsonObject{{"passed", painted}, {"colors", paintedColors},
@@ -154,24 +156,24 @@
                 const double leftMargin = QSettings().value("output/pageMarginLeft", 18).toDouble() * 72.0 / 25.4;
                 const double topMargin = QSettings().value("output/pageMarginTop", 18).toDouble() * 72.0 / 25.4;
                 const QImage raster = pdf.render(0, QSize(qRound(size.width()), qRound(size.height())));
-                int creamSamples = 0;
+                int backgroundSamples = 0;
                 if (!raster.isNull()) {
                     for (int y = int(topMargin) + 10; y < raster.height() - int(topMargin) - 10; y += 20)
                         for (int x = int(leftMargin) + 10; x < raster.width() - int(leftMargin) - 10; x += 20) {
                             const QColor color = raster.pixelColor(x, y);
-                            if (qAbs(color.red() - 250) <= 1 && qAbs(color.green() - 249) <= 1 && qAbs(color.blue() - 245) <= 1) ++creamSamples;
+                            if (qAbs(color.red() - 253) <= 1 && qAbs(color.green() - 253) <= 1 && qAbs(color.blue() - 252) <= 1) ++backgroundSamples;
                         }
                 }
                 report.insert("publishingThemePdf", QJsonObject{{"pageCount", pdf.pageCount()}, {"widthPoints", size.width()},
                     {"heightPoints", size.height()}, {"creator", pdf.metaData(QPdfDocument::MetaDataField::Creator).toString()},
                     {"headingBounds", rectJson(heading)}, {"leftMarginPoints", leftMargin}, {"topMarginPoints", topMargin},
-                    {"creamSamples", creamSamples}, {"sha256", sha256(bytes)}});
+                    {"backgroundSamples", backgroundSamples}, {"sha256", sha256(bytes)}});
                 check(qAbs(size.width() - 595) < 2 && qAbs(size.height() - 842) < 2 && !heading.isEmpty()
                     && heading.left() >= leftMargin - 1 && heading.left() <= leftMargin + 12 && heading.top() >= topMargin - 1,
                     "Browser PDF did not retain A4 portrait and the configured content margins");
-                check(creamSamples > 20 && bytes.contains("Georgia") && text.contains("Example North")
+                check(backgroundSamples > 20 && text.contains("Example North")
                     && pdf.getAllText(1).text().contains("Synthetic follow-up"),
-                    "Browser PDF lost the selected cream/serif theme or semantic document content");
+                    "Browser PDF lost the selected near-white theme or semantic document content");
                 check(pdfScroll && pdfScroll->isVisible() && web && !web->isVisible() && renderBarrier(window),
                       "The actual themed PDF pages were not visible in the publishing pane");
                 capture("theme-pdf");
