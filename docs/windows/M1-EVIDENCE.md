@@ -1,6 +1,6 @@
 # Windows M1 implementation evidence
 
-22 October 2026. Work in progress; native ARM64 packaging and deployed-checker evidence pass at `3095601`, but Windows Qt regression qualification remains pending. M1 is not complete.
+22 October 2026. **M1 (executable and CI) is complete** for code commit `b45cb345a9c4ff880f1f132dba936d2bb4dce9e0`. Both native Windows CI jobs, shared Mac/editor CI and both Parallels guest checks passed. This is a bounded M1 result; desktop parity, normal startup/restore, installer and distribution qualification remain in later milestones. Earlier failures and fixes below are historical evidence.
 
 ## Changes
 
@@ -16,7 +16,85 @@
 - Filesystem regressions use native temporary paths and Windows delete-sharing
   locks. Symlink fixtures are separate tests with a narrow privilege skip.
 
-## Evidence so far
+## M1 exit evidence: `b45cb34`
+
+Tested code commit: **`b45cb345a9c4ff880f1f132dba936d2bb4dce9e0`**. Later
+changes to these evidence documents do not rebuild or reidentify the artifacts.
+This is the bounded M1 executable/CI checkpoint, not installer, beta or public
+release qualification.
+
+| Gate | Result for this exact code candidate |
+| --- | --- |
+| Native ARM64 Windows CI | Appearance 3 passed, 0 failed, 0 skipped (27 ms); full offscreen Qt 269 passed, 0 failed, 39 skipped (454.751 seconds); deployed checker 124 scenarios, 0 failures, 0 QML warnings and strict verification passed. |
+| Native x64 Windows CI | Appearance 3 passed, 0 failed, 0 skipped (40 ms); full offscreen Qt 269 passed, 0 failed, 39 skipped (445.915 seconds); deployed checker 124 scenarios, 0 failures, 0 QML warnings and strict verification passed. |
+| Native ARM64 in Parallels | 124 scenarios, 0 failures, 0 QML warnings; fresh exit 0 and copied-report identity verification passed. |
+| x64 emulation in Parallels ARM64 | 124 scenarios, 0 failures, 0 QML warnings; fresh exit 0 and copied-report identity verification passed. |
+| Shared Mac CI | 295 passed, 0 failed, 13 expected skips; Qt 6.11.3 ARM64 on macOS 15.7.9, 596.040 seconds. |
+| Shared editor CI | 321 passed, 0 failed, 0 skipped; typecheck, asset build and committed-bundle checks passed. |
+| Local focused regression | 10 passed, 0 failed, 0 skipped; eight affected slots plus setup/cleanup, 41.534 seconds. |
+| Isolated local Mac deployed app | 124 scenarios, 0 failures, 0 QML warnings; Cocoa, Qt 6.11.2. |
+
+Runs: [native Windows 39681549835](https://github.com/andrewjngray/fomawrite_mac/actions/runs/39681549835)
+and [shared Mac/editor 39681549825](https://github.com/andrewjngray/fomawrite_mac/actions/runs/39681549825).
+Both native packages use Qt **6.11.3**, MSVC 2022 v143 **14.44.35207**, Windows
+SDK **10.0.26100.0** and app-local CRT **14.44.35211.0**. ARM64 was built on
+Windows 11 build 26200; x64 on Windows Server 2022 build 20348. Their manifests
+contain 1,606/1,609 hashed files respectively. Native PE and runtime-version
+checks passed; no browser sandbox override was used. Actual native ARM64 MSVC
+`cl /bigobj` compilation succeeded after the earlier C1128 failure; no test or
+optimization setting was removed to pass it.
+
+The guest is Windows 11 Enterprise ARM64, OS **10.0.26200.0**, desktop session 1;
+PowerShell **5.1.26100.9711**. Separate fresh NTFS package directories were used
+without a Qt SDK or developer PATH. The launch receipt, manifest, executable path,
+report hash and copied report were verified independently. ARM64 is native;
+x64 is explicitly emulation on ARM64. Source and Live screenshots show the correct
+fixture; all eight required Web/PDF current-document identity and paint observations
+pass in both guest reports.
+
+| Identity | ARM64 | x64 |
+| --- | --- | --- |
+| ZIP SHA-256 | `f2ed158fcebcc245c12943f660ece9cab084de3ab95cc120b28f2040065e3c52` | `aa228bdf1e658e610fdf046d06e5e713a33dab25e032211163dcf48a52cbfbf6` |
+| Executable SHA-256 | `6356bcd7c749b702f5ca4c57ef5c3e4f03d4464c252388130ae799dd492a73c2` | `9597f91fa810a929af571a3e8286677c08768d1ee853fb40ce8b0e5e847222c1` |
+| Manifest SHA-256 | `a04e34d336fd6fe972a8fd49b8bbd1b2ed6fc908d926e9d9da2bc174ddebb1b3` | `1e319079afdcd041b1ea60e51b5b51b98fc71dc6d9630bdead9398f78ac9e217` |
+
+Guest roots are under `C:\Users\andrewgray\AppData\Local\FomawritePortQA\`:
+`b45cb34-arm64-f16a95acca78` and `b45cb34-x64-6281f8809886`, each with the
+executable at `Fomawrite\Fomawrite.exe`. Local evidence is under the Windows task
+workspace's `work/ci-b45cb34/arm64-package/b45cb34-arm64-f16a95acca78/guest-evidence`
+and `work/ci-b45cb34/x64-package/b45cb34-x64-6281f8809886/guest-evidence`.
+Each contains `report.json`, `guest-run.json`, `guest-context.json`,
+`package-verification.json` and screenshots; adjacent `guest-run-location.json`
+records the ZIP hash and exact paths. Shared logs are
+`/tmp/fomawrite-shared-mac-b45cb34.log` and
+`/tmp/fomawrite-shared-editor-b45cb34.log`; local Mac checker evidence is
+`work/mac-acceptance-m1-final/report.json`. Native CI evidence is in
+`work/ci-b45cb34/arm64-evidence` and `work/ci-b45cb34/x64-evidence`; complete job
+logs are `/tmp/fomawrite-arm64-b45cb34.log` and
+`/tmp/fomawrite-x64-b45cb34.log`. Both CI executable and manifest hashes match
+the exact packages independently verified in the guest.
+
+### Windows skip scope
+
+Each native Windows full suite's 39 skips divide into **10** disabled updater/override
+fixtures (W12), **28** legacy macOS native-checker fixtures and **one** native Mac
+menu topology fixture. The updater skips retain portable bundle/path/URL validation;
+Windows update activation remains unavailable. Harper capability, bridge and real-page
+Source/Live/Review coverage passed in both current native suites. Some of the 28
+legacy fixtures also contain shared Review navigation/resize/render assertions;
+their omission is a coverage limitation, not proof that Windows Review is unavailable
+or that full W11/UI parity is qualified. The actual Windows menu regressions run.
+Neither native run had a symlink-privilege skip.
+Zero QML warnings above refers to deployed checkers; the offscreen Qt logs contain
+warning messages and are not claimed warning-free.
+
+The shared Mac suite's 13 skips are 12 unavailable runner-native grammar checks
+and one Windows-only appearance test. Synthetic checker input is confined to the
+isolated app; native physical input is rejected. Normal startup/restore, broader
+filesystem/shared-folder tests, physical input, DPI, installer and licensing gates
+remain in their later milestones.
+
+## Historical development evidence
 
 - Shared Mac application built successfully with local Qt 6.11.2 from this checkout.
 - Windows menu regression failed with an actual open Format popup before the
@@ -47,7 +125,7 @@
   variable collided with a Windows macro; renamed to `farBlock`. ARM64 deployment
   failed because the runner supplied a newer runtime directory to the v143
   compiler environment. Reviewed runtime discovery/selection now validates
-  actual DLL versions, native architecture and hashes; native rerun remains needed.
+  actual DLL versions, native architecture and hashes; a native rerun was still needed at that checkpoint.
 - Third native CI at `6eeca40` again compiled both apps and packaged x64. ARM64
   runtime inventory showed native v143 DLLs at version `14.44.35211.0`, plus an
   x64 `vcruntime140_1.dll` inside the ARM64 redistributable folder. The strict
@@ -140,7 +218,7 @@
   Qt's OS-profile lookup; the native x64 fixture still failed and needs correction.
   Both local failures and adjacent appearance tests then passed:
   **6 passed, 0 failed, 0 skipped**. The other affected file, footer, header, menu,
-  search and authorship checks passed in the integrated run. Complete native Windows Qt qualification remains pending; deployed-checker
+  search and authorship checks passed in the integrated run. Complete native Windows Qt qualification remained pending at that checkpoint; deployed-checker
   confirmation at `3095601` is recorded below.
 
 - Rebuilt the isolated Mac app after all integrated corrections. Its complete
@@ -148,7 +226,7 @@
   QML warnings. Source selection and footer labels were also checked in a fresh
   rendered frame. This is shared-code regression evidence; the next native
   ARM64/x64 packages received their own CI and guest checker verification at
-  `3095601`, recorded below; complete native Qt qualification remains pending.
+  `3095601`, recorded below; complete native Qt qualification was still pending then.
 
 ## Native ARM64 candidate `3095601`
 
@@ -189,7 +267,7 @@ object file format limit: compile with /bigobj,” while compiling the monolithi
 `tst_fomawrite.cpp`. Neither the native Windows appearance gate nor the full Qt
 suite executed. A bounded `tests/tests.pro` correction now adds `/bigobj` only
 for Windows MSVC, including the `win32-arm64-msvc` kit; no optimization, assertion
-or test cases changed. That correction awaits native rerun. Native x64 appearance passed (3/0/0 including setup/cleanup), and deployed CI
+or test cases changed. That correction awaited native rerun at this checkpoint; its successful native compilation is recorded above. Native x64 appearance passed (3/0/0 including setup/cleanup), and deployed CI
 acceptance passed 124 scenarios. Its full offscreen Qt suite reported **261 passed,
 8 failed, 39 skipped** in 517.536 seconds; bounded corrections and focused evidence are recorded below. Shared Mac/editor results are green, recorded below.
 These deployed-checker passes do not qualify normal startup/restore or complete M1.
@@ -210,7 +288,7 @@ These deployed-checker passes do not qualify normal startup/restore or complete 
   height and the Omarchy home fixture; bounded corrections and focused evidence are recorded below. Guest x64 emulation is not labelled native ARM64.
 - Mac qmake generation accepted the `/bigobj` correction and confirmed the flag
   is absent from Mac compiler flags. The native ARM64 before/after compile result
-  is still required; no tests or optimisation settings were removed.
+  was still required then; it is recorded in the final candidate above. No tests or optimisation settings were removed.
 
 - [Shared CI at `3095601`](https://github.com/andrewjngray/fomawrite_mac/actions/runs/39678109413)
   completed green. Mac Qt 6.11.3 on macOS 15.7.9 ARM64: **295 passed, 0 failed,
@@ -218,7 +296,7 @@ These deployed-checker passes do not qualify normal startup/restore or complete 
   grammar checks and the Windows-only appearance case. Editor: **321 passed,
   0 failed, 0 skipped**; typecheck, asset build and committed-bundle checks passed.
 
-## Remaining corrections after `3095601`
+## Corrections between `3095601` and `b45cb34`
 
 The footer defect reproduced locally with the bundled mono font at size 13 in a
 321px pane: the appearance selector was hidden (2 passed, 1 failed including
@@ -242,10 +320,10 @@ Live) passed locally: **10 passed, 0 failed, 0 skipped** including setup/cleanup
 41.534 seconds. Red and green logs are
 `/tmp/fomawrite-footer-font-pressure-red.log` and
 `/tmp/fomawrite-footer-font-pressure-green.log`. The rebuilt Mac app succeeded;
-its complete 124-scenario checker is still running. The Windows MSVC `/bigobj`
-correction and all remaining corrections await native CI. This focused result
-does not replace either Windows Qt gate, full shared regression CI or deployed
-checks on freshly built packages. M1 remains incomplete.
+its complete isolated Cocoa checker subsequently passed 124 scenarios with no
+failures or QML warnings. The Windows MSVC `/bigobj` correction and remaining
+corrections progressed to the final candidate above. The focused result did not
+replace either native Windows Qt gate, full shared CI or fresh deployed checks.
 
 ## Windows M2 menu limits
 
@@ -267,23 +345,20 @@ Share and Speech are intentionally absent as platform capabilities.
 ## Independent review and open qualification
 
 Independent reviews covered menu focus/clipboard parity, preview-check isolation,
-file I/O and packaging. Findings included the menu focus defect (fixed and
-regressed), a folder containment guard using the Windows separator against Qt's
-slash-normalized paths (native red observed; minimal fix awaiting native green),
-autosave's replacement-blocking read handle and the Windows preserved-mtime CSS
-watcher case (both fixed in source, awaiting native rerun), and acceptance
-verification that needed exact distinct Web/PDF scenarios (fixed with adversarial
-tests). Latest source and fixture corrections received independent review.
+file I/O and packaging. Findings included the menu focus defect, Qt-normalized
+folder containment, autosave's replacement-blocking read handle, preserved-mtime
+CSS watching and distinct current-document Web/PDF verification. Their bounded
+corrections and regressions passed the final native suites/checkers above. Latest
+source and fixture corrections received independent review.
 
-Native ARM64 deployed rendering and the isolated checker now have the bounded
-CI and guest proof above. Normal startup/restore, broader NTFS and UNC behavior,
-installer execution/upgrade/uninstall, DPI, and physical input remain unqualified.
-ARM64 still requires the native Windows appearance gate and complete Qt suite
-after the C1128 compiler-flag correction. The x64 appearance gate passed, but its
-complete offscreen Qt suite still requires a green run. Additional W09/W10 follow-up includes Windows filename/alternate
-stream rejection, path case identity, and hostname-bearing file URLs. The source
-still inherits Mac `0.3.0-dev49`; an internal Windows artifact is identified by
-architecture, exact source commit and manifest, not by Mac release readiness.
+Native ARM64 and x64 compilation, native appearance, full portable Qt suites and
+isolated deployed rendering now satisfy the bounded M1 exit. Normal startup/restore,
+broader NTFS and UNC behaviour, installer execution/upgrade/uninstall, DPI and
+physical input remain unqualified. Additional W09/W10 follow-up includes Windows
+filename/alternate-stream rejection, path case identity and hostname-bearing file
+URLs. The source still inherits Mac `0.3.0-dev49`; an internal Windows artifact
+is identified by architecture, exact code commit and manifest. This checkpoint
+does not qualify an internal beta, installer or public distribution.
 
 Raw logs/screenshots remain local or in CI artifacts. Root `STATUS.md` and the
 primary Mac checkout/installed bundles are unchanged.
