@@ -15,7 +15,7 @@ Exercise the actual macOS app, fix observed failures, enforce the editor checks 
 | A theme reload probe dereferenced an absent heading during navigation. | Its DOM read now tolerates a temporarily missing heading and keeps waiting for the expected color. |
 | The native suite switched into Live but did not type there. | Two required groups send Qt key events into the real WebEngine editor and check its canonical mirror, Source/Live switching, exact UTF-8 save/reopen, and Undo/Redo. They verify actual page caret and focus before input. |
 | Bundle checks covered QML but not the embedded editor bundle or built-in themes. | Added hashes for the editor HTML/CSS/JS and both built-in theme stylesheets; the wrapper requires them. |
-| CI omitted the editor's separate tests and build. | An independent pinned-Node job runs lockfile install, 321 editor tests, typecheck, build, and committed-asset freshness validation. |
+| CI omitted the editor's separate tests and build. | An independent pinned-Node job runs lockfile install, pinned Harper download, 321 editor tests, typecheck, build, and committed-asset freshness validation. |
 | Status notes listed shipped features and rejected experiments as outstanding. | Reconciled the status, roadmap introduction, Live friction list, spelling decision, and CI architecture description. |
 
 ## Regression evidence
@@ -34,6 +34,8 @@ A broader Source/Live transition test passed the old code because the delayed ch
 - `bin/check-publishing-startup`: **cold and restored passed**, with two document windows, matching preview contents, visible PDF page paint and normal quit. This harness compiles a separate instrumented binary from the same source and uses disposable persisted settings; it is distinct from the three packaged-app checks.
 - Visually reviewed the native Web theme and PDF document-B captures. No wrong-document or blank-pane regression reproduced in these runs. Transient Qt timer/compositor diagnostics occurred without failed paint/content checks; this is not a claim of warning-free stderr.
 - Initial baseline: 298 Qt tests and 321 editor tests passed, but native acceptance failed 124 assertions (120 consequences of one revision change, plus 4 stale theme assertions). That baseline was not accepted as a pass.
+
+The first green CI run exposed one avoidable skip: the editor job lacked the pinned Harper WASM fixture. The job now downloads and requires that fixture before testing. The GitHub macOS runner skips 12 native grammar-service tests because its OS has no grammar pass for the test language; all 12 passed locally.
 
 Logs, raw reports and captures are retained locally in `research/cycle-153/evidence/` (ignored by Git). CI results are tied to the pushed commit in [GitHub Actions](https://github.com/andrewjngray/fomawrite_mac/actions/workflows/ci.yml); the new editor job must pass alongside the macOS job before handoff.
 

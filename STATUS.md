@@ -11,7 +11,7 @@ Updated 22 October 2026. This is the authoritative current-build record. Directi
 | **Native app acceptance** | Dev, distribution and installed build 153 all pass: 124 footer states, 5 daily-writing, 5 zoom, 7 editing, 3 pane-chrome, 5 editing-layout and 12 publishing-theme groups. Tests check actual Web/PDF pixels and current document identity. [Bundle identities](research/cycle-153/verified-builds.json). |
 | **Startup** | **Cold and restored passed**, two document windows, correct PDF content and visible page paint, normal quit. Separate instrumented startup binary from the same source. |
 | **Synchronized bundles** | `/Applications/Fomawrite.app`, `dist/Fomawrite.app`, `dist/Fomawrite Dev.app`. All build 153, with verified signatures and matching embedded resources. Installed and distribution release executables are byte-identical; Dev has its own signed identity. |
-| **CI** | [Workflow](.github/workflows/ci.yml): macOS Qt 6.11.3 build/test; independent Ubuntu Node 22.16.0 editor lockfile install, tests, typecheck, build, and committed-asset freshness check. [Latest runs](https://github.com/andrewjngray/fomawrite_mac/actions/workflows/ci.yml). |
+| **CI** | [Workflow](.github/workflows/ci.yml): macOS Qt 6.11.3 build/test; independent Ubuntu Node 22.16.0 editor lockfile install, pinned Harper download, tests, typecheck, build, and committed-asset freshness check. [Latest runs](https://github.com/andrewjngray/fomawrite_mac/actions/workflows/ci.yml). |
 | **Review baseline** | [INDEPENDENT_REVIEW.md](INDEPENDENT_REVIEW.md), 6 October. Cycles 131–134 closed the listed correctness findings and established the current Live-editor direction. |
 
 ## What is shipped
