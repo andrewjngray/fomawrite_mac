@@ -17,8 +17,10 @@
 #include <QVersionNumber>
 #include <algorithm>
 
+#ifndef Q_OS_WIN
 #include <unistd.h>
 #include <cstdio>
+#endif
 
 #include "harperscheme.h"
 
@@ -52,6 +54,8 @@ bool writeFile(const QString &path, const QByteArray &bytes) {
 
 HarperUpdater::HarperUpdater(QObject *parent) : QObject(parent), m_registryUrl(QString::fromLatin1(DefaultRegistry)) {
     s_instances.append(this);
+    if (!updatesSupported())
+        m_status = QStringLiteral("Harper updates are unavailable on Windows; the bundled checker is used.");
 }
 
 HarperUpdater::~HarperUpdater() {
@@ -63,6 +67,23 @@ HarperUpdater::~HarperUpdater() {
 QNetworkAccessManager *HarperUpdater::network() {
     if (!m_network) m_network = new QNetworkAccessManager(this);
     return m_network;
+}
+
+bool HarperUpdater::updatesSupported() const {
+#ifdef Q_OS_WIN
+    return false;
+#else
+    return true;
+#endif
+}
+
+bool HarperUpdater::rejectUnsupported() {
+    if (updatesSupported()) return false;
+    m_error = QStringLiteral("Harper updates are unavailable on Windows; the bundled checker is used.");
+    setStatus(m_error);
+    emit failed(m_error);
+    emit notice(m_error);
+    return true;
 }
 
 QString HarperUpdater::root() const { return HarperSchemeHandler::harperRoot(); }
@@ -79,8 +100,9 @@ void HarperUpdater::setLastCheck(const QDateTime &when) {
     emit changed();
 }
 
-bool HarperUpdater::autoCheck() const { return QSettings().value(QStringLiteral("harper/autoCheck"), true).toBool(); }
+bool HarperUpdater::autoCheck() const { return updatesSupported() && QSettings().value(QStringLiteral("harper/autoCheck"), true).toBool(); }
 void HarperUpdater::setAutoCheck(bool on) {
+    if (!updatesSupported()) return;
     if (on == autoCheck()) return;
     QSettings().setValue(QStringLiteral("harper/autoCheck"), on);
     emit autoCheckChanged();
@@ -181,18 +203,21 @@ bool HarperUpdater::tarballAllowed(const QUrl &url, QString *why) const {
 // ---------------------------------------------------------------- checking
 
 void HarperUpdater::checkNow() {
+    if (rejectUnsupported()) return;
     if (m_checking || m_installing) return;
     m_mode = Mode::Plain;
     startCheck();
 }
 
 void HarperUpdater::checkAndInstall() {
+    if (rejectUnsupported()) return;
     if (m_checking || m_installing) return;
     m_mode = Mode::Manual;
     startCheck();
 }
 
 void HarperUpdater::runScheduledCheck() {
+    if (!updatesSupported()) return;
     if (!autoCheck() || m_checking || m_installing) return;
     const QDateTime last = lastCheck(), now = QDateTime::currentDateTime();
     // A recorded time in the future (a clock set wrong) must not silence the check until then.
@@ -313,6 +338,7 @@ void HarperUpdater::finishCheck(bool ok, const QString &message, bool) {
 // ---------------------------------------------------------------- installing
 
 void HarperUpdater::install() {
+    if (rejectUnsupported()) return;
     if (m_checking || m_installing) return;
     // One install at a time across windows: each window has its own updater.
     for (HarperUpdater *other : std::as_const(s_instances)) if (other != this && other->m_installing) { finishInstall(false, QStringLiteral("another window is installing an update"), false); return; }
@@ -482,6 +508,10 @@ void HarperUpdater::buildAndActivate() {
 // Points harper/current at harper/<version>: a symlink made beside it and renamed over it, so a reader sees either the
 // old target or the new one, never none.
 void HarperUpdater::activate(const QString &version) {
+#ifdef Q_OS_WIN
+    Q_UNUSED(version);
+    rejectUnsupported();
+#else
     const QString base = root();
     const QString current = base + QStringLiteral("/current");
     const QString previousTarget = HarperSchemeHandler::overrideVersion();
@@ -501,6 +531,7 @@ void HarperUpdater::activate(const QString &version) {
     }
     prune(version, previousTarget);
     finishInstall(true, version, false);
+#endif
 }
 
 // Version folders add up (16 MB each): keep the one in use and the one before it.
@@ -538,6 +569,7 @@ void HarperUpdater::finishInstall(bool ok, const QString &message, bool network)
 }
 
 void HarperUpdater::rollback() {
+    if (rejectUnsupported()) return;
     if (m_installing || root().isEmpty()) return;
     const QString current = root() + QStringLiteral("/current");
     const QString was = installedVersion();

@@ -46,6 +46,11 @@ QString HarperSchemeHandler::harperRoot() {
 }
 
 QString HarperSchemeHandler::overrideDirectory() {
+#ifdef Q_OS_WIN
+    // W12 has not qualified Windows extraction/activation/rollback. Ignore even
+    // an existing current directory so this build always serves the pinned bundle.
+    return {};
+#else
     const QString root = harperRoot();
     if (root.isEmpty()) return {};
     const QDir dir(root + QStringLiteral("/current"));
@@ -58,6 +63,7 @@ QString HarperSchemeHandler::overrideDirectory() {
     const QString bundled = bundledVersion();
     if (!bundled.isEmpty() && QVersionNumber::compare(QVersionNumber::fromString(version), QVersionNumber::fromString(bundled)) <= 0) return {};
     return dir.absolutePath();
+#endif
 }
 
 QString HarperSchemeHandler::overrideVersion() {

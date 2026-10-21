@@ -7,7 +7,7 @@
 // a stretch are misspelled, offers suggestions, and remembers learned and
 // ignored words. On macOS it is the system checker, so the dictionary, the
 // language list and the learned words are the ones every other Mac app uses.
-// Elsewhere it is unavailable and reports nothing.
+// On other platforms Harper is the available engine once its page is ready.
 //
 // Offsets are UTF-16 code units into the string given, the same units QString
 // and the page use, so a range can be mapped back without conversion.
@@ -24,13 +24,15 @@ class HarperEngine;
 
 class SpellCheck : public QObject {
     Q_OBJECT
-    Q_PROPERTY(bool available READ available CONSTANT)
+    Q_PROPERTY(bool available READ available NOTIFY availableChanged)
+    Q_PROPERTY(bool nativeEngineAvailable READ nativeEngineAvailable CONSTANT)
     Q_PROPERTY(bool enabled READ enabled WRITE setEnabled NOTIFY enabledChanged)
     Q_PROPERTY(bool grammarEnabled READ grammarEnabled WRITE setGrammarEnabled NOTIFY grammarEnabledChanged)
     Q_PROPERTY(QString language READ language WRITE setLanguage NOTIFY languageChanged)
     // The writing engine (Cycle 145). "harper" runs Harper inside the editor
     // page (grammar and style as well as spelling, in a dialect); "macos" is
-    // the system checker, which is also the fallback while Harper is not ready.
+    // the system checker, which is the macOS fallback while Harper is not ready.
+    // effectiveEngine is "none" on other platforms until Harper is ready.
     Q_PROPERTY(QString engine READ engine WRITE setEngine NOTIFY engineChanged)
     Q_PROPERTY(QString effectiveEngine READ effectiveEngine NOTIFY engineChanged)
     Q_PROPERTY(QString dialect READ dialect WRITE setDialect NOTIFY dialectChanged)
@@ -55,6 +57,7 @@ public:
     };
 
     bool available() const;
+    bool nativeEngineAvailable() const;
     bool enabled() const { return m_enabled; }
     void setEnabled(bool enabled);
     // Grammar as you type (macOS grammar pass: doubled words, capitalisation,
@@ -68,7 +71,7 @@ public:
 
     // The writing engine. Harper is attached once the editor bridge exists (the
     // engine lives in the Live page); until it reports ready, and whenever the
-    // setting says macOS, the system checker answers.
+    // setting says macOS, the system checker answers where it is available.
     void setHarper(HarperEngine *harper);
     HarperEngine *harper() const { return m_harper; }
     QString engine() const { return m_engine; }
@@ -121,6 +124,7 @@ public:
     Q_INVOKABLE bool hasLearnedWord(const QString &word) const;
 
 signals:
+    void availableChanged();
     void enabledChanged();
     void grammarEnabledChanged();
     void languageChanged();

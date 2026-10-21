@@ -14,7 +14,7 @@ SpellCheck::SpellCheck(QObject *parent) : QObject(parent) {
     m_language = settings.value(QStringLiteral("writing/spellingLanguage")).toString().left(32);
     m_grammarEnabled = settings.value(QStringLiteral("writing/checkGrammarWhileTyping"), true).toBool();
     const QString engine = settings.value(QStringLiteral("writing/engine"), QStringLiteral("harper")).toString();
-    m_engine = engine == QLatin1String("macos") ? engine : QStringLiteral("harper");
+    m_engine = engine == QLatin1String("macos") && nativeEngineAvailable() ? engine : QStringLiteral("harper");
     const QString dialect = settings.value(QStringLiteral("writing/dialect"), QStringLiteral("Australian")).toString();
     m_dialect = dialects().contains(dialect) ? dialect : QStringLiteral("Australian");
     m_styleEnabled = settings.value(QStringLiteral("writing/checkStyleWhileTyping"), false).toBool();
@@ -27,6 +27,7 @@ QStringList SpellCheck::dialects() const {
 void SpellCheck::setHarper(HarperEngine *harper) {
     if (m_harper == harper) return;
     const bool wasHarper = usesHarper();
+    const bool wasAvailable = available();
     if (m_harper) disconnect(m_harper, nullptr, this, nullptr);
     m_harper = harper;
     if (harper) {
@@ -34,11 +35,13 @@ void SpellCheck::setHarper(HarperEngine *harper) {
         harper->importWords(learnedWords());
         connect(harper, &HarperEngine::readyChanged, this, [this] {
             emit harperReadyChanged();
-            if (m_engine == QLatin1String("harper")) emit engineChanged(); // effectiveEngine moved between harper and macos
+            if (!nativeEngineAvailable()) emit availableChanged();
+            if (m_engine == QLatin1String("harper")) emit engineChanged(); // readiness changes the effective engine
         });
         connect(harper, &HarperEngine::resultsReady, this, &SpellCheck::resultsReady);
     }
     emit harperReadyChanged();
+    if (wasAvailable != available()) emit availableChanged();
     if (wasHarper != usesHarper()) emit engineChanged();
 }
 
@@ -47,11 +50,12 @@ QString SpellCheck::harperLoadError() const { return m_harper ? m_harper->loadEr
 QString SpellCheck::harperVersion() const { return m_harper && m_harper->ready() ? m_harper->version() : QString(); }
 
 QString SpellCheck::effectiveEngine() const {
-    return m_engine == QLatin1String("harper") && harperReady() ? QStringLiteral("harper") : QStringLiteral("macos");
+    if (m_engine == QLatin1String("harper") && harperReady()) return QStringLiteral("harper");
+    return nativeEngineAvailable() ? QStringLiteral("macos") : QStringLiteral("none");
 }
 
 void SpellCheck::setEngine(const QString &engine) {
-    const QString chosen = engine == QLatin1String("macos") ? engine : engine == QLatin1String("harper") ? engine : m_engine;
+    const QString chosen = engine == QLatin1String("macos") && nativeEngineAvailable() ? engine : engine == QLatin1String("harper") ? engine : m_engine;
     if (m_engine == chosen) return;
     m_engine = chosen;
     m_suggestionCache.clear();
@@ -86,6 +90,10 @@ void SpellCheck::setGrammarEnabled(bool enabled) {
 }
 
 bool SpellCheck::available() const {
+    return nativeEngineAvailable() || usesHarper();
+}
+
+bool SpellCheck::nativeEngineAvailable() const {
 #ifdef Q_OS_MACOS
     return true;
 #else

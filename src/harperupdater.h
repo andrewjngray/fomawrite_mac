@@ -43,6 +43,8 @@ class QCryptographicHash;
 
 class HarperUpdater : public QObject {
     Q_OBJECT
+    // Windows uses only the pinned bundle until W12 qualifies native activation.
+    Q_PROPERTY(bool updatesSupported READ updatesSupported CONSTANT)
     Q_PROPERTY(QString bundledVersion READ bundledVersion NOTIFY changed)
     Q_PROPERTY(QString installedVersion READ installedVersion NOTIFY changed)
     Q_PROPERTY(QString servedVersion READ servedVersion NOTIFY changed)
@@ -68,6 +70,7 @@ public:
     explicit HarperUpdater(QObject *parent = nullptr);
     ~HarperUpdater() override;
 
+    bool updatesSupported() const;
     QString bundledVersion() const;
     QString installedVersion() const;   // the override's, or empty
     QString servedVersion() const;
@@ -131,6 +134,7 @@ signals:
 
 private:
     enum class Mode { Idle, Plain, Manual, Scheduled };
+    bool rejectUnsupported();
     void startCheck();
     void drain(QNetworkReply *reply, bool toFile);
     void startRequest(const QUrl &url, qint64 limit, int timeoutMs, bool toFile);

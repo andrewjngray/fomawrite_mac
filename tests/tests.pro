@@ -49,3 +49,14 @@ QT += webenginecore pdf
 HEADERS += ../src/typorabase.h ../src/publishingthemes.h ../src/publishinghtml.h ../src/publishingpdf.h ../src/publisher.h ../src/macbridge.h ../src/editorbridge.h
 QT += webchannel
 SOURCES += ../src/typorabase.cpp ../src/publishingthemes.cpp ../src/publishinghtml.cpp ../src/publishingpdf.cpp ../src/publisher.cpp ../src/editorbridge.cpp ../src/vendor/md4c/md4c.c
+
+# Exercise the same appearance implementation selected by the application.
+HEADERS += ../src/systemtheme.h
+macx {
+    SOURCES += ../src/systemtheme_mac.cpp
+} else:win32 {
+    SOURCES += ../src/systemtheme_win.cpp
+} else:linux {
+    QT += dbus
+    SOURCES += ../src/systemtheme.cpp
+}

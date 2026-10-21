@@ -1,5 +1,5 @@
 QT += core gui widgets printsupport qml quick quickcontrols2 quickdialogs2
-!macx: QT += dbus
+linux: QT += dbus
 
 CONFIG += c++17 release
 TARGET = fomawrite
@@ -34,8 +34,12 @@ macx {
     QMAKE_INFO_PLIST = macos/Info.plist
     ICON = macos/Fomawrite.icns
     QMAKE_MACOSX_DEPLOYMENT_TARGET = 14.0
-} else {
+} else:win32 {
+    SOURCES += src/systemtheme_win.cpp
+} else:linux {
     SOURCES += src/systemtheme.cpp
+} else {
+    error("Unsupported platform: a SystemTheme implementation is required")
 }
 
 RESOURCES += src/resources.qrc

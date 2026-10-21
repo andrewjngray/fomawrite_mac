@@ -1,0 +1,78 @@
+name: Windows
+
+on:
+  push:
+    branches: [windows/port]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  native:
+    name: Native ${{ matrix.architecture }} / Qt 6.11.3 / MSVC2022 v143
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - architecture: arm64
+            runner: windows-11-vs2026-arm
+          - architecture: x64
+            runner: windows-2022
+    defaults:
+      run:
+        shell: pwsh
+    env:
+      QT_ROOT_DIR: C:/Qt/6.11.3-${{ matrix.architecture }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install pinned Qt SDK and WebEngine/PDF extensions
+        run: python bin/windows/install-qt.py --architecture ${{ matrix.architecture }} --output "$env:QT_ROOT_DIR"
+
+      - name: Build app (native MSVC2022 toolset)
+        run: ./bin/windows/build.ps1 -Architecture ${{ matrix.architecture }}
+
+      - name: Build and run complete Qt regression suite
+        run: ./bin/windows/test.ps1 -Architecture ${{ matrix.architecture }}
+
+      - name: Deploy portable application and bind manifest
+        run: ./bin/windows/package.ps1 -Architecture ${{ matrix.architecture }}
+
+      - name: Exercise deployed executable on native Windows desktop
+        run: python bin/windows/check-document-views.py --package "dist/windows-${{ matrix.architecture }}/Fomawrite" --output "build-tests/windows-${{ matrix.architecture }}/deployed-acceptance"
+
+      - name: Upload portable ZIP and SHA-256
+        uses: actions/upload-artifact@v4
+        with:
+          name: Fomawrite-windows-${{ matrix.architecture }}-${{ github.sha }}
+          path: |
+            dist/windows-${{ matrix.architecture }}/*.zip
+            dist/windows-${{ matrix.architecture }}/*.sha256
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload test/deployment evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-evidence-${{ matrix.architecture }}-${{ github.sha }}
+          path: |
+            build-tests/windows-${{ matrix.architecture }}/test.log
+            build-tests/windows-${{ matrix.architecture }}/test.xml
+            build-tests/windows-${{ matrix.architecture }}/deployed-acceptance/
+            dist/windows-${{ matrix.architecture }}/Fomawrite/manifest.json
+            ${{ env.QT_ROOT_DIR }}/fomawrite-qt-install.json
+          if-no-files-found: ignore
+          retention-days: 14

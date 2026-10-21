@@ -28,8 +28,9 @@ name: CI
 
 on:
   push:
-    branches: [master]
+    branches: [master, windows/port]
   pull_request:
+  workflow_dispatch:
 
 concurrency:
   group: ci-${{ github.ref }}
