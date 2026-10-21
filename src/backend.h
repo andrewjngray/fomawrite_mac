@@ -78,7 +78,10 @@ class Backend : public QObject, public PublishingSource {
     Q_PROPERTY(bool canGoBack READ canGoBack NOTIFY historyChanged)
     Q_PROPERTY(bool canGoForward READ canGoForward NOTIFY historyChanged)
 public:
-    explicit Backend(QObject *parent = nullptr, bool outputOnly = false);
+    // A caller may isolate the optional Omarchy palette source; ordinary app
+    // instances use the current user's existing Omarchy directory.
+    explicit Backend(QObject *parent = nullptr, bool outputOnly = false,
+                     const QString &omarchyCurrentDirectory = QString());
     ~Backend() override;
 
     QString applicationPath() const;
@@ -507,5 +510,6 @@ private:
     QString m_themeForeground;
     QString m_themeAccent;
     QString m_themeSelection;
+    const QString m_omarchyCurrentDirectory;
     QFileSystemWatcher m_themeWatcher;
 };

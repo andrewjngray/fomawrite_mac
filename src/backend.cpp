@@ -534,7 +534,11 @@ QString Backend::normalizedLinkUrl(const QString &clipboardText) {
     return url.toString();
 }
 
-Backend::Backend(QObject *parent, bool outputOnly) : QObject(parent), m_library(this) {
+Backend::Backend(QObject *parent, bool outputOnly, const QString &omarchyCurrentDirectory)
+    : QObject(parent), m_library(this),
+      m_omarchyCurrentDirectory(omarchyCurrentDirectory.isEmpty()
+          ? QDir::homePath() + QStringLiteral("/.local/state/omarchy/current")
+          : omarchyCurrentDirectory) {
     if (!outputOnly) liveBackends.insert(this);
     connect(&m_library, &FileLibrary::rootFolderChanged, this, &Backend::fileUrlChanged);
     const QString stateDirectory = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
@@ -2795,8 +2799,7 @@ void Backend::loadOmarchyTheme() {
 
 #endif
 
-    const QString colorsPath = QDir::homePath()
-        + QStringLiteral("/.local/state/omarchy/current/theme/colors.toml");
+    const QString colorsPath = m_omarchyCurrentDirectory + QStringLiteral("/theme/colors.toml");
     QString themeMode;
     QFile file(colorsPath);
     if (m_themePreset == "system" && file.open(QIODevice::ReadOnly | QIODevice::Text)) {
@@ -2905,8 +2908,7 @@ void Backend::watchOmarchyTheme() {
     if (!watched.isEmpty())
         m_themeWatcher.removePaths(watched);
 
-    const QString currentDir = QDir::homePath()
-        + QStringLiteral("/.local/state/omarchy/current");
+    const QString currentDir = m_omarchyCurrentDirectory;
     const QString themeDir = currentDir + QStringLiteral("/theme");
     const QString colorsPath = themeDir + QStringLiteral("/colors.toml");
 

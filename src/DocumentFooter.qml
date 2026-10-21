@@ -55,12 +55,17 @@ WorkspaceFooter {
     signal templateMenuRequested(var anchor)
     signal statisticsRequested()
 
-    // System font metrics vary across platforms. Keep the established capsule
-    // widths where they fit, and reserve the actual label plus its padding.
+    // Keep the established hit widths and full labels with wider system fonts.
+    // Spend surplus width on padding rather than pushing the pane's style
+    // selector out of its reserved space. Geometry stays fixed across modes.
     component ModeButton: FooterButton {
         id: modeButton
         required property real minimumWidth
-        width: Math.max(minimumWidth, Math.ceil(modeLabelMetrics.advanceWidth) + leftPadding + rightPadding)
+        property real preferredPadding: 4
+        readonly property real labelWidth: Math.ceil(modeLabelMetrics.advanceWidth)
+        width: Math.max(minimumWidth, labelWidth)
+        leftPadding: Math.min(preferredPadding, Math.max(0, (width - labelWidth) / 2))
+        rightPadding: leftPadding
         TextMetrics { id: modeLabelMetrics; text: modeButton.text; font: modeButton.font }
     }
 
@@ -137,7 +142,7 @@ WorkspaceFooter {
             enabled: root.chromeVisible
             objectName: "sourceModeButton"
             text: "Source"; hint: "Edit Markdown source"
-            leftPadding: root.compactEditing ? 5 : 6; rightPadding: leftPadding
+            preferredPadding: root.compactEditing ? 5 : 6
             grouped: true; minimumWidth: root.compactEditing ? 54 : 56
             checked: root.layoutMode !== 2 && !root.liveEditing
             Accessible.checkable: true; Accessible.checked: checked
@@ -148,7 +153,7 @@ WorkspaceFooter {
             objectName: "liveEditToggle"
             text: "Live"
             hint: "Live — edit with Markdown rendered in place"
-            leftPadding: root.compactEditing ? 5 : 6; rightPadding: leftPadding
+            preferredPadding: root.compactEditing ? 5 : 6
             grouped: true; minimumWidth: root.compactEditing ? 36 : 44
             checked: root.layoutMode !== 2 && root.liveEditing
             Accessible.checkable: true; Accessible.checked: checked
@@ -167,7 +172,7 @@ WorkspaceFooter {
             enabled: root.chromeVisible
             objectName: "webPublishingButton"
             text: "Web"; hint: "Web — read-only HTML publishing output"
-            leftPadding: 6; rightPadding: 6
+            preferredPadding: 6
             grouped: true; minimumWidth: 44
             checked: root.publishingFormat === "web"
             Accessible.checkable: true; Accessible.checked: checked
@@ -177,7 +182,7 @@ WorkspaceFooter {
             enabled: root.chromeVisible
             objectName: "pdfPublishingButton"
             text: "PDF"; hint: "PDF — read-only paginated publishing output"
-            leftPadding: 6; rightPadding: 6
+            preferredPadding: 6
             grouped: true; minimumWidth: 44
             checked: root.publishingFormat === "pdf"
             Accessible.checkable: true; Accessible.checked: checked
@@ -195,7 +200,7 @@ WorkspaceFooter {
             enabled: root.chromeVisible
             objectName: "singleModeButton"
             text: "Single"; hint: "Single — show the chosen editor alone"
-            leftPadding: 4; rightPadding: 4
+            preferredPadding: 4
             grouped: true; minimumWidth: 48
             checked: root.layoutMode === 0
             Accessible.checkable: true; Accessible.checked: checked
@@ -205,7 +210,7 @@ WorkspaceFooter {
             objectName: "previewSplitButton"
             text: "Split"
             hint: root.canSplit ? "Split — show the chosen editor beside output Preview" : "Widen the window to use Split layout"
-            leftPadding: 4; rightPadding: 4
+            preferredPadding: 4
             grouped: true; minimumWidth: 38
             enabled: root.chromeVisible && root.canSplit
             checked: root.layoutMode === 1
@@ -219,7 +224,7 @@ WorkspaceFooter {
             objectName: "previewOnlyButton"
             text: "Preview"
             hint: "Preview — read the published output on its own"
-            leftPadding: 4; rightPadding: 4
+            preferredPadding: 4
             grouped: true; minimumWidth: 58
             checked: root.layoutMode === 2
             Accessible.checkable: true; Accessible.checked: checked

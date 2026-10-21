@@ -3,6 +3,12 @@ CONFIG += testcase c++17
 TEMPLATE = app
 TARGET = tst_fomawrite
 
+# Native ARM64 hit MSVC C1128: the monolithic test source exceeds the
+# standard COFF section limit. Keep every case and enable larger objects.
+win32:contains(QMAKE_COMPILER, msvc) {
+    QMAKE_CXXFLAGS += /bigobj
+}
+
 INCLUDEPATH += ../src
 SOURCES += \
     tst_fomawrite.cpp \

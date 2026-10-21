@@ -85,7 +85,28 @@ void FomawriteTest::footerLiveOptionJoinsEditingCapsule() {
     QTRY_VERIFY(cycle106FooterControlsFit(f.window.data()));
     QTRY_VERIFY(cycle117PaneFooterAnchors(f.window.data()));
     QVERIFY(cycle103SceneBounds(appearance).right() + 7.5 <= cycle103SceneBounds(source).left());
+    // Exercise wide fallback-font metrics even on Mac: the Windows offscreen
+    // font has roughly eight-pixel glyphs at this size. Every label and the
+    // style selector must still fit the same 321 px footer without hiding.
+    const int fontId = QFontDatabase::addApplicationFont(QStringLiteral(":/fonts/IBMPlexMono-Regular.ttf"));
+    QVERIFY(fontId >= 0);
+    const QStringList families = QFontDatabase::applicationFontFamilies(fontId); QVERIFY(!families.isEmpty());
+    QFont wideFont(families.first()); wideFont.setPixelSize(13);
+    for (const char *name : {"sourceModeButton", "liveEditToggle", "singleModeButton", "previewSplitButton", "previewOnlyButton",
+                             "webPublishingButton", "pdfPublishingButton"}) {
+        auto *button = f.item(name); QVERIFY(button);
+        QVERIFY(button->setProperty("font", wideFont));
+    }
+    QVERIFY(cycle118FooterRenderBarrier(f.quick));
+    QTRY_VERIFY(live->isVisible() && appearance->isVisible());
+    QTRY_VERIFY(cycle107ViewLabelsReadable(f.footer));
+    QTRY_VERIFY(cycle106FooterControlsFit(f.window.data()));
+    QTRY_VERIFY(cycle117PaneFooterAnchors(f.window.data()));
     QVERIFY(cycle102Click(f.quick, source)); QTRY_VERIFY(!f.layout->property("liveEditEnabled").toBool());
+    auto *appearanceMenu = f.window->findChild<QObject *>("sourceAppearanceMenu"); QVERIFY(appearanceMenu);
+    QVERIFY(cycle102Click(f.quick, appearance)); QTRY_VERIFY(appearanceMenu->property("opened").toBool());
+    QVERIFY(QMetaObject::invokeMethod(appearanceMenu, "close"));
+    QTRY_VERIFY(!appearanceMenu->property("visible").toBool());
     // Read-only Preview hides the whole capsule, so no editing option is checked.
     QVERIFY(QMetaObject::invokeMethod(f.window.data(), "selectWritingMode", Q_ARG(QVariant, "live")));
     QVERIFY(cycle118ReadPreview(f.window.data()));

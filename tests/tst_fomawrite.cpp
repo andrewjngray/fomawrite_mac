@@ -5311,6 +5311,10 @@ QtObject {
                 && optionsBand && stylesBand && previewBand
                 && splitButton && fullButton && resizeGrip && wideGallery
                 && exportPreview && exportSource);
+        // Popup geometry is relative to the content item, which excludes the
+        // desktop menu on Windows. Require the same exact inset in that space.
+        auto *hubParent = qvariant_cast<QQuickItem *>(hub->property("parent"));
+        QVERIFY(hubParent);
         QVERIFY(QMetaObject::invokeMethod(hub, "open"));
         QTRY_VERIFY(hub->property("visible").toBool());
         QTRY_VERIFY(hub->property("opened").toBool());
@@ -5404,14 +5408,16 @@ QtObject {
             QVERIFY(window->setProperty("height", geometry.windowHeight));
             QVERIFY(hub->setProperty("requestedWidth", geometry.requestedWidth));
             QVERIFY(hub->setProperty("requestedHeight", geometry.requestedHeight));
-            const qreal expectedWidth = qMin(geometry.requestedWidth, geometry.windowWidth - 32);
-            const qreal expectedHeight = qMin(geometry.requestedHeight, geometry.windowHeight - 32);
-            QTRY_COMPARE(hub->property("width").toReal(), expectedWidth);
-            QTRY_COMPARE(hub->property("height").toReal(), expectedHeight);
+            QTRY_COMPARE(hub->property("width").toReal(),
+                         qMin(qreal(geometry.requestedWidth), hubParent->width() - 32));
+            QTRY_COMPARE(hub->property("height").toReal(),
+                         qMin(qreal(geometry.requestedHeight), hubParent->height() - 32));
+            const qreal expectedWidth = qMin(qreal(geometry.requestedWidth), hubParent->width() - 32);
+            const qreal expectedHeight = qMin(qreal(geometry.requestedHeight), hubParent->height() - 32);
             QTRY_VERIFY(hub->property("x").toReal() >= 16);
             QTRY_VERIFY(hub->property("y").toReal() >= 16);
-            QTRY_VERIFY(hub->property("x").toReal() + expectedWidth <= geometry.windowWidth - 16);
-            QTRY_VERIFY(hub->property("y").toReal() + expectedHeight <= geometry.windowHeight - 16);
+            QTRY_VERIFY(hub->property("x").toReal() + expectedWidth <= hubParent->width() - 16);
+            QTRY_VERIFY(hub->property("y").toReal() + expectedHeight <= hubParent->height() - 16);
             QTRY_COMPARE(horizontalBar->property("visible").toBool(), expectedWidth - 40 < 868);
             QVERIFY(cancel->property("visible").toBool());
             QVERIFY(destination->property("visible").toBool());
@@ -5475,44 +5481,39 @@ QtObject {
                 else settings.remove(key);
             }
         });
-        QTemporaryDir homeDirectory;
-        QVERIFY(homeDirectory.isValid());
-#ifdef Q_OS_WIN
-        // Isolate the filesystem input as well as preferences. Windows uses
-        // USERPROFILE for QDir::homePath; this empty home tests the fallback.
-        const bool hadProfile = qEnvironmentVariableIsSet("USERPROFILE");
-        const QByteArray originalProfile = qgetenv("USERPROFILE");
-        const auto restoreProfile = qScopeGuard([&] {
-            if (hadProfile) qputenv("USERPROFILE", originalProfile);
-            else qunsetenv("USERPROFILE");
-        });
-        QVERIFY(qputenv("USERPROFILE", QDir::toNativeSeparators(homeDirectory.path()).toUtf8()));
-        QCOMPARE(QDir::fromNativeSeparators(QDir::homePath()), homeDirectory.path());
-        Backend backend;
-        backend.setAppearanceFollowsOutputStyle(false);
-        backend.setThemePreset(QStringLiteral("system"));
-        backend.setDarkMode(false);
-        QCOMPARE(backend.themeBackground(), QStringLiteral("#FFFFFF"));
-        QCOMPARE(backend.themeForeground(), QStringLiteral("#34363A"));
-        QCOMPARE(backend.themeAccent(), QStringLiteral("#2077b2"));
-        QCOMPARE(backend.themeSelection(), QStringLiteral("#2077b2"));
-        QVERIFY(!backend.darkMode());
-        backend.setDarkMode(true);
-        QCOMPARE(backend.themeBackground(), QStringLiteral("#15181D"));
-        QCOMPARE(backend.themeForeground(), QStringLiteral("#ECEEF2"));
-        QCOMPARE(backend.themeAccent(), QStringLiteral("#5584aa"));
-        QCOMPARE(backend.themeSelection(), QStringLiteral("#186a9a"));
-        QVERIFY(backend.darkMode());
+        QTemporaryDir currentDirectory;
+        QVERIFY(currentDirectory.isValid());
+        // Official Windows Qt resolves the OS account profile before considering
+        // USERPROFILE. Inject only this instance's palette directory instead of
+        // changing the process home or reading/writing the user's real theme.
+        {
+            Backend fallback(nullptr, false, currentDirectory.path());
+            fallback.setAppearanceFollowsOutputStyle(false);
+            fallback.setThemePreset(QStringLiteral("system"));
+            fallback.setDarkMode(false);
+            QCOMPARE(fallback.themeBackground(), QStringLiteral("#FFFFFF"));
+            QCOMPARE(fallback.themeForeground(), QStringLiteral("#34363A"));
+#ifdef Q_OS_MACOS
+            QCOMPARE(fallback.themeAccent(), QStringLiteral("#244f88"));
+            QCOMPARE(fallback.themeSelection(), QStringLiteral("#345f98"));
 #else
-        const QByteArray originalHome = qgetenv("HOME");
-        struct HomeRestorer {
-            QByteArray value;
-            ~HomeRestorer() { qputenv("HOME", value); }
-        } restoreHome{originalHome};
-        QVERIFY(qputenv("HOME", homeDirectory.path().toUtf8()));
-
-        const QString themeDirectory = homeDirectory.path()
-            + QStringLiteral("/.local/state/omarchy/current/theme");
+            QCOMPARE(fallback.themeAccent(), QStringLiteral("#2077b2"));
+            QCOMPARE(fallback.themeSelection(), QStringLiteral("#2077b2"));
+#endif
+            QVERIFY(!fallback.darkMode());
+            fallback.setDarkMode(true);
+            QCOMPARE(fallback.themeBackground(), QStringLiteral("#15181D"));
+            QCOMPARE(fallback.themeForeground(), QStringLiteral("#ECEEF2"));
+#ifdef Q_OS_MACOS
+            QCOMPARE(fallback.themeAccent(), QStringLiteral("#8eb5f0"));
+            QCOMPARE(fallback.themeSelection(), QStringLiteral("#345783"));
+#else
+            QCOMPARE(fallback.themeAccent(), QStringLiteral("#5584aa"));
+            QCOMPARE(fallback.themeSelection(), QStringLiteral("#186a9a"));
+#endif
+            QVERIFY(fallback.darkMode());
+        }
+        const QString themeDirectory = currentDirectory.filePath(QStringLiteral("theme"));
         QVERIFY(QDir().mkpath(themeDirectory));
 
         QFile colorsFile(themeDirectory + QStringLiteral("/colors.toml"));
@@ -5526,7 +5527,7 @@ QtObject {
         QCOMPARE(colorsFile.write(palette), qint64(palette.size()));
         colorsFile.close();
 
-        Backend backend;
+        Backend backend(nullptr, false, currentDirectory.path());
         // This test must also pass by itself, independent of earlier theme tests.
         backend.setAppearanceFollowsOutputStyle(false);
         backend.setThemePreset(QStringLiteral("system"));
@@ -5535,7 +5536,6 @@ QtObject {
         QCOMPARE(backend.themeAccent(), QStringLiteral("#112233"));
         QCOMPARE(backend.themeSelection(), QStringLiteral("#445566"));
         QVERIFY(!backend.darkMode());
-#endif
     }
 
     void ignoresFileWatcherEventsForSavedContents() {

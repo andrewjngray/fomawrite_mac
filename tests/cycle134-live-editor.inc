@@ -320,28 +320,48 @@ void FomawriteTest::liveEditorAppliesFormatCommandsAtThePageSelection() {
     page.backend.discardRecovery();
 }
 
-// The page reports its selection 30 ms after it changes; a Format command in
-// that window used to act on the previous selection. Now it asks the page.
+// A Format command must ask the page instead of trusting the ordinary cursor
+// report, which can lag a newly made selection.
 void FomawriteTest::liveFormatCommandUsesTheSelectionMadeJustBefore() {
     Cycle103SettingsSnapshot settings;
     Cycle134Page page; QVERIFY2(page.create(), qPrintable(page.error));
+    const auto discardRecovery = qScopeGuard([&] { page.backend.discardRecovery(); });
     QTRY_VERIFY_WITH_TIMEOUT(page.bridge()->isReady(), 15000);
     const QString text = QStringLiteral("one two three");
     page.editor->setProperty("text", text);
     page.backend.syncLiveEditor(0);
     QTRY_COMPARE_WITH_TIMEOUT(page.pageText(), text, 10000);
-    QTest::qWait(200); // let the setDocument/setCursor reports settle on the caret at 0
+    auto *view = page.root->findChild<QObject *>("liveEditorView"); QVERIFY(view);
+    // runJavaScript and WebChannel requests take separate asynchronous paths.
+    // Confirm that Chromium has made the selection before sending the command;
+    // merely scheduling its dispatch does not establish that ordering.
+    page.engine.globalObject().setProperty("cycle134SelectionCommitted", QJSValue(QJSValue::UndefinedValue));
+    const QJSValue selected = page.engine.evaluate(
+        "(function(value) { cycle134SelectionCommitted = value; })");
+    QVERIFY(selected.isCallable());
+    QVERIFY(QMetaObject::invokeMethod(view, "runJavaScript", Q_ARG(QString, QStringLiteral(
+        "(() => { const view = window.fomawriteEditor.view;"
+        "view.dispatch({selection:{anchor:4,head:7}});"
+        "const selection = view.state.selection.main;"
+        "return selection.anchor + ':' + selection.head; })()")), Q_ARG(uint, 0), Q_ARG(QJSValue, selected)));
+    QTRY_COMPARE_WITH_TIMEOUT(page.engine.globalObject().property("cycle134SelectionCommitted").toString(), QStringLiteral("4:7"), 5000);
+    // Model an ordinary report still carrying the old caret, regardless of
+    // whether the real debounced report beat the evaluation callback. Only the
+    // stale cache is seeded here; the fresh selection must come from the page.
+    page.bridge()->cursorChanged(0, 0, false);
     QCOMPARE(page.bridge()->lastSelectionStart(), 0);
     QCOMPARE(page.bridge()->lastSelectionEnd(), 0);
-    auto *view = page.root->findChild<QObject *>("liveEditorView"); QVERIFY(view);
-    QVERIFY(QMetaObject::invokeMethod(view, "runJavaScript", Q_ARG(QString, QStringLiteral(
-        "window.fomawriteEditor.view.dispatch({selection:{anchor:4,head:7}})"))));
-    // No wait: the page's debounced report has not reached the host yet.
+    QSignalSpy requested(page.bridge(), &EditorBridge::requestSelection);
+    QSignalSpy replied(page.bridge(), &EditorBridge::selectionReceived);
     QVERIFY(page.backend.liveWrapSelection("**", "**"));
+    QCOMPARE(requested.count(), 1);
+    QTRY_COMPARE_WITH_TIMEOUT(replied.count(), 1, 5000);
+    QCOMPARE(replied.first().at(0).toInt(), requested.first().at(0).toInt());
+    QCOMPARE(replied.first().at(1).toInt(), 4);
+    QCOMPARE(replied.first().at(2).toInt(), 7);
     const QString wrapped = QStringLiteral("one **two** three");
     QTRY_COMPARE_WITH_TIMEOUT(page.canonical(), wrapped, 10000);
     QTRY_COMPARE_WITH_TIMEOUT(page.pageText(), wrapped, 10000);
-    page.backend.discardRecovery();
 }
 
 // A page that never answers must not swallow the command: after a second the
