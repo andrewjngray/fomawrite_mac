@@ -4,6 +4,8 @@ One line per cycle, newest first. Each line links to the cycle's record under `r
 
 ## 0.3.0 development series (Cycles 97–)
 
+- **Windows M1 (in progress)** — Explicit platform capabilities, desktop menus, native ARM64/x64 CI and portable deployment checks; native executable and rendering qualification remain open. [Record](docs/windows/M1-EVIDENCE.md)
+
 - **153** — Stability: revision-neutral checker refresh, real Live typing/save/history acceptance, current theme/rendering checks, embedded editor/theme verification and editor CI gates. [Record](research/cycle-153/README.md)
 - **152** — The Omawrite-like look (`0.3.0-dev48`, build 152, 15 Oct): IBM Plex Mono at 20 px, 140% lines, a 65-character column and Omawrite's dark and light colours, as a Source Writing appearance and as a built-in Output Style for Live, Preview and exports. [Record](research/cycle-152/README.md)
 - **151** — Back and forward for folders (`0.3.0-dev47`, build 151, 12 Oct): arrows before the folder name in the middle pane step through the folders it has shown (Explore Folder can be undone); ⌘↑ goes to the enclosing folder while the middle pane has focus (Source and Live keep ⌘↑ for the top of the document). [Record](research/cycle-151/README.md)

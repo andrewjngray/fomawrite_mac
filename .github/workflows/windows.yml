@@ -38,25 +38,35 @@ jobs:
         with:
           python-version: '3.12'
 
+      - name: Check deployment-evidence guards
+        run: python windows/test_ci.py
+
       - name: Install pinned Qt SDK and WebEngine/PDF extensions
-        run: python bin/windows/install-qt.py --architecture ${{ matrix.architecture }} --output "$env:QT_ROOT_DIR"
+        run: |
+          python bin/windows/install-qt.py --architecture ${{ matrix.architecture }} --output "$env:QT_ROOT_DIR"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          New-Item -ItemType Directory -Force -Path "build/windows-${{ matrix.architecture }}" | Out-Null
+          Copy-Item "$env:QT_ROOT_DIR/fomawrite-qt-install.json" "build/windows-${{ matrix.architecture }}/qt-install.json"
 
       - name: Build app (native MSVC2022 toolset)
         run: ./bin/windows/build.ps1 -Architecture ${{ matrix.architecture }}
 
+      - name: Deploy portable application and bind manifest
+        id: package
+        run: ./bin/windows/package.ps1 -Architecture ${{ matrix.architecture }}
+
       - name: Build and run complete Qt regression suite
         run: ./bin/windows/test.ps1 -Architecture ${{ matrix.architecture }}
 
-      - name: Deploy portable application and bind manifest
-        run: ./bin/windows/package.ps1 -Architecture ${{ matrix.architecture }}
-
       - name: Exercise deployed executable on native Windows desktop
+        if: ${{ !cancelled() && steps.package.outcome == 'success' }}
         run: python bin/windows/check-document-views.py --package "dist/windows-${{ matrix.architecture }}/Fomawrite" --output "build-tests/windows-${{ matrix.architecture }}/deployed-acceptance"
 
-      - name: Upload portable ZIP and SHA-256
+      - name: Upload internal diagnostic ZIP and SHA-256 (qualification remains in evidence)
+        if: ${{ !cancelled() && steps.package.outcome == 'success' }}
         uses: actions/upload-artifact@v4
         with:
-          name: Fomawrite-windows-${{ matrix.architecture }}-${{ github.sha }}
+          name: Fomawrite-internal-diagnostic-windows-${{ matrix.architecture }}-${{ github.sha }}
           path: |
             dist/windows-${{ matrix.architecture }}/*.zip
             dist/windows-${{ matrix.architecture }}/*.sha256
@@ -73,6 +83,6 @@ jobs:
             build-tests/windows-${{ matrix.architecture }}/test.xml
             build-tests/windows-${{ matrix.architecture }}/deployed-acceptance/
             dist/windows-${{ matrix.architecture }}/Fomawrite/manifest.json
-            ${{ env.QT_ROOT_DIR }}/fomawrite-qt-install.json
+            build/windows-${{ matrix.architecture }}/qt-install.json
           if-no-files-found: ignore
           retention-days: 14

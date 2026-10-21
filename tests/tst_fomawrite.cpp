@@ -32,11 +32,43 @@
 #include <QQuickStyle>
 #include <QSettings>
 #include <QStandardPaths>
+#ifdef Q_OS_WIN
+#include <qt_windows.h>
+#endif
 
 #include "backend.h"
 #include "spellcheck.h"
 #include "harperscheme.h"
 #include "markdownhighlighter.h"
+
+// QFile::link creates .lnk shortcuts on Windows, not filesystem symlinks.
+// Keep link-specific tests separate so a missing Windows privilege cannot hide
+// unrelated file-operation assertions.
+struct FilesystemLinkFixture {
+    bool created = false;
+    bool unavailable = false;
+    QString error;
+    FilesystemLinkFixture(const QString &target, const QString &link, bool directory) {
+#ifdef Q_OS_WIN
+        const QString nativeTarget = QDir::toNativeSeparators(target);
+        const QString nativeLink = QDir::toNativeSeparators(link);
+        const DWORD flags = (directory ? SYMBOLIC_LINK_FLAG_DIRECTORY : 0)
+            | SYMBOLIC_LINK_FLAG_ALLOW_UNPRIVILEGED_CREATE;
+        created = CreateSymbolicLinkW(reinterpret_cast<LPCWSTR>(nativeLink.utf16()),
+            reinterpret_cast<LPCWSTR>(nativeTarget.utf16()), flags);
+        if (!created) {
+            const DWORD code = GetLastError();
+            unavailable = code == ERROR_PRIVILEGE_NOT_HELD;
+            error = QStringLiteral("Native Windows symlink fixture failed (Win32 %1); Developer Mode or symlink privilege is required.").arg(code);
+        }
+#else
+        Q_UNUSED(directory);
+        QFile source(target);
+        created = source.link(link);
+        if (!created) error = source.errorString();
+#endif
+    }
+};
 
 
 // The retired Visual Edit pane rendered Backend::previewMarkdown() in a
@@ -192,6 +224,10 @@ private slots:
     void writingCheckerCommandsMenuAndPaneFollowTheEngine();
     void harperDrivesSourceTheLivePageAndThePaneInTheRealPage();
     void harperSchemeServesVersionedPathsFromTheOverrideThenTheBundle();
+    void platformWritingCheckerCapabilitiesAndBundledPolicy();
+    void spellCheckPlatformAvailabilityFollowsHarper();
+    void windowsAppearanceTracksQtColorScheme();
+    void windowsMenuRoutesPortableCommands();
     void harperUpdaterReportsUpToDateAndUpdateAvailable();
     void harperUpdaterInstallsAnUpdateServesItAndReloadsTheEngine();
     void harperUpdaterRollbackRestoresTheBundledVersionAndKeepsTheFolders();
@@ -559,8 +595,19 @@ private slots:
         QVERIFY(backend.libraryItemAction(folder, "rename", "Archive"));
         QCOMPARE(library->rootFolder(), QUrl::fromLocalFile(QFileInfo(dir.filePath("Archive")).canonicalFilePath()));
         QVERIFY(library->favorites().last().toMap().value("url").toUrl().toLocalFile().endsWith("Archive/Renamed.md"));
-        QVERIFY(QFile::link(dir.filePath("Archive"), dir.filePath("Notes copy/link")));
-        QVERIFY(!backend.libraryItemAction(QUrl::fromLocalFile(dir.filePath("Notes copy")), "duplicate", "Rejected"));
+    }
+
+    void contextFolderDuplicateRejectsSymbolicLinks() {
+        QTemporaryDir dir; QVERIFY(dir.isValid());
+        QVERIFY(QDir(dir.path()).mkdir("Archive"));
+        QVERIFY(QDir(dir.path()).mkdir("Notes"));
+        const QString link = dir.filePath("Notes/link");
+        const FilesystemLinkFixture fixture(dir.filePath("Archive"), link, true);
+        if (fixture.unavailable) QSKIP(qPrintable(fixture.error));
+        QVERIFY2(fixture.created, qPrintable(fixture.error));
+        QVERIFY(QFileInfo(link).isSymbolicLink());
+        Backend backend;
+        QVERIFY(!backend.libraryItemAction(QUrl::fromLocalFile(dir.filePath("Notes")), "duplicate", "Rejected"));
         QVERIFY(!QFileInfo::exists(dir.filePath("Rejected")));
     }
 
@@ -703,6 +750,9 @@ private slots:
 
     void contextOperationsPreserveOpenUnsavedDocument() {
         QTemporaryDir dir;
+        QVERIFY(dir.isValid());
+        QVERIFY(QDir(dir.path()).mkdir("Notes"));
+        const QUrl folder = QUrl::fromLocalFile(dir.filePath("Notes"));
         Backend backend;
         QQmlEngine engine;
         engine.rootContext()->setContextProperty("backend", &backend);
@@ -710,14 +760,21 @@ private slots:
         QVERIFY2(component.isReady(), qPrintable(component.errorString()));
         QScopedPointer<QObject> window(component.create()); QVERIFY(window);
         auto *editor = window->findChild<QObject *>("sourceEditor"); QVERIFY(editor);
-        const QUrl file=QUrl::fromLocalFile(dir.filePath("Open.md"));
+        const QUrl file=QUrl::fromLocalFile(dir.filePath("Notes/Open.md"));
         editor->setProperty("text", "Saved"); backend.saveAs(file);
         editor->setProperty("text", "Unsaved text"); QVERIFY(backend.modified());
         QVERIFY(!backend.libraryItemAction(file, "share"));
         QVERIFY(backend.libraryItemAction(file, "duplicate", "Copy.md"));
-        QFile copy(dir.filePath("Copy.md")); QVERIFY(copy.open(QIODevice::ReadOnly)); QCOMPARE(copy.readAll(), QByteArray("Unsaved text"));
+        QFile copy(dir.filePath("Notes/Copy.md")); QVERIFY(copy.open(QIODevice::ReadOnly)); QCOMPARE(copy.readAll(), QByteArray("Unsaved text")); copy.close();
         QVERIFY(!backend.libraryItemAction(file, "trash"));
-        QVERIFY(!backend.libraryItemAction(QUrl::fromLocalFile(dir.path()), "rename", "Nope"));
+        // Duplicate first: old Windows code misses '/' descendants, without a
+        // failed assertion first renaming or trashing this disposable fixture.
+        QVERIFY(!backend.libraryItemAction(folder, "duplicate", "Notes copy"));
+        QVERIFY(backend.status().contains("Close documents inside this folder"));
+        QVERIFY(!QFileInfo::exists(dir.filePath("Notes copy")));
+        QVERIFY(!backend.libraryItemAction(folder, "rename", "Nope"));
+        QVERIFY(backend.status().contains("Close documents inside this folder"));
+        QVERIFY(QFileInfo::exists(file.toLocalFile()));
         QVERIFY(backend.libraryItemAction(file, "rename", "Renamed.md"));
         QCOMPARE(editor->property("text").toString(), QString("Unsaved text"));
         QVERIFY(backend.modified()); backend.discardRecovery();
@@ -766,8 +823,6 @@ private slots:
             QVERIFY(!library.addLocation(parent));
             QVERIFY(QFileInfo(child.toLocalFile()).isDir());
             QVERIFY(!library.addLocation(QUrl("https://example.com")));
-            QVERIFY(QFile::link(parent.toLocalFile(), dir.filePath("Alias")));
-            QVERIFY(!library.addLocation(QUrl::fromLocalFile(dir.filePath("Alias"))));
         }
         settings.setValue("locations", QStringList{child.toLocalFile(), parent.toLocalFile(), child.toLocalFile()});
         settings.setValue("favorites", QStringList{});
@@ -783,6 +838,34 @@ private slots:
         FileLibrary reopened;
         QCOMPARE(reopened.locations().size(), 1);
         QCOMPARE(reopened.favorites().size(), 1);
+    }
+
+    void locationSymbolicAliasRejectsOverlap() {
+        QSettings settings;
+        settings.beginGroup("library");
+        QVariantMap original;
+        for (const auto &key : settings.allKeys()) original[key] = settings.value(key);
+        settings.remove("");
+        const auto restore = qScopeGuard([&] {
+            settings.remove("");
+            for (auto it = original.cbegin(); it != original.cend(); ++it) settings.setValue(it.key(), it.value());
+        });
+        QTemporaryDir dir; QVERIFY(dir.isValid());
+        QVERIFY(QDir(dir.path()).mkpath("Parent/Child"));
+        const QString parentPath = QFileInfo(dir.filePath("Parent")).canonicalFilePath();
+        const QString link = dir.filePath("Alias");
+        const FilesystemLinkFixture fixture(parentPath, link, true);
+        if (fixture.unavailable) QSKIP(qPrintable(fixture.error));
+        QVERIFY2(fixture.created, qPrintable(fixture.error));
+        QVERIFY(QFileInfo(link).isSymbolicLink());
+        QCOMPARE(QFileInfo(link).canonicalFilePath(), parentPath);
+        FileLibrary library;
+        QVERIFY(library.addLocation(QUrl::fromLocalFile(dir.filePath("Parent/Child"))));
+        QSignalSpy rejected(&library, &FileLibrary::locationRejected);
+        QVERIFY(!library.addLocation(QUrl::fromLocalFile(link)));
+        QCOMPARE(rejected.count(), 1);
+        QVERIFY(rejected.first().at(2).toBool()); // Actual overlap, not unreadability.
+        QCOMPARE(library.locations().size(), 1);
     }
 
     void locationPhysicalRenameReplacesLegacyAlias() {
@@ -1365,18 +1448,19 @@ private slots:
     }
 
     void secondInstanceForwardsWithoutTakingOwnership() {
-        QTemporaryDir directory("/tmp/ow-XXXXXX"); QVERIFY(directory.isValid());
+        QTemporaryDir directory(QDir::temp().filePath("ow-XXXXXX")); QVERIFY(directory.isValid());
+        const QStringList expectedPaths{directory.filePath("a file.md"), directory.filePath(QStringLiteral("東京.md"))};
         InstanceBroker owner;
         QCOMPARE(owner.start(directory.path(), "test", {}), InstanceBroker::Owner);
         QSignalSpy requests(&owner, &InstanceBroker::requested);
-        auto future = QtConcurrent::run([path=directory.path()] {
+        auto future = QtConcurrent::run([path=directory.path(), expectedPaths] {
             InstanceBroker client;
-            return client.start(path, "test", {"/tmp/a file.md", "/tmp/東京.md"});
+            return client.start(path, "test", expectedPaths);
         });
         QTRY_VERIFY_WITH_TIMEOUT(future.isFinished(), 15000);
         QCOMPARE(future.result(), InstanceBroker::Forwarded);
         QCOMPARE(requests.size(), 1);
-        QCOMPARE(requests[0][0].toStringList(), QStringList({"/tmp/a file.md", "/tmp/東京.md"}));
+        QCOMPARE(requests[0][0].toStringList(), expectedPaths);
         auto activate = QtConcurrent::run([path=directory.path()] {
             InstanceBroker client; return client.start(path, "test", {});
         });
@@ -1433,8 +1517,21 @@ private slots:
             QVERIFY2(backend.resolveOpenPath(input).contains("error"), qPrintable(input));
         QFile binary(directory.filePath("sample.png")); QVERIFY(binary.open(QIODevice::WriteOnly)); binary.write("binary"); binary.close();
         QVERIFY(backend.resolveOpenPath(binary.fileName()).contains("error"));
-        const QString link = directory.filePath("alias.md"); QVERIFY(QFile::link(path, link));
-        QCOMPARE(backend.resolveOpenPath(link)["url"].toUrl(), expected);
+    }
+
+    void resolveOpenPathFollowsSymbolicLink() {
+        QTemporaryDir directory; QVERIFY(directory.isValid());
+        const QString path = directory.filePath(QStringLiteral("a # café.md"));
+        QFile file(path); QVERIFY(file.open(QIODevice::WriteOnly)); file.write("sample"); file.close();
+        const QString link = directory.filePath("alias.md");
+        const FilesystemLinkFixture fixture(path, link, false);
+        if (fixture.unavailable) QSKIP(qPrintable(fixture.error));
+        QVERIFY2(fixture.created, qPrintable(fixture.error));
+        QVERIFY(QFileInfo(link).isSymbolicLink());
+        Backend backend;
+        const auto result = backend.resolveOpenPath(link);
+        QVERIFY2(!result.contains("error"), qPrintable(result.value("error").toString()));
+        QCOMPARE(result.value("url").toUrl(), QUrl::fromLocalFile(QFileInfo(path).canonicalFilePath()));
     }
 
     void openByPathProtectsDirtyDocumentAndOpensFolder() {
@@ -3122,15 +3219,25 @@ QtObject {
         QVERIFY(!backend.moveDocument(folder));
         QVERIFY(destination.open(QIODevice::ReadOnly)); QCOMPARE(destination.readAll(), QByteArray("occupied")); destination.close();
         QVERIFY(destination.remove());
-        // A dangling symlink is a collision, too.
-        QVERIFY(QFile::link(root.filePath("missing-target"), destination.fileName()));
-        QVERIFY(!backend.moveDocument(folder));
-        QVERIFY(destination.remove());
         // Destination remains writable, but removing the original must fail.
+#ifdef Q_OS_WIN
+        bool movedFromReadOnlyDirectory = false;
+        {
+            const QString nativePath = QDir::toNativeSeparators(original.fileName());
+            // Permit verification and copying, but deny deletion/rename until
+            // this handle closes. Directory ReadOnly is not a Windows ACL.
+            const HANDLE held = CreateFileW(reinterpret_cast<LPCWSTR>(nativePath.utf16()), GENERIC_READ,
+                FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+            QVERIFY2(held != INVALID_HANDLE_VALUE, qPrintable(QStringLiteral("Cannot hold source (Win32 %1)").arg(GetLastError())));
+            const auto close = qScopeGuard([held] { CloseHandle(held); });
+            movedFromReadOnlyDirectory = backend.moveDocument(folder);
+        } // Release before assertions and before the later successful move.
+#else
         const auto permissions = QFile::permissions(root.path());
         QVERIFY(QFile::setPermissions(root.path(), QFileDevice::ReadOwner | QFileDevice::ExeOwner));
         const bool movedFromReadOnlyDirectory = backend.moveDocument(folder);
         QVERIFY(QFile::setPermissions(root.path(), permissions));
+#endif
         QVERIFY(!movedFromReadOnlyDirectory);
         QVERIFY(original.exists());
         QVERIFY(destination.exists());
@@ -3183,6 +3290,40 @@ QtObject {
         QCOMPARE(backend.fileUrl(), moved);
         QVERIFY(!original.exists());
         QTRY_COMPARE(changed.count(), 1);
+        backend.discardRecovery();
+    }
+
+    void moveRejectsDanglingSymbolicDestination() {
+        QTemporaryDir root; QVERIFY(root.isValid());
+        QVERIFY(QDir(root.path()).mkdir("destination"));
+        const QString destination = root.filePath(QStringLiteral("destination/Note 日本語.md"));
+        const QString missing = root.filePath("missing-target");
+        const FilesystemLinkFixture fixture(missing, destination, false);
+        if (fixture.unavailable) QSKIP(qPrintable(fixture.error));
+        QVERIFY2(fixture.created, qPrintable(fixture.error));
+        QVERIFY(QFileInfo(destination).isSymbolicLink());
+        QVERIFY(!QFileInfo::exists(destination));
+        QFile original(root.filePath(QStringLiteral("Note 日本語.md")));
+        QVERIFY(original.open(QIODevice::WriteOnly)); original.write("saved text"); original.close();
+        Backend backend;
+        QQmlEngine engine;
+        engine.rootContext()->setContextProperty("backend", &backend);
+        QQmlComponent component(&engine, QUrl::fromLocalFile(QFINDTESTDATA("../src/Main.qml")));
+        QScopedPointer<QObject> window(component.create());
+        QVERIFY2(window, qPrintable(component.errorString()));
+        const QUrl oldUrl = QUrl::fromLocalFile(original.fileName());
+        QVERIFY(backend.open(oldUrl));
+        auto *editor = window->findChild<QObject *>("sourceEditor"); QVERIFY(editor);
+        editor->setProperty("text", "Unsaved text"); QVERIFY(backend.modified());
+        QVERIFY(!backend.moveDocument(QUrl::fromLocalFile(root.filePath("destination"))));
+        QVERIFY(backend.status().contains("already contains this filename"));
+        QCOMPARE(backend.fileUrl(), oldUrl);
+        QCOMPARE(editor->property("text").toString(), QStringLiteral("Unsaved text"));
+        QVERIFY(backend.modified());
+        QVERIFY(original.open(QIODevice::ReadOnly)); QCOMPARE(original.readAll(), QByteArray("saved text")); original.close();
+        QVERIFY(QFileInfo(destination).isSymbolicLink());
+        QVERIFY(!QFileInfo::exists(destination));
+        QVERIFY(!QFileInfo::exists(missing));
         backend.discardRecovery();
     }
 
@@ -5326,6 +5467,8 @@ private:
 #include "cycle144-review-pane.inc"
 #include "cycle145-harper-engine.inc"
 #include "cycle146-harper-updates.inc"
+#include "windows-platform.inc"
+#include "windows-menu.inc"
 
 int main(int argc, char **argv) {
     registerHarperScheme();

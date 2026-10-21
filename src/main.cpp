@@ -136,6 +136,8 @@ int main(int argc, char *argv[]) {
         app.setWindowIcon(lightIcon);
         setMacRunningDockIcon(false);
     });
+#elif defined(Q_OS_WIN)
+    app.setWindowIcon(QIcon(QStringLiteral(":/app/FomawriteIcon.png")));
 #else
     app.setWindowIcon(QIcon::fromTheme(QStringLiteral("fomawrite")));
 #endif
@@ -203,7 +205,7 @@ int main(int argc, char *argv[]) {
 
     // Carry the desktop's text scale into the default font, so the chrome that
     // inherits it (dialog titles, buttons) grows along with the writing area.
-#ifdef Q_OS_MACOS
+#if defined(Q_OS_MACOS) || defined(Q_OS_WIN)
     const QFont interfaceFont = QFontDatabase::systemFont(QFontDatabase::GeneralFont);
 #else
     const QFont interfaceFont(QStringLiteral("iA Writer Mono S"));

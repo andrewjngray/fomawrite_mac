@@ -63,8 +63,10 @@ Rectangle {
     function engineStatus() {
         // "Harper 2.10.0 · 2.12.0 available (built-in)": the version in use, what the weekly check found, and where the engine came from
         if (harperActive) return "Harper " + checker.harperVersion + backend.harperUpdater.paneSuffix
-        if (checker.engine !== "harper") return "macOS checker"
         var why = checker.harperLoadError()
+        if (!checker.nativeEngineAvailable)
+            return why !== "" ? "Harper failed to load" : "Harper is loading"
+        if (checker.engine !== "harper") return "macOS checker"
         return why !== "" ? "macOS checker (Harper failed to load)" : "macOS checker (Harper is loading)"
     }
     function emphasised(issue) {
@@ -322,7 +324,7 @@ Rectangle {
                 Label {
                     objectName: "reviewEmpty"
                     Layout.fillWidth: true
-                    text: !root.checker.available ? "Spelling check is not available on this platform"
+                    text: !root.checker.available ? (root.checker.harperLoadError() !== "" ? "Harper failed to load" : "Harper is loading")
                         : !root.checker.enabled ? "Spelling check is off"
                         : root.filter === "grammar" && !root.checker.grammarEnabled ? "Grammar check is off"
                         : root.filter === "style" && !root.harperActive ? "Style suggestions come from Harper"

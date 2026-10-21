@@ -63,6 +63,7 @@
         <file>editor/dist/fonts/KaTeX_Size4-Regular.woff2</file>
         <file>editor/dist/fonts/KaTeX_Typewriter-Regular.woff2</file>
         <file>NativeMenuBar.qml</file>
+        <file>WindowsMenuBar.qml</file>
         <file>PublishingPreview.qml</file>
         <file>ExportHub.qml</file>
         <file>StyleGallery.qml</file>

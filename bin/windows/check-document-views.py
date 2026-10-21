@@ -13,6 +13,17 @@ import subprocess
 import sys
 import time
 
+EXPECTED_PAINT = {
+    "preview-pdf-document-a": "pdf",
+    "preview-pdf-document-b": "pdf",
+    "preview-pdf-rapid-final-c": "pdf",
+    "preview-web-after-hidden-switch": "web",
+    "preview-pdf-after-theme-mode-switch": "pdf",
+    "preview-pdf-after-window-show": "pdf",
+    "preview-web-after-pdf-return": "web",
+    "preview-cold-pdf-component": "pdf",
+}
+
 
 def sha(path):
     return hashlib.sha256(path.read_bytes()).hexdigest()
@@ -33,6 +44,15 @@ def verify(report, manifest, executable):
         failures.append("Live keyboard input, persistence and history were not all exercised")
     observations = report.get("publishingPreviewCorrectness", {}).get("observations", [])
     painted = [entry for entry in observations if "actualPanePainted" in entry]
+    names = [entry.get("scenario") for entry in painted]
+    if (not set(EXPECTED_PAINT).issubset(names) or len(names) != len(set(names))
+            or any(entry.get("format") not in ("web", "pdf")
+                   or (entry.get("scenario") in EXPECTED_PAINT
+                       and entry.get("format") != EXPECTED_PAINT[entry["scenario"]]) for entry in painted)):
+        failures.append("Missing, duplicated or incorrectly formatted required Web/PDF paint scenario")
+    if not any(entry.get("scenario") == "rapid-selection-in-flight-request"
+               and entry.get("observedPendingRequest") for entry in observations):
+        failures.append("Rapid selection did not supersede an observed in-flight PDF request")
     if len(painted) < 8 or any(not entry.get("actualPanePainted") or not entry.get("contentCorrect")
             or entry.get("actualMarkerSamples", 0) <= 40
             or entry.get("naturalFramesBeforeCapture", 0) < 1
@@ -67,28 +87,45 @@ def verify(report, manifest, executable):
     return failures
 
 
+def deployment_environment(package, inherited):
+    environment = dict(inherited)
+    for name in list(environment):
+        if name.upper().startswith(("QT_", "QTWEBENGINE", "QML_", "FOMAWRITE_")):
+            environment.pop(name)
+    system_root = Path(inherited.get("SystemRoot", r"C:\Windows"))
+    environment["PATH"] = os.pathsep.join([str(package), str(system_root / "System32"), str(system_root)])
+    environment["QT_FORCE_STDERR_LOGGING"] = "1"
+    return environment
+
+
+def verify_package_files(package, manifest):
+    for name, expected in manifest["files"].items():
+        path = (package / name).resolve()
+        if not path.is_relative_to(package) or sha(path) != expected:
+            raise SystemExit(f"Deployed file hash mismatch or invalid path: {name}")
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--package", type=Path, required=True, help="Deployed Fomawrite directory")
-    parser.add_argument("--output", type=Path, required=True, help="New evidence directory")
+    parser.add_argument("--output", type=Path, help="New evidence directory")
+    parser.add_argument("--verify-only", action="store_true", help="Check deployed file integrity without launch")
     args = parser.parse_args()
-    package, output = args.package.resolve(), args.output.resolve()
+    package = args.package.resolve()
     executable = package / "Fomawrite.exe"
     manifest = json.loads((package / "manifest.json").read_text(encoding="utf-8"))
+    verify_package_files(package, manifest)
+    if args.verify_only:
+        print("Deployed package hashes verified")
+        return 0
+    if args.output is None:
+        parser.error("--output is required for native acceptance")
+    output = args.output.resolve()
     if output.exists():
         parser.error("Use a new output directory, so old reports cannot satisfy acceptance")
     output.mkdir(parents=True)
-    for name, expected in manifest["files"].items():
-        if sha(package / name) != expected:
-            raise SystemExit(f"Deployed file hash mismatch: {name}")
-    environment = dict(os.environ)
-    for name in list(environment):
-        if name.startswith("QT_") or name.startswith("QML_") or name.startswith("FOMAWRITE_"):
-            environment.pop(name)
     # Prove deployment without Qt/developer tools on PATH. Keep Windows itself.
-    system_root = Path(os.environ.get("SystemRoot", r"C:\Windows"))
-    environment["PATH"] = os.pathsep.join([str(package), str(system_root / "System32"), str(system_root)])
-    environment["QT_FORCE_STDERR_LOGGING"] = "1"
+    environment = deployment_environment(package, os.environ)
     started = time.time_ns()
     with (output / "process.log").open("wb") as log:
         result = subprocess.run([str(executable), "--check-document-views", str(output)],
@@ -102,6 +139,7 @@ def main():
         failures.append(f"Application exited with status {result.returncode}")
     verification = {"passed": not failures, "failures": failures, "commit": manifest["commit"],
                     "architecture": manifest["architecture"], "executableSha256": sha(executable),
+                    "manifestSha256": sha(package / "manifest.json"),
                     "platform": report.get("platform"), "report": str(report_path)}
     (output / "package-verification.json").write_text(json.dumps(verification, indent=2) + "\n", encoding="utf-8")
     print(json.dumps(verification, indent=2))

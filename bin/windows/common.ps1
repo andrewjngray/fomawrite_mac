@@ -51,9 +51,18 @@ function Enter-MsvcEnvironment {
     $hostArchitecture = if ([Runtime.InteropServices.RuntimeInformation]::OSArchitecture -eq 'Arm64') { 'arm64' } else { 'x64' }
     $devcmd = Join-Path $selected.Install 'Common7/Tools/VsDevCmd.bat'
     $toolVersion = '{0}.{1}' -f $selected.Version.Major, $selected.Version.Minor
-    $command = '""{0}" -no_logo -arch={1} -host_arch={2} -vcvars_ver={3} && set"' -f $devcmd, $Architecture, $hostArchitecture, $toolVersion
-    $environment = & $env:ComSpec /d /s /c $command
-    if ($LASTEXITCODE -ne 0) { throw 'VsDevCmd failed.' }
+    # A .cmd wrapper avoids PowerShell/cmd.exe double interpretation of quoted
+    # Program Files paths. CALL returns to the wrapper, then SET exports state.
+    $wrapper = Join-Path ([IO.Path]::GetTempPath()) "fomawrite-msvc-$([guid]::NewGuid().ToString('N')).cmd"
+    $lines = @('@echo off',
+        ('call "{0}" -no_logo -arch={1} -host_arch={2} -vcvars_ver={3}' -f $devcmd, $Architecture, $hostArchitecture, $toolVersion),
+        'if errorlevel 1 exit /b 1', 'set')
+    [IO.File]::WriteAllText($wrapper, ($lines -join "`r`n") + "`r`n", [Text.Encoding]::ASCII)
+    try {
+        $environment = & $env:ComSpec /d /c $wrapper
+        $status = $LASTEXITCODE
+    } finally { Remove-Item -LiteralPath $wrapper -Force }
+    if ($status -ne 0) { throw 'VsDevCmd failed.' }
     foreach ($line in $environment) {
         if ($line -match '^([^=]+)=(.*)$') { [Environment]::SetEnvironmentVariable($Matches[1], $Matches[2], 'Process') }
     }

@@ -32,3 +32,28 @@ Primary sources inspected:
 ## Remaining target gate
 
 Select and prove the runner/host tools; record exact dependency versions and checksums where available; compile and deploy; verify Chromium subprocess/sandbox/GPU behaviour and PDF/Live paint in the actual VM. If native ARM64 tooling blocks the first cycle, an explicitly labelled x64 emulation spike is useful evidence but does not close native ARM64 acceptance.
+
+
+## Runner and installer proof (M1 bootstrap)
+
+The repository is public. Native ARM64 uses GitHub's `windows-11-vs2026-arm`
+image with its separately installed **MSVC 2022 v143** toolset; x64 uses
+`windows-2022`. `bin/windows/common.ps1` discovers v143 explicitly and records
+its exact version rather than accepting the ARM image's default VS2026 compiler.
+The ARM image lists v143 14.44 and SDK 10.0.26100.0; the actual selected versions
+must be read from each build's manifest. Sources: [ARM runner availability](https://github.blog/changelog/2025-08-07-arm64-hosted-runners-for-public-repositories-are-now-generally-available/),
+[ARM image inventory](https://github.com/actions/runner-images/blob/main/images/windows/Windows11-VS2026-Arm64-Readme.md).
+
+`windows/qt-6.11.3.json` pins official archive URLs and upstream SHA-1 hashes
+for both native kits, including their WebEngine/PDF extension repositories.
+The installer verifies those hashes before extraction, records SHA-256 hashes,
+and verifies the relocated qmake version/prefix and required modules.
+[Bootstrap run 39670164799](https://github.com/andrewjngray/fomawrite_mac/actions/runs/39670164799)
+installed and verified both native Qt SDKs. It then failed at the same
+Visual Studio environment command quoting defect, before compiling the app.
+This confirms native runner and kit availability, not a working executable.
+
+Parallels `exec --current-user` runs in guest desktop session 1, matching
+Explorer. The guest's local application-data directory is available for
+isolated artifacts; its Desktop maps to the Mac share and is not a disposable
+local test destination. No compiler, SDK or Qt installation was added to the VM.

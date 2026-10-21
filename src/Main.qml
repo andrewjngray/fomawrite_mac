@@ -18,11 +18,18 @@ ApplicationWindow {
     flags: isMac ? Qt.Window | Qt.ExpandedClientAreaHint | Qt.NoTitleBarBackgroundHint : Qt.Window
     topPadding: 0
     visible: true
-    font.family: Qt.platform.os === "osx" ? Qt.application.font.family : "Helvetica Neue"
+    font.family: isMac || isWindows ? Qt.application.font.family : "Helvetica Neue"
     font.pixelSize: 13
     title: (backend.modified ? "* " : "") + backend.fileName + " - Fomawrite"
 
     readonly property bool isMac: Qt.platform.os === "osx"
+    readonly property bool isWindows: Qt.platform.os === "windows"
+    menuBar: Loader {
+        id: windowsMenuLoader
+        objectName: "windowsMenuLoader"
+        active: win.isWindows
+        sourceComponent: Component { WindowsMenuBar {} }
+    }
     readonly property bool darkMode: backend.darkMode
     readonly property color pageColor: backend.themeBackground
     readonly property color textColor: backend.themeForeground
@@ -40,7 +47,7 @@ ApplicationWindow {
     onActiveWritingAppearanceChanged: Qt.callLater(function() { backend.setSourceAppearance(activeWritingAppearance); codeDecorationsTimer.restart(); editorFlick.contentX = 0; })
     onDarkModeChanged: Qt.callLater(function() { backend.setSourceAppearance(activeWritingAppearance); })
     readonly property string editorFontFamily: activeWritingAppearance === "editorial" ? Qt.application.font.family
-        : activeWritingAppearance === "book" ? "Georgia" : codeAppearance ? "Menlo"
+        : activeWritingAppearance === "book" ? "Georgia" : codeAppearance ? (isWindows ? "Consolas" : "Menlo")
         : activeWritingAppearance === "omawrite" ? "IBM Plex Mono" : "iA Writer Mono S"
     readonly property int writingBasePixelSize: codeAppearance ? 15 : activeWritingAppearance === "manuscript" ? 18
         : activeWritingAppearance === "book" || activeWritingAppearance === "omawrite" ? 20 : 19
@@ -305,7 +312,12 @@ ApplicationWindow {
     readonly property bool sourceEditorVisible: editorPane.visible && !workspaceLayout.liveEditEnabled
     onSourceEditorVisibleChanged: if (!sourceEditorVisible && completionPopup) completionPopup.close()
     // Format commands reach the Live editor while it has focus (see Backend::liveWrapSelection).
-    readonly property bool canFormatLive: workspaceLayout.liveEditEnabled && liveEditorLoader.item !== null && liveEditorLoader.item.hasLiveFocus
+    // Quick desktop menus take QML focus. Keep their originating editor/field
+    // as the edit target until an action restores its focus and dispatches.
+    readonly property bool windowsMenuHasFocus: windowsMenuLoader.item !== null && windowsMenuLoader.item.ownsFocus(activeFocusItem)
+    readonly property var editingFocusItem: windowsMenuHasFocus ? windowsMenuLoader.item.previousFocusItem : activeFocusItem
+    readonly property bool canFormatLive: workspaceLayout.liveEditEnabled && liveEditorLoader.item !== null
+        && (liveEditorLoader.item.hasLiveFocus || (windowsMenuHasFocus && isInside(editingFocusItem, liveEditorLoader.item)))
     readonly property bool canFormatSource: sourceEditorVisible && sourceFormattingOwned
         && !editor.readOnly && !editor.inputMethodComposing
     function isSourceFormattingChrome(item) {
@@ -321,7 +333,12 @@ ApplicationWindow {
         return false;
     }
     function updateSourceFormattingOwner() {
+        // Focus-change handlers run before derived bindings necessarily update.
+        // Read the window's actual item synchronously; substitute a saved target
+        // only while the desktop menu really owns that focus.
         var item = activeFocusItem;
+        if (windowsMenuLoader.item && windowsMenuLoader.item.ownsFocus(item))
+            item = windowsMenuLoader.item.previousFocusItem;
         if (sourceEditorVisible && isInside(item, editor)) sourceFormattingOwned = true;
         else if (!isSourceFormattingChrome(item)) sourceFormattingOwned = false;
     }
@@ -424,6 +441,7 @@ ApplicationWindow {
         else if (isInside(item, previewPane)) lastZoomPane = "preview";
     }
     onActiveFocusItemChanged: {
+        if (windowsMenuLoader.item) windowsMenuLoader.item.rememberEditingFocus(activeFocusItem);
         // Pointer focus from a previous toolbar click must not pin the bars open.
         var keyboardFocus = activeFocusItem && (activeFocusItem.focusReason === Qt.TabFocusReason
             || activeFocusItem.focusReason === Qt.BacktabFocusReason || activeFocusItem.focusReason === Qt.ShortcutFocusReason);
@@ -893,7 +911,7 @@ ApplicationWindow {
         // app stays open; runScheduledCheck itself applies the weekly rule.
         interval: 10000
         repeat: true
-        running: win.visible && backend.checksHarperUpdates()
+        running: win.visible && backend.harperUpdater.updatesSupported && backend.checksHarperUpdates()
         onTriggered: { backend.harperUpdater.runScheduledCheck(); harperUpdateTimer.interval = 6 * 3600 * 1000; }
     }
     Rectangle {
@@ -1705,7 +1723,7 @@ ApplicationWindow {
             : Window.FullScreen;
     }
 
-    readonly property var editTarget: activeFocusItem && typeof activeFocusItem.cut === "function" ? activeFocusItem : editor
+    readonly property var editTarget: editingFocusItem && typeof editingFocusItem.cut === "function" ? editingFocusItem : editor
     // Clipboard commands must not borrow an invisible Source selection.
     readonly property bool sourceClipboardAllowed: sourceEditorVisible || editTarget !== editor
 

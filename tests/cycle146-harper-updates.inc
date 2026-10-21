@@ -160,6 +160,8 @@ void FomawriteTest::harperSchemeServesVersionedPathsFromTheOverrideThenTheBundle
                                 QStringLiteral("/") + bundled + QStringLiteral("/%2fetc%2fpasswd")})
         QVERIFY2(HarperSchemeHandler::resolvePath(QUrl(QStringLiteral("fomawrite://harper") + path)).isEmpty(), qPrintable(path));
     // An override: VERSION says it, its versioned files come from it, the bundled version still resolves to the bundle.
+    if (!HarperUpdater().updatesSupported())
+        QSKIP("Bundled scheme/path checks passed; downloaded overrides are disabled on Windows until W12");
     const QString root = HarperSchemeHandler::harperRoot();
     const QString folder = root + QStringLiteral("/") + Cycle146Newer;
     for (const char *name : {"index.js", "binary.js", "BinaryModule.js", "harper_wasm_bg.wasm", "LICENSE"}) QVERIFY(cycle146Write(folder + QLatin1Char('/') + QString::fromLatin1(name), name));
@@ -189,6 +191,8 @@ void FomawriteTest::harperSchemeServesVersionedPathsFromTheOverrideThenTheBundle
 // ---- checking and installing ------------------------------------------------------------------------------------------
 
 void FomawriteTest::harperUpdaterReportsUpToDateAndUpdateAvailable() {
+    if (!HarperUpdater().updatesSupported())
+        QSKIP("Harper downloads/activation are explicitly disabled on Windows until W12; bundled policy is covered separately");
     Cycle146Sandbox sandbox;
     Backend backend;
     HarperUpdater *updater = backend.harperUpdater();
@@ -253,6 +257,8 @@ void FomawriteTest::harperUpdaterReportsUpToDateAndUpdateAvailable() {
 }
 
 void FomawriteTest::harperUpdaterInstallsAnUpdateServesItAndReloadsTheEngine() {
+    if (!HarperUpdater().updatesSupported())
+        QSKIP("Harper downloads/activation are explicitly disabled on Windows until W12; bundled policy is covered separately");
     Cycle146Sandbox sandbox;
     Backend backend;
     HarperUpdater *updater = backend.harperUpdater();
@@ -327,6 +333,8 @@ void FomawriteTest::harperUpdaterInstallsAnUpdateServesItAndReloadsTheEngine() {
 }
 
 void FomawriteTest::harperUpdaterRollbackRestoresTheBundledVersionAndKeepsTheFolders() {
+    if (!HarperUpdater().updatesSupported())
+        QSKIP("Harper downloads/activation are explicitly disabled on Windows until W12; bundled policy is covered separately");
     Cycle146Sandbox sandbox;
     Backend backend;
     HarperUpdater *updater = backend.harperUpdater();
@@ -374,6 +382,8 @@ void FomawriteTest::harperUpdaterRollbackRestoresTheBundledVersionAndKeepsTheFol
 // ---- refusals ----------------------------------------------------------------------------------------------------------
 
 void FomawriteTest::harperUpdaterRefusesAWrongIntegrityAndLeavesNothingBehind() {
+    if (!HarperUpdater().updatesSupported())
+        QSKIP("Harper downloads/activation are explicitly disabled on Windows until W12; bundled policy is covered separately");
     Cycle146Sandbox sandbox;
     Backend backend;
     HarperUpdater *updater = backend.harperUpdater();
@@ -421,6 +431,8 @@ void FomawriteTest::harperUpdaterRefusesPackagesThatReachOutsideDist() {
                               "package/dist/sub/deeper.js", "package/dist/sub/", "package/dist/run.sh", "package/dist/image.png"}) // nothing nested under dist, only the kinds a release holds
         QVERIFY2(!HarperUpdater::tarEntryAllowed(QString::fromLatin1(entry)), entry);
 
+    if (!HarperUpdater().updatesSupported())
+        QSKIP("Portable validation assertions passed; updater network/extraction are disabled on Windows until W12");
     Backend backend;
     HarperUpdater *updater = backend.harperUpdater();
     Cycle146Server server; QVERIFY(server.start());
@@ -469,6 +481,8 @@ void FomawriteTest::harperUpdaterAcceptsOnlyHttpsAddressesOnTheRegistrysHost() {
     QVERIFY(!HarperUpdater::isNewer(QStringLiteral("2.10.0"), QStringLiteral("2.10.0")));
     QVERIFY(!HarperUpdater::isNewer(QStringLiteral("2.9.0"), QStringLiteral("2.10.0")));
 
+    if (!HarperUpdater().updatesSupported())
+        QSKIP("Portable validation assertions passed; updater network/extraction are disabled on Windows until W12");
     Backend backend;
     HarperUpdater *updater = backend.harperUpdater();
     QSignalSpy available(updater, &HarperUpdater::updateAvailable), failed(updater, &HarperUpdater::failed);
@@ -517,6 +531,8 @@ void FomawriteTest::harperUpdaterAcceptsOnlyHttpsAddressesOnTheRegistrysHost() {
 // ---- the weekly check --------------------------------------------------------------------------------------------------
 
 void FomawriteTest::harperUpdaterWeeklyCheckRespectsLastCheckAndAutoCheckAndInstallsOnce() {
+    if (!HarperUpdater().updatesSupported())
+        QSKIP("Harper downloads/activation are explicitly disabled on Windows until W12; bundled policy is covered separately");
     Cycle146Sandbox sandbox;
     Backend backend;
     HarperUpdater *updater = backend.harperUpdater();
@@ -632,6 +648,8 @@ void FomawriteTest::harperUpdaterWeeklyCheckRespectsLastCheckAndAutoCheckAndInst
 // ---- the Help menu, the banner and the pane ------------------------------------------------------------------------------
 
 void FomawriteTest::helpMenuOffersWritingCheckerUpdatesWithBannerAndPaneStatus() {
+    if (!HarperUpdater().updatesSupported())
+        QSKIP("Harper downloads/activation are explicitly disabled on Windows until W12; bundled policy is covered separately");
     Cycle146Sandbox sandbox;
     Cycle103SettingsSnapshot settings;
     Cycle117Window f; QVERIFY2(f.start(1200), qPrintable(f.error));
@@ -707,6 +725,8 @@ void FomawriteTest::helpMenuOffersWritingCheckerUpdatesWithBannerAndPaneStatus()
 // The real engine in the real page, updated and rolled back: a package made from the bundled engine under a new version
 // is installed, the page re-reads VERSION, imports fomawrite://harper/<new>/index.js (a URL it has never seen) and lints with it.
 void FomawriteTest::harperUpdateLoadsInTheRealPageUnderItsOwnVersionedUrlAndRollsBack() {
+    if (!HarperUpdater().updatesSupported())
+        QSKIP("Harper downloads/activation are explicitly disabled on Windows until W12; bundled policy is covered separately");
     Cycle146Sandbox sandbox;
     Cycle103SettingsSnapshot settings;
     Backend backend;

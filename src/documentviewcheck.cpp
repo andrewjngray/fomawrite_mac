@@ -217,12 +217,24 @@ public:
         if (m_path.isEmpty() || QFileInfo::exists(m_path) || QFileInfo(m_path).isSymLink()) return false;
         m_parent = QFileInfo(m_path).absolutePath();
         if (!QDir().mkpath(target) || !QDir().mkpath(m_parent)) return false;
+        #ifdef Q_OS_WIN
+        // QFile::link creates a .lnk shortcut on Windows, not a directory link.
+        // Use only the new UUID test namespace; no administrator privilege or
+        // existing profile is needed. Remove only this owned directory at exit.
+        m_created = QDir().mkdir(m_path);
+        return m_created;
+#else
         m_created = QFile::link(target, m_path);
         return m_created && QFileInfo(m_path).canonicalFilePath() == QFileInfo(target).canonicalFilePath();
+#endif
     }
     ~TemporaryDataLink() {
         if (m_created) {
+#ifdef Q_OS_WIN
+            QDir(m_path).removeRecursively();
+#else
             QFile::remove(m_path);
+#endif
             QDir().rmdir(m_parent); // Non-recursive: succeeds only if empty.
         }
     }
@@ -295,7 +307,7 @@ int runDocumentViewCheck(QApplication &app, const QString &outputDirectory) {
     };
     QJsonObject resources;
     for (const QString &name : {QStringLiteral("Main.qml"), QStringLiteral("DocumentFooter.qml"),
-            QStringLiteral("FooterButton.qml"), QStringLiteral("PublishingPreview.qml"), QStringLiteral("LiveEditorPane.qml"), QStringLiteral("NativeMenuBar.qml"), QStringLiteral("LibraryPane.qml"),
+            QStringLiteral("FooterButton.qml"), QStringLiteral("PublishingPreview.qml"), QStringLiteral("LiveEditorPane.qml"), QStringLiteral("NativeMenuBar.qml"), QStringLiteral("WindowsMenuBar.qml"), QStringLiteral("LibraryPane.qml"),
             QStringLiteral("WorkspaceLayout.qml"), QStringLiteral("WorkspaceCommands.qml"), QStringLiteral("AboutDialog.qml"),
             QStringLiteral("DocumentFindBar.qml"), QStringLiteral("DocumentOutline.qml"),
             QStringLiteral("PaneZoomState.qml"), QStringLiteral("PaneZoomControls.qml"), QStringLiteral("WorkspaceHeader.qml"), QStringLiteral("LinkEditor.qml"), QStringLiteral("LinkSyntax.js"), QStringLiteral("ExportHub.qml"), QStringLiteral("SquareDialogButton.qml"),
@@ -328,7 +340,7 @@ int runDocumentViewCheck(QApplication &app, const QString &outputDirectory) {
         {"uniqueApplicationName", identity}, {"preferencesMigration", false}, {"ipc", false}});
     QQuickStyle::setStyle(QStringLiteral("Material"));
     SystemTheme systemTheme;
-#ifdef Q_OS_MACOS
+#if defined(Q_OS_MACOS) || defined(Q_OS_WIN)
     QFont font = QFontDatabase::systemFont(QFontDatabase::GeneralFont);
 #else
     QFont font(QStringLiteral("iA Writer Mono S"));

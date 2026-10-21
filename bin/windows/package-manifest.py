@@ -12,6 +12,7 @@ import struct
 import subprocess
 import xml.etree.ElementTree as ET
 import zipfile
+import build_identity
 
 
 def sha(path):
@@ -43,6 +44,9 @@ def main():
     args = parser.parse_args()
     root = Path(__file__).resolve().parents[2]
     stage = args.stage.resolve()
+    build_record = build_identity.verify(root / f"build/windows-{args.architecture}", args.architecture)
+    if sha(stage / "Fomawrite.exe") != build_record["executableSha256"]:
+        raise SystemExit("Deployed executable differs from the verified native build")
     required = ["Fomawrite.exe", "Qt6Core.dll", "Qt6Gui.dll", "Qt6Quick.dll", "Qt6Qml.dll",
                 "Qt6Pdf.dll", "Qt6WebEngineCore.dll", "QtWebEngineProcess.exe",
                 "platforms/qwindows.dll", "qml/QtQuick/Controls/qmldir",
@@ -59,7 +63,7 @@ def main():
             raise SystemExit(f"Wrong PE architecture in deployment: {path}")
     # Runtime DLLs must be app-local, so portable use requires no administrator install.
     if not list(stage.glob("vcruntime140*.dll")) or not list(stage.glob("msvcp140*.dll")):
-        raise SystemExit("App-local MSVC runtime missing (windeployqt --compiler-runtime)")
+        raise SystemExit("App-local MSVC runtime missing")
     licenses = stage / "licenses"
     licenses.mkdir(exist_ok=True)
     for source, name in [("LICENSE", "Upstream-Omawrite-MIT.txt"),
@@ -90,7 +94,7 @@ def main():
                                     cwd=root, text=True).strip()
     manifest = {"schemaVersion": 1, "application": "Fomawrite", "applicationVersion": version,
                 "commit": commit, "trackedSourceDirty": bool(dirty), "architecture": args.architecture,
-                "qtVersion": install["qtVersion"], "qtInstall": install,
+                "qtVersion": install["qtVersion"], "qtInstall": install, "nativeBuild": build_record,
                 "compilerToolset": os.environ.get("VCToolsVersion"),
                 "distributionQualification": "internal build; full licensing/install acceptance pending",
                 "windowsSdk": os.environ.get("WindowsSDKVersion"), "buildOs": platform.platform(),

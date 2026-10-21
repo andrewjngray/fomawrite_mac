@@ -207,9 +207,9 @@ void FomawriteTest::spellCheckEngineDialectAndStyleSettingsPersistAndFallBackUnt
         QCOMPARE(f.spell.dialect(), QStringLiteral("Australian"));
         QVERIFY(!f.spell.styleEnabled());
         QCOMPARE(f.spell.dialects(), (QStringList{"Australian", "British", "American", "Canadian"}));
-        // Until Harper says it is ready, the macOS checker answers.
+        // Until Harper says it is ready, only an available native checker answers.
         QVERIFY(!f.spell.harperReady());
-        QCOMPARE(f.spell.effectiveEngine(), QStringLiteral("macos"));
+        QCOMPARE(f.spell.effectiveEngine(), f.spell.nativeEngineAvailable() ? QStringLiteral("macos") : QStringLiteral("none"));
         QCOMPARE(f.spell.harperVersion(), QString());
         QSignalSpy engineChanged(&f.spell, &SpellCheck::engineChanged), readyChanged(&f.spell, &SpellCheck::harperReadyChanged);
         QSignalSpy resultsForwarded(&f.spell, &SpellCheck::resultsReady);
@@ -223,12 +223,18 @@ void FomawriteTest::spellCheckEngineDialectAndStyleSettingsPersistAndFallBackUnt
         QVERIFY(engineChanged.count() >= 1);
         // The stored learned words were handed to Harper when it came up.
         QCOMPARE(f.imports, QStringList{QStringLiteral("[\"zxqvlearned\"]")});
-        // The setting can say macOS: Harper is ready but not used.
+        // An unavailable native engine cannot be selected, including via stale settings.
         f.spell.setEngine(QStringLiteral("macos"));
-        QCOMPARE(f.spell.effectiveEngine(), QStringLiteral("macos"));
-        QCOMPARE(QSettings().value("writing/engine").toString(), QStringLiteral("macos"));
+        if (f.spell.nativeEngineAvailable()) {
+            QCOMPARE(f.spell.effectiveEngine(), QStringLiteral("macos"));
+            QCOMPARE(QSettings().value("writing/engine").toString(), QStringLiteral("macos"));
+        } else {
+            QCOMPARE(f.spell.engine(), QStringLiteral("harper"));
+            QCOMPARE(f.spell.effectiveEngine(), QStringLiteral("harper"));
+        }
+        const QString selected = f.spell.engine();
         f.spell.setEngine(QStringLiteral("nonsense")); // ignored
-        QCOMPARE(f.spell.engine(), QStringLiteral("macos"));
+        QCOMPARE(f.spell.engine(), selected);
         f.spell.setEngine(QStringLiteral("harper"));
         QCOMPARE(f.spell.effectiveEngine(), QStringLiteral("harper"));
         // Dialect: validated, stored, passed to the engine.
@@ -285,7 +291,7 @@ void FomawriteTest::spellCheckEngineDialectAndStyleSettingsPersistAndFallBackUnt
         QSettings().setValue(QStringLiteral("writing/dialect"), QStringLiteral("Canadian"));
         QSettings().setValue(QStringLiteral("writing/checkStyleWhileTyping"), true);
         SpellCheck reread;
-        QCOMPARE(reread.engine(), QStringLiteral("macos"));
+        QCOMPARE(reread.engine(), reread.nativeEngineAvailable() ? QStringLiteral("macos") : QStringLiteral("harper"));
         QCOMPARE(reread.dialect(), QStringLiteral("Canadian"));
         QVERIFY(reread.styleEnabled());
         QSettings().setValue(QStringLiteral("writing/dialect"), QStringLiteral("Martian"));
@@ -512,28 +518,43 @@ void FomawriteTest::writingCheckerCommandsMenuAndPaneFollowTheEngine() {
     Cycle103SettingsSnapshot settings;
     Cycle117Window f; QVERIFY2(f.start(1200), qPrintable(f.error));
     auto *spell = f.backend.spellCheck();
-    if (!spell->available()) QSKIP("the system spell checker exists only on macOS");
     spell->setEnabled(true); spell->setGrammarEnabled(true); spell->setStyleEnabled(false);
     QVERIFY(f.mode(0));
     QObject *window = f.window.data();
-    // Menu: the submenu and its items exist (the two existing items kept their ids).
+    if (!spell->nativeEngineAvailable()) {
+        f.backend.editorBridge()->ready();
+        f.backend.editorBridge()->harperReady(QStringLiteral("2.10.0-test"));
+    }
+#ifdef Q_OS_MACOS
+    // Native macOS menu items retain their stable identities.
     for (const char *name : {"editWritingChecker", "editWritingEngine", "editWritingDialect", "editEngineHarper", "editEngineMacos", "editDialectAustralian",
                              "editDialectBritish", "editDialectAmerican", "editDialectCanadian", "editCheckSpellingWhileTyping",
                              "editCheckGrammarWhileTyping", "editCheckStyleWhileTyping"})
         QVERIFY2(window->findChild<QObject *>(QString::fromLatin1(name)), name);
+#elif defined(Q_OS_WIN)
+    QVERIFY(window->findChild<QObject *>("windowsMenuBar"));
+    QVERIFY(!window->findChild<QObject *>("windows_engineMacos"));
+    QVERIFY(!window->findChild<QObject *>("windows_checkWritingCheckerUpdates"));
+#endif
     // Ticks follow the settings; the dialects are Harper's, so they dim with the macOS engine.
     QVERIFY(cycle145Checked(window, "engineHarper")); QVERIFY(!cycle145Checked(window, "engineMacos"));
     QVERIFY(cycle145Checked(window, "dialectAustralian"));
     QVERIFY(cycle144Run(window, "dialectBritish"));
     QCOMPARE(spell->dialect(), QStringLiteral("British"));
     QVERIFY(cycle145Checked(window, "dialectBritish") && !cycle145Checked(window, "dialectAustralian"));
+#ifdef Q_OS_MACOS
     QVERIFY(window->findChild<QObject *>("editDialectBritish")->property("checked").toBool());
+#endif
     QVERIFY(cycle145Enabled(window, "dialectAmerican") && cycle145Enabled(window, "checkStyleWhileTyping"));
-    QVERIFY(cycle144Run(window, "engineMacos"));
-    QCOMPARE(spell->engine(), QStringLiteral("macos"));
-    QVERIFY(cycle145Checked(window, "engineMacos") && !cycle145Checked(window, "engineHarper"));
-    QVERIFY(!cycle145Enabled(window, "dialectAmerican") && !cycle145Enabled(window, "checkStyleWhileTyping"));
-    QVERIFY(cycle144Run(window, "engineHarper"));
+    if (spell->nativeEngineAvailable()) {
+        QVERIFY(cycle144Run(window, "engineMacos"));
+        QCOMPARE(spell->engine(), QStringLiteral("macos"));
+        QVERIFY(cycle145Checked(window, "engineMacos") && !cycle145Checked(window, "engineHarper"));
+        QVERIFY(!cycle145Enabled(window, "dialectAmerican") && !cycle145Enabled(window, "checkStyleWhileTyping"));
+        QVERIFY(cycle144Run(window, "engineHarper"));
+    } else {
+        QVERIFY(!cycle145Enabled(window, "engineMacos"));
+    }
     QCOMPARE(spell->engine(), QStringLiteral("harper"));
     QVERIFY(!cycle145Checked(window, "checkStyleWhileTyping"));
     QVERIFY(cycle144Run(window, "checkStyleWhileTyping"));
@@ -543,8 +564,13 @@ void FomawriteTest::writingCheckerCommandsMenuAndPaneFollowTheEngine() {
     // The pane with the macOS checker answering (Harper is not ready): status line and language list.
     QVERIFY(cycle144Run(window, "spelling"));
     QTRY_VERIFY(cycle144Control(window, "reviewFilterStyle"));
-    QCOMPARE(cycle145Label(window, "reviewEngine"), QStringLiteral("macOS checker (Harper is loading)"));
-    QCOMPARE(cycle144Control(window, "reviewLanguage")->property("text").toString(), QStringLiteral("System language"));
+    if (spell->nativeEngineAvailable()) {
+        QCOMPARE(cycle145Label(window, "reviewEngine"), QStringLiteral("macOS checker (Harper is loading)"));
+        QCOMPARE(cycle144Control(window, "reviewLanguage")->property("text").toString(), QStringLiteral("System language"));
+    } else {
+        QCOMPARE(cycle145Label(window, "reviewEngine"), QStringLiteral("Harper 2.10.0-test (built-in)"));
+        QCOMPARE(cycle144Control(window, "reviewLanguage")->property("text").toString(), QStringLiteral("Australian"));
+    }
     // Harper comes up and answers: three categories, kinds as tags, Style filter, version in the header.
     auto *bridge = f.backend.editorBridge();
     QList<QPair<int, QString>> sent;
@@ -585,8 +611,13 @@ void FomawriteTest::writingCheckerCommandsMenuAndPaneFollowTheEngine() {
     QTRY_COMPARE(f.backend.reviewIssues().size(), 2);
     // Back to the macOS engine: the header says so and the language list returns.
     spell->setEngine(QStringLiteral("macos"));
-    QTRY_COMPARE(cycle145Label(window, "reviewEngine"), QStringLiteral("macOS checker"));
-    QCOMPARE(cycle144Control(window, "reviewLanguage")->property("text").toString(), QStringLiteral("System language"));
+    if (spell->nativeEngineAvailable()) {
+        QTRY_COMPARE(cycle145Label(window, "reviewEngine"), QStringLiteral("macOS checker"));
+        QCOMPARE(cycle144Control(window, "reviewLanguage")->property("text").toString(), QStringLiteral("System language"));
+    } else {
+        QCOMPARE(spell->effectiveEngine(), QStringLiteral("harper"));
+        QCOMPARE(cycle145Label(window, "reviewEngine"), QStringLiteral("Harper 2.10.0-test (built-in)"));
+    }
 }
 
 // (h) The real engine in the real page. The window starts in Source and never
@@ -605,7 +636,6 @@ void FomawriteTest::harperDrivesSourceTheLivePageAndThePaneInTheRealPage() {
     QElapsedTimer clock; clock.start();
     Cycle117Window f; QVERIFY2(f.start(1200), qPrintable(f.error));
     auto *spell = f.backend.spellCheck();
-    if (!spell->available()) QSKIP("the system spell checker exists only on macOS");
     spell->setEnabled(true); spell->setGrammarEnabled(true); spell->setStyleEnabled(false);
     QVERIFY(f.mode(0));
     QObject *window = f.window.data();

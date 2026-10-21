@@ -93,6 +93,7 @@ QtObject {
         { id: "togglePreview", title: "Preview", toggle: true },
         { id: "reloadPreview", title: "Reload Preview" },
         { id: "webPreview", title: "Web", toggle: true },
+        { id: "pdfPreview", title: "PDF", toggle: true },
         { id: "sans", title: "Sans", toggle: true },
         { id: "serif", title: "Serif", toggle: true },
         { id: "mono", title: "Mono", toggle: true },
@@ -150,10 +151,12 @@ QtObject {
         if (id === "checkGrammarWhileTyping") return backend.spellCheck.available && backend.spellCheck.enabled;
         // Style findings and dialects are Harper's: the macOS checker has neither.
         if (id === "checkStyleWhileTyping") return backend.spellCheck.available && backend.spellCheck.enabled && backend.spellCheck.engine === "harper";
-        if (id === "engineHarper" || id === "engineMacos") return backend.spellCheck.available;
+        if (id === "engineHarper") return true;
+        if (id === "engineMacos") return backend.spellCheck.nativeEngineAvailable;
         if (id.indexOf("dialect") === 0) return backend.spellCheck.available && backend.spellCheck.engine === "harper";
-        if (id === "checkWritingCheckerUpdates") return !backend.harperUpdater.checking && !backend.harperUpdater.installing;
-        if (id === "useBuiltInWritingChecker") return backend.harperUpdater.hasOverride && !backend.harperUpdater.installing;
+        if (id === "checkWritingCheckerAutomatically") return backend.harperUpdater.updatesSupported;
+        if (id === "checkWritingCheckerUpdates") return backend.harperUpdater.updatesSupported && !backend.harperUpdater.checking && !backend.harperUpdater.installing;
+        if (id === "useBuiltInWritingChecker") return backend.harperUpdater.updatesSupported && backend.harperUpdater.hasOverride && !backend.harperUpdater.installing;
         if (id === "organizer") return true;
         if (id === "liveThemeExact") return layoutState.liveEditEnabled;
         if (id === "split") return layoutState.availableWidth >= 800;
@@ -187,6 +190,7 @@ QtObject {
         case "split": return layoutState.effectiveLayoutMode === 1;
         case "preview": return layoutState.effectiveLayoutMode === 2;
         case "togglePreview": return layoutState.effectiveLayoutMode !== 0;
+        case "pdfPreview": return layoutState.effectiveLayoutMode !== 0 && settings.publishingFormat === "pdf";
         case "webPreview": return layoutState.effectiveLayoutMode !== 0 && settings.publishingFormat === "web";
         case "titleBarFade": return settings.autoHideChrome;
         case "titleBarAlways": return !settings.autoHideChrome;
@@ -269,6 +273,7 @@ QtObject {
         case "preview": window.selectWritingMode("preview"); break;
         case "togglePreview": window.setDocumentView(layoutState.effectiveLayoutMode === 0 ? (layoutState.availableWidth >= 800 ? 1 : 2) : 0); break;
         case "reloadPreview": preview.reload(); break;
+        case "pdfPreview": settings.publishingFormat = "pdf"; if (layoutState.effectiveLayoutMode === 0) window.setDocumentView(layoutState.availableWidth >= 800 ? 1 : 2); break;
         case "webPreview": settings.publishingFormat = "web"; if (layoutState.effectiveLayoutMode === 0) window.setDocumentView(layoutState.availableWidth >= 800 ? 1 : 2); break;
         case "titleBarFade": settings.autoHideChrome = true; break;
         case "titleBarAlways": settings.autoHideChrome = false; break;
