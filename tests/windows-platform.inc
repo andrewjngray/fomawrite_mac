@@ -1,5 +1,7 @@
 // Windows M1: capability truth, pinned Harper policy, and Qt appearance.
 #include "systemtheme.h"
+#include <QPalette>
+#include <QScopeGuard>
 #include <QStyleHints>
 
 void FomawriteTest::platformWritingCheckerCapabilitiesAndBundledPolicy() {
@@ -87,13 +89,49 @@ void FomawriteTest::windowsAppearanceTracksQtColorScheme() {
     QSKIP("Windows Qt appearance implementation; native Windows execution required");
 #else
     auto *hints = QGuiApplication::styleHints();
-    const auto before = hints->colorScheme();
+    QVERIFY(hints);
+    const QPalette beforePalette = QGuiApplication::palette();
+    const auto restore = qScopeGuard([&] {
+        hints->unsetColorScheme();
+        QGuiApplication::setPalette(beforePalette);
+    });
     SystemTheme theme;
+    QCOMPARE(theme.textScale(), 1.0); // Qt handles Windows display DPI itself.
+    if (QGuiApplication::platformName() != QStringLiteral("windows")) {
+        // QStyleHints::setColorScheme is a platform request, not a setter for
+        // its stored value. Qt's offscreen theme does not implement overrides.
+        // Exercise the real fallback with actual Qt palette changes instead.
+        QCOMPARE(hints->colorScheme(), Qt::ColorScheme::Unknown);
+        QSignalSpy changed(&theme, &SystemTheme::darkModeChanged);
+        QPalette palette = beforePalette;
+        palette.setColor(QPalette::Window, Qt::white);
+        QGuiApplication::setPalette(palette);
+        theme.refresh();
+        QVERIFY(!theme.darkMode());
+        changed.clear();
+        palette.setColor(QPalette::Window, Qt::black);
+        QGuiApplication::setPalette(palette);
+        theme.refresh();
+        QVERIFY(theme.darkMode());
+        QCOMPARE(changed.count(), 1);
+        palette.setColor(QPalette::Window, Qt::white);
+        QGuiApplication::setPalette(palette);
+        theme.refresh();
+        QVERIFY(!theme.darkMode());
+        QCOMPARE(changed.count(), 2);
+        qInfo("Verified unknown-scheme palette fallback; native Windows light/dark transitions require the separate windows-platform run.");
+        return;
+    }
+    QSignalSpy changed(&theme, &SystemTheme::darkModeChanged);
     hints->setColorScheme(Qt::ColorScheme::Dark);
+    QTRY_COMPARE(hints->colorScheme(), Qt::ColorScheme::Dark);
     QTRY_VERIFY(theme.darkMode());
     hints->setColorScheme(Qt::ColorScheme::Light);
+    QTRY_COMPARE(hints->colorScheme(), Qt::ColorScheme::Light);
     QTRY_VERIFY(!theme.darkMode());
-    QCOMPARE(theme.textScale(), 1.0); // Qt handles Windows display DPI itself.
-    hints->setColorScheme(before);
+    hints->setColorScheme(Qt::ColorScheme::Dark);
+    QTRY_COMPARE(hints->colorScheme(), Qt::ColorScheme::Dark);
+    QTRY_VERIFY(theme.darkMode());
+    QVERIFY(changed.count() >= 2);
 #endif
 }

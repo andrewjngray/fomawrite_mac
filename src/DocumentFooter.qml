@@ -55,6 +55,15 @@ WorkspaceFooter {
     signal templateMenuRequested(var anchor)
     signal statisticsRequested()
 
+    // System font metrics vary across platforms. Keep the established capsule
+    // widths where they fit, and reserve the actual label plus its padding.
+    component ModeButton: FooterButton {
+        id: modeButton
+        required property real minimumWidth
+        width: Math.max(minimumWidth, Math.ceil(modeLabelMetrics.advanceWidth) + leftPadding + rightPadding)
+        TextMetrics { id: modeLabelMetrics; text: modeButton.text; font: modeButton.font }
+    }
+
     Rectangle {
         x: 0; y: 1; width: root.sourcePaneWidth; height: parent.height - 1
         visible: root.layoutMode !== 2
@@ -124,23 +133,23 @@ WorkspaceFooter {
         anchors.verticalCenter: parent.verticalCenter
         Accessible.role: Accessible.Grouping
         Accessible.name: "Editing mode"
-        FooterButton {
+        ModeButton {
             enabled: root.chromeVisible
             objectName: "sourceModeButton"
             text: "Source"; hint: "Edit Markdown source"
             leftPadding: root.compactEditing ? 5 : 6; rightPadding: leftPadding
-            grouped: true; width: root.compactEditing ? 54 : 56
+            grouped: true; minimumWidth: root.compactEditing ? 54 : 56
             checked: root.layoutMode !== 2 && !root.liveEditing
             Accessible.checkable: true; Accessible.checked: checked
             onClicked: root.sourceEditingRequested()
         }
-        FooterButton {
+        ModeButton {
             enabled: root.chromeVisible
             objectName: "liveEditToggle"
             text: "Live"
             hint: "Live — edit with Markdown rendered in place"
             leftPadding: root.compactEditing ? 5 : 6; rightPadding: leftPadding
-            grouped: true; width: root.compactEditing ? 36 : 44
+            grouped: true; minimumWidth: root.compactEditing ? 36 : 44
             checked: root.layoutMode !== 2 && root.liveEditing
             Accessible.checkable: true; Accessible.checked: checked
             onClicked: root.liveEditingRequested()
@@ -154,22 +163,22 @@ WorkspaceFooter {
         anchors.verticalCenter: parent.verticalCenter
         Accessible.role: Accessible.Grouping
         Accessible.name: "Publishing format"
-        FooterButton {
+        ModeButton {
             enabled: root.chromeVisible
             objectName: "webPublishingButton"
             text: "Web"; hint: "Web — read-only HTML publishing output"
             leftPadding: 6; rightPadding: 6
-            grouped: true; width: 44
+            grouped: true; minimumWidth: 44
             checked: root.publishingFormat === "web"
             Accessible.checkable: true; Accessible.checked: checked
             onClicked: root.publishingFormatRequested("web")
         }
-        FooterButton {
+        ModeButton {
             enabled: root.chromeVisible
             objectName: "pdfPublishingButton"
             text: "PDF"; hint: "PDF — read-only paginated publishing output"
             leftPadding: 6; rightPadding: 6
-            grouped: true; width: 44
+            grouped: true; minimumWidth: 44
             checked: root.publishingFormat === "pdf"
             Accessible.checkable: true; Accessible.checked: checked
             onClicked: root.publishingFormatRequested("pdf")
@@ -182,22 +191,22 @@ WorkspaceFooter {
         anchors.verticalCenter: parent.verticalCenter
         Accessible.role: Accessible.Grouping
         Accessible.name: "Document layout"
-        FooterButton {
+        ModeButton {
             enabled: root.chromeVisible
             objectName: "singleModeButton"
             text: "Single"; hint: "Single — show the chosen editor alone"
             leftPadding: 4; rightPadding: 4
-            grouped: true; width: 48
+            grouped: true; minimumWidth: 48
             checked: root.layoutMode === 0
             Accessible.checkable: true; Accessible.checked: checked
             onClicked: root.layoutRequested(0)
         }
-        FooterButton {
+        ModeButton {
             objectName: "previewSplitButton"
             text: "Split"
             hint: root.canSplit ? "Split — show the chosen editor beside output Preview" : "Widen the window to use Split layout"
             leftPadding: 4; rightPadding: 4
-            grouped: true; width: 38
+            grouped: true; minimumWidth: 38
             enabled: root.chromeVisible && root.canSplit
             checked: root.layoutMode === 1
             Accessible.checkable: true; Accessible.checked: checked
@@ -205,13 +214,13 @@ WorkspaceFooter {
         }
         // Preview Only is the third layout. Naming it here gives one click into
         // it and one click back (Single / Split), instead of a menu-only route.
-        FooterButton {
+        ModeButton {
             enabled: root.chromeVisible
             objectName: "previewOnlyButton"
             text: "Preview"
             hint: "Preview — read the published output on its own"
             leftPadding: 4; rightPadding: 4
-            grouped: true; width: 58
+            grouped: true; minimumWidth: 58
             checked: root.layoutMode === 2
             Accessible.checkable: true; Accessible.checked: checked
             onClicked: root.layoutRequested(2)

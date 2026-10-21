@@ -227,8 +227,11 @@ void FomawriteTest::formattingToolbarAndMenusKeepSourceSelection() {
     QVERIFY(editor->property("text").toString().contains(QString::fromUtf8("## A café draft")));
     QVERIFY(QMetaObject::invokeMethod(editor, "undo")); QCOMPARE(editor->property("text").toString(), source);
     QVERIFY(selectSource());
-    auto *native = cycle113NativeFormatItem(window.data(), "Italic"); QVERIFY(native && native->property("enabled").toBool());
-    QVERIFY(QMetaObject::invokeMethod(native, "triggered"));
+    QVERIFY(testDesktopMenusMatchPlatform(window.data()));
+    auto *desktopItalic = window->property("isMac").toBool() ? cycle113NativeFormatItem(window.data(), "Italic")
+        : testWindowsMenuItem(window.data(), QStringLiteral("&Italic"));
+    QVERIFY(desktopItalic && desktopItalic->property("enabled").toBool());
+    QVERIFY(QMetaObject::invokeMethod(desktopItalic, "triggered"));
     marked = source; marked.replace(start, 4, QString::fromUtf8("*café*"));
     QCOMPARE(editor->property("text").toString(), marked);
     QVERIFY(QMetaObject::invokeMethod(editor, "undo")); QCOMPARE(editor->property("text").toString(), source);

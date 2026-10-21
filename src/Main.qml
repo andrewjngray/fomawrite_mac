@@ -16,7 +16,9 @@ ApplicationWindow {
     minimumWidth: 720
     minimumHeight: 520
     flags: isMac ? Qt.Window | Qt.ExpandedClientAreaHint | Qt.NoTitleBarBackgroundHint : Qt.Window
-    topPadding: 0
+    // The expanded Mac client area starts at zero. An in-window desktop menu
+    // needs its own reservation above the document header and writing panes.
+    topPadding: windowsMenuLoader.active ? windowsMenuLoader.height : 0
     visible: true
     font.family: isMac || isWindows ? Qt.application.font.family : "Helvetica Neue"
     font.pixelSize: 13
@@ -63,7 +65,9 @@ ApplicationWindow {
     readonly property int liveFontPixelSize: backend.publishingThemeId === "omawrite"
         ? scaledSize(20 * paneZoom.sourceZoom / 100) : editorFontPixelSize
     // Omawrite: at most 65 characters, narrowing to the pane width minus 20 characters (and the usual margins).
-    readonly property real omawriteCharWidth: Math.max(1, writerFontMetrics.averageCharacterWidth)
+    // Use the monospaced glyph advance: Windows may hint it differently from
+    // the font's design-time average width, especially at larger zoom levels.
+    readonly property real omawriteCharWidth: Math.max(1, writerGlyphMetrics.advanceWidth)
     readonly property int editorWidth: codeAppearance ? Math.max(180, editorPane.width - 112)
         : activeWritingAppearance === "omawrite" ? Math.max(180, Math.floor(Math.min(65 * omawriteCharWidth,
             editorPane.width - 20 * omawriteCharWidth, editorPane.width - 48)))
@@ -1706,10 +1710,10 @@ ApplicationWindow {
         }
     }
 
-    FontMetrics {
-        id: writerFontMetrics
-        font.family: win.editorFontFamily
-        font.pixelSize: win.editorFontPixelSize
+    TextMetrics {
+        id: writerGlyphMetrics
+        text: "0"
+        font: editor.font
     }
 
     // Every hardcoded size in the interface is expressed at text scale 1.

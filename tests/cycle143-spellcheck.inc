@@ -59,6 +59,14 @@ void FomawriteTest::checkSpellingWhileTypingCommandTogglesTheSetting() {
     Cycle117Window f; QVERIFY2(f.start(1100), qPrintable(f.error));
     auto *commands = f.window->findChild<QObject *>("workspaceCommands"); QVERIFY(commands);
     auto *spell = f.backend.spellCheck();
+    QVERIFY(testDesktopMenusMatchPlatform(f.window.data()));
+    if (!spell->nativeEngineAvailable()) {
+        // This command/setting test needs a ready checker, independently of
+        // the page's asynchronous bundled-WASM load (covered by bridge tests).
+        f.backend.editorBridge()->ready();
+        f.backend.editorBridge()->harperReady(QStringLiteral("2.10.0-test"));
+    }
+    QVERIFY(spell->available());
     const bool before = spell->enabled();
     QVariant checked;
     QVERIFY(QMetaObject::invokeMethod(commands, "isChecked", Q_RETURN_ARG(QVariant, checked), Q_ARG(QVariant, QStringLiteral("checkSpellingWhileTyping"))));
@@ -67,7 +75,10 @@ void FomawriteTest::checkSpellingWhileTypingCommandTogglesTheSetting() {
     QCOMPARE(spell->enabled(), !before);
     QVERIFY(QMetaObject::invokeMethod(commands, "isChecked", Q_RETURN_ARG(QVariant, checked), Q_ARG(QVariant, QStringLiteral("checkSpellingWhileTyping"))));
     QCOMPARE(checked.toBool(), !before);
-    auto *item = f.window->findChild<QObject *>("editCheckSpellingWhileTyping"); QVERIFY(item);
+    auto *item = f.window->property("isMac").toBool()
+        ? f.window->findChild<QObject *>("editCheckSpellingWhileTyping")
+        : testDesktopCommand(f.window.data(), QStringLiteral("checkSpellingWhileTyping"));
+    QVERIFY(item && item->property("enabled").toBool());
     QCOMPARE(item->property("text").toString(), QStringLiteral("Check Spelling While Typing"));
     QVERIFY(QMetaObject::invokeMethod(commands, "run", Q_ARG(QVariant, QStringLiteral("checkSpellingWhileTyping"))));
     QCOMPARE(spell->enabled(), before);

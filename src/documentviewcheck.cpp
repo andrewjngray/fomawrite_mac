@@ -1384,6 +1384,7 @@ int runDocumentViewCheck(QApplication &app, const QString &outputDirectory) {
                 if (item) result.insert(item->objectName(), bounds(item));
             return result;
         };
+        if (!check(renderBarrier(window), "Cannot render document-bar hover geometry")) return;
         const auto baseline = geometry();
         const auto movePointer = [&](const QPointF &point) {
             QMouseEvent event(QEvent::MouseMove, point, point, window->mapToGlobal(point.toPoint()), Qt::NoButton, Qt::NoButton, Qt::NoModifier);
@@ -1392,6 +1393,18 @@ int runDocumentViewCheck(QApplication &app, const QString &outputDirectory) {
         const QPointF writingPoint = bounds(sourceScroll).center();
         const QRectF headerBounds = bounds(header);
         const QPointF topRevealPoint(headerBounds.right() - 4, headerBounds.top() + 4);
+        QJsonObject hoverGeometry{{"headerBounds", rectJson(headerBounds)},
+            {"topRevealPoint", QJsonObject{{"x", topRevealPoint.x()}, {"y", topRevealPoint.y()}}}};
+        if (windows) {
+            auto *desktop = window->findChild<QQuickItem *>("windowsMenuBar");
+            if (!check(desktop, "Windows document-bar hover requires the actual desktop menu item")) return;
+            const QRectF menuBounds = bounds(desktop);
+            hoverGeometry.insert("menuBounds", rectJson(menuBounds));
+            check(desktop->isVisible() && menuBounds.height() > 0
+                    && qAbs(headerBounds.top() - menuBounds.bottom()) <= 0.5,
+                "Windows document header must meet the visible desktop menu without overlap or extra padding");
+        }
+        report.insert("documentChromeHoverGeometry", hoverGeometry);
         movePointer(writingPoint);
         editor->forceActiveFocus(Qt::MouseFocusReason);
         key(window, Qt::Key_unknown, "x");

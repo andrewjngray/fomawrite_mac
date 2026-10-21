@@ -316,7 +316,10 @@ private:
 // Context operations always resolve the clicked path, never the active editor by accident.
 static QSet<Backend *> liveBackends;
 static bool pathWithin(const QString &path, const QString &folder) {
-    return path == folder || path.startsWith(folder + QDir::separator());
+    // QFileInfo canonical paths use '/' on every platform, including drive
+    // and UNC roots that already end with it.
+    return path == folder || path.startsWith(folder.endsWith(QLatin1Char('/'))
+        ? folder : folder + QLatin1Char('/'));
 }
 
 QVariantMap Backend::libraryItemInfo(const QUrl &url) const {
@@ -4001,6 +4004,9 @@ void Backend::autosave() {
     if (!current.open(QIODevice::ReadOnly) || current.readAll() != m_lastKnownFileContents || current.error() != QFile::NoError) {
         setStatus("Autosave paused: file changed outside Fomawrite."); return;
     }
+    // Release our read handle before QSaveFile replaces the original on Windows.
+    // saveTo() checks the baseline again immediately before committing.
+    current.close();
     saveTo(m_fileUrl, true);
 }
 

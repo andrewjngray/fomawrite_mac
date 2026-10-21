@@ -283,3 +283,41 @@ void FomawriteTest::publishingWebCommandSelectsWebWithoutChangingEditor() {
     QCOMPARE(f.layout->property("effectiveLayoutMode").toInt(), 1);
     QCOMPARE(f.editor->property("text").toString(), source);
 }
+
+// Exercise the real in-window menu on Mac as well as Windows so its layout
+// cannot cover the document bar's pointer reveal surface.
+void FomawriteTest::desktopMenuLeavesDocumentChromeHoverAccessible() {
+    Cycle103SettingsSnapshot isolatedSettings;
+    Cycle117Window f; QVERIFY2(f.start(1280), qPrintable(f.error));
+    auto *loader = f.window->findChild<QObject *>("windowsMenuLoader"); QVERIFY(loader);
+    if (!f.window->property("isWindows").toBool()) {
+        QVERIFY(!loader->property("active").toBool());
+        QCOMPARE(f.window->property("topPadding").toReal(), qreal(0));
+        loader->setProperty("active", true);
+    }
+    QTRY_VERIFY(loader->property("active").toBool());
+    auto *desktop = f.item("windowsMenuBar"), *header = f.item("topChrome"), *scroll = f.item("editorScroll");
+    auto *settings = f.window->findChild<QObject *>("workspaceSettings");
+    QVERIFY(desktop && header && scroll && settings);
+    QVERIFY(f.mode(0));
+    settings->setProperty("autoHideChrome", true);
+    QVERIFY(cycle118FooterRenderBarrier(f.quick));
+    const QRectF menuBounds = cycle103SceneBounds(desktop), headerBounds = cycle103SceneBounds(header);
+    qInfo() << "Desktop menu/header bounds" << menuBounds << headerBounds;
+    QVERIFY(menuBounds.height() > 0);
+    QVERIFY2(qAbs(headerBounds.top() - menuBounds.bottom()) <= 0.5,
+        "Document header must meet the desktop menu without overlap or extra padding");
+    const auto geometry = cycle119DocumentGeometry(f);
+    const QPoint writingPoint = cycle103SceneBounds(scroll).center().toPoint();
+    QTest::mouseMove(f.quick, writingPoint);
+    f.editor->forceActiveFocus(Qt::MouseFocusReason);
+    cycle111KeyClick(f.quick, 'x');
+    QTRY_VERIFY(!header->property("documentChromeVisible").toBool());
+    QTest::mouseMove(f.quick, cycle119TopRevealPoint(header));
+    QTRY_VERIFY(header->property("documentChromeVisible").toBool());
+    QVERIFY(!f.footer->property("chromeVisible").toBool());
+    QTest::mouseMove(f.quick, writingPoint);
+    QTest::qWait(200);
+    QVERIFY(header->property("documentChromeVisible").toBool());
+    QCOMPARE(cycle119DocumentGeometry(f), geometry);
+}

@@ -49,6 +49,7 @@ jobs:
           Copy-Item "$env:QT_ROOT_DIR/fomawrite-qt-install.json" "build/windows-${{ matrix.architecture }}/qt-install.json"
 
       - name: Build app (native MSVC2022 toolset)
+        id: build
         run: ./bin/windows/build.ps1 -Architecture ${{ matrix.architecture }}
 
       - name: Deploy portable application and bind manifest
@@ -67,6 +68,7 @@ jobs:
           retention-days: 14
 
       - name: Build and run complete Qt regression suite
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         run: ./bin/windows/test.ps1 -Architecture ${{ matrix.architecture }}
 
       - name: Exercise deployed executable on native Windows desktop
@@ -81,6 +83,8 @@ jobs:
           path: |
             build-tests/windows-${{ matrix.architecture }}/test.log
             build-tests/windows-${{ matrix.architecture }}/test.xml
+            build-tests/windows-${{ matrix.architecture }}/native-appearance.log
+            build-tests/windows-${{ matrix.architecture }}/native-appearance.xml
             build-tests/windows-${{ matrix.architecture }}/deployed-acceptance/
             dist/windows-${{ matrix.architecture }}/Fomawrite/manifest.json
             build/windows-${{ matrix.architecture }}/qt-install.json

@@ -162,6 +162,7 @@ private slots:
     void sourceHangingIndentPreservesLiteralMarkdown();
     void sourceHangingIndentKeepsUndoRedoAndSelection();
     void documentChromeHidesForUserInputAndRevealsEdgesWithoutReflow();
+    void desktopMenuLeavesDocumentChromeHoverAccessible();
     void documentChromeKeepsMenusKeyboardAndNativeToggleAccessible();
     void paneAlignedFooterMenusFollowDividerWithoutEditing();
     void editingAndLayoutChoicesAreIndependent();
@@ -774,6 +775,13 @@ private slots:
         QVERIFY(!backend.libraryItemAction(folder, "duplicate", "Notes copy"));
         QVERIFY(backend.status().contains("Close documents inside this folder"));
         QVERIFY(!QFileInfo::exists(dir.filePath("Notes copy")));
+        // A sibling with a shared name prefix is not a containing folder.
+        QVERIFY(QDir(dir.path()).mkdir("Note"));
+        const QUrl sibling = QUrl::fromLocalFile(dir.filePath("Note"));
+        QVERIFY2(backend.libraryItemAction(sibling, "duplicate", "Note copy"), qPrintable(backend.status()));
+        QVERIFY(QFileInfo(dir.filePath("Note copy")).isDir());
+        QCOMPARE(editor->property("text").toString(), QString("Unsaved text"));
+        QVERIFY(backend.modified());
         QVERIFY(!backend.libraryItemAction(folder, "rename", "Nope"));
         QVERIFY(backend.status().contains("Close documents inside this folder"));
         QVERIFY(QFileInfo::exists(file.toLocalFile()));
@@ -961,7 +969,11 @@ private slots:
         auto *target = qobject_cast<QWindow *>(root.data());
         auto *editor = root->findChild<QObject *>("sourceEditor");
         auto *centerAction = root->findChild<QObject *>("windowCenterAction");
-        QVERIFY(target && editor && centerAction);
+        QVERIFY(target && editor);
+        QVERIFY(testDesktopMenusMatchPlatform(root.data()));
+        const bool windowsMenus = root->property("isWindows").toBool();
+        if (windowsMenus) QVERIFY(!centerAction); // AppKit window commands are not exposed on Windows.
+        else QVERIFY(centerAction);
         backend.setParentWindow(target);
         QVERIFY(backend.open(QUrl::fromLocalFile(file.fileName())));
         QVERIFY(QMetaObject::invokeMethod(editor, "insert", Q_ARG(int, editor->property("length").toInt()),
@@ -979,7 +991,8 @@ private slots:
         target->setGeometry(4, 7, 720, 520);
         target->show();
         QCoreApplication::processEvents();
-        QCOMPARE(centerAction->property("enabled").toBool(), true);
+        if (centerAction) QCOMPARE(centerAction->property("enabled").toBool(), true);
+        const QRect targetGeometry = target->geometry();
         const QSize targetSize = target->size();
         const QRect available = target->screen()->availableGeometry();
         backend.nativeWindowAction(QStringLiteral("center"));
@@ -987,8 +1000,12 @@ private slots:
 
         // AppKit centers the native frame, which includes the title bar. Qt's
         // content position is therefore not the available-screen center.
-        QTRY_VERIFY(qAbs(target->frameGeometry().center().x() - available.center().x()) <= 2);
-        QTRY_VERIFY(qAbs(target->frameGeometry().center().y() - available.center().y()) <= 2);
+        if (windowsMenus) {
+            QCOMPARE(target->geometry(), targetGeometry);
+        } else {
+            QTRY_VERIFY(qAbs(target->frameGeometry().center().x() - available.center().x()) <= 2);
+            QTRY_VERIFY(qAbs(target->frameGeometry().center().y() - available.center().y()) <= 2);
+        }
         QCOMPARE(target->size(), targetSize);
         QCOMPARE(other.geometry(), otherGeometry);
         QCOMPARE(editor->property("text").toString(), source);
@@ -1238,14 +1255,19 @@ private slots:
         QScopedPointer<QObject> window(component.create());
         QVERIFY2(window, qPrintable(component.errorString()));
         auto *editor = window->findChild<QObject *>("sourceEditor");
-        auto *helpAction = window->findChild<QObject *>("helpFomawrite");
+        QVERIFY(testDesktopMenusMatchPlatform(window.data()));
+        const bool windowsMenus = window->property("isWindows").toBool();
+        auto *helpAction = windowsMenus ? testWindowsMenuItem(window.data(), QStringLiteral("Fomawrite Help"))
+                                       : window->findChild<QObject *>("helpFomawrite");
         auto *whatsNewAction = window->findChild<QObject *>("helpWhatsNew");
-        auto *shortcutsAction = window->findChild<QObject *>("helpKeyboardShortcuts");
+        auto *shortcutsAction = windowsMenus ? testWindowsMenuItem(window.data(), QStringLiteral("Keyboard Shortcuts"))
+                                            : window->findChild<QObject *>("helpKeyboardShortcuts");
         auto *dialog = window->findChild<QObject *>("helpDialog");
         auto *viewer = window->findChild<QObject *>("helpDocumentText");
         auto *shortcuts = window->findChild<QObject *>("shortcutsDialog");
-        QVERIFY(editor && helpAction && whatsNewAction && shortcutsAction && dialog
-                && viewer && shortcuts);
+        QVERIFY(editor && helpAction && shortcutsAction && dialog && viewer && shortcuts);
+        if (windowsMenus) QVERIFY(!whatsNewAction); // Desktop affordance remains M2.
+        else QVERIFY(whatsNewAction);
 
         editor->setProperty("text", QStringLiteral("# Synthetic dirty draft\n\nKeep this exact text."));
         QVERIFY(editor->setProperty("cursorPosition", 12));
@@ -1275,8 +1297,8 @@ private slots:
         const auto recoveryBefore = recoveryContents();
 
         QCOMPARE(helpAction->property("text").toString(), QStringLiteral("Fomawrite Help"));
-        QCOMPARE(whatsNewAction->property("text").toString(),
-                 QStringLiteral("What’s New in Fomawrite"));
+        if (whatsNewAction)
+            QCOMPARE(whatsNewAction->property("text").toString(), QStringLiteral("What’s New in Fomawrite"));
         QVERIFY(QMetaObject::invokeMethod(helpAction, "triggered"));
         QTRY_VERIFY(dialog->property("opened").toBool());
         QCOMPARE(dialog->property("title").toString(), QStringLiteral("Fomawrite Help"));
@@ -1287,7 +1309,12 @@ private slots:
         QTest::keyClick(quickWindow, Qt::Key_Escape);
         QTRY_VERIFY(!dialog->property("opened").toBool());
 
-        QVERIFY(QMetaObject::invokeMethod(whatsNewAction, "triggered"));
+        if (windowsMenus) {
+            QVERIFY(QMetaObject::invokeMethod(dialog, "showPage", Q_ARG(QVariant, "whats-new"),
+                                              Q_ARG(QVariant, "What’s New in Fomawrite")));
+        } else {
+            QVERIFY(QMetaObject::invokeMethod(whatsNewAction, "triggered"));
+        }
         QTRY_VERIFY(dialog->property("opened").toBool());
         QCOMPARE(dialog->property("title").toString(), QStringLiteral("What’s New in Fomawrite"));
         QVERIFY(viewer->property("text").toString().startsWith(QStringLiteral("# What’s New in Fomawrite")));
@@ -2397,11 +2424,28 @@ QtObject {
         auto *saveSmartFolder = window->findChild<QObject *>("saveSmartFolder");
         auto *removeSmartFolder = window->findChild<QObject *>("removeSmartFolder");
         QVERIFY(dialog && query && contents && savedChoice && saveSmartFolder && removeSmartFolder);
+        QVERIFY(testDesktopMenusMatchPlatform(window.data()));
+        const bool windowsMenus = window->property("isWindows").toBool();
+        if (windowsMenus) {
+            // Go and Open Recent desktop menus are M2; shared routes are exercised below.
+            for (const char *id : {"goSavedSearch_0", "goNewSmartFolder", "goRefreshHashtags", "goHashtag_work", "goHashtagsEmpty", "recentFile_0", "recentFile_1"})
+                QVERIFY(!window->findChild<QObject *>(id));
+        }
+        auto openSavedSearch = [&] {
+            QVariant opened;
+            return QMetaObject::invokeMethod(window.data(), "openSavedSearch", Q_RETURN_ARG(QVariant, opened),
+                                             Q_ARG(QVariant, library->savedSearches().first())) && opened.toBool();
+        };
 
         library->setRootFolder(rootTwo);
         auto *saved = window->findChild<QObject *>("goSavedSearch_0");
-        QVERIFY(saved);
-        QVERIFY(QMetaObject::invokeMethod(saved, "triggered"));
+        if (windowsMenus) {
+            QVERIFY(!saved);
+            QVERIFY(openSavedSearch());
+        } else {
+            QVERIFY(saved);
+            QVERIFY(QMetaObject::invokeMethod(saved, "triggered"));
+        }
         QTRY_VERIFY(dialog->property("opened").toBool());
         QCOMPARE(library->rootFolder(), rootOne);
         QCOMPARE(query->property("text").toString(), QStringLiteral("#work"));
@@ -2412,8 +2456,17 @@ QtObject {
         contents->setProperty("checked", true);
         const int searchCount = library->savedSearches().size();
         auto *newSmartFolder = window->findChild<QObject *>("goNewSmartFolder");
-        QVERIFY(newSmartFolder);
-        QVERIFY(QMetaObject::invokeMethod(newSmartFolder, "triggered"));
+        if (windowsMenus) {
+            QVERIFY(!newSmartFolder);
+            QVariant opened;
+            QVERIFY(QMetaObject::invokeMethod(window.data(), "openQuickSearchState", Q_RETURN_ARG(QVariant, opened),
+                                              Q_ARG(QVariant, QString()), Q_ARG(QVariant, false),
+                                              Q_ARG(QVariant, library->rootFolder()), Q_ARG(QVariant, true)));
+            QVERIFY(opened.toBool());
+        } else {
+            QVERIFY(newSmartFolder);
+            QVERIFY(QMetaObject::invokeMethod(newSmartFolder, "triggered"));
+        }
         QTRY_VERIFY(dialog->property("opened").toBool());
         QVERIFY(dialog->property("creationMode").toBool());
         QCOMPARE(query->property("text").toString(), QString());
@@ -2422,22 +2475,43 @@ QtObject {
         query->setProperty("text", QStringLiteral("fresh query"));
         QVERIFY(QMetaObject::invokeMethod(saveSmartFolder, "clicked"));
         QTRY_COMPARE(library->savedSearches().size(), searchCount + 1);
-        QTRY_COMPARE(window->findChild<QObject *>("goSavedSearch_0")->property("text").toString(),
-                     QStringLiteral("fresh query — filenames"));
+        QCOMPARE(library->savedSearches().first().toMap().value("query").toString(), QStringLiteral("fresh query"));
+        QVERIFY(!library->savedSearches().first().toMap().value("contents").toBool());
+        if (!windowsMenus)
+            QTRY_COMPARE(window->findChild<QObject *>("goSavedSearch_0")->property("text").toString(),
+                         QStringLiteral("fresh query — filenames"));
         savedChoice->setProperty("currentIndex", 0);
         QVERIFY(QMetaObject::invokeMethod(removeSmartFolder, "clicked"));
         QTRY_COMPARE(library->savedSearches().size(), searchCount);
-        QTRY_COMPARE(window->findChild<QObject *>("goSavedSearch_0")->property("text").toString(),
-                     QStringLiteral("#work — contents"));
+        QCOMPARE(library->savedSearches().first().toMap().value("query").toString(), QStringLiteral("#work"));
+        QVERIFY(library->savedSearches().first().toMap().value("contents").toBool());
+        if (!windowsMenus)
+            QTRY_COMPARE(window->findChild<QObject *>("goSavedSearch_0")->property("text").toString(),
+                         QStringLiteral("#work — contents"));
         QVERIFY(QMetaObject::invokeMethod(dialog, "close"));
 
         auto *refreshTags = window->findChild<QObject *>("goRefreshHashtags");
-        QVERIFY(refreshTags && refreshTags->property("enabled").toBool());
-        QVERIFY(QMetaObject::invokeMethod(refreshTags, "triggered"));
+        if (windowsMenus) {
+            QVERIFY(!refreshTags);
+            QVERIFY(testCommandState(window.data(), "isEnabled", QStringLiteral("refreshTags")));
+            QVERIFY(testRunCommand(window.data(), QStringLiteral("refreshTags")));
+        } else {
+            QVERIFY(refreshTags && refreshTags->property("enabled").toBool());
+            QVERIFY(QMetaObject::invokeMethod(refreshTags, "triggered"));
+        }
         QTRY_VERIFY_WITH_TIMEOUT(!library->tagStatus().startsWith(QStringLiteral("Scanning")), 10000);
         auto *hashtag = window->findChild<QObject *>("goHashtag_work");
-        QVERIFY(hashtag);
-        QVERIFY(QMetaObject::invokeMethod(hashtag, "triggered"));
+        if (windowsMenus) {
+            QVERIFY(!hashtag);
+            QVERIFY(!library->tagIndex().isEmpty());
+            QVariant opened;
+            QVERIFY(QMetaObject::invokeMethod(window.data(), "openHashtag", Q_RETURN_ARG(QVariant, opened),
+                                              Q_ARG(QVariant, "work")));
+            QVERIFY(opened.toBool());
+        } else {
+            QVERIFY(hashtag);
+            QVERIFY(QMetaObject::invokeMethod(hashtag, "triggered"));
+        }
         QTRY_VERIFY(dialog->property("opened").toBool());
         QCOMPARE(query->property("text").toString(), QStringLiteral("#work"));
         QVERIFY(contents->property("checked").toBool());
@@ -2446,25 +2520,50 @@ QtObject {
         library->setRootFolder(rootTwo);
         QCOMPARE(library->tagIndex().size(), 0);
         QTRY_VERIFY(!window->findChild<QObject *>("goHashtag_work"));
-        QVERIFY(window->findChild<QObject *>("goHashtagsEmpty")->property("visible").toBool());
+        if (!windowsMenus)
+            QVERIFY(window->findChild<QObject *>("goHashtagsEmpty")->property("visible").toBool());
 
         library->setRootFolder(missingRoot);
         library->saveSearch(QStringLiteral("missing root"), false);
         library->setRootFolder(rootTwo);
         QVERIFY(QDir(missingRoot.toLocalFile()).removeRecursively());
-        QTRY_VERIFY(window->findChild<QObject *>("goSavedSearch_0"));
-        QVERIFY(QMetaObject::invokeMethod(window->findChild<QObject *>("goSavedSearch_0"), "triggered"));
+        if (windowsMenus) {
+            QVERIFY(!openSavedSearch());
+        } else {
+            QTRY_VERIFY(window->findChild<QObject *>("goSavedSearch_0"));
+            QVERIFY(QMetaObject::invokeMethod(window->findChild<QObject *>("goSavedSearch_0"), "triggered"));
+        }
         QVERIFY(!dialog->property("opened").toBool());
         QCOMPARE(library->rootFolder(), rootTwo);
         QVERIFY(!library->error().isEmpty());
 
         const auto unavailableItems = window->findChildren<QObject *>(QStringLiteral("recentFile_0"));
         const auto availableItems = window->findChildren<QObject *>(QStringLiteral("recentFile_1"));
-        QCOMPARE(unavailableItems.size(), 2); // File → Open Recent and Go → Smart Folders → Recents.
-        QCOMPARE(availableItems.size(), 2);
-        for (QObject *item : unavailableItems) QVERIFY(!item->property("enabled").toBool());
-        for (QObject *item : availableItems) QVERIFY(item->property("enabled").toBool());
-        QVERIFY(QMetaObject::invokeMethod(availableItems.first(), "triggered"));
+        if (windowsMenus) {
+            QVERIFY(unavailableItems.isEmpty() && availableItems.isEmpty());
+            const auto recents = library->recentFiles();
+            QCOMPARE(recents.size(), 2);
+            QVERIFY(!recents.at(0).toMap().value("available").toBool());
+            QVERIFY(recents.at(1).toMap().value("available").toBool());
+            auto *editor = window->findChild<QObject *>("sourceEditor"); QVERIFY(editor);
+            const QString source = editor->property("text").toString();
+            const QUrl fileBefore = backend.fileUrl();
+            QVariant opened;
+            QVERIFY(QMetaObject::invokeMethod(window.data(), "requestOpen", Q_RETURN_ARG(QVariant, opened),
+                                              Q_ARG(QVariant, recents.at(0).toMap().value("url"))));
+            QVERIFY(!opened.toBool());
+            QCOMPARE(backend.fileUrl(), fileBefore);
+            QCOMPARE(editor->property("text").toString(), source);
+            QVERIFY(QMetaObject::invokeMethod(window.data(), "requestOpen", Q_RETURN_ARG(QVariant, opened),
+                                              Q_ARG(QVariant, recents.at(1).toMap().value("url"))));
+            QVERIFY(opened.toBool());
+        } else {
+            QCOMPARE(unavailableItems.size(), 2); // File → Open Recent and Go → Smart Folders → Recents.
+            QCOMPARE(availableItems.size(), 2);
+            for (QObject *item : unavailableItems) QVERIFY(!item->property("enabled").toBool());
+            for (QObject *item : availableItems) QVERIFY(item->property("enabled").toBool());
+            QVERIFY(QMetaObject::invokeMethod(availableItems.first(), "triggered"));
+        }
         QCOMPARE(backend.fileUrl(), QUrl::fromLocalFile(QFileInfo(available.fileName()).canonicalFilePath()));
         backend.discardRecovery();
     }
@@ -3359,7 +3458,12 @@ QtObject {
         if (fixture.unavailable) QSKIP(qPrintable(fixture.error));
         QVERIFY2(fixture.created, qPrintable(fixture.error));
         QVERIFY(QFileInfo(destination).isSymbolicLink());
+#ifndef Q_OS_WIN
         QVERIFY(!QFileInfo::exists(destination));
+#endif
+        QCOMPARE(QFileInfo(destination).symLinkTarget(), missing);
+        { QFile throughLink(destination); QVERIFY(!throughLink.open(QIODevice::ReadOnly)); }
+        QVERIFY(!QFileInfo::exists(missing));
         QFile original(root.filePath(QStringLiteral("Note 日本語.md")));
         QVERIFY(original.open(QIODevice::WriteOnly)); original.write("saved text"); original.close();
         Backend backend;
@@ -3379,7 +3483,11 @@ QtObject {
         QVERIFY(backend.modified());
         QVERIFY(original.open(QIODevice::ReadOnly)); QCOMPARE(original.readAll(), QByteArray("saved text")); original.close();
         QVERIFY(QFileInfo(destination).isSymbolicLink());
+#ifndef Q_OS_WIN
         QVERIFY(!QFileInfo::exists(destination));
+#endif
+        QCOMPARE(QFileInfo(destination).symLinkTarget(), missing);
+        { QFile throughLink(destination); QVERIFY(!throughLink.open(QIODevice::ReadOnly)); }
         QVERIFY(!QFileInfo::exists(missing));
         backend.discardRecovery();
     }
@@ -3796,10 +3904,20 @@ QtObject {
             QVERIFY(QMetaObject::invokeMethod(query, "forceActiveFocus"));
             QVERIFY(QMetaObject::invokeMethod(query, "selectAll"));
             QTRY_VERIFY(!window->property("canFormatSource").toBool());
+            // Editing Find rehighlights Source and advances QTextDocument's
+            // formatting revision. Measure Copy after that separate operation.
+            QCOMPARE(editor->property("text").toString(), source);
+            QVERIFY(!backend.modified());
+            const int auxiliaryCopyRevision = backend.documentRevision();
+            const bool auxiliaryCopyUndo = editor->property("canUndo").toBool();
+            const bool auxiliaryCopyRedo = editor->property("canRedo").toBool();
             QVERIFY(QMetaObject::invokeMethod(copy, "triggered"));
             QCOMPARE(QGuiApplication::clipboard()->text(), QStringLiteral("auxiliary selection"));
             QCOMPARE(editor->property("text").toString(), source);
-            QCOMPARE(backend.documentRevision(), revision);
+            QCOMPARE(backend.documentRevision(), auxiliaryCopyRevision);
+            QCOMPARE(editor->property("canUndo").toBool(), auxiliaryCopyUndo);
+            QCOMPARE(editor->property("canRedo").toBool(), auxiliaryCopyRedo);
+            QVERIFY(!backend.modified());
             editor->setProperty("text", QStringLiteral("dirty but retained"));
             QVERIFY(QMetaObject::invokeMethod(close, "triggered"));
             auto *prompt = window->findChild<QObject *>("unsavedChangesPrompt"); QVERIFY(prompt);
@@ -4238,17 +4356,26 @@ QtObject {
         auto *identifier = window->findChild<QObject *>("authorshipProfileIdentifier");
         auto *save = window->findChild<QObject *>("authorshipProfileSave");
         auto *cancel = window->findChild<QObject *>("authorshipProfileCancel");
-        QVERIFY(settings && editor && menu && setup && dialog && name && identifier
-                && save && cancel);
+        QVERIFY(settings && editor && dialog && name && identifier && save && cancel);
+        QVERIFY(testDesktopMenusMatchPlatform(window.data()));
+        const bool windowsMenus = window->property("isWindows").toBool();
+        if (windowsMenus) QVERIFY(!menu && !setup); // Authors desktop menu remains M2.
+        else QVERIFY(menu && setup);
+        auto openSetup = [&] {
+            return windowsMenus ? QMetaObject::invokeMethod(dialog, "open")
+                                : QMetaObject::invokeMethod(setup, "triggered");
+        };
 
         const QString originalName = settings->property("authorshipProfileName").toString();
         const QString originalIdentifier = settings->property("authorshipProfileIdentifier").toString();
         settings->setProperty("authorshipProfileName", QString());
         settings->setProperty("authorshipProfileIdentifier", QString());
 
-        QCOMPARE(menu->property("title").toString(), QStringLiteral("Authors"));
-        QCOMPARE(setup->property("text").toString(), QStringLiteral("Set Up Authorship…"));
-        QVERIFY(QMetaObject::invokeMethod(setup, "triggered"));
+        if (!windowsMenus) {
+            QCOMPARE(menu->property("title").toString(), QStringLiteral("Authors"));
+            QCOMPARE(setup->property("text").toString(), QStringLiteral("Set Up Authorship…"));
+        }
+        QVERIFY(openSetup());
         QTRY_VERIFY(dialog->property("opened").toBool());
         QVERIFY(!save->property("enabled").toBool());
         name->setProperty("text", QStringLiteral("   "));
@@ -4302,7 +4429,7 @@ QtObject {
         QTest::qWait(850);
         QCOMPARE(recoveryContents(), recoveryBefore);
 
-        QVERIFY(QMetaObject::invokeMethod(setup, "triggered"));
+        QVERIFY(openSetup());
         QTRY_VERIFY(dialog->property("opened").toBool());
         QCOMPARE(name->property("text").toString(), QStringLiteral("Test Writer"));
         QCOMPARE(identifier->property("text").toString(), QStringLiteral("test@example.invalid"));
@@ -5338,9 +5465,45 @@ QtObject {
     }
 
     void loadsCurrentOmarchyTheme() {
+        QSettings settings;
+        const QStringList keys{QStringLiteral("appearance/theme"), QStringLiteral("appearance/followOutputStyle")};
+        QVariantMap original;
+        for (const QString &key : keys) if (settings.contains(key)) original.insert(key, settings.value(key));
+        const auto restore = qScopeGuard([&] {
+            for (const QString &key : keys) {
+                if (original.contains(key)) settings.setValue(key, original.value(key));
+                else settings.remove(key);
+            }
+        });
         QTemporaryDir homeDirectory;
         QVERIFY(homeDirectory.isValid());
-
+#ifdef Q_OS_WIN
+        // Isolate the filesystem input as well as preferences. Windows uses
+        // USERPROFILE for QDir::homePath; this empty home tests the fallback.
+        const bool hadProfile = qEnvironmentVariableIsSet("USERPROFILE");
+        const QByteArray originalProfile = qgetenv("USERPROFILE");
+        const auto restoreProfile = qScopeGuard([&] {
+            if (hadProfile) qputenv("USERPROFILE", originalProfile);
+            else qunsetenv("USERPROFILE");
+        });
+        QVERIFY(qputenv("USERPROFILE", QDir::toNativeSeparators(homeDirectory.path()).toUtf8()));
+        QCOMPARE(QDir::fromNativeSeparators(QDir::homePath()), homeDirectory.path());
+        Backend backend;
+        backend.setAppearanceFollowsOutputStyle(false);
+        backend.setThemePreset(QStringLiteral("system"));
+        backend.setDarkMode(false);
+        QCOMPARE(backend.themeBackground(), QStringLiteral("#FFFFFF"));
+        QCOMPARE(backend.themeForeground(), QStringLiteral("#34363A"));
+        QCOMPARE(backend.themeAccent(), QStringLiteral("#2077b2"));
+        QCOMPARE(backend.themeSelection(), QStringLiteral("#2077b2"));
+        QVERIFY(!backend.darkMode());
+        backend.setDarkMode(true);
+        QCOMPARE(backend.themeBackground(), QStringLiteral("#15181D"));
+        QCOMPARE(backend.themeForeground(), QStringLiteral("#ECEEF2"));
+        QCOMPARE(backend.themeAccent(), QStringLiteral("#5584aa"));
+        QCOMPARE(backend.themeSelection(), QStringLiteral("#186a9a"));
+        QVERIFY(backend.darkMode());
+#else
         const QByteArray originalHome = qgetenv("HOME");
         struct HomeRestorer {
             QByteArray value;
@@ -5364,11 +5527,15 @@ QtObject {
         colorsFile.close();
 
         Backend backend;
+        // This test must also pass by itself, independent of earlier theme tests.
+        backend.setAppearanceFollowsOutputStyle(false);
+        backend.setThemePreset(QStringLiteral("system"));
         QCOMPARE(backend.themeBackground(), QStringLiteral("#fefefe"));
         QCOMPARE(backend.themeForeground(), QStringLiteral("#101010"));
         QCOMPARE(backend.themeAccent(), QStringLiteral("#112233"));
         QCOMPARE(backend.themeSelection(), QStringLiteral("#445566"));
         QVERIFY(!backend.darkMode());
+#endif
     }
 
     void ignoresFileWatcherEventsForSavedContents() {

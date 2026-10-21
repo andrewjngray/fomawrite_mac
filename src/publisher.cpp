@@ -84,7 +84,16 @@ Publisher::Publisher(PublishingSource &source, QObject *parent) : QObject(parent
         m_fileHashes.remove(path);
         m_refreshTimer.start();
     });
-    connect(&m_watcher, &QFileSystemWatcher::directoryChanged, this, [this] { m_refreshTimer.start(); });
+    connect(&m_watcher, &QFileSystemWatcher::directoryChanged, this, [this](const QString &path) {
+        // Windows can report only the directory event when an editor restores
+        // a CSS file's timestamp. Re-read CSS in that directory even when its
+        // metadata is unchanged; unrelated subtrees keep their cached hashes.
+        for (auto it = m_fileHashes.begin(); it != m_fileHashes.end();) {
+            if (QFileInfo(it.key()).absolutePath() == path) it = m_fileHashes.erase(it);
+            else ++it;
+        }
+        m_refreshTimer.start();
+    });
     m_snapshot = watchThemes();
     m_catalogSnapshot = catalogHash(themes());
     updateCss();

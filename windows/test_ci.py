@@ -214,11 +214,11 @@ class DeploymentEvidenceTests(unittest.TestCase):
     def test_matching_v143_runtime_is_preferred_to_latest_v145(self):
         matching = self.runtime_candidate("Microsoft.VC143.CRT", [14, 44, 35211, 0])
         latest = self.runtime_candidate("Microsoft.VC145.CRT", [14, 51, 36231, 0])
-        self.assertIs(matching, packaging.select_runtime([latest, matching], [14, 44, 35207, 0], "arm64"))
+        self.assertEqual(matching["path"], packaging.select_runtime([latest, matching], [14, 44, 35207, 0], "arm64")["path"])
 
     def test_actual_newer_v14_runtime_is_compatible(self):
         latest = self.runtime_candidate("Microsoft.VC145.CRT", [14, 51, 36231, 0])
-        self.assertIs(latest, packaging.select_runtime([latest], [14, 44, 35207, 0], "arm64"))
+        self.assertEqual(latest["path"], packaging.select_runtime([latest], [14, 44, 35207, 0], "arm64")["path"])
 
     def test_older_runtime_cannot_satisfy_selected_compiler(self):
         old = self.runtime_candidate("Microsoft.VC143.CRT", [14, 44, 35112, 0])
@@ -246,6 +246,53 @@ class DeploymentEvidenceTests(unittest.TestCase):
         del partial["files"]["msvcp140.dll"]
         with self.assertRaises(SystemExit):
             packaging.select_runtime([partial], [14, 44, 35207, 0], "arm64")
+
+    def test_arm64_runtime_excludes_unimported_x64_sidecar(self):
+        candidate = self.runtime_candidate("Microsoft.VC143.CRT", [14, 44, 35211, 0])
+        candidate["files"]["vcruntime140_1.dll"] = {"architecture": "x64", "version": [14, 44, 35211, 0]}
+        selected = packaging.select_runtime([candidate], [14, 44, 35207, 0], "arm64", {"vcruntime140.dll", "msvcp140.dll"})
+        self.assertNotIn("vcruntime140_1.dll", selected["files"])
+        self.assertEqual("x64", selected["excludedFiles"]["vcruntime140_1.dll"]["architecture"])
+
+    def test_x64_runtime_keeps_legitimately_imported_vcruntime140_1(self):
+        candidate = self.runtime_candidate("Microsoft.VC143.CRT", [14, 44, 35211, 0], "x64")
+        candidate["files"]["vcruntime140_1.dll"] = {"architecture": "x64", "version": [14, 44, 35211, 0]}
+        selected = packaging.select_runtime([candidate], [14, 44, 35207, 0], "x64", {"vcruntime140_1.dll"})
+        self.assertIn("vcruntime140_1.dll", selected["files"])
+
+    def test_arm64_import_requiring_foreign_runtime_is_rejected(self):
+        candidate = self.runtime_candidate("Microsoft.VC143.CRT", [14, 44, 35211, 0])
+        candidate["files"]["vcruntime140_1.dll"] = {"architecture": "x64", "version": [14, 44, 35211, 0]}
+        with self.assertRaises(SystemExit):
+            packaging.select_runtime([candidate], [14, 44, 35207, 0], "arm64", {"vcruntime140_1.dll"})
+
+    def test_native_crt_transitive_import_requiring_foreign_runtime_is_rejected(self):
+        candidate = self.runtime_candidate("Microsoft.VC143.CRT", [14, 44, 35211, 0])
+        candidate["files"]["vcruntime140_1.dll"] = {"architecture": "x64", "version": [14, 44, 35211, 0]}
+        candidate["files"]["msvcp140.dll"]["imports"] = ["vcruntime140_1.dll"]
+        with self.assertRaises(SystemExit):
+            packaging.select_runtime([candidate], [14, 44, 35207, 0], "arm64")
+
+    def test_missing_required_native_crt_is_rejected(self):
+        candidate = self.runtime_candidate("Microsoft.VC143.CRT", [14, 44, 35211, 0])
+        with self.assertRaises(SystemExit):
+            packaging.select_runtime([candidate], [14, 44, 35207, 0], "arm64", {"msvcp140_atomic_wait.dll"})
+
+    def test_dumpbin_reads_normal_and_delay_import_sections(self):
+        listing = """Dump of file synthetic.exe
+  Section contains the following imports:
+    MSVCP140.dll
+  Section contains the following delay load imports:
+    VCRUNTIME140_1.dll
+"""
+        with patch.object(packaging.subprocess, "check_output", return_value=listing) as command:
+            self.assertEqual(["msvcp140.dll", "vcruntime140_1.dll"], packaging.dumpbin_imports(self.exe))
+            self.assertIn("/imports", command.call_args.args[0])
+
+    def test_empty_dumpbin_output_cannot_prove_foreign_runtime_unused(self):
+        with patch.object(packaging.subprocess, "check_output", return_value="Unexpected dumpbin output"):
+            with self.assertRaises(ValueError):
+                packaging.dumpbin_imports(self.exe)
 
 
 if __name__ == "__main__":

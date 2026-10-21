@@ -16,6 +16,7 @@ import zipfile
 import build_identity
 
 MSVC_COMPATIBILITY = "https://learn.microsoft.com/en-us/cpp/porting/binary-compat-2015-2017"
+MSVC_IMPORTS = "https://learn.microsoft.com/en-us/cpp/build/reference/imports-dumpbin"
 
 
 def sha(path):
@@ -63,19 +64,40 @@ def windows_file_version(path):
     return [fixed[2] >> 16, fixed[2] & 0xFFFF, fixed[3] >> 16, fixed[3] & 0xFFFF]
 
 
-def select_runtime(inventory, compiler, architecture):
+def dumpbin_imports(path):
+    # /IMPORTS includes both normal and delay-loaded DLL imports. Keep the
+    # actual dependency names; never infer them from a compiler/folder label.
+    output = subprocess.check_output(["dumpbin", "/nologo", "/imports", str(path)],
+                                     text=True, encoding="utf-8", errors="replace")
+    imports = sorted({name.lower() for name in re.findall(r"^\s+([^\s\\/]+\.dll)\s*$", output, re.MULTILINE | re.IGNORECASE)})
+    if not imports:
+        raise ValueError(f"No DLL imports found by dumpbin; cannot certify runtime dependencies: {path}")
+    return imports
+
+
+def select_runtime(inventory, compiler, architecture, required_imports=()):
     compatible = []
     for candidate in inventory:
-        files = candidate.get("files", {})
+        native = {name: file for name, file in candidate.get("files", {}).items()
+                  if file.get("architecture") == architecture}
+        foreign = {name: file for name, file in candidate.get("files", {}).items() if name not in native}
+        required = set(required_imports)
+        for file in native.values():
+            required.update(file.get("imports", []))
+        required_crt = {name for name in required if re.match(r"^(?:concrt|msvcp|vccorlib|vcruntime|vcomp)\d.*\.dll$", name)}
         if (candidate.get("family") not in ("Microsoft.VC143.CRT", "Microsoft.VC145.CRT")
-                or not {"vcruntime140.dll", "msvcp140.dll"}.issubset(files)
-                or any(file.get("architecture") != architecture
-                       or file.get("version", [0])[0] != 14
-                       or tuple(file["version"]) < tuple(compiler) for file in files.values())):
+                or not {"vcruntime140.dll", "msvcp140.dll"}.issubset(native)
+                or required.intersection(foreign)
+                or not required_crt.issubset(native)
+                or any(file.get("version", [0])[0] != 14
+                       or tuple(file["version"]) < tuple(compiler) for file in native.values())):
             continue
-        version = min(tuple(file["version"]) for file in files.values())
+        selected = {**candidate, "files": native, "excludedFiles": {
+            name: {**file, "reason": "Foreign architecture; not imported by deployed binaries or any selected native CRT DLL"}
+            for name, file in foreign.items()}, "requiredCrtImports": sorted(required_crt)}
+        version = min(tuple(file["version"]) for file in native.values())
         matching = candidate["family"] == "Microsoft.VC143.CRT" and version[:2] == tuple(compiler[:2])
-        compatible.append((matching, candidate["family"] == "Microsoft.VC143.CRT", version, candidate))
+        compatible.append((matching, candidate["family"] == "Microsoft.VC143.CRT", version, selected))
     if not compatible:
         raise SystemExit("No native app-local v14 CRT at least as new as the compiler; see runtime inventory")
     return max(compatible, key=lambda item: item[:3])[3]
@@ -88,6 +110,9 @@ def deploy_runtime(stage, architecture):
     # Inventory all installed versions before preferring a matching v143 CRT.
     redist = Path(os.environ["VCToolsRedistDir"].rstrip("\\/"))
     root = redist.parent
+    package_imports = {path.relative_to(stage).as_posix(): dumpbin_imports(path)
+                       for path in sorted(stage.rglob("*")) if path.suffix.lower() in (".exe", ".dll")}
+    required_imports = {name for names in package_imports.values() for name in names}
     inventory = []
     for version_dir in sorted(root.iterdir()):
         if not version_dir.is_dir() or not re.fullmatch(r"14\.\d+\.\d+(?:\.\d+)?", version_dir.name):
@@ -99,14 +124,18 @@ def deploy_runtime(stage, architecture):
             candidate = {"path": str(folder), "family": family, "files": {}}
             for path in sorted(folder.glob("*.dll")):
                 candidate["files"][path.name.lower()] = {
-                    "architecture": pe_architecture(path), "version": windows_file_version(path), "sha256": sha(path)}
+                    "architecture": pe_architecture(path), "version": windows_file_version(path), "sha256": sha(path),
+                    "imports": dumpbin_imports(path)}
             inventory.append(candidate)
     print("Installed native CRT inventory: " + json.dumps(inventory, indent=2), flush=True)
-    selected = select_runtime(inventory, compiler, architecture)
+    print("Deployed CRT imports (normal and delay): " + json.dumps(sorted(
+        name for name in required_imports if re.match(r"^(?:concrt|msvcp|vccorlib|vcruntime|vcomp)\d.*\.dll$", name))), flush=True)
+    selected = select_runtime(inventory, compiler, architecture, required_imports)
     for name in selected["files"]:
         shutil.copy2(Path(selected["path"]) / name, stage / name)
     print(f"Selected app-local CRT: {selected['path']} (compiler {compiler})", flush=True)
     return {"compilerVersion": compiler, "selected": selected, "inventory": inventory,
+            "packageImportDlls": package_imports, "importInspectionSource": MSVC_IMPORTS,
             "compatibilitySource": MSVC_COMPATIBILITY}
 
 
