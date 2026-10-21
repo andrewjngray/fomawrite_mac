@@ -5,6 +5,10 @@ QMap<QString, QRectF> cycle119DocumentGeometry(const Cycle117Window &f) {
         if (auto *item = f.item(name)) result.insert(name, cycle103SceneBounds(item));
     return result;
 }
+QPoint cycle119TopRevealPoint(QQuickItem *header) {
+    const QRectF rect = cycle103SceneBounds(header);
+    return QPointF(rect.right() - 4, rect.top() + 4).toPoint();
+}
 void cycle119Wheel(QQuickWindow *window, const QPointF &position) {
     QWheelEvent event(position, window->mapToGlobal(position.toPoint()), QPoint(), QPoint(0, -120),
                       Qt::NoButton, Qt::NoModifier, Qt::NoScrollPhase, false);
@@ -45,7 +49,7 @@ void FomawriteTest::documentChromeHidesForUserInputAndRevealsEdgesWithoutReflow(
     QCOMPARE(cycle119DocumentGeometry(f), geometry);
 
     // Each edge reveals its own bar; the other bar stays quiet.
-    QTest::mouseMove(f.quick, QPoint(f.quick->width() - 5, 4));
+    QTest::mouseMove(f.quick, cycle119TopRevealPoint(header));
     QTRY_VERIFY(header->property("documentChromeVisible").toBool());
     QVERIFY(!f.footer->property("chromeVisible").toBool());
     QTest::mouseMove(f.quick, writingPoint);
@@ -80,7 +84,7 @@ void FomawriteTest::documentChromeHidesForUserInputAndRevealsEdgesWithoutReflow(
     QCOMPARE(f.editor->property("text").toString(), "yx" + text);
     // Both edges can be latched independently, and activity resets them on every cycle.
     for (int cycle = 0; cycle < 2; ++cycle) {
-        QTest::mouseMove(f.quick, QPoint(f.quick->width() - 5, 4));
+        QTest::mouseMove(f.quick, cycle119TopRevealPoint(header));
         QTRY_VERIFY(header->property("documentChromeVisible").toBool());
         QVERIFY(!f.footer->property("chromeVisible").toBool());
         QTest::mouseMove(f.quick, QPoint(f.quick->width() - 5, f.quick->height() - 4));
@@ -108,7 +112,7 @@ void FomawriteTest::documentChromeHidesForUserInputAndRevealsEdgesWithoutReflow(
     f.editor->forceActiveFocus(Qt::MouseFocusReason);
     QVERIFY(QMetaObject::invokeMethod(f.window.data(), "writingActivity"));
     const auto revealTop = [&] {
-        QTest::mouseMove(f.quick, QPoint(f.quick->width() - 5, 4));
+        QTest::mouseMove(f.quick, cycle119TopRevealPoint(header));
         QTest::mouseMove(f.quick, writingPoint);
         QTest::qWait(200);
         return header->property("documentChromeVisible").toBool();
@@ -124,7 +128,9 @@ void FomawriteTest::documentChromeHidesForUserInputAndRevealsEdgesWithoutReflow(
     QTRY_COMPARE(f.editor->property("text").toString(), QString("Pasted draft."));
     QTRY_VERIFY(!header->property("documentChromeVisible").toBool());
     QVERIFY(revealTop());
-    auto *undo = f.window->findChild<QObject *>("editUndo");
+    QVERIFY(testDesktopMenusMatchPlatform(f.window.data()));
+    auto *undo = f.window->property("isMac").toBool() ? f.window->findChild<QObject *>("editUndo")
+        : testWindowsMenuItem(f.window.data(), QStringLiteral("&Undo"));
     QVERIFY(undo && undo->property("enabled").toBool());
     QVERIFY(QMetaObject::invokeMethod(undo, "triggered"));
     QTRY_COMPARE(f.editor->property("text").toString(), clipboardDraft);
@@ -143,22 +149,45 @@ void FomawriteTest::documentChromeKeepsMenusKeyboardAndNativeToggleAccessible() 
     auto *menu = f.window->findChild<QObject *>("sourceAppearanceMenu");
     auto *source = f.item("sourceModeButton"), *appearance = f.item("sourceAppearanceButton");
     auto *header = f.item("topChrome"), *scroll = f.item("editorScroll");
-    QVERIFY(settings && toggle && fade && always && menu && source && appearance && header && scroll);
-    QCOMPARE(fade->property("text").toString(), QString("Fade In/Out"));
-    QCOMPARE(always->property("text").toString(), QString("Always Show"));
+    QVERIFY(testDesktopMenusMatchPlatform(f.window.data()));
+    const bool mac = f.window->property("isMac").toBool();
+    QVERIFY(settings && menu && source && appearance && header && scroll);
+    if (mac) {
+        QVERIFY(toggle && fade && always);
+        QCOMPARE(fade->property("text").toString(), QString("Fade In/Out"));
+        QCOMPARE(always->property("text").toString(), QString("Always Show"));
+    } else {
+        QVERIFY(!toggle && !fade && !always);
+        QVERIFY(!testDesktopCommand(f.window.data(), QStringLiteral("titleBarFade")));
+        QVERIFY(!testDesktopCommand(f.window.data(), QStringLiteral("titleBarAlways")));
+        QCOMPARE(testCommandLabel(f.window.data(), QStringLiteral("titleBarFade")), QStringLiteral("Fade In/Out"));
+        QCOMPARE(testCommandLabel(f.window.data(), QStringLiteral("titleBarAlways")), QStringLiteral("Always Show"));
+    }
+    const auto checked = [&](QObject *nativeItem, const QString &id) {
+        return mac ? nativeItem->property("checked").toBool() : testCommandState(f.window.data(), "isChecked", id);
+    };
+    const auto choose = [&](QObject *nativeItem, const QString &id) {
+        return mac ? QMetaObject::invokeMethod(nativeItem, "triggered") : testRunCommand(f.window.data(), id);
+    };
+    const auto toggleBars = [&] {
+        if (mac) return QMetaObject::invokeMethod(toggle, "triggered");
+        // Auto-hide menu affordance is omitted in Windows M1; the persisted
+        // common setting and both chrome behaviors remain covered here.
+        return settings->setProperty("autoHideChrome", !settings->property("autoHideChrome").toBool());
+    };
     QVERIFY(f.mode(0));
     settings->setProperty("autoHideChrome", true);
     const QPoint writingPoint = cycle103SceneBounds(scroll).center().toPoint();
     QTest::mouseMove(f.quick, writingPoint);
     const int toolbarPreference = settings->property("toolbarVisibilityMode").toInt();
     settings->setProperty("titleBarMode", 0); // Legacy hover preference must not mask Always Show.
-    QTRY_VERIFY(fade->property("checked").toBool());
-    QVERIFY(!always->property("checked").toBool());
-    QVERIFY(QMetaObject::invokeMethod(always, "triggered"));
+    QTRY_VERIFY(checked(fade, QStringLiteral("titleBarFade")));
+    QVERIFY(!checked(always, QStringLiteral("titleBarAlways")));
+    QVERIFY(choose(always, QStringLiteral("titleBarAlways")));
     QTRY_VERIFY(!settings->property("autoHideChrome").toBool());
-    QTRY_VERIFY(always->property("checked").toBool());
-    QVERIFY(!fade->property("checked").toBool());
-    QVERIFY(!toggle->property("checked").toBool());
+    QTRY_VERIFY(checked(always, QStringLiteral("titleBarAlways")));
+    QVERIFY(!checked(fade, QStringLiteral("titleBarFade")));
+    QVERIFY(!(mac ? toggle->property("checked").toBool() : settings->property("autoHideChrome").toBool()));
     QTRY_COMPARE(header->property("titleContentOpacity").toReal(), qreal(1));
     f.editor->forceActiveFocus(Qt::MouseFocusReason);
     const QString beforeAlwaysTyping = f.editor->property("text").toString();
@@ -168,11 +197,11 @@ void FomawriteTest::documentChromeKeepsMenusKeyboardAndNativeToggleAccessible() 
     QVERIFY(f.footer->property("chromeVisible").toBool());
     QVERIFY(!f.window->property("documentChromeHidden").toBool());
     settings->setProperty("titleBarMode", 1); // Legacy Always preference must not override Fade.
-    QVERIFY(QMetaObject::invokeMethod(fade, "triggered"));
+    QVERIFY(choose(fade, QStringLiteral("titleBarFade")));
     QTRY_VERIFY(settings->property("autoHideChrome").toBool());
-    QTRY_VERIFY(fade->property("checked").toBool());
-    QVERIFY(!always->property("checked").toBool());
-    QVERIFY(toggle->property("checked").toBool());
+    QTRY_VERIFY(checked(fade, QStringLiteral("titleBarFade")));
+    QVERIFY(!checked(always, QStringLiteral("titleBarAlways")));
+    QVERIFY((mac ? toggle->property("checked").toBool() : settings->property("autoHideChrome").toBool()));
     QCOMPARE(settings->property("toolbarVisibilityMode").toInt(), toolbarPreference);
     const QString beforeFadeTyping = f.editor->property("text").toString();
     cycle111KeyClick(f.quick, 'f');
@@ -180,7 +209,7 @@ void FomawriteTest::documentChromeKeepsMenusKeyboardAndNativeToggleAccessible() 
     QTRY_VERIFY(!header->property("documentChromeVisible").toBool());
     QTRY_COMPARE(header->property("titleContentOpacity").toReal(), qreal(0));
     QTRY_VERIFY(!f.footer->property("chromeVisible").toBool());
-    QTest::mouseMove(f.quick, QPoint(f.quick->width() - 5, 4));
+    QTest::mouseMove(f.quick, cycle119TopRevealPoint(header));
     QTRY_VERIFY(header->property("documentChromeVisible").toBool());
     QTRY_COMPARE(header->property("titleContentOpacity").toReal(), qreal(1));
     QTest::mouseMove(f.quick, writingPoint);
@@ -188,18 +217,18 @@ void FomawriteTest::documentChromeKeepsMenusKeyboardAndNativeToggleAccessible() 
     QVERIFY(header->property("documentChromeVisible").toBool());
     QVERIFY(QMetaObject::invokeMethod(f.window.data(), "writingActivity"));
     QTRY_VERIFY(!header->property("documentChromeVisible").toBool());
-    QTRY_VERIFY(toggle->property("checked").toBool());
-    QVERIFY(QMetaObject::invokeMethod(toggle, "triggered"));
+    QTRY_VERIFY((mac ? toggle->property("checked").toBool() : settings->property("autoHideChrome").toBool()));
+    QVERIFY(toggleBars());
     QTRY_VERIFY(!settings->property("autoHideChrome").toBool());
-    QTRY_VERIFY(always->property("checked").toBool());
-    QVERIFY(!fade->property("checked").toBool());
+    QTRY_VERIFY(checked(always, QStringLiteral("titleBarAlways")));
+    QVERIFY(!checked(fade, QStringLiteral("titleBarFade")));
     QTRY_VERIFY(f.footer->property("chromeVisible").toBool());
     QVERIFY(QMetaObject::invokeMethod(f.window.data(), "writingActivity"));
     QVERIFY(!f.window->property("documentChromeHidden").toBool());
-    QVERIFY(QMetaObject::invokeMethod(toggle, "triggered"));
+    QVERIFY(toggleBars());
     QTRY_VERIFY(settings->property("autoHideChrome").toBool());
-    QTRY_VERIFY(fade->property("checked").toBool());
-    QVERIFY(!always->property("checked").toBool());
+    QTRY_VERIFY(checked(fade, QStringLiteral("titleBarFade")));
+    QVERIFY(!checked(always, QStringLiteral("titleBarAlways")));
 
     QVERIFY(cycle102Click(f.quick, appearance));
     QTRY_VERIFY(menu->property("opened").toBool());
@@ -236,7 +265,8 @@ void FomawriteTest::publishingWebCommandSelectsWebWithoutChangingEditor() {
     Cycle103SettingsSnapshot isolatedSettings;
     Cycle117Window f; QVERIFY2(f.start(1280), qPrintable(f.error));
     auto *settings = f.window->findChild<QObject *>("workspaceSettings");
-    auto *command = f.window->findChild<QObject *>("native_webPreview");
+    QVERIFY(testDesktopMenusMatchPlatform(f.window.data()));
+    auto *command = testDesktopCommand(f.window.data(), QStringLiteral("webPreview"));
     QVERIFY(settings && command);
     QVERIFY(f.mode(1));
     QVERIFY(QMetaObject::invokeMethod(f.window.data(), "selectWritingMode", Q_ARG(QVariant, "live")));

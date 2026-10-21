@@ -118,14 +118,14 @@ void FomawriteTest::sourceSpellingFollowsTheSettingAndLearnedWords() {
     // Qt 6.11 restyles lazily as layout reaches each block (adjustSize was not
     // enough on the CI runner): ask for the far block's restyle explicitly.
     largeHighlighter.rehighlightBlock(large.findBlockByNumber(1500));
-    const QTextBlock far = large.findBlockByNumber(1500);
-    const int farWord = far.position() + far.text().indexOf("recieve");
+    const QTextBlock farBlock = large.findBlockByNumber(1500);
+    const int farWord = farBlock.position() + farBlock.text().indexOf("recieve");
     if (!cycle143Underlined(large, farWord)) {
         // Say what this machine's checker and the layer think, for the CI log.
         int underlinedBlocks = 0;
         for (QTextBlock b = large.firstBlock(); b.isValid(); b = b.next()) if (cycle143Underlined(large, b.position() + b.text().indexOf("recieve"))) ++underlinedBlocks;
-        qWarning() << "far block not underlined; checker on its text:" << spell.misspelledRanges(far.text()).size()
-                   << "layer ranges:" << largeHighlighter.misspellingsInBlock(far).size() << "formats:" << far.layout()->formats().size()
+        qWarning() << "far block not underlined; checker on its text:" << spell.misspelledRanges(farBlock.text()).size()
+                   << "layer ranges:" << largeHighlighter.misspellingsInBlock(farBlock).size() << "formats:" << farBlock.layout()->formats().size()
                    << "blocks underlined:" << underlinedBlocks << "of" << large.blockCount();
     }
     QVERIFY(cycle143Underlined(large, farWord));

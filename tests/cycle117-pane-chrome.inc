@@ -196,14 +196,54 @@ void FomawriteTest::compactLibraryRowsOpenActualFilesAndIndentChildren() {
             auto *title = row->findChild<QQuickItem *>("libraryEntryTitle"), *date = row->findChild<QQuickItem *>("libraryEntryDate");
             auto *excerpt = row->findChild<QQuickItem *>("libraryEntryExcerpt"), *icon = row->findChild<QQuickItem *>("libraryEntryIcon");
             QVERIFY(title && date && excerpt && icon);
-            QTRY_VERIFY(icon->isVisible() && date->isVisible() && excerpt->isVisible());
+            QTRY_VERIFY(icon->isVisible() && title->isVisible() && date->isVisible() && excerpt->isVisible());
             QVERIFY(title->property("font").value<QFont>().weight() >= QFont::DemiBold);
             QCOMPARE(excerpt->property("maximumLineCount").toInt(), 2);
+            QTRY_COMPARE(excerpt->property("lineCount").toInt(), row == alphaRow ? 2 : 1);
+            QCOMPARE(title->property("lineCount").toInt(), 1);
+            QCOMPARE(date->property("lineCount").toInt(), 1);
             QCOMPARE(excerpt->property("color"), date->property("color"));
             QTRY_VERIFY(cycle103SceneBounds(title).right() < cycle103SceneBounds(date).left());
             QTRY_VERIFY(qAbs(cycle103SceneBounds(title).center().y() - cycle103SceneBounds(date).center().y()) < 2);
             QVERIFY(cycle103SceneBounds(excerpt).top() > cycle103SceneBounds(title).bottom());
-            QVERIFY(row->height() <= 66);
+            const QFont titleFont = title->property("font").value<QFont>();
+            const QFont dateFont = date->property("font").value<QFont>();
+            const QFont excerptFont = excerpt->property("font").value<QFont>();
+            const QRectF rowBounds = cycle103SceneBounds(row), titleBounds = cycle103SceneBounds(title);
+            const QRectF dateBounds = cycle103SceneBounds(date), excerptBounds = cycle103SceneBounds(excerpt);
+            const QRectF iconBounds = cycle103SceneBounds(icon);
+            const QRectF visibleContents = titleBounds.united(dateBounds).united(excerptBounds).united(iconBounds);
+            const qreal topSpare = visibleContents.top() - rowBounds.top();
+            const qreal bottomSpare = rowBounds.bottom() - visibleContents.bottom();
+            const qreal excerptGap = excerptBounds.top() - qMax(titleBounds.bottom(), dateBounds.bottom());
+            const qreal titleContentHeight = title->property("contentHeight").toReal();
+            const qreal dateContentHeight = date->property("contentHeight").toReal();
+            const qreal excerptContentHeight = excerpt->property("contentHeight").toReal();
+            const qreal excerptLineHeight = excerpt->property("lineHeight").toReal();
+            const QByteArray measured = QJsonDocument(QJsonObject{
+                {"filename", title->property("text").toString()}, {"dark", dark}, {"height", row->height()},
+                {"titleFont", titleFont.family()}, {"titlePixelSize", titleFont.pixelSize()},
+                {"titleHeight", title->height()}, {"dateHeight", date->height()},
+                {"titleContentHeight", titleContentHeight}, {"dateContentHeight", dateContentHeight},
+                {"excerptFont", excerptFont.family()}, {"excerptPixelSize", excerptFont.pixelSize()},
+                {"excerptHeight", excerpt->height()}, {"excerptContentHeight", excerptContentHeight},
+                {"excerptLineCount", excerpt->property("lineCount").toInt()}, {"excerptLineHeight", excerptLineHeight},
+                {"topSpare", topSpare}, {"bottomSpare", bottomSpare}, {"excerptGap", excerptGap}
+            }).toJson(QJsonDocument::Compact);
+            qInfo().noquote() << "Compact library row:" << measured;
+            // Bound the visible content and spare space instead of fitting a
+            // native font into the old Mac-derived 66 px total-height limit.
+            QCOMPARE(titleFont.pixelSize(), 13); QCOMPARE(dateFont.pixelSize(), 11); QCOMPARE(excerptFont.pixelSize(), 12);
+            QVERIFY2(iconBounds.right() < titleBounds.left() && iconBounds.right() < excerptBounds.left(), measured.constData());
+            QVERIFY2(excerptLineHeight >= 1 && excerptLineHeight <= 1.25, measured.constData());
+            QVERIFY2(titleContentHeight > 0 && dateContentHeight > 0 && excerptContentHeight > 0
+                && qAbs(title->height() - titleContentHeight) <= 2
+                && qAbs(date->height() - dateContentHeight) <= 2
+                && qAbs(excerpt->height() - excerptContentHeight) <= 2, measured.constData());
+            QVERIFY2(rowBounds.adjusted(-0.5, -0.5, 0.5, 0.5).contains(visibleContents), measured.constData());
+            QVERIFY2(excerptGap >= -0.5 && excerptGap <= 4, measured.constData());
+            QVERIFY2(topSpare >= -0.5 && bottomSpare >= -0.5 && topSpare <= 8 && bottomSpare <= 8
+                && topSpare + bottomSpare <= 14, measured.constData());
         }
     }
     QVERIFY(cycle102Click(f.quick, alphaRow)); QTRY_COMPARE(f.backend.fileUrl(), QUrl::fromLocalFile(QFileInfo(alphaPath).canonicalFilePath()));

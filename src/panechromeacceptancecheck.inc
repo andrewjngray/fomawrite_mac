@@ -154,18 +154,65 @@
         check(renderBarrier(window), "Cannot render compact library rows");
         check(nested->property("leftPadding").toReal() == folder->property("leftPadding").toReal() + 18
               && first->property("leftPadding") == folder->property("leftPadding"), "Child indentation is not based on real tree depth");
+        QJsonArray compactRowMeasurements;
         for (auto *row : {first, nested}) {
             auto *name = row->findChild<QQuickItem *>("libraryEntryTitle"), *date = row->findChild<QQuickItem *>("libraryEntryDate");
             auto *excerpt = row->findChild<QQuickItem *>("libraryEntryExcerpt"), *icon = row->findChild<QQuickItem *>("libraryEntryIcon");
             if (!check(name && date && excerpt && icon, "Library row metadata missing")) continue;
-            check(icon->isVisible() && date->isVisible() && excerpt->isVisible()
-                  && name->property("font").value<QFont>().weight() >= QFont::DemiBold
-                  && bounds(name).right() < bounds(date).left()
-                  && qAbs(bounds(name).center().y() - bounds(date).center().y()) < 2
-                  && excerpt->property("maximumLineCount").toInt() == 2
-                  && excerpt->property("color") == date->property("color") && row->height() <= 66,
-                  "Compact library row does not retain its icon/name/date/two-line excerpt layout");
+            const QFont titleFont = name->property("font").value<QFont>();
+            const QFont dateFont = date->property("font").value<QFont>();
+            const QFont excerptFont = excerpt->property("font").value<QFont>();
+            const QRectF rowBounds = bounds(row), nameBounds = bounds(name), dateBounds = bounds(date);
+            const QRectF excerptBounds = bounds(excerpt), iconBounds = bounds(icon);
+            const QRectF visibleContents = nameBounds.united(dateBounds).united(excerptBounds).united(iconBounds);
+            const qreal topSpare = visibleContents.top() - rowBounds.top();
+            const qreal bottomSpare = rowBounds.bottom() - visibleContents.bottom();
+            const qreal excerptGap = excerptBounds.top() - qMax(nameBounds.bottom(), dateBounds.bottom());
+            const qreal titleContentHeight = name->property("contentHeight").toReal();
+            const qreal dateContentHeight = date->property("contentHeight").toReal();
+            const qreal excerptContentHeight = excerpt->property("contentHeight").toReal();
+            const qreal excerptLineHeight = excerpt->property("lineHeight").toReal();
+            // A fixed 66 px cap encodes the Mac font's metrics. Bound visible
+            // content, type sizes, line count and spare space independently so
+            // native fonts can fit without permitting tall whitespace cards.
+            const QJsonObject invariants{
+                {"metadataVisible", icon->isVisible() && name->isVisible() && date->isVisible() && excerpt->isVisible()},
+                {"titleBold", titleFont.weight() >= QFont::DemiBold},
+                {"fontSizes", titleFont.pixelSize() == 13 && dateFont.pixelSize() == 11 && excerptFont.pixelSize() == 12},
+                {"titleDateSeparated", nameBounds.right() < dateBounds.left()},
+                {"titleDateAligned", qAbs(nameBounds.center().y() - dateBounds.center().y()) < 2},
+                {"iconBeforeText", iconBounds.right() < nameBounds.left() && iconBounds.right() < excerptBounds.left()},
+                {"twoLineLimit", excerpt->property("maximumLineCount").toInt() == 2
+                    && excerpt->property("lineCount").toInt() > 0 && excerpt->property("lineCount").toInt() <= 2},
+                {"singleLineIdentity", name->property("lineCount").toInt() == 1 && date->property("lineCount").toInt() == 1},
+                {"compactLineSpacing", excerptLineHeight >= 1 && excerptLineHeight <= 1.25},
+                {"contentFitsLabels", titleContentHeight > 0 && dateContentHeight > 0 && excerptContentHeight > 0
+                    && qAbs(name->height() - titleContentHeight) <= 2
+                    && qAbs(date->height() - dateContentHeight) <= 2
+                    && qAbs(excerpt->height() - excerptContentHeight) <= 2},
+                {"contentsInsideRow", rowBounds.adjusted(-0.5, -0.5, 0.5, 0.5).contains(visibleContents)},
+                {"excerptBelowIdentity", excerptGap >= -0.5 && excerptGap <= 4},
+                {"compactPaddingBudget", topSpare >= -0.5 && bottomSpare >= -0.5
+                    && topSpare <= 8 && bottomSpare <= 8 && topSpare + bottomSpare <= 14},
+                {"matchingMutedColors", excerpt->property("color") == date->property("color")},
+            };
+            const QJsonObject measurement{
+                {"filename", name->property("text").toString()}, {"height", row->height()},
+                {"titleFont", titleFont.family()}, {"titlePixelSize", titleFont.pixelSize()},
+                {"titleHeight", name->height()}, {"dateHeight", date->height()},
+                {"titleContentHeight", titleContentHeight}, {"dateContentHeight", dateContentHeight},
+                {"titleDateCenterDifference", qAbs(nameBounds.center().y() - dateBounds.center().y())},
+                {"excerptFont", excerptFont.family()}, {"excerptPixelSize", excerptFont.pixelSize()},
+                {"excerptHeight", excerpt->height()}, {"excerptLineCount", excerpt->property("lineCount").toInt()},
+                {"excerptContentHeight", excerptContentHeight}, {"excerptLineHeight", excerptLineHeight},
+                {"topSpare", topSpare}, {"bottomSpare", bottomSpare}, {"excerptGap", excerptGap},
+                {"invariants", invariants}};
+            compactRowMeasurements.append(measurement);
+            for (auto it = invariants.begin(); it != invariants.end(); ++it)
+                check(it.value().toBool(), QStringLiteral("Compact library row failed %1: %2")
+                    .arg(it.key(), QString::fromUtf8(QJsonDocument(measurement).toJson(QJsonDocument::Compact))));
         }
+        report.insert("compactLibraryRows", compactRowMeasurements);
         check(click(window, first), "Cannot open actual filename row");
         check(waitUntil([&] { return backend.fileUrl() == QUrl::fromLocalFile(QFileInfo(sampleRoot + "/First actual file.md").canonicalFilePath()); }), "Filename row opened the wrong document");
         check(editor->property("text").toString() == files[0].second, "Actual-file click lost the document text");

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Validate and archive a windeployqt directory, binding all files to its commit."""
 import argparse
+import ctypes
 import hashlib
 import json
 import os
@@ -13,6 +14,8 @@ import subprocess
 import xml.etree.ElementTree as ET
 import zipfile
 import build_identity
+
+MSVC_COMPATIBILITY = "https://learn.microsoft.com/en-us/cpp/porting/binary-compat-2015-2017"
 
 
 def sha(path):
@@ -36,6 +39,77 @@ def pe_architecture(path):
     return {0xAA64: "arm64", 0x8664: "x64"}.get(machine, f"unknown-{machine:x}")
 
 
+def windows_file_version(path):
+    """Read the binary's actual fixed version resource, not its folder label."""
+    library = ctypes.WinDLL("version", use_last_error=True)
+    library.GetFileVersionInfoSizeW.argtypes = [ctypes.c_wchar_p, ctypes.POINTER(ctypes.c_uint32)]
+    library.GetFileVersionInfoSizeW.restype = ctypes.c_uint32
+    library.GetFileVersionInfoW.argtypes = [ctypes.c_wchar_p, ctypes.c_uint32, ctypes.c_uint32, ctypes.c_void_p]
+    library.VerQueryValueW.argtypes = [ctypes.c_void_p, ctypes.c_wchar_p,
+                                     ctypes.POINTER(ctypes.c_void_p), ctypes.POINTER(ctypes.c_uint32)]
+    ignored = ctypes.c_uint32()
+    size = library.GetFileVersionInfoSizeW(str(path), ctypes.byref(ignored))
+    if not size:
+        raise ValueError(f"No runtime version resource: {path}")
+    data = ctypes.create_string_buffer(size)
+    if not library.GetFileVersionInfoW(str(path), 0, size, data):
+        raise ValueError(f"Cannot read runtime version resource: {path}")
+    pointer, length = ctypes.c_void_p(), ctypes.c_uint32()
+    if not library.VerQueryValueW(data, "\\", ctypes.byref(pointer), ctypes.byref(length)) or length.value < 16:
+        raise ValueError(f"Invalid fixed runtime version: {path}")
+    fixed = ctypes.cast(pointer, ctypes.POINTER(ctypes.c_uint32))
+    if fixed[0] != 0xFEEF04BD:
+        raise ValueError(f"Invalid runtime version signature: {path}")
+    return [fixed[2] >> 16, fixed[2] & 0xFFFF, fixed[3] >> 16, fixed[3] & 0xFFFF]
+
+
+def select_runtime(inventory, compiler, architecture):
+    compatible = []
+    for candidate in inventory:
+        files = candidate.get("files", {})
+        if (candidate.get("family") not in ("Microsoft.VC143.CRT", "Microsoft.VC145.CRT")
+                or not {"vcruntime140.dll", "msvcp140.dll"}.issubset(files)
+                or any(file.get("architecture") != architecture
+                       or file.get("version", [0])[0] != 14
+                       or tuple(file["version"]) < tuple(compiler) for file in files.values())):
+            continue
+        version = min(tuple(file["version"]) for file in files.values())
+        matching = candidate["family"] == "Microsoft.VC143.CRT" and version[:2] == tuple(compiler[:2])
+        compatible.append((matching, candidate["family"] == "Microsoft.VC143.CRT", version, candidate))
+    if not compatible:
+        raise SystemExit("No native app-local v14 CRT at least as new as the compiler; see runtime inventory")
+    return max(compatible, key=lambda item: item[:3])[3]
+
+
+def deploy_runtime(stage, architecture):
+    compiler = [int(part) for part in os.environ["VCToolsVersion"].strip("\\/").split(".")]
+    compiler += [0] * (4 - len(compiler))
+    # VsDevCmd can set the latest redist even when -vcvars_ver selects v143.
+    # Inventory all installed versions before preferring a matching v143 CRT.
+    redist = Path(os.environ["VCToolsRedistDir"].rstrip("\\/"))
+    root = redist.parent
+    inventory = []
+    for version_dir in sorted(root.iterdir()):
+        if not version_dir.is_dir() or not re.fullmatch(r"14\.\d+\.\d+(?:\.\d+)?", version_dir.name):
+            continue
+        for family in ("Microsoft.VC143.CRT", "Microsoft.VC145.CRT"):
+            folder = version_dir / architecture / family
+            if not folder.is_dir():
+                continue
+            candidate = {"path": str(folder), "family": family, "files": {}}
+            for path in sorted(folder.glob("*.dll")):
+                candidate["files"][path.name.lower()] = {
+                    "architecture": pe_architecture(path), "version": windows_file_version(path), "sha256": sha(path)}
+            inventory.append(candidate)
+    print("Installed native CRT inventory: " + json.dumps(inventory, indent=2), flush=True)
+    selected = select_runtime(inventory, compiler, architecture)
+    for name in selected["files"]:
+        shutil.copy2(Path(selected["path"]) / name, stage / name)
+    print(f"Selected app-local CRT: {selected['path']} (compiler {compiler})", flush=True)
+    return {"compilerVersion": compiler, "selected": selected, "inventory": inventory,
+            "compatibilitySource": MSVC_COMPATIBILITY}
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--architecture", choices=["arm64", "x64"], required=True)
@@ -47,6 +121,7 @@ def main():
     build_record = build_identity.verify(root / f"build/windows-{args.architecture}", args.architecture)
     if sha(stage / "Fomawrite.exe") != build_record["executableSha256"]:
         raise SystemExit("Deployed executable differs from the verified native build")
+    runtime = deploy_runtime(stage, args.architecture)
     required = ["Fomawrite.exe", "Qt6Core.dll", "Qt6Gui.dll", "Qt6Quick.dll", "Qt6Qml.dll",
                 "Qt6Pdf.dll", "Qt6WebEngineCore.dll", "QtWebEngineProcess.exe",
                 "platforms/qwindows.dll", "qml/QtQuick/Controls/qmldir",
@@ -95,6 +170,7 @@ def main():
     manifest = {"schemaVersion": 1, "application": "Fomawrite", "applicationVersion": version,
                 "commit": commit, "trackedSourceDirty": bool(dirty), "architecture": args.architecture,
                 "qtVersion": install["qtVersion"], "qtInstall": install, "nativeBuild": build_record,
+                "msvcRuntime": runtime,
                 "compilerToolset": os.environ.get("VCToolsVersion"),
                 "distributionQualification": "internal build; full licensing/install acceptance pending",
                 "windowsSdk": os.environ.get("WindowsSDKVersion"), "buildOs": platform.platform(),

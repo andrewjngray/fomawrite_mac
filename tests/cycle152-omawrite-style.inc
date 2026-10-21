@@ -170,12 +170,16 @@ void FomawriteTest::omawriteShowsInBothOutputStyleMenusAndApplies() {
     });
     auto *nativeThemes = window->findChild<QObject *>("nativeCustomThemesMenu");
     auto *previewThemes = window->findChild<QObject *>("previewCustomThemesMenu");
-    QVERIFY(nativeThemes && previewThemes);
-
+    QVERIFY(testDesktopMenusMatchPlatform(window.data()));
+    const bool mac = window->property("isMac").toBool();
+    QVERIFY(previewThemes);
+    if (mac) QVERIFY(nativeThemes);
+    else QVERIFY(!nativeThemes); // Output Style desktop submenu is an M2 omission.
+    QObject *nativeOmawrite = nullptr, *nativeClaude = nullptr;
+    if (mac) {
     // The native menu.
     QQmlListReference nativeItems(nativeThemes, "items");
     QVERIFY(nativeItems.isValid());
-    QObject *nativeOmawrite = nullptr, *nativeClaude = nullptr;
     qsizetype claudeAt = -1, omawriteAt = -1;
     for (qsizetype i = 0; i < nativeItems.count(); ++i) {
         const QString name = nativeItems.at(i)->objectName();
@@ -186,6 +190,7 @@ void FomawriteTest::omawriteShowsInBothOutputStyleMenusAndApplies() {
     QCOMPARE(nativeClaude->property("text").toString(), QStringLiteral("Claude Like"));
     QCOMPARE(nativeOmawrite->property("text").toString(), QStringLiteral("Omawrite"));
     QCOMPARE(omawriteAt, claudeAt + 1);
+    }
 
     // The in-app menu.
     QQuickItem *previewOmawrite = nullptr, *previewClaude = nullptr;
@@ -204,11 +209,13 @@ void FomawriteTest::omawriteShowsInBothOutputStyleMenusAndApplies() {
 
     // Selecting applies it, and each menu shows the check.
     backend.selectPublishingTheme("claude-like");
-    QVERIFY(QMetaObject::invokeMethod(nativeOmawrite, "triggered"));
+    QVERIFY(QMetaObject::invokeMethod(mac ? nativeOmawrite : previewOmawrite, "triggered"));
     QTRY_COMPARE(backend.publishingThemeId(), QStringLiteral("omawrite"));
     QCOMPARE(backend.publishingThemeName(), QStringLiteral("Omawrite"));
-    QTRY_VERIFY(nativeOmawrite->property("checked").toBool());
-    QVERIFY(!nativeClaude->property("checked").toBool());
+    if (mac) {
+        QTRY_VERIFY(nativeOmawrite->property("checked").toBool());
+        QVERIFY(!nativeClaude->property("checked").toBool());
+    }
     QTRY_VERIFY(previewOmawrite->property("checked").toBool());
     QVERIFY(!previewClaude->property("checked").toBool());
     QVERIFY(QMetaObject::invokeMethod(previewClaude, "triggered"));
@@ -221,7 +228,8 @@ void FomawriteTest::omawriteShowsInBothOutputStyleMenusAndApplies() {
     QVariant twenty;
     QVERIFY(QMetaObject::invokeMethod(window.data(), "scaledSize", Q_RETURN_ARG(QVariant, twenty), Q_ARG(QVariant, 20)));
     QTRY_COMPARE(window->property("liveFontPixelSize").toInt(), twenty.toInt());
-    QTRY_VERIFY(nativeOmawrite->property("checked").toBool());
+    if (mac) QTRY_VERIFY(nativeOmawrite->property("checked").toBool());
+    QTRY_VERIFY(previewOmawrite->property("checked").toBool());
     // The theme error line stays empty: nothing is missing.
     QVERIFY2(backend.publishingThemeError().isEmpty(), qPrintable(backend.publishingThemeError()));
 }

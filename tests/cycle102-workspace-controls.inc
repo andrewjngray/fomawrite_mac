@@ -279,7 +279,15 @@ void FomawriteTest::previewTemplateFooterAndNativeMenuShareState() {
     auto *nativeView = window->findChild<QObject *>("nativeViewMenu");
     auto *nativePalatino = window->findChild<QObject *>("nativeTemplate6");
     auto *nativeHelvetica = window->findChild<QObject *>("nativeTemplate5");
-    QVERIFY(quick && layout && editor && button && menu && palatino && nativeView && nativePalatino && nativeHelvetica);
+    QVERIFY(quick && layout && editor && button && menu && palatino);
+    if (window->property("isMac").toBool()) QVERIFY(nativeView && nativePalatino && nativeHelvetica);
+    else {
+        QVERIFY(window->property("isWindows").toBool());
+        QVERIFY(!nativeView);
+        auto *desktopLoader = window->findChild<QObject *>("windowsMenuLoader"); QVERIFY(desktopLoader);
+        QVERIFY(desktopLoader->property("active").toBool());
+        QTRY_VERIFY(window->findChild<QObject *>("windowsMenuBar"));
+    }
     Cycle106MouseInputIsolation mouseInput(quick);
     const int originalStyle = backend.outputStyle();
     const auto cleanup = qScopeGuard([&] { backend.setOutputStyle(originalStyle); backend.discardRecovery(); });
@@ -299,6 +307,11 @@ void FomawriteTest::previewTemplateFooterAndNativeMenuShareState() {
     const QString draft = editor->property("text").toString();
     backend.setOutputStyle(0);
 
+    auto *previewThemes = window->findChild<QObject *>("previewCustomThemesMenu");
+    QVERIFY(previewThemes);
+    QCOMPARE(previewThemes->property("title").toString(), QStringLiteral("Custom Themes"));
+    QCOMPARE(previewThemes->property("count").toInt(), backend.publishingThemes().size());
+    if (nativeView) {
     // Inspect the actual native menu model, including submenu separators.
     QQmlListReference items(nativeView, "items");
     QVERIFY(items.isValid());
@@ -343,6 +356,19 @@ void FomawriteTest::previewTemplateFooterAndNativeMenuShareState() {
             inRoot |= outputItems.at(index)->objectName() == name;
         QVERIFY2(inRoot, qPrintable(name + " is missing from the Output Style root"));
     }
+    } else {
+        // Windows M1 exposes library/organizer state in its real desktop menu.
+        // Output Style remains in the common footer; its desktop affordance is M2.
+        auto *desktop = window->findChild<QObject *>("windowsMenuBar"); QVERIFY(desktop);
+        for (const char *id : {"library", "organizer"}) {
+            auto *action = desktop->findChild<QObject *>(QStringLiteral("windows_") + QLatin1String(id)); QVERIFY(action);
+            QCOMPARE(action->property("text").toString(), QLatin1String(id) == QLatin1String("library") ? QStringLiteral("Toggle Library") : QStringLiteral("Toggle Organizer"));
+            QVERIFY(QMetaObject::invokeMethod(action, "triggered"));
+            QTRY_VERIFY(action->property("checked").toBool());
+            QVERIFY(QMetaObject::invokeMethod(action, "triggered"));
+            QTRY_VERIFY(!action->property("checked").toBool());
+        }
+    }
     // A quick show/hide pair must cancel any deferred compact-navigation open.
     QCoreApplication::processEvents();
     auto *drawer = window->findChild<QObject *>("workspaceNavigationDrawer");
@@ -363,14 +389,28 @@ void FomawriteTest::previewTemplateFooterAndNativeMenuShareState() {
     QTRY_VERIFY(!menu->property("visible").toBool());
     QCOMPARE(button->property("text").toString(), QStringLiteral("Output Style"));
     QVERIFY(button->property("hint").toString().contains("Palatino"));
-    QVERIFY(nativePalatino->property("checked").toBool());
-    QVERIFY(!nativeHelvetica->property("checked").toBool());
-    QVERIFY(QMetaObject::invokeMethod(nativeHelvetica, "triggered"));
+    if (nativeView) {
+        QVERIFY(nativePalatino->property("checked").toBool());
+        QVERIFY(!nativeHelvetica->property("checked").toBool());
+        QVERIFY(QMetaObject::invokeMethod(nativeHelvetica, "triggered"));
+    } else {
+        auto *helvetica = window->findChild<QQuickItem *>("previewTemplate5"); QVERIFY(helvetica);
+        QVERIFY(palatino->property("checked").toBool());
+        QVERIFY(!helvetica->property("checked").toBool());
+        QVERIFY(cycle102Click(quick, button));
+        QTRY_VERIFY(menu->property("opened").toBool());
+        QVERIFY(cycle102Click(quick, helvetica));
+        QTRY_VERIFY(!menu->property("visible").toBool());
+        QVERIFY(!palatino->property("checked").toBool());
+        QVERIFY(helvetica->property("checked").toBool());
+    }
     QTRY_COMPARE(backend.outputStyle(), 5);
     QCOMPARE(button->property("text").toString(), QStringLiteral("Output Style"));
     QVERIFY(button->property("hint").toString().contains("Helvetica"));
-    QVERIFY(!nativePalatino->property("checked").toBool());
-    QVERIFY(nativeHelvetica->property("checked").toBool());
+    if (nativeView) {
+        QVERIFY(!nativePalatino->property("checked").toBool());
+        QVERIFY(nativeHelvetica->property("checked").toBool());
+    }
     QCOMPARE(editor->property("text").toString(), draft);
     QVERIFY(backend.modified());
     QVERIFY(QMetaObject::invokeMethod(window.data(), "undoEditing"));

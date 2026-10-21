@@ -1309,10 +1309,22 @@ int runDocumentViewCheck(QApplication &app, const QString &outputDirectory) {
             && pdfFile.open(QIODevice::ReadOnly) && pdfFile.read(5) == "%PDF-", "PDF publishing did not load a real PDF document");
         check(renderBarrier(window), "Cannot render the publishing PDF page");
         capture("publishing-pdf-actual-pages");
-        auto *nativeWeb = window->findChild<QObject *>("native_webPreview");
-        check(nativeWeb && !nativeWeb->property("checked").toBool(), "Native Web command disagrees with PDF publishing");
-        check(nativeWeb && QMetaObject::invokeMethod(nativeWeb, "triggered"), "Cannot select Web publishing through the native View command");
-        check(waitUntil([&] { return ready() && pane->property("publishingMode").toString() == "web"; }), "Native Web command did not select Web output");
+        const bool windows = window->property("isWindows").toBool();
+        QObject *webCommand = nullptr;
+        if (windows) {
+            auto *loader = window->findChild<QObject *>("windowsMenuLoader");
+            auto *desktop = window->findChild<QObject *>("windowsMenuBar");
+            if (!check(!window->property("isMac").toBool() && loader && loader->property("active").toBool()
+                    && desktop && !window->findChild<QObject *>("nativeViewMenu"),
+                    "Windows publishing check requires the active production desktop menu")) return;
+            webCommand = desktop->findChild<QObject *>("windows_webPreview");
+        } else {
+            webCommand = window->findChild<QObject *>("native_webPreview");
+        }
+        report.insert("publishingWebCommandRoute", windows ? "windows_webPreview" : "native_webPreview");
+        check(webCommand && !webCommand->property("checked").toBool(), "Desktop Web command disagrees with PDF publishing");
+        check(webCommand && QMetaObject::invokeMethod(webCommand, "triggered"), "Cannot select Web publishing through the desktop View command");
+        check(waitUntil([&] { return ready() && pane->property("publishingMode").toString() == "web"; }), "Desktop Web command did not select Web output");
         check(click(window, webChoice), "Cannot reselect Web publishing");
         check(waitUntil([&] { return ready() && pane->property("publishingMode").toString() == "web"; }), "Web publishing return did not finish loading");
         check(editor->property("text").toString() == sample && backend.documentRevision() == revision && !backend.modified(),
@@ -1325,11 +1337,47 @@ int runDocumentViewCheck(QApplication &app, const QString &outputDirectory) {
         auto *toggle = window->findChild<QObject *>("nativeAutoHideDocumentChrome");
         auto *fade = window->findChild<QObject *>("native_titleBarFade");
         auto *always = window->findChild<QObject *>("native_titleBarAlways");
-        if (!check(header && toggle && fade && always, "Document chrome menu controls are missing")) return;
-        check(fade->property("text").toString() == "Fade In/Out"
-            && always->property("text").toString() == "Always Show", "Native Title Bar labels differ from the requested choices");
-        check(fade->property("checked").toBool() && !always->property("checked").toBool(),
-            "Native Title Bar choices disagree with enabled auto-hide");
+        const bool windows = window->property("isWindows").toBool();
+        if (windows) {
+            auto *loader = window->findChild<QObject *>("windowsMenuLoader");
+            auto *desktop = window->findChild<QObject *>("windowsMenuBar");
+            if (!check(header && commands && !window->property("isMac").toBool() && loader
+                    && loader->property("active").toBool() && desktop
+                    && !window->findChild<QObject *>("nativeViewMenu"),
+                    "Windows chrome check requires the active production desktop menu and command registry")) return;
+            check(!toggle && !fade && !always
+                    && !desktop->findChild<QObject *>("windows_titleBarFade")
+                    && !desktop->findChild<QObject *>("windows_titleBarAlways"),
+                    "Windows M1 unexpectedly exposes the omitted document-bar menu affordances");
+            report.insert("documentChromeCommandRoute", "workspaceCommands and autoHideChrome setting; Windows desktop menu affordances omitted pending M2");
+        } else {
+            if (!check(header && toggle && fade && always, "Document chrome menu controls are missing")) return;
+            check(fade->property("text").toString() == "Fade In/Out"
+                && always->property("text").toString() == "Always Show", "Native Title Bar labels differ from the requested choices");
+            report.insert("documentChromeCommandRoute", "nativeAutoHideDocumentChrome and native Title Bar menu");
+        }
+        const auto titleChecked = [&](QObject *nativeItem, const QString &command) {
+            if (!windows) return nativeItem->property("checked").toBool();
+            QVariant value;
+            check(QMetaObject::invokeMethod(commands, "isChecked", Q_RETURN_ARG(QVariant, value), Q_ARG(QVariant, command)),
+                "Cannot read document-bar command state: " + command);
+            return value.toBool();
+        };
+        const auto chooseTitle = [&](QObject *nativeItem, const QString &command) {
+            return windows ? QMetaObject::invokeMethod(commands, "run", Q_ARG(QVariant, command))
+                : QMetaObject::invokeMethod(nativeItem, "triggered");
+        };
+        const auto toggleBars = [&] {
+            // Windows M1 omits this desktop affordance. Exercise the same
+            // persisted setting while retaining every actual input/paint check.
+            return windows ? settings->setProperty("autoHideChrome", !settings->property("autoHideChrome").toBool())
+                : QMetaObject::invokeMethod(toggle, "triggered");
+        };
+        const auto autoHideChecked = [&] {
+            return windows ? settings->property("autoHideChrome").toBool() : toggle->property("checked").toBool();
+        };
+        check(titleChecked(fade, QStringLiteral("titleBarFade")) && !titleChecked(always, QStringLiteral("titleBarAlways")),
+            "Title Bar choices disagree with enabled auto-hide");
         const auto geometry = [&] {
             QMap<QString, QRectF> result;
             for (auto *item : {child("editorPane"), sourceScroll, pane, header, footer})
@@ -1342,6 +1390,8 @@ int runDocumentViewCheck(QApplication &app, const QString &outputDirectory) {
             QCoreApplication::sendEvent(window, &event); QCoreApplication::processEvents();
         };
         const QPointF writingPoint = bounds(sourceScroll).center();
+        const QRectF headerBounds = bounds(header);
+        const QPointF topRevealPoint(headerBounds.right() - 4, headerBounds.top() + 4);
         movePointer(writingPoint);
         editor->forceActiveFocus(Qt::MouseFocusReason);
         key(window, Qt::Key_unknown, "x");
@@ -1349,7 +1399,7 @@ int runDocumentViewCheck(QApplication &app, const QString &outputDirectory) {
             && !header->property("documentChromeVisible").toBool() && !footer->property("chromeVisible").toBool(); }), "Source typing did not hide document bars");
         check(geometry() == baseline, "Hiding document bars changed writing geometry");
         capture("document-chrome-hidden-writing");
-        movePointer(QPointF(window->width() - 4, 4));
+        movePointer(topRevealPoint);
         check(waitUntil([&] { return header->property("documentChromeVisible").toBool(); })
             && !footer->property("chromeVisible").toBool(), "Top edge did not independently reveal its document bar");
         movePointer(writingPoint);
@@ -1382,7 +1432,7 @@ int runDocumentViewCheck(QApplication &app, const QString &outputDirectory) {
             && !header->property("documentChromeVisible").toBool() && !footer->property("chromeVisible").toBool(); }),
             "Publishing wheel interaction did not clear the bottom-edge reveal");
         for (int cycle = 0; cycle < 2; ++cycle) {
-            movePointer(QPointF(window->width() - 4, 4));
+            movePointer(topRevealPoint);
             check(waitUntil([&] { return header->property("documentChromeVisible").toBool(); })
                 && !footer->property("chromeVisible").toBool(), "Repeated top-edge reveal was not independent");
             movePointer(QPointF(window->width() - 4, window->height() - 4));
@@ -1397,43 +1447,43 @@ int runDocumentViewCheck(QApplication &app, const QString &outputDirectory) {
                 && !footer->property("chromeVisible").toBool(); }), "Repeated source typing did not reset both edge reveals");
             check(geometry() == baseline, "Repeated edge reveals changed writing geometry");
         }
-        check(QMetaObject::invokeMethod(toggle, "triggered"), "Cannot choose native always-visible document bars");
+        check(toggleBars(), "Cannot choose always-visible document bars");
         check(waitUntil([&] { return !settings->property("autoHideChrome").toBool() && footer->property("chromeVisible").toBool(); }),
-            "Native View toggle did not restore always-visible document bars");
-        check(always->property("checked").toBool() && !fade->property("checked").toBool(),
-            "Native checkbox did not synchronize Title Bar choices");
+            "Document-bar toggle did not restore always-visible document bars");
+        check(titleChecked(always, QStringLiteral("titleBarAlways")) && !titleChecked(fade, QStringLiteral("titleBarFade")),
+            "Auto-hide state did not synchronize Title Bar choices");
         settings->setProperty("titleBarMode", 0);
         const int toolbarPreference = settings->property("toolbarVisibilityMode").toInt();
-        check(QMetaObject::invokeMethod(always, "triggered"), "Cannot select Title Bar Always Show");
+        check(chooseTitle(always, QStringLiteral("titleBarAlways")), "Cannot select Title Bar Always Show");
         movePointer(writingPoint);
         editor->forceActiveFocus(Qt::MouseFocusReason);
         const QString alwaysText = editor->property("text").toString();
         key(window, Qt::Key_unknown, "a");
         check(waitUntil([&] { return editor->property("text").toString() != alwaysText; }), "Always Show typing did not edit source");
-        check(!settings->property("autoHideChrome").toBool() && !toggle->property("checked").toBool()
-            && always->property("checked").toBool() && !fade->property("checked").toBool()
+        check(!settings->property("autoHideChrome").toBool() && !autoHideChecked()
+            && titleChecked(always, QStringLiteral("titleBarAlways")) && !titleChecked(fade, QStringLiteral("titleBarFade"))
             && header->property("documentChromeVisible").toBool() && footer->property("chromeVisible").toBool()
             && header->property("titleContentOpacity").toReal() == 1,
             "Always Show did not retain document bars while typing with legacy fade preference");
         settings->setProperty("titleBarMode", 1);
-        check(QMetaObject::invokeMethod(fade, "triggered"), "Cannot select Title Bar Fade In/Out");
+        check(chooseTitle(fade, QStringLiteral("titleBarFade")), "Cannot select Title Bar Fade In/Out");
         const QString fadeText = editor->property("text").toString();
         key(window, Qt::Key_unknown, "f");
         check(waitUntil([&] { return editor->property("text").toString() != fadeText
             && !header->property("documentChromeVisible").toBool() && !footer->property("chromeVisible").toBool(); }),
             "Fade In/Out did not restore hiding during actual typing");
-        check(settings->property("autoHideChrome").toBool() && toggle->property("checked").toBool()
-            && fade->property("checked").toBool() && !always->property("checked").toBool()
+        check(settings->property("autoHideChrome").toBool() && autoHideChecked()
+            && titleChecked(fade, QStringLiteral("titleBarFade")) && !titleChecked(always, QStringLiteral("titleBarAlways"))
             && header->property("titleContentOpacity").toReal() == 0
             && settings->property("toolbarVisibilityMode").toInt() == toolbarPreference,
             "Title Bar Fade selection changed toolbar preference or disagreed with checkbox");
-        movePointer(QPointF(window->width() - 4, 4));
+        movePointer(topRevealPoint);
         check(waitUntil([&] { return header->property("documentChromeVisible").toBool(); }), "Fade selection lost top-edge reveal");
         movePointer(writingPoint);
         settle(200);
         check(header->property("documentChromeVisible").toBool() && header->property("titleContentOpacity").toReal() == 1,
             "Fade selection lost sticky title reveal after pointer departure");
-        check(geometry() == baseline, "Native chrome preference changed writing geometry");
+        check(geometry() == baseline, "Chrome preference changed writing geometry");
     });
 
     if (auto *about = window->findChild<QObject *>("aboutDialog")) {

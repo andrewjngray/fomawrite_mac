@@ -749,6 +749,7 @@ void FomawriteTest::livePageWarmUpDoesNotDelayFirstPaintAndIsMeasured() {
     auto *view = window->findChild<QObject *>("liveEditorView");
     QCOMPARE(view != nullptr, on); // the page exists only because of the warm-up
     if (on) { QTRY_VERIFY_WITH_TIMEOUT(backend.editorBridge()->isReady(), 20000); }
+#ifndef Q_OS_WIN
     // Memory: resident set of this process and its descendants (the WebEngine renderer and GPU processes).
     QProcess ps; ps.start(QStringLiteral("ps"), {QStringLiteral("-axo"), QStringLiteral("pid=,ppid=,rss=,args=")});
     QVERIFY(ps.waitForFinished(5000));
@@ -766,6 +767,11 @@ void FomawriteTest::livePageWarmUpDoesNotDelayFirstPaintAndIsMeasured() {
     qInfo() << "processes:" << breakdown;
     qInfo("warm-up %s: window created in %lld ms, first paint %lld ms after that began (%lld ms after the window showed), worst event-loop stall %lld ms, resident %lld MB (process tree)",
           on ? "ON" : "OFF", created, firstPaint, firstPaint - created, worstStall, total / 1024);
+#else
+    // POSIX ps is not a Windows dependency. Memory observation is unqualified;
+    // all warm-up, first-paint and event-loop timing checks still run.
+    qInfo("warm-up %s: window created %lld ms, first paint %lld ms, worst event-loop stall %lld ms; Windows process-tree RSS not measured", on ? "ON" : "OFF", created, firstPaint, worstStall);
+#endif
     QVERIFY2(firstPaint < 15000, "the first paint is not held up by the page");
     backend.discardRecovery();
 }

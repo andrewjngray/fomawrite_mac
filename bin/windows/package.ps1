@@ -15,7 +15,6 @@ Copy-Item -LiteralPath $exe -Destination (Join-Path $stage 'Fomawrite.exe')
 Invoke-Checked (Join-Path $QtRoot 'bin/windeployqt.exe') @('--release', '--no-compiler-runtime', '--qmldir', (Join-Path $RepoRoot 'src'), '--dir', $stage, (Join-Path $stage 'Fomawrite.exe'))
 # windeployqt may bundle a vc_redist installer rather than app-local DLLs. A
 # portable ZIP must launch without elevation or an installed development kit.
-$crt = Join-Path $env:VCToolsRedistDir "$Architecture/Microsoft.VC143.CRT"
-if (-not (Test-Path -LiteralPath $crt)) { throw "MSVC2022 app-local CRT missing: $crt" }
-Copy-Item -Path (Join-Path $crt '*.dll') -Destination $stage
+# package-manifest inventories actual native CRT DLL versions and prefers the
+# selected compiler's v143 runtime; compatible newer v14 runtimes are explicit.
 Invoke-Checked python @("$PSScriptRoot/package-manifest.py", '--architecture', $Architecture, '--qt-root', $QtRoot, '--stage', $stage)

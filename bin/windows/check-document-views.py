@@ -8,7 +8,7 @@ import argparse
 import hashlib
 import json
 import os
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 import subprocess
 import sys
 import time
@@ -29,7 +29,15 @@ def sha(path):
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def verify(report, manifest, executable):
+def same_windows_executable(actual, expected):
+    """Compare guest paths lexically, without resolving them on the host OS."""
+    paths = [PureWindowsPath(value) for value in (actual, expected)]
+    if any(not path.is_absolute() or ".." in path.parts for path in paths):
+        return False
+    return paths[0] == paths[1]
+
+
+def verify(report, manifest, executable, expected_executable=None):
     failures = []
     if not report.get("passed"):
         failures.append("The executable reported failed view checks")
@@ -66,7 +74,10 @@ def verify(report, manifest, executable):
         failures.append("Publishing pane failed document identity, marker or natural-paint checks")
     if report.get("platform") != "windows":
         failures.append("Expected native Windows QPA; offscreen is insufficient for deployed acceptance")
-    if Path(report.get("executable", "")).resolve() != executable.resolve():
+    executable_matches = (same_windows_executable(report.get("executable", ""), expected_executable)
+                          if expected_executable is not None else
+                          Path(report.get("executable", "")).resolve() == executable.resolve())
+    if not executable_matches:
         failures.append("Report came from a different executable")
     if report.get("executableSha256") != sha(executable) or sha(executable) != manifest["executableSha256"]:
         failures.append("Executable hash differs from manifest/report")
@@ -110,7 +121,15 @@ def main():
     parser.add_argument("--package", type=Path, required=True, help="Deployed Fomawrite directory")
     parser.add_argument("--output", type=Path, help="New evidence directory")
     parser.add_argument("--verify-only", action="store_true", help="Check deployed file integrity without launch")
+    parser.add_argument("--verify-report", type=Path, help="Verify a copied guest report offline, without launch")
+    parser.add_argument("--expected-executable", help="Exact absolute Windows executable path used in the guest")
     args = parser.parse_args()
+    if args.verify_report and (not args.expected_executable or args.output or args.verify_only):
+        parser.error("--verify-report requires --expected-executable and cannot combine with --output/--verify-only")
+    if args.expected_executable and not args.verify_report:
+        parser.error("--expected-executable is only valid with --verify-report")
+    if args.expected_executable and not same_windows_executable(args.expected_executable, args.expected_executable):
+        parser.error("--expected-executable must be an absolute Windows path without parent traversal")
     package = args.package.resolve()
     executable = package / "Fomawrite.exe"
     manifest = json.loads((package / "manifest.json").read_text(encoding="utf-8"))
@@ -118,29 +137,45 @@ def main():
     if args.verify_only:
         print("Deployed package hashes verified")
         return 0
-    if args.output is None:
+    if args.verify_report:
+        report_path = args.verify_report.resolve()
+        output = report_path.parent
+        receipt = json.loads((output / "guest-run.json").read_text(encoding="utf-8-sig"))
+        report = json.loads(report_path.read_text(encoding="utf-8-sig"))
+        failures = verify(report, manifest, executable, args.expected_executable)
+        if (receipt.get("exitCode") != 0 or receipt.get("freshReport") is not True
+                or receipt.get("reportSha256") != sha(report_path)
+                or receipt.get("manifestSha256") != sha(package / "manifest.json")
+                or receipt.get("executableSha256") != sha(executable)
+                or not same_windows_executable(receipt.get("executable", ""), args.expected_executable)):
+            failures.append("Guest launch receipt failed freshness, process exit, path or package/report identity")
+    elif args.output is None:
         parser.error("--output is required for native acceptance")
-    output = args.output.resolve()
-    if output.exists():
-        parser.error("Use a new output directory, so old reports cannot satisfy acceptance")
-    output.mkdir(parents=True)
-    # Prove deployment without Qt/developer tools on PATH. Keep Windows itself.
-    environment = deployment_environment(package, os.environ)
-    started = time.time_ns()
-    with (output / "process.log").open("wb") as log:
-        result = subprocess.run([str(executable), "--check-document-views", str(output)],
-                                cwd=package, env=environment, stdout=log, stderr=subprocess.STDOUT, timeout=360)
-    report_path = output / "report.json"
-    if not report_path.is_file() or report_path.stat().st_mtime_ns < started:
-        raise SystemExit(f"No fresh native acceptance report (exit {result.returncode}); see {output}")
-    report = json.loads(report_path.read_text(encoding="utf-8"))
-    failures = verify(report, manifest, executable)
-    if result.returncode:
-        failures.append(f"Application exited with status {result.returncode}")
+    else:
+        output = args.output.resolve()
+        if output.exists():
+            parser.error("Use a new output directory, so old reports cannot satisfy acceptance")
+        output.mkdir(parents=True)
+        # Prove deployment without Qt/developer tools on PATH. Keep Windows itself.
+        environment = deployment_environment(package, os.environ)
+        started = time.time_ns()
+        with (output / "process.log").open("wb") as log:
+            result = subprocess.run([str(executable), "--check-document-views", str(output)],
+                                    cwd=package, env=environment, stdout=log, stderr=subprocess.STDOUT, timeout=360)
+        report_path = output / "report.json"
+        if not report_path.is_file() or report_path.stat().st_mtime_ns < started:
+            raise SystemExit(f"No fresh native acceptance report (exit {result.returncode}); see {output}")
+        report = json.loads(report_path.read_text(encoding="utf-8"))
+        failures = verify(report, manifest, executable)
+        if result.returncode:
+            failures.append(f"Application exited with status {result.returncode}")
     verification = {"passed": not failures, "failures": failures, "commit": manifest["commit"],
                     "architecture": manifest["architecture"], "executableSha256": sha(executable),
                     "manifestSha256": sha(package / "manifest.json"),
                     "platform": report.get("platform"), "report": str(report_path)}
+    if args.verify_report:
+        verification["expectedExecutable"] = args.expected_executable
+        verification["verificationMode"] = "copied-guest-report"
     (output / "package-verification.json").write_text(json.dumps(verification, indent=2) + "\n", encoding="utf-8")
     print(json.dumps(verification, indent=2))
     return bool(failures)

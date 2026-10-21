@@ -55,13 +55,6 @@ jobs:
         id: package
         run: ./bin/windows/package.ps1 -Architecture ${{ matrix.architecture }}
 
-      - name: Build and run complete Qt regression suite
-        run: ./bin/windows/test.ps1 -Architecture ${{ matrix.architecture }}
-
-      - name: Exercise deployed executable on native Windows desktop
-        if: ${{ !cancelled() && steps.package.outcome == 'success' }}
-        run: python bin/windows/check-document-views.py --package "dist/windows-${{ matrix.architecture }}/Fomawrite" --output "build-tests/windows-${{ matrix.architecture }}/deployed-acceptance"
-
       - name: Upload internal diagnostic ZIP and SHA-256 (qualification remains in evidence)
         if: ${{ !cancelled() && steps.package.outcome == 'success' }}
         uses: actions/upload-artifact@v4
@@ -72,6 +65,13 @@ jobs:
             dist/windows-${{ matrix.architecture }}/*.sha256
           if-no-files-found: error
           retention-days: 14
+
+      - name: Build and run complete Qt regression suite
+        run: ./bin/windows/test.ps1 -Architecture ${{ matrix.architecture }}
+
+      - name: Exercise deployed executable on native Windows desktop
+        if: ${{ !cancelled() && steps.package.outcome == 'success' }}
+        run: python bin/windows/check-document-views.py --package "dist/windows-${{ matrix.architecture }}/Fomawrite" --output "build-tests/windows-${{ matrix.architecture }}/deployed-acceptance"
 
       - name: Upload test/deployment evidence
         if: always()

@@ -1,6 +1,8 @@
 """Regression guards against falsely accepting broken deployment evidence."""
 import copy
+import contextlib
 import importlib.util
+import io
 import json
 from pathlib import Path
 import struct
@@ -62,6 +64,49 @@ class DeploymentEvidenceTests(unittest.TestCase):
 
     def test_complete_native_evidence_passes(self):
         self.assertEqual([], self.failures())
+
+    def test_cross_host_guest_path_mapping_accepts_exact_windows_executable(self):
+        expected = r"C:\Users\Andrew\Fomawrite Guest\Fomawrite.exe"
+        self.report["executable"] = "C:/Users/Andrew/Fomawrite Guest/Fomawrite.exe"
+        original = self.report["executable"]
+        self.assertEqual([], acceptance.verify(self.report, self.manifest, self.exe, expected))
+        self.assertEqual(original, self.report["executable"])
+
+    def test_cross_host_wrong_expected_executable_is_rejected(self):
+        self.report["executable"] = r"C:\Guest\Fomawrite\Fomawrite.exe"
+        self.assertIn("Report came from a different executable", acceptance.verify(
+            self.report, self.manifest, self.exe, r"C:\Other\Fomawrite.exe"))
+
+    def test_cross_host_relative_expected_executable_is_rejected(self):
+        self.report["executable"] = r"C:Guest\Fomawrite.exe"
+        self.assertFalse(acceptance.same_windows_executable(self.report["executable"], self.report["executable"]))
+
+    def test_offline_cli_verifies_copied_guest_evidence_without_launch(self):
+        expected = r"C:\Guest\Fomawrite\Fomawrite.exe"
+        self.report["executable"] = expected
+        package = self.exe.parent
+        manifest = {**self.manifest, "commit": "synthetic", "architecture": "arm64",
+                    "files": {"Fomawrite.exe": acceptance.sha(self.exe)}}
+        manifest_path = package / "manifest.json"
+        manifest_path.write_text(json.dumps(manifest))
+        evidence = package / "copied-evidence"
+        evidence.mkdir()
+        report_path = evidence / "report.json"
+        report_path.write_text(json.dumps(self.report))
+        original_report = report_path.read_bytes()
+        receipt = {"executable": expected, "executableSha256": acceptance.sha(self.exe),
+                   "manifestSha256": acceptance.sha(manifest_path), "reportSha256": acceptance.sha(report_path),
+                   "exitCode": 0, "freshReport": True}
+        (evidence / "guest-run.json").write_text(json.dumps(receipt))
+        arguments = ["check-document-views.py", "--package", str(package), "--verify-report", str(report_path),
+                     "--expected-executable", expected]
+        with patch.object(sys, "argv", arguments), contextlib.redirect_stdout(io.StringIO()), \
+                patch.object(acceptance.subprocess, "run", side_effect=AssertionError("Offline mode must not launch")):
+            self.assertEqual(0, acceptance.main())
+        self.assertEqual(original_report, report_path.read_bytes())
+        verification = json.loads((evidence / "package-verification.json").read_text())
+        self.assertTrue(verification["passed"])
+        self.assertEqual(expected, verification["expectedExecutable"])
 
     def test_offscreen_is_rejected(self):
         self.report["platform"] = "offscreen"
@@ -160,6 +205,47 @@ class DeploymentEvidenceTests(unittest.TestCase):
             struct.pack_into("<H", data, 132, machine)
             self.exe.write_bytes(data)
             self.assertEqual(architecture, packaging.pe_architecture(self.exe))
+
+    def runtime_candidate(self, family, version, architecture="arm64"):
+        return {"path": family, "family": family, "files": {
+            name: {"architecture": architecture, "version": version}
+            for name in ("vcruntime140.dll", "msvcp140.dll")}}
+
+    def test_matching_v143_runtime_is_preferred_to_latest_v145(self):
+        matching = self.runtime_candidate("Microsoft.VC143.CRT", [14, 44, 35211, 0])
+        latest = self.runtime_candidate("Microsoft.VC145.CRT", [14, 51, 36231, 0])
+        self.assertIs(matching, packaging.select_runtime([latest, matching], [14, 44, 35207, 0], "arm64"))
+
+    def test_actual_newer_v14_runtime_is_compatible(self):
+        latest = self.runtime_candidate("Microsoft.VC145.CRT", [14, 51, 36231, 0])
+        self.assertIs(latest, packaging.select_runtime([latest], [14, 44, 35207, 0], "arm64"))
+
+    def test_older_runtime_cannot_satisfy_selected_compiler(self):
+        old = self.runtime_candidate("Microsoft.VC143.CRT", [14, 44, 35112, 0])
+        with self.assertRaises(SystemExit):
+            packaging.select_runtime([old], [14, 44, 35207, 0], "arm64")
+
+    def test_wrong_architecture_runtime_is_rejected(self):
+        wrong = self.runtime_candidate("Microsoft.VC145.CRT", [14, 51, 36231, 0], "x64")
+        with self.assertRaises(SystemExit):
+            packaging.select_runtime([wrong], [14, 44, 35207, 0], "arm64")
+
+    def test_mixed_runtime_architectures_are_rejected(self):
+        mixed = self.runtime_candidate("Microsoft.VC145.CRT", [14, 51, 36231, 0])
+        mixed["files"]["msvcp140.dll"]["architecture"] = "unknown-a641"
+        with self.assertRaises(SystemExit):
+            packaging.select_runtime([mixed], [14, 44, 35207, 0], "arm64")
+
+    def test_unknown_runtime_family_is_rejected(self):
+        unknown = self.runtime_candidate("Microsoft.VC999.CRT", [14, 51, 36231, 0])
+        with self.assertRaises(SystemExit):
+            packaging.select_runtime([unknown], [14, 44, 35207, 0], "arm64")
+
+    def test_partial_runtime_is_rejected(self):
+        partial = self.runtime_candidate("Microsoft.VC145.CRT", [14, 51, 36231, 0])
+        del partial["files"]["msvcp140.dll"]
+        with self.assertRaises(SystemExit):
+            packaging.select_runtime([partial], [14, 44, 35207, 0], "arm64")
 
 
 if __name__ == "__main__":

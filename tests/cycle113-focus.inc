@@ -39,10 +39,40 @@ bool cycle113TryEveryFormattingRoute(QObject *window, QQuickItem *editor, Backen
         if (!QMetaObject::invokeMethod(commands, "isEnabled", Q_RETURN_ARG(QVariant, enabled), Q_ARG(QVariant, name))
             || enabled.toBool() || !QMetaObject::invokeMethod(commands, "run", Q_ARG(QVariant, name))) return false;
     }
+    const bool mac = window->property("isMac").toBool();
+    const bool windows = window->property("isWindows").toBool();
+    auto *nativeMenu = window->findChild<QObject *>("nativeFormatMenu");
+    if (mac && !nativeMenu) return false;
+    if (!mac && !windows) return false;
+    if (windows && nativeMenu) return false;
+    if (mac) {
     for (const auto &name : {"Bold", "Italic", "Highlight", "Strikethrough", "Code", "Heading 2", "List", "Indent", "Add Link",
                               "Add Footnote", "Add Content Block", "Add Hashtag", "Add Table of Contents", "Add Page Break"}) {
         auto *item = cycle113NativeFormatItem(window, QString::fromLatin1(name));
         if (!item || item->property("enabled").toBool() || !QMetaObject::invokeMethod(item, "triggered")) return false;
+    }
+    } else {
+        auto *loader = window->findChild<QObject *>("windowsMenuLoader");
+        if (!windows || !loader || !loader->property("active").toBool()) return false;
+        auto *desktop = window->findChild<QObject *>("windowsMenuBar");
+        if (!desktop) return false;
+        // Exercise every Format command currently exposed by Windows M1.
+        // Additional Mac menu affordances remain an explicit M2 gap.
+        for (const auto &label : {"&Bold", "&Italic", "Strikethrough", "Inline Code", "&Link…", "Insert Page Break"}) {
+            QObject *item = nullptr;
+            for (auto *candidate : desktop->findChildren<QObject *>())
+                if (candidate->property("text").toString() == QString::fromUtf8(label)
+                    && candidate->metaObject()->indexOfSignal("triggered()") >= 0) { item = candidate; break; }
+            if (!item || item->property("enabled").toBool() || !QMetaObject::invokeMethod(item, "triggered")) return false;
+        }
+        // Preserve guard coverage for the common operations even where this
+        // initial desktop menu has no corresponding item yet.
+        for (const auto &marks : {QStringLiteral("**"), QStringLiteral("*"), QStringLiteral("==")})
+            if (!QMetaObject::invokeMethod(window, "tryWrapSelection", Q_ARG(QVariant, marks), Q_ARG(QVariant, marks))) return false;
+        for (const auto &operation : {"heading2", "bullet", "indent"})
+            if (!QMetaObject::invokeMethod(window, "editMarkdown", Q_ARG(QVariant, operation))) return false;
+        for (const auto &snippet : {"[^note]\n\n[^note]: Note text", "\n/chapter.md\n", "#tag", "# Table of contents\n", "\n\n<!-- pagebreak -->\n\n"})
+            if (!QMetaObject::invokeMethod(window, "tryInsertSourceSnippet", Q_ARG(QVariant, QString::fromUtf8(snippet)))) return false;
     }
     // Exercise the actual registered shortcuts where an isolated test window can
     // be active. Cocoa tests deliberately remain non-activating to protect input.

@@ -25,6 +25,21 @@
                     : prefix + "PublishingTheme_" + backend.publishingThemeId();
                 return checkedCount == 1 && checkedName == expected;
             };
+            // Every platform uses the real footer menu. macOS also exposes
+            // the same choices in its native menu; Windows M1 does not yet have
+            // an Output Style desktop submenu. Never infer platform from a
+            // missing object, which would hide a broken Mac menu loader.
+            const bool macThemeMenu = window->property("isMac").toBool();
+            auto *nativeThemes = window->findChild<QObject *>("nativeCustomThemesMenu");
+            auto *desktopThemeLoader = window->findChild<QObject *>("windowsMenuLoader");
+            check(macThemeMenu ? nativeThemes != nullptr
+                : window->property("isWindows").toBool() && nativeThemes == nullptr
+                    && desktopThemeLoader && desktopThemeLoader->property("active").toBool()
+                    && window->findChild<QObject *>("windowsMenuBar") != nullptr,
+                "Publishing theme desktop menu does not match the active platform");
+            const auto authoritativeSelection = [&] {
+                return soleSelection("preview") && (!macThemeMenu || soleSelection("native"));
+            };
             auto *customThemes = window->findChild<QObject *>("previewCustomThemesMenu");
             const auto itemAt = [](QObject *owner, int index) {
                 QQuickItem *item = nullptr;
@@ -110,7 +125,17 @@
                 renderBarrier(window);
                 const QRectF rootBounds = rootContent->mapRectToScene(rootContent->boundingRect());
                 const QRectF childBounds = childContent->mapRectToScene(childContent->boundingRect());
-                check(childBounds.left() >= rootBounds.right(), "Custom Themes did not cascade to the right");
+                // Qt cascades left when the display constrains the window and
+                // there is no room on the right. Both menus must remain separate
+                // and inside the actual window, including on a small CI desktop.
+                const bool cascadedRight = childBounds.left() >= rootBounds.right();
+                const bool cascadedLeft = childBounds.right() <= rootBounds.left();
+                check(cascadedRight || cascadedLeft, "Custom Themes overlaps its parent menu");
+                report.insert("publishingThemeCascade", QJsonObject{
+                    {"direction", cascadedRight ? "right" : cascadedLeft ? "left" : "overlap"},
+                    {"rootBounds", rectJson(rootBounds)}, {"childBounds", rectJson(childBounds)},
+                    {"windowWidth", window->width()}, {"windowHeight", window->height()}});
+                check(QRectF(QPointF(), window->size()).contains(rootBounds), "Output Style menu extends beyond the window");
                 check(QRectF(QPointF(), window->size()).contains(childBounds), "CSS submenu extends beyond the window");
                 capture("folder-theme-cascading-menu");
                 capturedCascade = true;
@@ -118,11 +143,11 @@
                 if (!check(waitUntil([&] { return !menu->property("visible").toBool()
                     && !customThemes->property("visible").toBool(); }), "Closing root left CSS submenu visible")) return;
                 if (!chooseItem("previewPublishingTheme_cycle125-z23")) return;
-                check(backend.publishingThemeId() == "cycle125-z23" && soleSelection("preview") && soleSelection("native"),
+                check(backend.publishingThemeId() == "cycle125-z23" && authoritativeSelection(),
                       "Scrolled CSS submenu did not select its lower item");
                 for (const QString &id : {firstId, secondId, secondId, firstId}) {
                     if (!chooseItem("previewPublishingTheme_" + id)) return;
-                    if (!check(waitUntil([&] { return backend.publishingThemeId() == id && soleSelection("preview") && soleSelection("native"); }),
+                    if (!check(waitUntil([&] { return backend.publishingThemeId() == id && authoritativeSelection(); }),
                                "Theme click did not retain exactly one authoritative checkmark")) return;
                     if (!check(themeReady("web"), "Folder theme Web preview did not settle")) return;
                     const QString expected = id == firstId ? "rgb(12, 34, 56)" : "rgb(65, 43, 21)";
@@ -133,7 +158,7 @@
                 auto *notice = window->findChild<QObject *>("publishingThemeNotice");
                 check(waitUntil([&] { return notice && notice->property("visible").toBool() && !backend.publishingThemeError().isEmpty(); }),
                       "Rejected theme did not show an actionable notice");
-                check(backend.publishingThemeId() == firstId && soleSelection("preview") && soleSelection("native"),
+                check(backend.publishingThemeId() == firstId && authoritativeSelection(),
                       "Rejected theme left an extra checkmark or changed the active theme");
                 if (notice) QMetaObject::invokeMethod(notice, "close");
                 capture("folder-theme-menu-selection");
@@ -147,13 +172,13 @@
                     return publishingDomResult(web, "(() => { const heading = document.querySelector('#write h1'); return heading ? getComputedStyle(heading).color : ''; })()").toString() == "rgb(76, 54, 32)";
                 }, 10000), "Edited folder CSS did not refresh the actual preview automatically");
                 if (!chooseItem("previewThemesReload")) return;
-                check(backend.publishingThemeId() == firstId && soleSelection("preview") && soleSelection("native"),
+                check(backend.publishingThemeId() == firstId && authoritativeSelection(),
                       "Reload changed the chosen theme or checkmarks");
                 if (!chooseItem("previewTemplate3")) return;
-                check(backend.publishingThemeId().isEmpty() && backend.outputStyle() == 3 && soleSelection("preview") && soleSelection("native"),
+                check(backend.publishingThemeId().isEmpty() && backend.outputStyle() == 3 && authoritativeSelection(),
                       "Custom Settings did not select only the basic custom settings");
                 if (!chooseItem("previewPublishingTheme_" + secondId)) return;
-                check(backend.publishingThemeId() == secondId && soleSelection("preview") && soleSelection("native"),
+                check(backend.publishingThemeId() == secondId && authoritativeSelection(),
                       "Switching from basic settings to folder CSS lost authoritative selection");
                 capture("folder-theme-restored");
             });
@@ -177,7 +202,7 @@
                 check(importDialog->property("visible").toBool(), "Import Theme did not open its file picker");
                 if (!acceptFile(importDialog, importedPath)) return;
                 const QString importedId = backend.publishingThemeId();
-                check(importedId.startsWith("cycle125-imported-") && soleSelection("preview") && soleSelection("native"),
+                check(importedId.startsWith("cycle125-imported-") && authoritativeSelection(),
                       "Import Theme callback did not install and select the CSS theme");
                 const QString jsonPath = temporary.filePath("cycle125-settings.json");
                 QFile json(jsonPath);
@@ -187,13 +212,13 @@
                 check(settingsDialog->property("visible").toBool(), "Load Basic Settings did not open its JSON picker");
                 if (!acceptFile(settingsDialog, jsonPath)) return;
                 check(backend.publishingThemeId().isEmpty() && backend.outputStyle() == 3 && backend.outputFont() == "Georgia"
-                    && backend.outputPointSize() == 14 && soleSelection("preview") && soleSelection("native"),
+                    && backend.outputPointSize() == 14 && authoritativeSelection(),
                     "Loading basic JSON settings did not apply the chosen font/size/selection");
                 if (!check(json.open(QIODevice::WriteOnly | QIODevice::Truncate), "Cannot write invalid settings fixture")) return;
                 json.write("not JSON"); json.close();
                 if (!chooseItem("previewTemplateCustomLoad") || !acceptFile(settingsDialog, jsonPath)) return;
                 check(notice->property("visible").toBool() && backend.outputFont() == "Georgia" && backend.outputPointSize() == 14
-                    && soleSelection("preview") && soleSelection("native"), "Invalid JSON did not report failure while retaining accepted settings");
+                    && authoritativeSelection(), "Invalid JSON did not report failure while retaining accepted settings");
                 QMetaObject::invokeMethod(notice, "close");
                 check(waitUntil([&] { return !notice->property("visible").toBool(); }), "Settings error notice did not close");
                 if (!chooseItem("previewTemplateCustomEdit")) return;

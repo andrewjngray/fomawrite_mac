@@ -41,6 +41,8 @@
 #include "harperscheme.h"
 #include "markdownhighlighter.h"
 
+#include "platform-menu-helpers.inc"
+
 // QFile::link creates .lnk shortcuts on Windows, not filesystem symlinks.
 // Keep link-specific tests separate so a missing Windows privilege cannot hide
 // unrelated file-operation assertions.
@@ -2625,8 +2627,18 @@ QtObject {
         QVERIFY2(window, qPrintable(component.errorString()));
         auto *editor = window->findChild<QObject *>("sourceEditor");
         auto *transformations = window->findChild<QObject *>("editTransformations");
-        QVERIFY(editor && transformations);
+        QVERIFY(testDesktopMenusMatchPlatform(window.data()));
+        const bool mac = window->property("isMac").toBool();
+        QVERIFY(editor);
+        if (mac) QVERIFY(transformations);
+        else QVERIFY(!transformations); // Transformations desktop submenu is M2.
+        const auto transform = [&](QObject *item, const QString &operation) {
+            if (mac) return QMetaObject::invokeMethod(item, "triggered");
+            QMetaObject::invokeMethod(editor, "forceActiveFocus");
+            return QMetaObject::invokeMethod(window.data(), "editMarkdown", Q_ARG(QVariant, operation));
+        };
 
+        if (mac) {
         const QStringList expectedLabels = {QStringLiteral("Make Upper Case"),
                                             QStringLiteral("Make Lower Case"),
                                             QStringLiteral("Capitalize"),
@@ -2649,13 +2661,14 @@ QtObject {
         }
         QCOMPARE(labels, expectedLabels);
 
+        }
         const QString source = QStringLiteral("tEST of THE wORLD");
         editor->setProperty("text", source);
         QVERIFY(QMetaObject::invokeMethod(editor, "select", Q_ARG(int, 0),
                                           Q_ARG(int, source.size())));
-        auto *titleCase = transformations->findChild<QObject *>("editTitleCase");
-        QVERIFY(titleCase->property("enabled").toBool());
-        QVERIFY(QMetaObject::invokeMethod(titleCase, "triggered"));
+        auto *titleCase = mac ? transformations->findChild<QObject *>("editTitleCase") : nullptr;
+        if (mac) QVERIFY(titleCase->property("enabled").toBool());
+        QVERIFY(transform(titleCase, QStringLiteral("titlecase")));
         QCOMPARE(editor->property("text").toString(), QStringLiteral("tEST of the wORLD"));
         QCOMPARE(editor->property("selectedText").toString(), QStringLiteral("tEST of the wORLD"));
         QVERIFY(QMetaObject::invokeMethod(editor, "undo"));
@@ -2665,7 +2678,7 @@ QtObject {
         editor->setProperty("text", lowerMajorWords);
         QVERIFY(QMetaObject::invokeMethod(editor, "select", Q_ARG(int, 0),
                                           Q_ARG(int, lowerMajorWords.size())));
-        QVERIFY(QMetaObject::invokeMethod(titleCase, "triggered"));
+        QVERIFY(transform(titleCase, QStringLiteral("titlecase")));
         QCOMPARE(editor->property("text").toString(),
                  QStringLiteral("The QUICK BROWN Fox and a DOG in New YORK"));
         QVERIFY(QMetaObject::invokeMethod(editor, "undo"));
@@ -2679,9 +2692,9 @@ QtObject {
         editor->setProperty("text", source);
         QVERIFY(QMetaObject::invokeMethod(editor, "select", Q_ARG(int, 0),
                                           Q_ARG(int, source.size())));
-        auto *capitalize = transformations->findChild<QObject *>("editCapitalize");
-        QVERIFY(capitalize->property("enabled").toBool());
-        QVERIFY(QMetaObject::invokeMethod(capitalize, "triggered"));
+        auto *capitalize = mac ? transformations->findChild<QObject *>("editCapitalize") : nullptr;
+        if (mac) QVERIFY(capitalize->property("enabled").toBool());
+        QVERIFY(transform(capitalize, QStringLiteral("capitalize")));
         QCOMPARE(editor->property("text").toString(),
                  QStringLiteral("Test Of The World"));
         QCOMPARE(editor->property("selectedText").toString(),
@@ -2693,7 +2706,7 @@ QtObject {
         editor->setProperty("text", unicodeSource);
         QVERIFY(QMetaObject::invokeMethod(editor, "select", Q_ARG(int, 0),
                                           Q_ARG(int, unicodeSource.size())));
-        QVERIFY(QMetaObject::invokeMethod(capitalize, "triggered"));
+        QVERIFY(transform(capitalize, QStringLiteral("capitalize")));
         QCOMPARE(editor->property("text").toString(), QStringLiteral("Café Straße"));
         QVERIFY(QMetaObject::invokeMethod(editor, "undo"));
         QCOMPARE(editor->property("text").toString(), unicodeSource);
@@ -2713,7 +2726,11 @@ QtObject {
         auto *editor = window->findChild<QObject *>("sourceEditor");
         auto *menuItem = window->findChild<QObject *>("native_showCompletions");
         auto *popup = window->findChild<QObject *>("completionPopup");
-        QVERIFY(editor && menuItem && popup);
+        QVERIFY(testDesktopMenusMatchPlatform(window.data()));
+        const bool mac = window->property("isMac").toBool();
+        QVERIFY(editor && popup);
+        if (mac) QVERIFY(menuItem);
+        else QVERIFY(!menuItem); // Show Completions desktop affordance remains M2.
         QVERIFY(QMetaObject::invokeMethod(window.data(), "selectWritingMode",
                                           Q_ARG(QVariant, QStringLiteral("source"))));
         QTRY_VERIFY(window->property("sourceEditorVisible").toBool());
@@ -2724,7 +2741,8 @@ QtObject {
         const QVariantMap unicode = backend.wordCompletions(source.size());
         QCOMPARE(unicode.value("start").toInt(), source.size() - 4);
         QVERIFY(unicode.value("items").toStringList().contains(QStringLiteral("caféteria")));
-        QVERIFY(menuItem->property("enabled").toBool());
+        if (mac) QVERIFY(menuItem->property("enabled").toBool());
+        else QVERIFY(window->property("sourceEditorVisible").toBool());
 
         QVariant shown;
         QVERIFY(QMetaObject::invokeMethod(window.data(), "showCompletions",
@@ -2775,7 +2793,8 @@ QtObject {
                                               Q_ARG(QVariant, mode)));
             QTRY_VERIFY(!window->property("sourceEditorVisible").toBool());
             QTRY_VERIFY(!popup->property("visible").toBool());
-            QVERIFY(!menuItem->property("enabled").toBool());
+            if (mac) QVERIFY(!menuItem->property("enabled").toBool());
+            else QVERIFY(!window->property("sourceEditorVisible").toBool());
             QCOMPARE(editor->property("cursorPosition").toInt(), source.size());
             QCOMPARE(window->property("completionPrefix").toString(), QStringLiteral("café"));
             QVERIFY(QMetaObject::invokeMethod(window.data(), "showCompletions",
@@ -2850,8 +2869,12 @@ QtObject {
         QVERIFY2(window, qPrintable(component.errorString()));
         auto *editor = window->findChild<QObject *>(QStringLiteral("sourceEditor"));
         auto *menuItem = window->findChild<QObject *>(QStringLiteral("editSmartQuotes"));
-        QVERIFY(editor && menuItem);
-        QVERIFY(menuItem->property("checked").toBool());
+        QVERIFY(testDesktopMenusMatchPlatform(window.data()));
+        const bool mac = window->property("isMac").toBool();
+        auto *workspaceSettings = window->findChild<QObject *>("workspaceSettings");
+        QVERIFY(editor && workspaceSettings);
+        if (mac) { QVERIFY(menuItem); QVERIFY(menuItem->property("checked").toBool()); }
+        else { QVERIFY(!menuItem); QVERIFY(workspaceSettings->property("smartQuotes").toBool()); }
 
         editor->setProperty("text", QString());
         editor->setProperty("cursorPosition", 0);
@@ -2918,8 +2941,11 @@ QtObject {
         auto *editor = window->findChild<QObject *>(QStringLiteral("sourceEditor"));
         auto *menuItem = window->findChild<QObject *>(QStringLiteral("editSmartDashes"));
         auto *workspaceSettings = window->findChild<QObject *>(QStringLiteral("workspaceSettings"));
-        QVERIFY(editor && menuItem && workspaceSettings);
-        QVERIFY(menuItem->property("checked").toBool());
+        QVERIFY(testDesktopMenusMatchPlatform(window.data()));
+        const bool mac = window->property("isMac").toBool();
+        QVERIFY(editor && workspaceSettings);
+        if (mac) { QVERIFY(menuItem); QVERIFY(menuItem->property("checked").toBool()); }
+        else { QVERIFY(!menuItem); QVERIFY(workspaceSettings->property("smartDashes").toBool()); }
 
         editor->setProperty("text", QStringLiteral("one -"));
         editor->setProperty("cursorPosition", 5);
@@ -2934,7 +2960,8 @@ QtObject {
         QCOMPARE(editor->property("text").toString(), QStringLiteral("one -"));
 
         workspaceSettings->setProperty("smartDashes", false);
-        QVERIFY(!menuItem->property("checked").toBool());
+        if (mac) QVERIFY(!menuItem->property("checked").toBool());
+        else QVERIFY(!workspaceSettings->property("smartDashes").toBool());
         QVERIFY(QMetaObject::invokeMethod(window.data(), "insertSmartDash",
                                           Q_RETURN_ARG(QVariant, inserted)));
         QVERIFY(!inserted.toBool());
@@ -3153,9 +3180,38 @@ QtObject {
         QCOMPARE(matches.first().toInt(), source.indexOf(QStringLiteral("café")));
         QVERIFY(backend.searchPositions("").isEmpty());
         QVERIFY(backend.searchPositions("absent").isEmpty());
+        const bool nativeMenus = window->findChild<QObject *>("editReplace") != nullptr;
+        QCOMPARE(nativeMenus, window->property("isMac").toBool());
+        if (!nativeMenus) {
+            QVERIFY(window->property("isWindows").toBool());
+            auto *desktopLoader = window->findChild<QObject *>("windowsMenuLoader"); QVERIFY(desktopLoader);
+            QVERIFY(desktopLoader->property("active").toBool());
+            QVERIFY(window->findChild<QObject *>("windowsMenuBar"));
+        }
         auto trigger = [&](const char *name) {
-            QObject *action = window->findChild<QObject *>(name);
-            return action && QMetaObject::invokeMethod(action, "triggered");
+            if (nativeMenus) {
+                QObject *action = window->findChild<QObject *>(name);
+                return action && QMetaObject::invokeMethod(action, "triggered");
+            }
+            // Windows M1 exposes Replace in the desktop menu. Find next/previous,
+            // selection Find and field deletion use their existing common routes;
+            // their extra desktop menu affordances are an explicit M2 gap.
+            const QLatin1String id(name);
+            if (id == QLatin1String("editReplace")) {
+                auto *desktop = window->findChild<QObject *>("windowsMenuBar");
+                if (!desktop) return false;
+                for (QObject *action : desktop->findChildren<QObject *>())
+                    if (action->property("text").toString() == QStringLiteral("&Replace…"))
+                        return QMetaObject::invokeMethod(action, "triggered");
+                return false;
+            }
+            if (id == QLatin1String("editFindPrevious") || id == QLatin1String("editFindNext"))
+                return QMetaObject::invokeMethod(window.data(), "moveSearch", Q_ARG(QVariant, id == QLatin1String("editFindPrevious") ? -1 : 1));
+            if (id == QLatin1String("editDelete"))
+                return QMetaObject::invokeMethod(query, "remove", Q_ARG(int, query->property("selectionStart").toInt()), Q_ARG(int, query->property("selectionEnd").toInt()));
+            if (id == QLatin1String("editFindSelection"))
+                return QMetaObject::invokeMethod(window.data(), "openSearch", Q_ARG(QVariant, false), Q_ARG(QVariant, true));
+            return false;
         };
         QVERIFY(trigger("editReplace"));
         QVERIFY(window->property("searchOpen").toBool());
@@ -3177,7 +3233,8 @@ QtObject {
         QVERIFY(QMetaObject::invokeMethod(editor, "undo"));
         QCOMPARE(editor->property("text").toString(), source);
         query->setProperty("text", "absent");
-        QVERIFY(!window->findChild<QObject *>("editFindNext")->property("enabled").toBool());
+        if (nativeMenus) QVERIFY(!window->findChild<QObject *>("editFindNext")->property("enabled").toBool());
+        else QVERIFY(window->property("searchMatches").toList().isEmpty());
         QVERIFY(QMetaObject::invokeMethod(query, "forceActiveFocus"));
         QVERIFY(QMetaObject::invokeMethod(query, "selectAll"));
         QVERIFY(trigger("editDelete"));
@@ -3691,6 +3748,69 @@ QtObject {
         auto *editor = window->findChild<QObject *>("sourceEditor");
         QVERIFY(editor);
         auto action = [&](const char *name) -> QObject * { return window->findChild<QObject *>(name); };
+        QVERIFY(testDesktopMenusMatchPlatform(window.data()));
+        if (window->property("isWindows").toBool()) {
+            // Windows exposes these portable file/clipboard actions. Native
+            // versions, Share, Speech and extra Copy formats are M2 omissions.
+            for (const char *id : {"fileCreateVersion", "fileRestoreVersion", "fileShareMarkdown", "editSpeakSelection", "editCopyFormatted", "editCopyHtml", "editCopyMarkdown"})
+                QVERIFY(!action(id));
+            auto *duplicate = testDesktopCommand(window.data(), QStringLiteral("duplicate"));
+            auto *rename = testDesktopCommand(window.data(), QStringLiteral("rename"));
+            auto *move = testDesktopCommand(window.data(), QStringLiteral("move"));
+            auto *reveal = testWindowsMenuItem(window.data(), QStringLiteral("Open Containing Folder"));
+            QVERIFY(duplicate && rename && move && reveal);
+            for (auto *item : {duplicate, rename, move, reveal}) QVERIFY(!item->property("enabled").toBool());
+            QVERIFY(!testCommandState(window.data(), "isEnabled", QStringLiteral("reveal")));
+            const QString source = QStringLiteral("**café** source");
+            editor->setProperty("text", source);
+            const QUrl saved = QUrl::fromLocalFile(directory.filePath("menu.md"));
+            QSignalSpy savedSignal(&backend, &Backend::saveSucceeded);
+            backend.saveAs(saved);
+            QCOMPARE(savedSignal.count(), 1);
+            QCOMPARE(backend.fileUrl(), saved);
+            QVERIFY(!backend.modified());
+            for (auto *item : {duplicate, rename, move, reveal}) QTRY_VERIFY(item->property("enabled").toBool());
+            QVERIFY(testCommandState(window.data(), "isEnabled", QStringLiteral("reveal")));
+            QVERIFY(backend.versions().isEmpty());
+            auto *copy = testWindowsMenuItem(window.data(), QStringLiteral("&Copy"));
+            auto *find = testWindowsMenuItem(window.data(), QStringLiteral("&Find…"));
+            auto *close = testWindowsMenuItem(window.data(), QStringLiteral("&Close Window"));
+            QVERIFY(copy && find && close);
+            QVERIFY(QMetaObject::invokeMethod(editor, "forceActiveFocus"));
+            QVERIFY(QMetaObject::invokeMethod(editor, "select", Q_ARG(int, 0), Q_ARG(int, 8)));
+            QTRY_VERIFY(copy->property("enabled").toBool());
+            const int revision = backend.documentRevision();
+            QVERIFY(QMetaObject::invokeMethod(copy, "triggered"));
+            QCOMPARE(QGuiApplication::clipboard()->mimeData()->data("text/markdown"), QByteArray("**café**"));
+            // Preserve the common extra-format behavior despite its absent
+            // desktop affordance; none of these calls may edit the source.
+            QVERIFY(backend.copySelection(0, 8, QStringLiteral("html")));
+            QVERIFY(QGuiApplication::clipboard()->text().contains("<html"));
+            QVERIFY(backend.copySelection(0, 8, QStringLiteral("formatted")));
+            QVERIFY(QGuiApplication::clipboard()->mimeData()->hasHtml());
+            QCOMPARE(editor->property("text").toString(), source);
+            QCOMPARE(backend.documentRevision(), revision);
+            QVERIFY(QMetaObject::invokeMethod(find, "triggered"));
+            auto *query = window->findChild<QObject *>("searchField"); QVERIFY(query);
+            query->setProperty("text", QStringLiteral("auxiliary selection"));
+            QVERIFY(QMetaObject::invokeMethod(query, "forceActiveFocus"));
+            QVERIFY(QMetaObject::invokeMethod(query, "selectAll"));
+            QTRY_VERIFY(!window->property("canFormatSource").toBool());
+            QVERIFY(QMetaObject::invokeMethod(copy, "triggered"));
+            QCOMPARE(QGuiApplication::clipboard()->text(), QStringLiteral("auxiliary selection"));
+            QCOMPARE(editor->property("text").toString(), source);
+            QCOMPARE(backend.documentRevision(), revision);
+            editor->setProperty("text", QStringLiteral("dirty but retained"));
+            QVERIFY(QMetaObject::invokeMethod(close, "triggered"));
+            auto *prompt = window->findChild<QObject *>("unsavedChangesPrompt"); QVERIFY(prompt);
+            QTRY_VERIFY(prompt->property("opened").toBool());
+            QVERIFY(QMetaObject::invokeMethod(prompt, "cancelRequested"));
+            QCOMPARE(window->property("pendingAction").toString(), QString());
+            QCOMPARE(editor->property("text").toString(), QStringLiteral("dirty but retained"));
+            QVERIFY(backend.modified());
+            backend.discardRecovery();
+            return;
+        }
 
         auto *duplicate = action("fileDuplicate");
         auto *rename = action("fileRename");
@@ -3824,8 +3944,11 @@ QtObject {
         auto *typewriter = window->findChild<QObject *>("native_typewriter");
         auto *review = window->findChild<QObject *>("focusWritingReview");
         auto *reviewDialog = window->findChild<QObject *>("writingReviewDialog");
-        QVERIFY(commands && settings && editor && focusMenu && sentence && paragraph
-                && typewriter && review && reviewDialog);
+        QVERIFY(testDesktopMenusMatchPlatform(window.data()));
+        const bool mac = window->property("isMac").toBool();
+        QVERIFY(commands && settings && editor && reviewDialog);
+        if (mac) QVERIFY(focusMenu && sentence && paragraph && typewriter && review);
+        else { QVERIFY(!focusMenu && !sentence && !paragraph && !typewriter && !review); }
 
         const bool originalSentence = settings->property("sentenceFocus").toBool();
         const bool originalParagraph = settings->property("paragraphFocus").toBool();
@@ -3841,6 +3964,7 @@ QtObject {
         editor->setProperty("text", QStringLiteral("Focus modes keep this source unchanged."));
         const QString source = editor->property("text").toString();
 
+        if (mac) {
         QCOMPARE(focusMenu->property("title").toString(), QStringLiteral("Enable Focus Mode"));
         QCOMPARE(sentence->property("text").toString(), QStringLiteral("Sentence"));
         QCOMPARE(paragraph->property("text").toString(), QStringLiteral("Paragraph"));
@@ -3849,6 +3973,11 @@ QtObject {
         QVERIFY(paragraph->property("checkable").toBool());
         QVERIFY(typewriter->property("checkable").toBool());
 
+        } else {
+            QCOMPARE(testCommandLabel(window.data(), QStringLiteral("sentence")), QStringLiteral("Sentence Focus"));
+            QCOMPARE(testCommandLabel(window.data(), QStringLiteral("paragraph")), QStringLiteral("Paragraph Focus"));
+            QCOMPARE(testCommandLabel(window.data(), QStringLiteral("typewriter")), QStringLiteral("Typewriter Scrolling (Source)"));
+        }
         auto run = [&](const QString &id) {
             return QMetaObject::invokeMethod(commands, "run", Q_ARG(QVariant, id));
         };
@@ -3856,19 +3985,19 @@ QtObject {
         QVERIFY(settings->property("sentenceFocus").toBool());
         QVERIFY(!settings->property("paragraphFocus").toBool());
         QVERIFY(!settings->property("typewriter").toBool());
-        QVERIFY(sentence->property("checked").toBool());
+        QVERIFY((mac ? sentence->property("checked").toBool() : testCommandState(window.data(), "isChecked", QStringLiteral("sentence"))));
 
         QVERIFY(run(QStringLiteral("typewriter")));
         QVERIFY(settings->property("sentenceFocus").toBool());
         QVERIFY(settings->property("typewriter").toBool());
-        QVERIFY(typewriter->property("checked").toBool());
+        QVERIFY((mac ? typewriter->property("checked").toBool() : testCommandState(window.data(), "isChecked", QStringLiteral("typewriter"))));
 
         QVERIFY(run(QStringLiteral("paragraph")));
         QVERIFY(!settings->property("sentenceFocus").toBool());
         QVERIFY(settings->property("paragraphFocus").toBool());
         QVERIFY(settings->property("typewriter").toBool());
-        QVERIFY(paragraph->property("checked").toBool());
-        QVERIFY(!sentence->property("checked").toBool());
+        QVERIFY((mac ? paragraph->property("checked").toBool() : testCommandState(window.data(), "isChecked", QStringLiteral("paragraph"))));
+        QVERIFY(!(mac ? sentence->property("checked").toBool() : testCommandState(window.data(), "isChecked", QStringLiteral("sentence"))));
 
         QVERIFY(run(QStringLiteral("paragraph")));
         QVERIFY(!settings->property("sentenceFocus").toBool());
@@ -3876,8 +4005,13 @@ QtObject {
         QVERIFY(settings->property("typewriter").toBool());
         QCOMPARE(editor->property("text").toString(), source);
 
-        QCOMPARE(review->property("text").toString(), QStringLiteral("Writing Review…"));
-        QVERIFY(QMetaObject::invokeMethod(review, "triggered"));
+        if (mac) {
+            QCOMPARE(review->property("text").toString(), QStringLiteral("Writing Review…"));
+            QVERIFY(QMetaObject::invokeMethod(review, "triggered"));
+        } else {
+            QCOMPARE(testCommandLabel(window.data(), QStringLiteral("writingReview")), QStringLiteral("Writing Review…"));
+            QVERIFY(testRunCommand(window.data(), QStringLiteral("writingReview")));
+        }
         QTRY_VERIFY(reviewDialog->property("opened").toBool());
         QVERIFY(QMetaObject::invokeMethod(reviewDialog, "close"));
         backend.discardRecovery();
@@ -3896,7 +4030,11 @@ QtObject {
         auto *editor = window->findChild<QObject *>("sourceEditor");
         auto *styleMenu = window->findChild<QObject *>("focusStyleCheckMenu");
         auto *custom = window->findChild<QObject *>("native_customStyleCheck");
-        QVERIFY(commands && settings && editor && styleMenu && custom);
+        QVERIFY(testDesktopMenusMatchPlatform(window.data()));
+        const bool mac = window->property("isMac").toBool();
+        QVERIFY(commands && settings && editor);
+        if (mac) QVERIFY(styleMenu && custom);
+        else QVERIFY(!styleMenu && !custom);
 
         const bool originalEnabled = settings->property("styleCheckCustom").toBool();
         const QString originalWords = settings->property("reviewWords").toString();
@@ -3907,14 +4045,16 @@ QtObject {
         const QString source = editor->property("text").toString();
         const bool canUndo = editor->property("canUndo").toBool();
 
-        QCOMPARE(styleMenu->property("title").toString(), QStringLiteral("Enable Style Check"));
-        QCOMPARE(custom->property("text").toString(), QStringLiteral("Custom"));
-        QVERIFY(custom->property("checkable").toBool());
-        QVERIFY(!custom->property("checked").toBool());
+        if (mac) {
+            QCOMPARE(styleMenu->property("title").toString(), QStringLiteral("Enable Style Check"));
+            QCOMPARE(custom->property("text").toString(), QStringLiteral("Custom"));
+            QVERIFY(custom->property("checkable").toBool());
+        } else QCOMPARE(testCommandLabel(window.data(), QStringLiteral("customStyleCheck")), QStringLiteral("Custom"));
+        QVERIFY(!(mac ? custom->property("checked").toBool() : testCommandState(window.data(), "isChecked", QStringLiteral("customStyleCheck"))));
         QVERIFY(QMetaObject::invokeMethod(commands, "run",
                                           Q_ARG(QVariant, QStringLiteral("customStyleCheck"))));
         QVERIFY(settings->property("styleCheckCustom").toBool());
-        QVERIFY(custom->property("checked").toBool());
+        QVERIFY((mac ? custom->property("checked").toBool() : testCommandState(window.data(), "isChecked", QStringLiteral("customStyleCheck"))));
 
         auto *quick = qvariant_cast<QQuickTextDocument *>(editor->property("textDocument"));
         QVERIFY(quick);
@@ -3955,10 +4095,12 @@ QtObject {
         QVERIFY2(reopened, qPrintable(component.errorString()));
         auto *reopenedSettings = reopened->findChild<QObject *>("workspaceSettings");
         auto *reopenedCustom = reopened->findChild<QObject *>("native_customStyleCheck");
-        QVERIFY(reopenedSettings && reopenedCustom);
+        QVERIFY(testDesktopMenusMatchPlatform(reopened.data()));
+        QVERIFY(reopenedSettings);
+        if (mac) QVERIFY(reopenedCustom); else QVERIFY(!reopenedCustom);
         QCOMPARE(reopenedSettings->property("styleCheckCustom").toBool(), true);
         QCOMPARE(reopenedSettings->property("reviewWords").toString(), QStringLiteral("custom"));
-        QVERIFY(reopenedCustom->property("checked").toBool());
+        QVERIFY((mac ? reopenedCustom->property("checked").toBool() : testCommandState(reopened.data(), "isChecked", QStringLiteral("customStyleCheck"))));
 
         reopenedSettings->setProperty("reviewWords", originalWords);
         reopenedSettings->setProperty("styleCheckCustom", originalEnabled);
@@ -3985,7 +4127,10 @@ QtObject {
         auto *commands = window->findChild<QObject *>("workspaceCommands");
         auto *fillers = window->findChild<QObject *>("native_fillersStyleCheck");
         auto *custom = window->findChild<QObject *>("native_customStyleCheck");
-        QVERIFY(settings && commands && fillers && custom);
+        QVERIFY(testDesktopMenusMatchPlatform(window.data()));
+        const bool mac = window->property("isMac").toBool();
+        QVERIFY(settings && commands);
+        if (mac) QVERIFY(fillers && custom); else QVERIFY(!fillers && !custom);
         const bool originalFillers = settings->property("styleCheckFillers").toBool();
         const bool originalCustom = settings->property("styleCheckCustom").toBool();
         const QString originalWords = settings->property("reviewWords").toString();
@@ -3996,12 +4141,14 @@ QtObject {
         auto run = [&](const QString &id) {
             return QMetaObject::invokeMethod(commands, "run", Q_ARG(QVariant, id));
         };
-        QCOMPARE(fillers->property("text").toString(), QStringLiteral("Fillers"));
-        QVERIFY(fillers->property("checkable").toBool());
+        if (mac) {
+            QCOMPARE(fillers->property("text").toString(), QStringLiteral("Fillers"));
+            QVERIFY(fillers->property("checkable").toBool());
+        } else QCOMPARE(testCommandLabel(window.data(), QStringLiteral("fillersStyleCheck")), QStringLiteral("Fillers"));
         QVERIFY(run(QStringLiteral("fillersStyleCheck")));
         QVERIFY(settings->property("styleCheckFillers").toBool());
         QVERIFY(!settings->property("styleCheckCustom").toBool());
-        QVERIFY(fillers->property("checked").toBool());
+        QVERIFY((mac ? fillers->property("checked").toBool() : testCommandState(window.data(), "isChecked", QStringLiteral("fillersStyleCheck"))));
         QVERIFY(QMetaObject::invokeMethod(settings, "sync"));
         window.reset();
 
@@ -4012,10 +4159,12 @@ QtObject {
         fillers = reopened->findChild<QObject *>("native_fillersStyleCheck");
         custom = reopened->findChild<QObject *>("native_customStyleCheck");
         auto *editor = reopened->findChild<QObject *>("sourceEditor");
-        QVERIFY(settings && commands && fillers && custom && editor);
+        QVERIFY(testDesktopMenusMatchPlatform(reopened.data()));
+        QVERIFY(settings && commands && editor);
+        if (mac) QVERIFY(fillers && custom); else QVERIFY(!fillers && !custom);
         QCOMPARE(settings->property("styleCheckFillers").toBool(), true);
         QCOMPARE(settings->property("styleCheckCustom").toBool(), false);
-        QVERIFY(fillers->property("checked").toBool());
+        QVERIFY((mac ? fillers->property("checked").toBool() : testCommandState(reopened.data(), "isChecked", QStringLiteral("fillersStyleCheck"))));
 
         backend.open(QUrl::fromLocalFile(path));
         QCoreApplication::processEvents(); // Let the document-loaded caret reset finish first.

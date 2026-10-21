@@ -43,12 +43,22 @@ void FomawriteTest::editingAndLayoutChoicesAreIndependent() {
     auto *appearance = f.item("workspaceAppearanceButton");
     auto *nativeDelete = f.window->findChild<QObject *>("editDelete");
     auto *nativePaste = f.window->findChild<QObject *>("editPastePlain");
-    QVERIFY(find && findBar && appearance && nativeDelete && nativePaste);
+    QVERIFY(testDesktopMenusMatchPlatform(f.window.data()));
+    const bool mac = f.window->property("isMac").toBool();
+    auto *desktopPaste = mac ? nullptr : testWindowsMenuItem(f.window.data(), QStringLiteral("&Paste"));
+    QVERIFY(find && findBar && appearance);
+    if (mac) QVERIFY(nativeDelete && nativePaste);
+    else { QVERIFY(!nativeDelete && !nativePaste); QVERIFY(desktopPaste); }
     QVERIFY(cycle102Click(f.quick, find)); QTRY_VERIFY(findBar->isVisible());
     QVERIFY(cycle102Click(f.quick, liveChoice)); QTRY_VERIFY(!findBar->isVisible());
     QVERIFY(cycle102Click(f.quick, appearance));
     QTRY_VERIFY(!f.window->property("sourceClipboardAllowed").toBool());
-    QVERIFY(!nativeDelete->property("enabled").toBool()); QVERIFY(!nativePaste->property("enabled").toBool());
+    if (mac) {
+        QVERIFY(!nativeDelete->property("enabled").toBool()); QVERIFY(!nativePaste->property("enabled").toBool());
+    } else {
+        // Delete / Paste As Plain Text desktop affordances remain M2 omissions.
+        QVERIFY(!desktopPaste->property("enabled").toBool());
+    }
     auto *appearanceMenu = f.window->findChild<QObject *>("writingOptions");
     QVERIFY(appearanceMenu); QVERIFY(QMetaObject::invokeMethod(appearanceMenu, "close"));
     QTRY_VERIFY(!appearanceMenu->property("visible").toBool());

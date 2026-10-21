@@ -18,8 +18,9 @@ QQuickItem *cycle108MenuItem(QObject *menu, const QString &text) {
     return nullptr;
 }
 bool cycle108NativeViewChecks(QObject *window, int mode) {
-    for (const auto &[name, expectedMode] : {std::pair{"native_editor", 0}, std::pair{"native_split", 1}, std::pair{"native_preview", 2}}) {
-        auto *item = window->findChild<QObject *>(name);
+    if (!testDesktopMenusMatchPlatform(window)) return false;
+    for (const auto &[name, expectedMode] : {std::pair{"editor", 0}, std::pair{"split", 1}, std::pair{"preview", 2}}) {
+        auto *item = testDesktopCommand(window, QString::fromLatin1(name));
         if (!item || item->property("checked").toBool() != (mode == expectedMode)) return false;
     }
     return true;

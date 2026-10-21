@@ -63,7 +63,8 @@ void FomawriteTest::omawriteSourcePresetIsInTheMenuAndSelectsPlexMono() {
     QCOMPARE(f.footer->property("writingAppearance").toString(), QString("Omawrite"));
     // The native Writing Appearance menu and the command table carry it too.
     settings->setProperty("writingAppearance", "manuscript");
-    auto *native = f.window->findChild<QObject *>("native_writingOmawrite");
+    QVERIFY(testDesktopMenusMatchPlatform(f.window.data()));
+    auto *native = testDesktopCommand(f.window.data(), QStringLiteral("writingOmawrite"));
     QVERIFY(native);
     QCOMPARE(native->property("text").toString(), QString("Omawrite (Mono)"));
     QVERIFY(!native->property("checked").toBool());

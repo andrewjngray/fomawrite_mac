@@ -1044,9 +1044,10 @@ void FomawriteTest::nativeEditingMenuChecksFollowTheLayoutFromTheStart() {
     QQmlComponent component(&engine, QUrl(QStringLiteral("qrc:/Main.qml")));
     QScopedPointer<QObject> window(component.create()); QVERIFY2(window, qPrintable(component.errorString()));
     auto *layout = window->findChild<QObject *>("workspaceLayout"); QVERIFY(layout);
-    auto *source = window->findChild<QObject *>("native_sourceEditing"); QVERIFY(source);
-    auto *live = window->findChild<QObject *>("native_liveEditing"); QVERIFY(live);
-    auto *preview = window->findChild<QObject *>("native_preview"); QVERIFY(preview);
+    QVERIFY(testDesktopMenusMatchPlatform(window.data()));
+    auto *source = testDesktopCommand(window.data(), QStringLiteral("sourceEditing")); QVERIFY(source);
+    auto *live = testDesktopCommand(window.data(), QStringLiteral("liveEditing")); QVERIFY(live);
+    auto *preview = testDesktopCommand(window.data(), QStringLiteral("preview")); QVERIFY(preview);
     QVERIFY(QMetaObject::invokeMethod(window.data(), "selectWritingMode", Q_ARG(QVariant, QStringLiteral("preview"))));
     QTRY_COMPARE(layout->property("effectiveLayoutMode").toInt(), 2);
     QVERIFY(!source->property("checked").toBool()); QVERIFY(!live->property("checked").toBool()); QVERIFY(preview->property("checked").toBool());
@@ -1055,7 +1056,18 @@ void FomawriteTest::nativeEditingMenuChecksFollowTheLayoutFromTheStart() {
     QTRY_VERIFY(source->property("checked").toBool());
     QVERIFY(!live->property("checked").toBool()); QVERIFY(!preview->property("checked").toBool());
     // The native tick is re-asserted when the submenu opens; the value and the binding survive.
-    for (QObject *item : {source, live, preview}) QVERIFY(QMetaObject::invokeMethod(item, "resync"));
+    if (window->property("isMac").toBool()) {
+        for (QObject *item : {source, live, preview}) QVERIFY(QMetaObject::invokeMethod(item, "resync"));
+    } else {
+        QObject *viewMenu = nullptr;
+        for (auto *candidate : window->findChild<QObject *>("windowsMenuBar")->findChildren<QObject *>())
+            if (candidate->property("title").toString() == QStringLiteral("&View")) { viewMenu = candidate; break; }
+        QVERIFY(viewMenu);
+        QVERIFY(QMetaObject::invokeMethod(viewMenu, "open"));
+        QTRY_VERIFY(viewMenu->property("opened").toBool());
+        QVERIFY(QMetaObject::invokeMethod(viewMenu, "close"));
+        QTRY_VERIFY(!viewMenu->property("visible").toBool());
+    }
     QVERIFY(source->property("checked").toBool()); QVERIFY(!live->property("checked").toBool()); QVERIFY(!preview->property("checked").toBool());
     QVERIFY(QMetaObject::invokeMethod(window.data(), "selectWritingMode", Q_ARG(QVariant, QStringLiteral("live"))));
     QTRY_VERIFY(live->property("checked").toBool()); QVERIFY(!source->property("checked").toBool());
