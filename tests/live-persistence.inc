@@ -320,9 +320,24 @@ void FomawriteTest::livePersistenceMismatchAndTimeoutFailClosed() {
     // The delayed genuine reply is ignored after the request was canceled.
     QCOMPARE(cycle144PageText(f.backend.editorBridge(), 5000), original);
     QCOMPARE(saved.count(), 0); QCOMPARE(cycle103Read(path), original.toUtf8());
-    // An explicit switch to Source must remain usable after renderer failure.
+    // Exhaust the genuine one-retry lifecycle before testing queued calls from
+    // a stopped page. Otherwise its one-second reload can replace that page
+    // during this test's Source transition or asynchronous JavaScript probe.
     auto *pane = f.window->findChild<QObject *>("liveEditorPane"); QVERIFY(pane);
+    auto *automaticRetry = pane->findChild<QObject *>("liveEditorAutomaticRetry"); QVERIFY(automaticRetry);
+    auto *bridge = f.backend.editorBridge();
     QVERIFY(QMetaObject::invokeMethod(pane, "rendererStopped"));
+    QVERIFY(!bridge->isReady());
+    QTRY_VERIFY_WITH_TIMEOUT(bridge->isReady(), 15000);
+    QCOMPARE(cycle144PageText(bridge), original);
+    QVERIFY(pane->property("automaticRetryUsed").toBool());
+    QVERIFY(!automaticRetry->property("running").toBool());
+    QVERIFY(QMetaObject::invokeMethod(pane, "rendererStopped"));
+    QVERIFY(!bridge->isReady());
+    QVERIFY(!pane->property("loadError").toString().isEmpty());
+    QVERIFY(!automaticRetry->property("running").toBool());
+    const int stoppedGeneration = bridge->pageGeneration();
+    // An explicit switch to Source must remain usable after renderer failure.
     QVERIFY(QMetaObject::invokeMethod(f.window.data(), "setSourceEditing"));
     QTRY_VERIFY(!f.backend.liveEditingActive());
     QVERIFY(!f.window->property("documentBarrierCallback").value<QJSValue>().isCallable());
@@ -333,18 +348,55 @@ void FomawriteTest::livePersistenceMismatchAndTimeoutFailClosed() {
     QCOMPARE(saved.count(), 1); QVERIFY(!f.backend.modified());
     // The invalidated old page can still send queued channel calls, but its
     // real delta must not overwrite Source before a fresh ready handshake.
-    QSignalSpy oldPageDispatch(f.backend.editorBridge(), &EditorBridge::metricRecorded);
-    QSignalSpy oldPageChanges(f.backend.editorBridge(), &EditorBridge::changesReceived);
-    QCOMPARE(cycle143PageResult(view, "(()=>{window.fomawriteEditor.view.dom.dispatchEvent(new Event('beforeinput'));window.fomawriteEditor.simulateUserChanges('[{\"from\":0,\"to\":0,\"insert\":\"late old renderer \"}]');return window.fomawriteEditor.getText();})()", 0).toString(), QStringLiteral("late old renderer ") + original);
+    QTest::qWait(1200); // Beyond the real retry delay: this page must stay stopped.
+    QVERIFY(!bridge->isReady());
+    QVERIFY(!automaticRetry->property("running").toBool());
+    QVERIFY(pane->property("automaticRetryUsed").toBool());
+    QCOMPARE(bridge->pageGeneration(), stoppedGeneration);
+    QSignalSpy oldPageDispatch(bridge, &EditorBridge::metricRecorded);
+    QSignalSpy oldPageChanges(bridge, &EditorBridge::changesReceived);
+    // Submit the mutation once in the main world. Record callback completion
+    // separately from its value so timeout/undefined cannot look like empty text.
+    QJSValue probe = engine->newObject();
+    probe.setProperty("completed", false);
+    engine->globalObject().setProperty("liveStalePageProbe", probe);
+    const QJSValue probeCallback = engine->evaluate(
+        "(function(value) { liveStalePageProbe.value = value; liveStalePageProbe.completed = true; })");
+    QVERIFY(probeCallback.isCallable());
+    QVERIFY(QMetaObject::invokeMethod(view, "runJavaScript", Q_ARG(QString, QStringLiteral(R"JS(
+        (() => {
+            try {
+                window.fomawriteEditor.view.dom.dispatchEvent(new Event('beforeinput'));
+                window.fomawriteEditor.simulateUserChanges('[{"from":0,"to":0,"insert":"late old renderer "}]');
+                return JSON.stringify({text: window.fomawriteEditor.getText()});
+            } catch (error) { return JSON.stringify({error: String(error)}); }
+        })()
+    )JS")), Q_ARG(uint, 0), Q_ARG(QJSValue, probeCallback)));
+    const bool completed = QTest::qWaitFor([&] { return probe.property("completed").toBool(); }, 5000);
+    const QJSValue result = probe.property("value");
+    qInfo() << "Stopped-page mutation callback completed" << completed
+            << "result" << result.toString() << "generation" << bridge->pageGeneration()
+            << "expected generation" << stoppedGeneration << "ready" << bridge->isReady();
+    QVERIFY2(completed, "Stopped-page JavaScript callback did not complete within five seconds");
+    QVERIFY2(result.isString(), "Stopped-page callback completed without the expected JSON string");
+    QJsonParseError parseError;
+    const auto resultDocument = QJsonDocument::fromJson(result.toString().toUtf8(), &parseError);
+    QVERIFY2(parseError.error == QJsonParseError::NoError && resultDocument.isObject(), qPrintable(result.toString()));
+    const auto resultObject = resultDocument.object();
+    QVERIFY2(!resultObject.contains("error"), qPrintable(resultObject.value("error").toString()));
+    QCOMPARE(resultObject.value("text").toString(), QStringLiteral("late old renderer ") + original);
     // onDocChanged sends the keystroke metric immediately after the real
-    // documentChanged call on the same channel. Hidden Chromium pages throttle
-    // the debounced cursor timer, which can lose to automatic renderer retry.
+    // documentChanged call on the same channel; do not rely on the hidden
+    // page's throttled cursor timer as a delivery witness.
     QTRY_VERIFY(std::any_of(oldPageDispatch.cbegin(), oldPageDispatch.cend(), [](const auto &args) {
         return args.at(0).toString() == QStringLiteral("keystroke-to-dispatch");
     }));
     QCOMPARE(oldPageChanges.count(), 0);
     QCOMPARE(f.editor->property("text").toString(), source);
+    QCOMPARE(cycle103Read(path), source.toUtf8());
     QVERIFY(!f.backend.modified());
+    QVERIFY(!bridge->isReady());
+    QCOMPARE(bridge->pageGeneration(), stoppedGeneration);
 }
 
 void FomawriteTest::liveCloseBlocksPostSnapshotMutations() {

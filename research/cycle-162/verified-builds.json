@@ -151,7 +151,7 @@
     "Clipboard/search ordinary follow-through",
     "Complete nested-menu observations",
     "Review three-card readiness in final toggle workflow",
-    "Correct desktop Center test to visible-frame contract; full follow-through and other monitors",
+    "Execute corrected visible-frame Center driver through normal Exit/reopen; other monitors remain pending",
     "Native Print cancellation",
     "Immediate in-flight Live entry to separate Paginated Preview",
     "Installer install/upgrade/uninstall",
@@ -281,5 +281,368 @@
     }
   },
   "finalCiSummarySha256": "219fe032400cacb28102b7dbf143d45c3b1633a3f4dc15cc8bcf492356968662",
-  "finalVmCleanupUtc": "2026-10-22T17:20:38Z"
+  "finalVmCleanupUtc": "2026-10-22T17:20:38Z",
+  "hostFollowthrough": {
+    "commit": "fb6ef371b9f1a19e452e0492e1583fd004719c20",
+    "windows": {
+      "arm64": {
+        "commit": "fb6ef371b9f1a19e452e0492e1583fd004719c20",
+        "architecture": "arm64",
+        "runId": 39825977075,
+        "jobId": 119989411819,
+        "jobConclusion": "success",
+        "evidenceArtifactId": 12448755823,
+        "evidenceArtifactSha256": "a807516e1314ed955db700b758ec3fec85dafcb63134dfab6ee1a777a7ed8e6f",
+        "qt": {
+          "name": "FomawriteTest",
+          "timestamp": "2026-10-22T11:00:02",
+          "hostname": "runnervmts3yc",
+          "tests": "389",
+          "failures": "0",
+          "errors": "0",
+          "skipped": "0",
+          "time": "884.136"
+        },
+        "failures": [],
+        "appearance": {
+          "name": "FomawriteTest",
+          "timestamp": "2026-10-22T11:00:02",
+          "hostname": "runnervmts3yc",
+          "tests": "3",
+          "failures": "0",
+          "errors": "0",
+          "skipped": "0",
+          "time": "0.034"
+        },
+        "guards": {
+          "pythonCI": 37,
+          "pythonNormal": 25,
+          "pythonLive": 13,
+          "pythonDesktopSupplement": 41,
+          "pythonQtInstaller": 12,
+          "nativeStarter": 9,
+          "nativeNormalWait": 20,
+          "nativeUiaRetry": 35,
+          "nativeMenuClickBounds": 6,
+          "nativeDesktopPreparation": 10
+        },
+        "guardsTotal": 208,
+        "deployed": {
+          "passed": true,
+          "scenarios": 124,
+          "failures": [],
+          "qmlWarnings": []
+        },
+        "menuProof": {
+          "stepConclusion": "skipped",
+          "scope": "Automatic push did not request optional baseline; exact prior b056 red/green proof retained separately."
+        },
+        "newHeadEvidenceManifestIdentity": {
+          "manifestSha256": "d5cac5623b89032279e37fcb881e7daa72e62d567e87ddb29575dc5ae61ec604",
+          "executableSha256": "80e1d29a4262eff8b93bee146288f844eb04929a604170c9967bb369fbe3da91",
+          "nativeBuildFullSourceTreeSha256": "ca3416fdd11e8d6f619165afca715672ff34c676bcf7dbba75c80af693e9fc8e",
+          "applicationSourceHashesMatchB056": true,
+          "applicationSourcePaths": 191
+        },
+        "qualification": "Newhead CI/evidence only; packageZIP/PEinventory not independently downloaded/verified and ordinary b056 acceptance is not transferred.",
+        "traceFiles": []
+      },
+      "x64": {
+        "commit": "fb6ef371b9f1a19e452e0492e1583fd004719c20",
+        "architecture": "x64",
+        "runId": 39825977075,
+        "jobId": 119989412348,
+        "jobConclusion": "success",
+        "evidenceArtifactId": 12447783676,
+        "evidenceArtifactSha256": "8f0f50982a1ef07a2f199c30d96c89c79e2571556b3c1fbe348bb6fe04d89a59",
+        "qt": {
+          "name": "FomawriteTest",
+          "timestamp": "2026-10-22T17:58:48",
+          "hostname": "runnervmgnbhw",
+          "tests": "389",
+          "failures": "0",
+          "errors": "0",
+          "skipped": "0",
+          "time": "923.165"
+        },
+        "failures": [],
+        "appearance": {
+          "name": "FomawriteTest",
+          "timestamp": "2026-10-22T17:58:47",
+          "hostname": "runnervmgnbhw",
+          "tests": "3",
+          "failures": "0",
+          "errors": "0",
+          "skipped": "0",
+          "time": "0.034"
+        },
+        "guards": {
+          "pythonCI": 37,
+          "pythonNormal": 25,
+          "pythonLive": 13,
+          "pythonDesktopSupplement": 41,
+          "pythonQtInstaller": 12,
+          "nativeStarter": 9,
+          "nativeNormalWait": 20,
+          "nativeUiaRetry": 35,
+          "nativeMenuClickBounds": 6,
+          "nativeDesktopPreparation": 10
+        },
+        "guardsTotal": 208,
+        "deployed": {
+          "passed": true,
+          "scenarios": 124,
+          "failures": [],
+          "qmlWarnings": []
+        },
+        "menuProof": {
+          "stepConclusion": "skipped",
+          "scope": "Automatic push did not request optional baseline; exact prior b056 red/green proof retained separately."
+        },
+        "newHeadEvidenceManifestIdentity": {
+          "manifestSha256": "4481e5e357a6a2284e39f492e35a93f563447e2357d969c522065d3597bae58f",
+          "executableSha256": "2d36b278a780983b2cac8d5554e8606e1f1041441f95c2d23638e01707d7f942",
+          "nativeBuildFullSourceTreeSha256": "ca3416fdd11e8d6f619165afca715672ff34c676bcf7dbba75c80af693e9fc8e",
+          "applicationSourceHashesMatchB056": true,
+          "applicationSourcePaths": 191
+        },
+        "qualification": "Newhead CI/evidence only; packageZIP/PEinventory not independently downloaded/verified and ordinary b056 acceptance is not transferred.",
+        "traceFiles": []
+      }
+    },
+    "shared": {
+      "repository": "andrewjngray/fomawrite_mac",
+      "runId": 39825977283,
+      "commit": "fb6ef371b9f1a19e452e0492e1583fd004719c20",
+      "url": "https://github.com/andrewjngray/fomawrite_mac/actions/runs/39825977283",
+      "status": "completed",
+      "conclusion": "failure",
+      "recordedUtc": "2026-10-22T18:15:12.424973+00:00",
+      "mac": {
+        "jobId": 119989612994,
+        "url": "https://github.com/andrewjngray/fomawrite_mac/actions/runs/39825977283/job/119989612994",
+        "conclusion": "failure",
+        "completedAt": "2026-10-22T18:10:50Z",
+        "qtVersion": "6.11.3",
+        "counts": {
+          "passed": 412,
+          "failed": 1,
+          "skipped": 13,
+          "blacklisted": 0,
+          "elapsedMs": 1060970
+        },
+        "independentlyCountedResultRows": {
+          "passed": 412,
+          "failed": 1,
+          "skipped": 13
+        },
+        "skipReasonCounts": {
+          "this macOS has no grammar pass for the test language": 12,
+          "Windows Qt appearance implementation; native Windows execution required": 1
+        },
+        "skips": [
+          {
+            "case": "spellCheckServiceReportsGrammarIssuesWithCategory(native-checker)",
+            "reason": "this macOS has no grammar pass for the test language"
+          },
+          {
+            "case": "windowsAppearanceTracksQtColorScheme()",
+            "reason": "Windows Qt appearance implementation; native Windows execution required"
+          },
+          {
+            "case": "grammarChecksLongParagraphsInCachedChunks(native-checker)",
+            "reason": "this macOS has no grammar pass for the test language"
+          },
+          {
+            "case": "ignoreGrammarFromAnySurfaceReachesEverySurface(native-checker)",
+            "reason": "this macOS has no grammar pass for the test language"
+          },
+          {
+            "case": "sourceGrammarUnderlinesDoubledWordsAndSpellingStaysRed(native-checker)",
+            "reason": "this macOS has no grammar pass for the test language"
+          },
+          {
+            "case": "sourceGrammarFollowsItsSettingAndKeepsSpelling(native-checker)",
+            "reason": "this macOS has no grammar pass for the test language"
+          },
+          {
+            "case": "sourceGrammarWithholdsTheRangeAtTheCaretWithoutARevision(native-checker)",
+            "reason": "this macOS has no grammar pass for the test language"
+          },
+          {
+            "case": "sourceGrammarUnderlineIsBlueInTheRenderedWindow(native-checker)",
+            "reason": "this macOS has no grammar pass for the test language"
+          },
+          {
+            "case": "sourceGrammarContextMenuShowsTheMessageCorrectsAndIgnores(native-checker)",
+            "reason": "this macOS has no grammar pass for the test language"
+          },
+          {
+            "case": "sourceGrammarIgnoreIsPerDocumentAndRestylesInPlace(native-checker)",
+            "reason": "this macOS has no grammar pass for the test language"
+          },
+          {
+            "case": "liveGrammarUnderlinesFollowTheGrammarSetting(native-checker)",
+            "reason": "this macOS has no grammar pass for the test language"
+          },
+          {
+            "case": "reviewIssuesListSpellingAndGrammarInOrderWithDocumentOffsets(native-checker)",
+            "reason": "this macOS has no grammar pass for the test language"
+          },
+          {
+            "case": "reviewPaneRendersInLightAndDarkThemes(native-checker)",
+            "reason": "this macOS has no grammar pass for the test language"
+          }
+        ],
+        "failures": [
+          {
+            "case": "livePersistenceMismatchAndTimeoutFailClosed()",
+            "assertion": "Compared values are not the same",
+            "source": "tests/live-persistence.inc:338",
+            "rawLines": [
+              "FAIL!  : FomawriteTest::livePersistenceMismatchAndTimeoutFailClosed() Compared values are not the same",
+              "   Actual   (cycle143PageResult(view, \"(()=>{window.fomawriteEditor.view.dom.dispatchEvent(new Event('beforeinput'));window.fomawriteEditor.simulateUserChanges('[{\\\"from\\\":0,\\\"to\\\":0,\\\"insert\\\":\\\"late old renderer \\\"}]');return window.fomawriteEditor.getText();})()\", 0).toString()): \"\"",
+              "   Expected (QStringLiteral(\"late old renderer \") + original)                                                                                                                                                                                                                             : \"late old renderer Known host text.\\n\"",
+              "   Loc: [../tests/live-persistence.inc(338)]"
+            ],
+            "diagnosis": "Not established by this evidence audit; the main-world JavaScript probe (world 0) returned an empty value instead of the expected changed renderer text."
+          }
+        ],
+        "steps": {
+          "Set up job": "success",
+          "Check out": "success",
+          "Install Qt 6.11.3": "success",
+          "Show toolchain": "success",
+          "Fetch the pinned Harper engine": "success",
+          "Build app": "success",
+          "Build and run tests (offscreen)": "failure",
+          "Upload test log": "success",
+          "Post Install Qt 6.11.3": "success",
+          "Post Check out": "success",
+          "Complete job": "success"
+        }
+      },
+      "editor": {
+        "jobId": 119989613352,
+        "url": "https://github.com/andrewjngray/fomawrite_mac/actions/runs/39825977283/job/119989613352",
+        "conclusion": "success",
+        "counts": {
+          "tests": 324,
+          "pass": 324,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0
+        },
+        "typecheck": "success",
+        "assetBuild": "success",
+        "committedAssetVerification": "success"
+      },
+      "limits": [
+        "This exact shared run failed; earlier green runs are not substituted.",
+        "No native Windows desktop acceptance is established by this shared CI evidence.",
+        "No repository, application or VM changes were performed by this audit."
+      ],
+      "evidence": [
+        {
+          "path": "/private/tmp/fomawrite-fb6ef37-shared/editor-evidence.json",
+          "bytes": 628,
+          "sha256": "c821910df3e32c2f5b707128a9df00cf9f4d5c9077897ba7eb1bcb749873f3f7"
+        },
+        {
+          "path": "/private/tmp/fomawrite-fb6ef37-shared/editor-job.log",
+          "bytes": 152145,
+          "sha256": "6b1d9d8d8bfaae216f5b6b7732243b2a6d224c7e6050dc83cfcc6e555a9921dd"
+        },
+        {
+          "path": "/private/tmp/fomawrite-fb6ef37-shared/mac-job.log",
+          "bytes": 382742,
+          "sha256": "4d7a13936a3b41edc37b0a589922e05c4e5f07b7e111576d3e745a6b5be3933f"
+        },
+        {
+          "path": "/private/tmp/fomawrite-fb6ef37-shared/mac-test-artifact/test.log",
+          "bytes": 200199,
+          "sha256": "1370ba02ba0263fa999b375cb4b47b32539b238759de6c81b15ea8f1f27010d7"
+        },
+        {
+          "path": "/private/tmp/fomawrite-fb6ef37-shared/run-status.json",
+          "bytes": 4440,
+          "sha256": "9437b0c9ba2e13e4727095b74eb22a2254f4dff0cb28ec281d0ac047d66938f0"
+        },
+        {
+          "path": "/private/tmp/fomawrite-fb6ef37-shared/run-watch.log",
+          "bytes": 6781,
+          "sha256": "38770c98b17e8bfcffd5903fea6f0df5763944752a2c930bc30dd7ab459bd605"
+        }
+      ]
+    },
+    "fixtureRepair": {
+      "scope": "test fixture repair; no product red/green claim",
+      "source": "tests/live-persistence.inc",
+      "sourceSha256": "9cdf051e2b98d6e15a52a9754e9a09634ad8e219123a7afc4f62e433f5aa8a76",
+      "qtVersion": "6.11.2",
+      "platform": "macOS arm64 offscreen host",
+      "originalDiagnostic": {
+        "change": "temporary1200ms pre-mutation gap only",
+        "counts": {
+          "passed": 2,
+          "failed": 1,
+          "skipped": 0
+        },
+        "actual": "late old renderer Source recovery remains writable.\n",
+        "expected": "late old renderer Known host text.\n",
+        "interpretation": "real automatic retry replaced the supposed old renderer during the fixture"
+      },
+      "repairedFocused": {
+        "tests": [
+          "livePersistenceMismatchAndTimeoutFailClosed",
+          "liveEditorRendererRecoveryIsBoundedAndPreservesCanonicalEdits"
+        ],
+        "counts": {
+          "passed": 4,
+          "failed": 0,
+          "skipped": 0
+        }
+      },
+      "limits": [
+        "Focused host tests only; exact hosted Qt6.11.3 Mac/Windows reruns remain required",
+        "No VM input, app source change, commit or push"
+      ],
+      "files": [
+        {
+          "path": "/private/tmp/fomawrite-live-stale-page-repair/original-gap1200-build.log",
+          "sha256": "c64196a1b7e71ee9e886780c8d1fbddd6ff32e5bf577a874371af606a4e95898",
+          "bytes": 9299
+        },
+        {
+          "path": "/private/tmp/fomawrite-live-stale-page-repair/original-gap1200-test.log",
+          "sha256": "72d041094c616ee3f69e1c189650dbfbb305f93bf3c3bd9e513c2f03490c9ea4",
+          "bytes": 1438
+        },
+        {
+          "path": "/private/tmp/fomawrite-live-stale-page-repair/original-live-persistence.inc",
+          "sha256": "8141a8cb6240c01007f130e4e4bb2f626ef31e2843bef82c48c25a307194fbe2",
+          "bytes": 27447
+        },
+        {
+          "path": "/private/tmp/fomawrite-live-stale-page-repair/repaired-focused-build.log",
+          "sha256": "c64196a1b7e71ee9e886780c8d1fbddd6ff32e5bf577a874371af606a4e95898",
+          "bytes": 9299
+        },
+        {
+          "path": "/private/tmp/fomawrite-live-stale-page-repair/repaired-focused-test.log",
+          "sha256": "485244dd9c5eab49a84a0f6d3aeb308e7ecdf588aafb76f75ad992c2333e9c67",
+          "bytes": 1387
+        },
+        {
+          "path": "/private/tmp/fomawrite-live-stale-page-repair/repaired-live-persistence.inc",
+          "sha256": "9cdf051e2b98d6e15a52a9754e9a09634ad8e219123a7afc4f62e433f5aa8a76",
+          "bytes": 30619
+        }
+      ]
+    },
+    "hostedRepairVerification": "pending",
+    "applicationChanged": false,
+    "desktopQualification": false
+  }
 }

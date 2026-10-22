@@ -1,7 +1,7 @@
 # Windows workstream status
 
 
-**Host/CI follow-through after VM release:** the [Review/Center supplementary harness](DESKTOP-SUPPLEMENT.md) passed ten native preparation/parse/compile checks on each Windows architecture at `385340d`. Its independent verifier has 41 passing fixture tests (128 including the existing Python guards). Current full CI is pending; no new ordinary desktop run or app/build change is claimed. Interactive qualification requires another unattended VM session.
+**Host/CI follow-through after VM release:** at `fb6ef37`, [Windows CI](https://github.com/andrewjngray/fomawrite_mac/actions/runs/39825977075) passed on ARM64 and x64: each **389 Qt / 0 failures / 0 skips**, **3 appearance checks**, **124 deployed scenarios**, and **208 deployment/driver guards**. [Shared CI](https://github.com/andrewjngray/fomawrite_mac/actions/runs/39825977283) retained a Mac **412/1/13** failure in the stale-renderer test; editor **324/0/0**, typecheck and asset verification passed. A focused host diagnostic reproduced a fixture race with the real automatic retry. The repaired fixture passes **4/0/0** with the separate recovery test; full hosted verification is pending. No application source or installed app changed. Interactive qualification still requires another unattended VM session.
 Updated: 22 October 2026 UTC / 23 October Brisbane. Windows only; the root `STATUS.md` records the Mac baseline.
 
 ## Current state — `b056ab5`, not promoted
