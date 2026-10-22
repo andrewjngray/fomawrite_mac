@@ -43,6 +43,9 @@ jobs:
           python windows/test_ci.py
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           python windows/test_normal_launch.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          powershell.exe -NoProfile -File windows/test_launch_local.ps1
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Install pinned Qt SDK and WebEngine/PDF extensions
         run: |

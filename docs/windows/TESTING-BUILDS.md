@@ -13,7 +13,13 @@ The shelf contains the original verified ZIPs **and already unpacked application
 - `builds/b45cb34-arm64/Fomawrite/Fomawrite.exe` — native Apple Silicon Parallels target.
 - `builds/b45cb34-x64/Fomawrite/Fomawrite.exe` — x64 comparison under emulation in the ARM VM.
 
-**Both are the existing diagnostic candidate. There is no newer fix here.** Andrew reported that ordinary launch opens menus but menu actions, buttons and folder navigation do not work. The running executable matched the tested ARM64 hash. It was launched from `C:\Mac\Home\Desktop\Fomawrite_windows\Fomawrite\Fomawrite.exe`. The cause is not confirmed. The prior checker used fresh isolated settings and synthetic events, bypassing normal startup and IPC; its passes do not resolve this report.
+**These are the original `b45cb34` diagnostic packages. No fixed or qualified package is promoted here.** On the Mac share, ordinary launch repeatedly failed to load the Live page and a QtWebEngine renderer crash was observed. The executable hash matched the original ARM64 package. A same-hash Windows-local copy completed real File Open, View Source and File Save actions. The full failure mechanism remains unresolved; those successful actions do not establish complete normal-startup, Live, folder or restore acceptance.
+
+The newer `d8b8580` packages belong only in `diagnostic-candidates/<commit>-<architecture>/`. [Their CI run](https://github.com/andrewjngray/fomawrite_mac/actions/runs/39736778817) is green on both architectures, but they add normal-startup isolation only. They contain neither the current bounded Live recovery changes nor the new local portable starter. Do not label them fixed, accepted or latest recommended builds. See [M2 repair evidence](M2-REPAIR-EVIDENCE.md).
+
+## Windows-local starter under development
+
+The working portable packaging change adds `START-FOMAWRITE.cmd` and a manifest-verifying local starter. It stages the whole manifest-listed application in a versioned `%LOCALAPPDATA%\Fomawrite\Portable` cache, verifies the copy and launches it through normal startup. Its 9 synthetic fixture checks passed without launching the app. Real UNC/shared-folder starter acceptance and the full [ordinary launch gate](NORMAL-LAUNCH-GATE.md) remain pending. The starter is not present in the original shelf packages or the `d8b8580` diagnostic packages. See [starter behavior and limits](PORTABLE-STARTER.md).
 
 ## Run a version
 
@@ -32,9 +38,9 @@ Different app directories may still share preferences and themes; copying an app
 - Keep builds in new `<commit>-<architecture>` folders. Never overwrite a running or previously reviewed version.
 - Identify builds by commit, architecture and hashes, not only the inherited application version string.
 - Place each original ZIP beside its extracted `Fomawrite` folder; verify ZIP, executable and every package-manifest file hash.
-- Update `BUILD-CATALOG.json`, `COPY-VERIFICATION.json` and `START-HERE.txt` when a new candidate is added. Keep diagnostic, failed and accepted states explicit.
+- Update `BUILD-CATALOG.json`, `COPY-VERIFICATION.json` and `START-HERE.txt` only when intentionally adding a candidate to the shelf after identity verification. Diagnostic-only staging under `diagnostic-candidates/` does not promote a build or update those public shelf pointers. Keep diagnostic, failed and accepted states explicit.
 - `dist/` is ignored by Git. Packages and local result notes stay local; publish only reviewed status/evidence in `docs/windows/` and CI artifacts.
-- The shelf currently has **one code version in two architectures**, not two different revisions. Older failed candidates are not promoted into it.
+- The shelf has **one code version in two architectures** (`b45cb34`). Separately staged diagnostic revisions are not accepted shelf versions.
 
 ## Next Windows work
 

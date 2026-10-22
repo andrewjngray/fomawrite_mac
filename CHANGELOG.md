@@ -4,6 +4,8 @@ One line per cycle, newest first. Each line links to the cycle's record under `r
 
 ## 0.3.0 development series (Cycles 97–)
 
+- **Windows M2 repair in progress** — Record shared-folder Live page failures, same-hash local native file actions, bounded renderer recovery and manifest-verifying local starter checks; ordinary launch acceptance remains pending. [Record](docs/windows/M2-REPAIR-EVIDENCE.md)
+
 - **Windows M1 complete** — Code `b45cb34` passes native ARM64/x64 compile, Qt, appearance and deployed checks, shared Mac/editor CI, and both Parallels package checkers. Desktop parity, normal startup/restore, installer and distribution qualification remain later milestones. [Record](docs/windows/M1-EVIDENCE.md)
 
 - **153** — Stability: revision-neutral checker refresh, real Live typing/save/history acceptance, current theme/rendering checks, embedded editor/theme verification and editor CI gates. [Record](research/cycle-153/README.md)

@@ -128,6 +128,7 @@ private slots:
     void liveImagesSaveBesideTheDocument();
     void liveEditorPastesImagesThroughTheHost();
     void liveEditorPageMirrorsUserEditsByteExactly();
+    void liveEditorRendererRecoveryIsBoundedAndPreservesCanonicalEdits();
     void liveEditorRoundTripsPersistenceFixturesThroughThePage();
     void liveEditorLoadsLargeDocumentQuickly();
     void liveEditorFollowsHostEdits();
@@ -5774,6 +5775,7 @@ private:
 #include "cycle140-typora-fixtures.inc"
 #include "perf-profile.inc"
 #include "cycle134-live-editor.inc"
+#include "live-renderer-recovery.inc"
 #include "cycle134-footer-live.inc"
 #include "cycle140-typora-base.inc"
 #include "cycle143-spellcheck.inc"

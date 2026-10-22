@@ -1,4 +1,5 @@
 import QtQuick
+import QtQuick.Controls
 import QtWebEngine
 import QtWebChannel
 
@@ -31,7 +32,52 @@ Rectangle {
     // A page-side refusal the writer should see (e.g. an image that could not be saved).
     signal noticeRequested(string message)
     // The app's Format commands apply to the page while it has keyboard focus.
-    readonly property bool hasLiveFocus: web.activeFocus
+    readonly property bool hasLiveFocus: web.activeFocus && loadError === ""
+    property string loadError: ""
+    property bool automaticRetryUsed: false
+    property bool recoveringPage: false
+
+    function showLoadError(message) {
+        automaticRetry.stop();
+        recoveringPage = false;
+        if (loadError === message) return;
+        loadError = message;
+        // A prewarmed page can fail while hidden behind Source. Keep that
+        // failure visible in the workspace as well as in the Live pane.
+        noticeRequested(message);
+    }
+    function reloadPage() {
+        // The bridge's last full document can predate incremental Live edits.
+        // Refresh its replay from canonical host text before reconnecting.
+        backend.syncLiveEditor(backend.liveCursor());
+        pushAppearance();
+        web.reload();
+    }
+    function rendererStopped() {
+        if (automaticRetry.running) return;
+        if (automaticRetryUsed) {
+            showLoadError("The Live editor stopped unexpectedly. Retry Live, or switch to Source to keep writing.");
+            return;
+        }
+        automaticRetryUsed = true;
+        recoveringPage = true;
+        loadError = "";
+        noticeRequested("The Live editor stopped unexpectedly. Retrying once…");
+        automaticRetry.start();
+    }
+    function retryLiveEditor() {
+        automaticRetry.stop();
+        automaticRetryUsed = false;
+        recoveringPage = true;
+        loadError = "";
+        reloadPage();
+    }
+    Timer {
+        id: automaticRetry
+        objectName: "liveEditorAutomaticRetry"
+        interval: 1000
+        onTriggered: root.reloadPage()
+    }
 
     function scrollToFraction(fraction) { if (root.bridge) root.bridge.scrollTo(fraction); }
 
@@ -83,6 +129,7 @@ Rectangle {
         objectName: "liveEditorView"
         anchors.fill: parent
         anchors.bottomMargin: root.bottomInset
+        visible: root.loadError === ""
         webChannel: channel
         backgroundColor: root.color
         settings.javascriptEnabled: true
@@ -100,11 +147,45 @@ Rectangle {
             console.warn("Live editor page: " + message + " (" + sourceID + ":" + lineNumber + ")");
         }
         onLoadingChanged: function(info) {
-            if (info.status === WebEngineView.LoadFailedStatus) console.warn("Live editor page failed to load: " + info.errorString);
+            if (info.status === WebEngineView.LoadFailedStatus) {
+                console.warn("Live editor page failed to load: " + info.errorString);
+                if (!automaticRetry.running)
+                    root.showLoadError("The Live editor could not load. Retry Live, or switch to Source to keep writing.");
+            }
         }
-        onRenderProcessTerminated: function(terminationStatus, exitCode) { web.reload(); }
+        onRenderProcessTerminated: function(terminationStatus, exitCode) { root.rendererStopped(); }
         Keys.onPressed: root.writingActivity()
         Accessible.name: "Live Markdown editor"
+    }
+
+    Rectangle {
+        objectName: "liveEditorError"
+        anchors.centerIn: parent
+        width: Math.max(100, Math.min(440, parent.width - 48))
+        height: errorContents.implicitHeight + 32
+        visible: root.loadError !== ""
+        color: backend.palette.panel
+        radius: 8
+        Column {
+            id: errorContents
+            anchors.centerIn: parent
+            width: parent.width - 32
+            spacing: 12
+            Label {
+                width: parent.width
+                text: root.loadError
+                wrapMode: Text.WordWrap
+                horizontalAlignment: Text.AlignHCenter
+                color: backend.palette.text
+                Accessible.name: text
+            }
+            Button {
+                objectName: "liveEditorRetry"
+                anchors.horizontalCenter: parent.horizontalCenter
+                text: "Retry Live"
+                onClicked: root.retryLiveEditor()
+            }
+        }
     }
 
     onVisibleChanged: if (visible) { backend.syncLiveEditor(root.cursorOnEnter); root.cursorOnEnter = -1; }
@@ -116,6 +197,15 @@ Rectangle {
     }
     Connections {
         target: root.bridge
+        function onReadyChanged() {
+            if (!root.bridge.connected || !root.recoveringPage || automaticRetry.running) return;
+            // Source can have changed again while the replacement page loaded.
+            backend.syncLiveEditor(backend.liveCursor());
+            root.recoveringPage = false;
+            root.loadError = "";
+            // A successful handshake does not replenish the automatic retry:
+            // a page that loads and immediately crashes must still stop.
+        }
         function onScrollFractionChanged(fraction) { root.scrollFractionChanged(fraction); }
         function onMessageLogged(message) {
             if (message.indexOf("image not saved: ") === 0) root.noticeRequested(message.substring(17));

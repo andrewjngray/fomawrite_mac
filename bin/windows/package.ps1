@@ -13,6 +13,10 @@ if (Test-Path -LiteralPath $stage) { Remove-Item -LiteralPath $stage -Recurse -F
 New-Item -ItemType Directory -Force -Path $stage | Out-Null
 Copy-Item -LiteralPath $exe -Destination (Join-Path $stage 'Fomawrite.exe')
 Invoke-Checked (Join-Path $QtRoot 'bin/windeployqt.exe') @('--release', '--no-compiler-runtime', '--qmldir', (Join-Path $RepoRoot 'src'), '--dir', $stage, (Join-Path $stage 'Fomawrite.exe'))
+# The double-click starter stages verified files onto Windows-local storage.
+# Include both helpers before manifest creation so their hashes are bound too.
+Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'launch-local.ps1') -Destination (Join-Path $stage 'launch-local.ps1')
+Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'START-FOMAWRITE.cmd') -Destination (Join-Path $stage 'START-FOMAWRITE.cmd')
 # windeployqt may bundle a vc_redist installer rather than app-local DLLs. A
 # portable ZIP must launch without elevation or an installed development kit.
 # package-manifest inventories actual native CRT DLL versions and prefers the

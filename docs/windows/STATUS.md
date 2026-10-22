@@ -14,11 +14,15 @@ Updated: 22 October 2026. This file tracks Windows only. The root `STATUS.md` re
 - Local affected regressions: **10 passed, 0 failed, 0 skipped** (eight slots plus setup/cleanup), following a reproduced narrow-footer failure. The rebuilt isolated Mac app passed **124 scenarios, 0 failures, 0 QML warnings**.
 - Mac checkout, root status and installed applications remain unchanged. No compiler or Qt SDK was installed in the Windows guest.
 
-## User-reported normal-launch failure
+## Normal-launch failure and repair work
 
-After M1, Andrew reported that menus open but their actions, buttons and folder navigation do not work when double-clicking the ARM64 app. The running executable hash matched `b45cb34`; it was running from the Mac-shared Desktop. Root cause remains unconfirmed, and there is **no newer fixed build**. This report blocks recommending the candidate for ordinary use even though the bounded diagnostic harness passed.
+**M2 remains open; no fixed or qualified build is available.** The original `b45cb34` ARM64 package repeatedly failed to load the Live editor page from Mac-shared storage, with a QtWebEngine renderer crash also observed. The executable hash matched the M1 package. A Windows-local copy with the same executable hash completed real **File → Open File…**, **View → Source** and **File → Save** actions. This isolates an observed storage/location difference; the complete causal mechanism remains unresolved, and those local actions do not establish the full normal-launch gate.
 
-A [versioned testing shelf](TESTING-BUILDS.md) is now available at `dist/windows-testing`, with the existing ARM64/x64 ZIPs, complete extracted app folders and a manual results template. All extracted files were checked against their package manifests. This verifies copying and identity, not normal-launch functionality. Next priority is a normal-launch/native-input reproduction and fix, testing Windows-local storage and shared storage separately.
+[Diagnostic CI 39736778817](https://github.com/andrewjngray/fomawrite_mac/actions/runs/39736778817) is green for native ARM64 and x64 at `d8b8580384821f0e3d2f3cfd573d22ccec83369e`. That candidate adds normal-startup profile isolation for acceptance testing. It is **not a repair build** and does not contain the current bounded recovery or local starter changes. It is staged separately under `dist/windows-testing/diagnostic-candidates`; it is not promoted to the testing shelf.
+
+The current working changes bound automatic Live renderer recovery to one delayed retry, preserve canonical unsaved edits across reload, and show a visible error with an explicit retry. The focused local regression run passed **6 tests, 0 failures** with red/green evidence, and the local build passed. A manifest-verifying portable starter stages the application on Windows-local storage; its **9 non-UI fixture checks passed**. The UNC/shared-folder starter run and the full normal-launch acceptance gate remain pending. These local results do not qualify a packaged Windows repair.
+
+See [M2 repair evidence](M2-REPAIR-EVIDENCE.md), [testing builds](TESTING-BUILDS.md), [portable starter](PORTABLE-STARTER.md) and [normal-launch gate](NORMAL-LAUNCH-GATE.md) for the evidence boundaries and remaining checks.
 
 ## Scope and remaining qualification
 
