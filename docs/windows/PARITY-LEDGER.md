@@ -14,6 +14,17 @@ The complete Windows suite runs without a fixed platform skip list. The old `nat
 
 Mac-conditional assertions need separate treatment: native checker details in `writingReviewExcludesCodeAndCorrectsSafely` and the two NSFileVersion test bodies are genuine capability boundaries. OS-specific colour expectations are legitimate substitutions. Recent-menu activation, toolbar metrics, chrome, Focus and Output Style are now implemented in the Windows candidate, with actual-menu assertions replacing the former absence/shared-command fallbacks. The exact b056 ARM64/x64 native suites now pass all 389 tests, including these routes; ordinary desktop coverage remains separately bounded. Cycles 159–161 replace the remaining Format/authorship/Center limitations and add the five missing shortcut registrations below. Their focused host checks pass. Native Windows key/geometry regression rows passed. Ordinary packaged Review next/previous selections also passed, while the desktop outer-rectangle Center check failed; a separate native diagnostic measured the visible frame exactly centered and identified the invisible resize border mismatch.
 
+## Exact test-case comparison
+
+At exact `6c12569`, the retained complete Mac job log contains **427 rows (414 passed, 13 skipped)**; Windows x64 JUnit XML contains **390 rows, all passed**. Comparing full test names and data tags finds **390 shared identities and no missing applicable function name**. The 37 additional Mac rows are:
+
+- **28 native-checker rows**, excluded on Windows by `#ifndef Q_OS_WIN`; every matching `bundled-harper` row passed on Windows.
+- **9 windows-component rows**, omitted as duplicates on Windows; every matching `production-platform` row passed there against the actual Windows platform.
+
+Mac skips the Windows appearance row and Windows passes it. Therefore the pass-count difference is 16 native-provider passes + 9 duplicate-component passes − 1 Windows appearance pass = 24. Each omitted row, counterpart and exact-commit source binding is recorded in [the verification record](../../research/cycle-162/verified-builds.json) under `hostFollowthrough.macWindowsCaseIdentityAudit`. Root independently reproduced the comparison from retained logs/XML.
+
+This establishes named-case coverage, not equal assertions inside every conditional body or ordinary desktop acceptance. In particular, `automaticVersionsPreservePreviousSavedBytes` and `restoredVersionsRequireSaveAndDoNotInheritAuthorship` have Mac-only bodies: their Windows PASS rows do not prove Versions support. Native-provider assertions in `writingReviewExcludesCodeAndCorrectsSafely` are also conditional. These remain explicit capability boundaries above. The retained ARM64 failure and newer CI outcomes are recorded separately in STATUS.
+
 ## Implemented View and clipboard/search slices
 
 Candidate `7c37078b0d135f78b68f412444083ae7f919b339` restores the complete `nativeWorkspaceMenusShareState` assertions using platform menu lookup, plus these 15 Windows View commands and Paginated Preview:

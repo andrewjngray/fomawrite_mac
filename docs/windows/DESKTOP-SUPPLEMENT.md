@@ -2,7 +2,11 @@
 
 This maintained driver covers six physical Windows input workflows: Open by Path cancellation, Command Palette cancellation, Review toggle, Next Issue, Previous Issue, and Window → Center. It composes the current normal-launch driver and helper; it returns to that driver for Source preservation, normal Exit, ordinary relaunch and restored-document checks. It makes no Print claim.
 
-This is a reproducible **future acceptance harness**, not new qualification of the b056 package. Native Windows PowerShell 5.1 parsing, generated-driver preparation and combined C# helper compilation passed on ARM64 and x64 in commit `385340d` ([CI run](https://github.com/andrewjngray/fomawrite_mac/actions/runs/39824399841)). The ten preparation/identity checks send no input and launch no application. Interactive desktop execution of this maintained composition remains pending. The historical failures in [M2-DESKTOP-B056.md](M2-DESKTOP-B056.md) remain unchanged. This covers parts of [TEST-MATRIX.md](TEST-MATRIX.md) W11/W13/W14; the wider matrix remains applicable.
+This is a reproducible **future acceptance harness**, not new qualification of the b056 package. Native Windows PowerShell 5.1 parsing, generated-driver preparation and combined C# helper compilation passed on ARM64 and x64 in commit `385340d` ([CI run](https://github.com/andrewjngray/fomawrite_mac/actions/runs/39824399841)). The ten preparation/identity checks send no input and launch no application. At that preparation checkpoint, interactive desktop execution remained pending; see the later scoped result below. The historical failures in [M2-DESKTOP-B056.md](M2-DESKTOP-B056.md) remain unchanged. This covers parts of [TEST-MATRIX.md](TEST-MATRIX.md) W11/W13/W14; the wider matrix remains applicable.
+
+## Final session result — 23 October 2026
+
+The maintained composition initially exercised six actions but failed its return-file step due to incomplete native filename typing. A separate unmerged acknowledgment-driver copy then completed a fresh run against exact b056 ARM64. Independent verification passed all six actions and normal Source/Live/Exit/reopen follow-through; root visually confirmed all three Harper 2.10.0 cards and closed Review, and 255 evidence hashes verified. Both ordinary launches exited with status zero. This qualifies only `review-center-supplement`, not full M2. Maintained driver files are unchanged; review the [proposal](review-candidates/README.md) before adopting it. The historical failures remain intact. [Final handover](../../SESSION-HANDOVER.md).
 
 ## Sources and preparation
 
@@ -75,8 +79,8 @@ Forty-one supplemental fixture tests cover rejected/corrupted evidence and the v
 
 The VM was released after the overnight session on 22 October 2026; all work described above after release was host/CI work without VM input. Application source and the tested b056 packages remain unchanged.
 
-1. After another unattended VM session is authorized, run the maintained composition against the exact verified local package with a fresh profile, then verify the full normal Exit/reopen follow-through.
-2. Inspect the exact Review captures and record the separate visual receipt only if the label, three cards and closing behavior are visible. Two-card evidence stays pending.
+1. Review the unmerged filename acknowledgment proposal. The exact diagnostic composition already completed the fresh scoped workflow described above; adopting it into maintained drivers is separate work.
+2. Preserve the final hash-bound visual receipt and the historical two-card/failed evidence separately. Any future changed composition requires its own appropriate validation.
 3. Complete Print cancellation separately after observing ownership and lifecycle of the second Windows printer UI. Clipboard/search, nested menus, installer and wider display/endurance checks remain separate open work.
 
 Full M2 qualification remains open. Current complete CI status is recorded in [STATUS.md](STATUS.md); a green preparation step does not establish that the entire run passed.

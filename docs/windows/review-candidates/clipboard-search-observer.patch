@@ -1,0 +1,186 @@
+--- retained-r10c/clipboard-menu-os.cs
++++ observer-r12/clipboard-menu-os.cs
+@@ -202,7 +202,90 @@
+     }); }
+     // Include disabled controls, unlike the maintained clickable-target search.
+     public static System.Windows.Automation.AutomationElement Menu(System.Windows.Automation.AutomationElement root,int pid,string name) { return Find(root,pid,name,System.Windows.Automation.ControlType.MenuItem); }
+-    public static System.Windows.Automation.AutomationElement Field(System.Windows.Automation.AutomationElement root,int pid,string name) { return Find(root,pid,name,System.Windows.Automation.ControlType.Edit); }
++    // Field observations cross the worker boundary as primitives only. Each read
++    // creates its own root from the immutable owned HWND, never a saved provider.
++    public sealed class FieldState {
++        public bool present,keyboardFocus,treeFound,treeComplete;
++        public int processId; public long hwnd;
++        public string name,automationId,value,method,observedUtc;
++        public double left,top,width,height;
++    }
++    [System.Runtime.InteropServices.DllImport("user32.dll")] static extern uint GetWindowThreadProcessId(System.IntPtr window,out uint pid);
++    [System.Runtime.InteropServices.DllImport("user32.dll")] static extern bool IsWindow(System.IntPtr window);
++    [System.Runtime.InteropServices.DllImport("user32.dll",EntryPoint="GetForegroundWindow")] static extern System.IntPtr FieldForeground();
++    static System.Windows.Automation.AutomationElement FieldRoot(System.IntPtr window,int pid) {
++        uint actual;
++        if(window==System.IntPtr.Zero||pid<=0||!IsWindow(window)||GetWindowThreadProcessId(window,out actual)==0||actual!=(uint)pid)
++            throw new System.InvalidOperationException("Find field main HWND ownership changed");
++        if(FieldForeground()!=window)
++            throw new System.InvalidOperationException("Find field main window is not foreground");
++        var root=System.Windows.Automation.AutomationElement.FromHandle(window);
++        if(root==null||root.Current.ProcessId!=pid||root.Current.NativeWindowHandle!=window.ToInt32())
++            throw new System.InvalidOperationException("Find field UIA root identity changed");
++        return root;
++    }
++    static string FieldSuffix(string name) {
++        if(name=="Find in document")return ".searchField";
++        if(name=="Replace with")return ".replaceField";
++        throw new System.InvalidOperationException("Only the two exact document Find/Replace fields are supported");
++    }
++    static bool IsField(System.Windows.Automation.AutomationElement.AutomationElementInformation c,int pid,string name,string suffix) {
++        return c.ProcessId==pid&&c.ControlType==System.Windows.Automation.ControlType.Edit&&c.Name==name&&
++            (c.AutomationId??"").EndsWith(suffix,System.StringComparison.Ordinal)&&!c.IsOffscreen&&c.IsEnabled&&
++            !c.BoundingRectangle.IsEmpty&&c.BoundingRectangle.Width>0&&c.BoundingRectangle.Height>0;
++    }
++    static FieldState FieldValue(System.Windows.Automation.AutomationElement e,System.Windows.Automation.AutomationElement root,System.IntPtr window,int pid,string name,string method,bool treeFound) {
++        var c=e.Current;
++        if(!IsField(c,pid,name,FieldSuffix(name))||!root.Current.BoundingRectangle.Contains(c.BoundingRectangle))
++            throw new System.InvalidOperationException("Find field is not the precise visible owned Edit within its main window");
++        object raw;
++        if(!e.TryGetCurrentPattern(System.Windows.Automation.ValuePattern.Pattern,out raw))
++            throw new System.InvalidOperationException("Find field ValuePattern unavailable");
++        string value=((System.Windows.Automation.ValuePattern)raw).Current.Value;
++        FieldRoot(window,pid);
++        return new FieldState {present=true,keyboardFocus=c.HasKeyboardFocus,treeFound=treeFound,treeComplete=false,
++            processId=pid,hwnd=window.ToInt64(),name=name,automationId=c.AutomationId,value=value,method=method,
++            left=c.BoundingRectangle.Left,top=c.BoundingRectangle.Top,width=c.BoundingRectangle.Width,height=c.BoundingRectangle.Height,
++            observedUtc=System.DateTime.UtcNow.ToString("o")};
++    }
++    public static FieldState Field(System.IntPtr window,int pid,string name,bool treeOnly) { return Read(delegate() {
++        string suffix=FieldSuffix(name);var root=FieldRoot(window,pid);var timer=System.Diagnostics.Stopwatch.StartNew();
++        if(!treeOnly) {
++            var focused=System.Windows.Automation.AutomationElement.FocusedElement;
++            if(focused!=null&&IsField(focused.Current,pid,name,suffix)&&focused.Current.HasKeyboardFocus)
++                return FieldValue(focused,root,window,pid,name,"fresh-focused-edit",false);
++        }
++        var pending=new System.Collections.Generic.Queue<System.Tuple<System.Windows.Automation.AutomationElement,int>>();
++        var visited=new System.Collections.Generic.HashSet<string>();pending.Enqueue(System.Tuple.Create(root,0));
++        while(pending.Count>0) {
++            if(visited.Count>=1600||timer.ElapsedMilliseconds>=4500)
++                throw new System.TimeoutException("Incomplete fresh field tree cannot establish absence");
++            var entry=pending.Dequeue();var e=entry.Item1;var c=e.Current;
++            if(c.ProcessId!=pid)throw new System.InvalidOperationException("Field provider escaped isolated process");
++            if(!visited.Add(string.Join(".",e.GetRuntimeId())))continue;
++            if(IsField(c,pid,name,suffix))return FieldValue(e,root,window,pid,name,"fresh-owned-tree",true);
++            if(c.ControlType==System.Windows.Automation.ControlType.Document||
++                System.Text.RegularExpressions.Regex.IsMatch(c.ClassName??"","WebEngine|Chrome_|RenderWidget",System.Text.RegularExpressions.RegexOptions.IgnoreCase)||
++                System.Text.RegularExpressions.Regex.IsMatch(c.Name??"","^(Live Markdown editor|Publishing preview|Web content)$"))continue;
++            var children=e.FindAll(System.Windows.Automation.TreeScope.Children,System.Windows.Automation.Condition.TrueCondition);
++            if(entry.Item2>=18&&children.Count>0)throw new System.InvalidOperationException("Field tree depth exhausted; absence unproved");
++            foreach(System.Windows.Automation.AutomationElement child in children)pending.Enqueue(System.Tuple.Create(child,entry.Item2+1));
++        }
++        FieldRoot(window,pid);
++        return new FieldState {present=false,treeComplete=true,processId=pid,hwnd=window.ToInt64(),name=name,
++            method="complete-fresh-owned-tree",observedUtc=System.DateTime.UtcNow.ToString("o")};
++    }); }
++    // The hit-test element is created on the long-lived calling PS thread and
++    // stays alive there through the existing guarded Click. No input is retried
++    // or issued by this observation worker.
++    public static bool ValidateFieldHit(System.Windows.Automation.AutomationElement element,System.IntPtr window,int pid,string name,FieldState observed) {return Read(delegate() {
++        var root=FieldRoot(window,pid);var c=element.Current;var rect=c.BoundingRectangle;
++        if(!observed.present||observed.processId!=pid||observed.hwnd!=window.ToInt64()||observed.name!=name||
++            !IsField(c,pid,name,FieldSuffix(name))||c.AutomationId!=observed.automationId||!root.Current.BoundingRectangle.Contains(rect)||
++            rect.Left!=observed.left||rect.Top!=observed.top||rect.Width!=observed.width||rect.Height!=observed.height)
++            throw new System.InvalidOperationException("Fresh field hit test differs; refusing physical click");
++        FieldRoot(window,pid);return true;
++    }); }
+     static System.Windows.Automation.AutomationElement Find(System.Windows.Automation.AutomationElement root,int pid,string name,System.Windows.Automation.ControlType kind) { return Read(delegate() {
+         var pending=new System.Collections.Generic.Queue<System.Tuple<System.Windows.Automation.AutomationElement,int>>();
+         pending.Enqueue(System.Tuple.Create(root,0)); var timer=System.Diagnostics.Stopwatch.StartNew(); int visited=0;
+--- retained-r10c/source-steps.ps1
++++ observer-r12/source-steps.ps1
+@@ -3,6 +3,26 @@
+ $script:EditMenuReport=[ordered]@{ schemaVersion=2; findSelectionMenuTarget=$null; menuOpeningPolicy='hover-observe-owned-popup-before-click'; menuOpenings=@(); sourceUndoDirtyContract='conservative-unsaved-until-explicit-save'; sharedMacWindowsLimitation=$true; sourceSelectionControls=@(); mappedRightTransport='physical-left-shift-extended-right-four-events'; clipboardScope='public-test-baseline'; userClipboardCaptured=$false; userClipboardPreserved=$false; priorUserClipboardRestoration='unknown-r3'; sourceCompleted=$false; liveCompleted=$false; baselineRestored=$false; publicBaselineInitialized=$false; publicBaselineVerified=$false; publicBaselineRestoreAttempted=$false; publicBaselineRestored=$false; publicBaselinePreserved=$false; publicBaselinePreservationMode='not-initialized'; clipboardMetadata=@(); clipboardCopyConditions=@(); typedEmojiQualified=$false; fixtureOpened=$false; checkpoints=@(); disabled=@() }
+ $script:EditChecks=New-Object 'System.Collections.Generic.List[object]'
+ $script:EditDisabled=New-Object 'System.Collections.Generic.List[object]'
++$script:EditMainWindow=[NormalLaunchInput]::GetForegroundWindow()
++$script:EditFieldObservations=New-Object 'System.Collections.Generic.List[object]'
++function Edit-ObserveField([string]$name,[bool]$treeOnly=$false) {
++    $state=[EditMenuReadback]::Field($script:EditMainWindow,$script:process.Id,$name,$treeOnly)
++    $script:EditFieldObservations.Add($state)
++    $script:EditFieldObservations|ConvertTo-Json -Depth 6|Set-Content (Join-Path $outputRoot 'find-field-observations.json') -Encoding UTF8
++    return $state
++}
++function Edit-Field([string]$name,[bool]$requireFocus=$false) {
++    Wait-For {$state=Edit-ObserveField $name;if($state.present-and(-not$requireFocus-or$state.keyboardFocus)){$state}} ('precise owned Edit '+$name)
++}
++function Edit-ClickField([string]$name) {
++    $state=Edit-Field $name
++    $point=New-Object Windows.Point(($state.left+$state.width/2),($state.top+$state.height/2))
++    # Create this provider on the calling PS thread, which survives the click.
++    $target=[Windows.Automation.AutomationElement]::FromPoint($point)
++    $null=[EditMenuReadback]::ValidateFieldHit($target,$script:EditMainWindow,$script:process.Id,$name,$state)
++    [NormalLaunchInput]::Click($target)
++}
++
+ function Edit-PreserveClipboard {
+     if(-not $script:EditMenuReport.publicBaselineInitialized){return}
+     try {
+@@ -238,7 +258,7 @@
+ if(Test-Path -LiteralPath $unicodeFile){throw 'Unicode fixture path must be fresh'}
+ [IO.File]::WriteAllText($unicodeFile,$fixture,(New-Object Text.UTF8Encoding($false)))
+ Open-Menu 'File' ('^Open File'+[char]0x2026+'$');$picker=Native-Picker 'Open';$pickerHandle=[IntPtr]$picker.Current.NativeWindowHandle
+-[NormalLaunchInput]::Chord(0x12,0x4E);[NormalLaunchInput]::Type($unicodeFile);[NormalLaunchInput]::Press(0x0D)
++[NormalLaunchInput]::Chord(0x12,0x4E);Type-NativeFilePath $pickerHandle $unicodeFile;[NormalLaunchInput]::Press(0x0D)
+ Wait-For {[NormalLaunchInput]::OpenedDocument($script:main,$pickerHandle,$script:EditDocumentName+' - Fomawrite')} 'Unicode fixture opened through native file picker' | Out-Null
+ $sample=$unicodeFile
+ $editor=Edit-Source $fixture;Edit-Dirty $false
+@@ -287,39 +307,42 @@
+ 1..4 | ForEach-Object {$null=[MappedSourceInput]::ShiftRight()}
+ Edit-RequireSourceSelection $editor 'café' 'source-cafe-selection-before-find' 4
+ Edit-Action 'Use Selection for Find'
+-$query=Wait-For {[EditMenuReadback]::Field($script:main,$script:process.Id,'Find in document')} 'Find text field'
+-Wait-For {[NormalLaunchInput]::Text($query) -ceq 'café'} 'selection used for Find' | Out-Null
++$query=Edit-Field 'Find in document' $true
++Wait-For {(Edit-ObserveField 'Find in document').value -ceq 'café'} 'selection used for Find' | Out-Null
+ Edit-Action 'Find Previous';$span=[EditMenuReadback]::Selection($editor,$script:process.Id)
+ $last=$fixture.LastIndexOf('café');if($span[0] -ne $last -or $span[1] -ne $last+4){throw 'Find Previous did not wrap to final café range'}
+ Edit-Action 'Find Next';$span=[EditMenuReadback]::Selection($editor,$script:process.Id)
+ if($span[0] -ne 0 -or $span[1] -ne 4){throw 'Find Next did not wrap to first café range'}
+-[NormalLaunchInput]::Click($query);[NormalLaunchInput]::Chord(0x11,0x41);[NormalLaunchInput]::Type('ABSENT_QUERY')
++Edit-ClickField 'Find in document';[NormalLaunchInput]::Chord(0x11,0x41);[NormalLaunchInput]::Type('ABSENT_QUERY')
+ Edit-Disabled @('Find Next','Find Previous')
+ Edit-Action ('Replace'+[char]0x2026)
+-$replacement=Wait-For {[EditMenuReadback]::Field($script:main,$script:process.Id,'Replace with')} 'auxiliary Replace field'
+-[NormalLaunchInput]::Click($replacement);[NormalLaunchInput]::Type('auxiliary selection');[NormalLaunchInput]::Chord(0x11,0x41)
++$replacement=Edit-Field 'Replace with'
++Edit-ClickField 'Replace with';[NormalLaunchInput]::Type('auxiliary selection');[NormalLaunchInput]::Chord(0x11,0x41)
+ Edit-Disabled @('Copy Markdown','Copy HTML','Copy Formatted')
+ Edit-Disabled @('Plain Text','Markdown from HTML') $true
+ Edit-Copy 'Copy' 'plain' 'auxiliary selection'
+-Edit-Action 'Delete';Wait-For {[NormalLaunchInput]::Text($replacement) -ceq ''} 'auxiliary Delete' | Out-Null
+-Edit-Action 'Undo';Wait-For {[NormalLaunchInput]::Text($replacement) -ceq 'auxiliary selection'} 'auxiliary Undo' | Out-Null
++Edit-Action 'Delete';Wait-For {(Edit-ObserveField 'Replace with').value -ceq ''} 'auxiliary Delete' | Out-Null
++Edit-Action 'Undo';Wait-For {(Edit-ObserveField 'Replace with').value -ceq 'auxiliary selection'} 'auxiliary Undo' | Out-Null
+ Edit-Source $fixture | Out-Null
+ if(-not(Edit-Bytes $fixture)){throw 'Auxiliary edits changed Unicode fixture disk bytes'}
+ Edit-Record 'source-search-auxiliary' $fixture $false
+-[NormalLaunchInput]::Click($replacement);[NormalLaunchInput]::Press(0x1B)
+-Wait-For {-not [EditMenuReadback]::Field($script:main,$script:process.Id,'Find in document')} 'Find bar closed through Escape' | Out-Null
++# The tree must expose this same field before it can prove absence after Escape.
++$beforeClose=Edit-ObserveField 'Find in document' $true
++if(-not$beforeClose.present-or-not$beforeClose.treeFound){throw 'Provider tree omitted the visible Find field; cannot prove closure by a missing UIA node'}
++Edit-ClickField 'Replace with';[NormalLaunchInput]::Press(0x1B)
++Wait-For {$closed=Edit-ObserveField 'Find in document' $true;$closed.treeComplete-and-not$closed.present} 'Find bar closed through Escape' | Out-Null
+ # A final ordinary ASCII edit makes Save observable while preserving all Unicode.
+ $editor=Edit-Source $fixture
+ [NormalLaunchInput]::Click($editor);[NormalLaunchInput]::Chord(0x11,0x23);[NormalLaunchInput]::Type('!')
+ $editor=Edit-Source $fixtureSaved;Edit-Dirty $true
+ Edit-Save $fixtureSaved 'source-clipboard-saved'
+ Open-Menu 'File' ('^Open File'+[char]0x2026+'$');$picker=Native-Picker 'Open';$handle=[IntPtr]$picker.Current.NativeWindowHandle
+-[NormalLaunchInput]::Chord(0x12,0x4E);[NormalLaunchInput]::Type($sample);[NormalLaunchInput]::Press(0x0D)
++[NormalLaunchInput]::Chord(0x12,0x4E);Type-NativeFilePath $handle $sample;[NormalLaunchInput]::Press(0x0D)
+ Wait-For {[NormalLaunchInput]::OpenedDocument($script:main,$handle,$script:EditDocumentName+' - Fomawrite')} 'Unicode fixture reopened' | Out-Null
+ $editor=Edit-Source $fixtureSaved;Edit-Dirty $false
+ # Return to the unchanged maintained fixture by actual native Open.
+ Open-Menu 'File' ('^Open File'+[char]0x2026+'$');$picker=Native-Picker 'Open';$handle=[IntPtr]$picker.Current.NativeWindowHandle
+-[NormalLaunchInput]::Chord(0x12,0x4E);[NormalLaunchInput]::Type($script:EditOriginalSample);[NormalLaunchInput]::Press(0x0D)
++[NormalLaunchInput]::Chord(0x12,0x4E);Type-NativeFilePath $handle $script:EditOriginalSample;[NormalLaunchInput]::Press(0x0D)
+ Wait-For {[NormalLaunchInput]::OpenedDocument($script:main,$handle,'normal-launch-sample.md - Fomawrite')} 'maintained original reopened unchanged' | Out-Null
+ $sample=$script:EditOriginalSample;$script:EditDocumentName='normal-launch-sample.md'
+ $editor=Edit-Source $expected;Edit-Dirty $false

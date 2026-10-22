@@ -4,13 +4,15 @@ Snapshot: 23 October 2026 Brisbane / 22 October UTC. Owner: Andrew Gray.
 
 **Disposition: internal manual-test candidate, not a fully qualified Windows release.** Andrew has narrowed this checkpoint to a usable manual-test handoff. Preserve the unresolved results below; do not turn sampled passes into an overall green qualification.
 
+The session has now closed for Andrew's independent review. Start with **[SESSION-HANDOVER.md](SESSION-HANDOVER.md)** for the final scoped desktop result and frozen outstanding work.
+
 ## Start here
 
 - Double-click **[TEST-FOMAWRITE.cmd](TEST-FOMAWRITE.cmd)** in this folder from Windows. It selects the reviewed ARM64 candidate and runs its existing verified Windows-local starter.
 - The root launcher was actually tested on the ARM64 Parallels VM: exact local executable identity, isolated ordinary startup, visible window, normal Alt+F4 close and exit zero passed. Five evidence hashes and the screenshot were independently reviewed.
 - Follow **[MANUAL-TEST-CHECKLIST.md](MANUAL-TEST-CHECKLIST.md)**.
 - Authoritative current state: **[docs/windows/STATUS.md](docs/windows/STATUS.md)**.
-- This handoff describes the product candidate `b056ab5e6a73078b69c99916a4c5bce52772dfa6`, version **0.3.0-dev49**. Later commits through `be99f89` concern tests, drivers, diagnostics, SDK acquisition and records, not a new product implementation. The final handoff commit is available with `git log -1`.
+- This handoff describes the product candidate `b056ab5e6a73078b69c99916a4c5bce52772dfa6`, version **0.3.0-dev49**. Later commits through `78b9d9c` concern tests, drivers, diagnostics, SDK acquisition and records, not a new product implementation; all 191 application source hashes still match b056. The final handoff commit is available with `git log -1`.
 
 ## Repository and separation
 
@@ -52,19 +54,19 @@ See [repair history](docs/windows/M2-REPAIR-EVIDENCE.md), [Live persistence](doc
 
 ## Test results and limits
 
-Latest complete suites at `6c1256909f4af5a9c422808ee1e3e270ddcaf786`:
+Latest normal Windows CI at `78b9d9c2540d44fc3fa73ae4a6e0a4ccc284d08b` is **successful on both architectures**: [run 39845554167](https://github.com/andrewjngray/fomawrite_mac/actions/runs/39845554167). Shared Mac/editor results below remain bound to `6c1256909f4af5a9c422808ee1e3e270ddcaf786`.
 
 | Check | Result |
 | --- | --- |
-| Mac Qt | 414 passed, 0 failed, 13 capability skips |
-| Editor | 324 passed, 0 failed, 0 skipped; typecheck/assets also passed |
-| Windows x64 Qt | 390 passed, 0 failed, 0 skipped |
-| Windows ARM64 Qt | **389 passed, 1 failed, 0 skipped** |
-| Both Windows architectures | 3 native appearance checks and 124 deployed scenarios passed |
+| Mac Qt, `6c12569` | 414 passed, 0 failed, 13 capability skips |
+| Editor, `6c12569` | 324 passed, 0 failed, 0 skipped; typecheck/assets also passed |
+| Windows x64 Qt, `78b9d9c` | 390 passed, 0 failed, 0 skipped |
+| Windows ARM64 Qt, `78b9d9c` | 390 passed, 0 failed, 0 skipped |
+| Both Windows architectures, `78b9d9c` | 3 native appearance checks, 124 deployed scenarios and 210 deployment/driver guards passed; no deployed failures or QML warnings |
 
-[Shared CI 39835545936](https://github.com/andrewjngray/fomawrite_mac/actions/runs/39835545936); [Windows CI 39836302810](https://github.com/andrewjngray/fomawrite_mac/actions/runs/39836302810). Mac skips are twelve unavailable native grammar-checker rows and one Windows-only appearance row.
+Exact artifact digests, executable/source identities and pinned SDK records were independently verified. All 191 application source hashes match b056; the later CI packages have separate identities and are not promoted or ordinary desktop qualified. [Retained normal CI summary](research/cycle-162/evidence/normal-78b9d9c/summary.json). [Shared CI 39835545936](https://github.com/andrewjngray/fomawrite_mac/actions/runs/39835545936) records the Mac/editor results; Mac skips are twelve unavailable native grammar-checker rows and one Windows-only appearance row.
 
-The ARM64 failure is `publishingFolderThemesReloadAndAtomicResourcesSettle`: the second atomic replacement of an imported CSS file failed with `Access is denied`, QFileDevice error 10 and immediate Windows error 5. The owner/cause is unknown. Test-only native diagnostics now record metadata and query Restart Manager after failure without retrying the write. A bounded diagnostic at `be99f89c253faf20db21fd2b88eccdc03f6ff2a3` compiled natively and passed **10/10 fresh-process attempts** (30 Qt rows including setup/cleanup): [run 39843298436](https://github.com/andrewjngray/fomawrite_mac/actions/runs/39843298436). It did not reproduce the full-suite failure or exercise the failure-only owner diagnostics. The first diagnostic attempt failed before testing because its standalone build omitted the Harper download; that setup failure is retained and corrected.
+The earlier [Windows CI 39836302810](https://github.com/andrewjngray/fomawrite_mac/actions/runs/39836302810) at `6c12569` remains a failed run: ARM64 **389 passed, 1 failed, 0 skipped**, x64 **390/0/0**. Its ARM64 failure is `publishingFolderThemesReloadAndAtomicResourcesSettle`: the second atomic replacement of imported CSS failed with `Access is denied`, QFileDevice error 10 and immediate Windows error 5. The intermittent failure's owner/cause remains unknown despite the later full-suite pass. Test-only native diagnostics record metadata and query Restart Manager after failure without retrying the write. The bounded diagnostic at `be99f89c253faf20db21fd2b88eccdc03f6ff2a3` compiled natively and passed **10/10 fresh-process attempts** (30 Qt rows including setup/cleanup): [run 39843298436](https://github.com/andrewjngray/fomawrite_mac/actions/runs/39843298436). Neither passing run exercised the failure-only owner diagnostics or established a fix. The first diagnostic attempt failed before testing because its standalone build omitted the Harper download; that setup failure is retained and corrected.
 
 Ordinary b056 ARM64 VM evidence separately covers normal startup/pickers/edit/save/Source/Live/Exit/restore **6/6**, five Live timing cases **5/5**, selected Bold with immediate Save/Undo/Redo/reopen, and publishing **9/9** with actual Web/PDF captures and exports. x64 ordinary checks ran **under ARM64 emulation**, not physical x64 hardware. These bounded passes do not establish all menu, recovery or distribution behavior.
 
@@ -72,7 +74,7 @@ Ordinary b056 ARM64 VM evidence separately covers normal startup/pickers/edit/sa
 
 1. Independently investigate the retained ARM64 atomic-theme failure. Do not weaken the assertion, silently retry until green, or assume a post-failure process snapshot identifies the culprit.
 2. Manually test the current candidate with the checklist. Focus on Save/Undo, switching files and Source/Live, and matching current-document Web/PDF output.
-3. Complete Review's three-card visual evidence, clipboard/search and nested-menu workflows, normal preview cleanup and native Print cancellation. A maintained Review/Center harness is prepared and natively compiled but has not completed a new interactive acceptance run: [contract](docs/windows/DESKTOP-SUPPLEMENT.md).
+3. Complete clipboard/search and nested-menu workflows, normal preview cleanup and native Print cancellation. The final b056 Review/Center supplement now passes independent verification, including three visible cards, centering, exact files and normal close/reopen. It used an unmerged physical filename acknowledgment driver proposal; 255 evidence hashes and both exit-zero launches are verified. See the [session handover](SESSION-HANDOVER.md) and [contract](docs/windows/DESKTOP-SUPPLEMENT.md).
 4. Complete installer/upgrade/uninstall preservation, broader profiles/storage/recovery, DPI/monitors/endurance and physical x64 qualification. Final-package updater evidence also remains incomplete; older successful package evidence does not automatically transfer.
 
 The original user's clipboard restoration from an earlier test remains **unknown**. Later public-baseline restoration does not establish restoration of that original content. Subsequent root-launcher testing does not use the clipboard.

@@ -1,0 +1,111 @@
+--- maintained/run-normal-launch-guest.ps1
++++ ack-candidate/run-normal-launch-guest.ps1
+@@ -71,8 +71,31 @@
+     $proof=[ordered]@{dialogHwnd=$dialog.ToInt64();expectedPublicPath=$path;typedOnce=$false;matched=$false;before=$null;focusSamples=@();samples=@();failure=$null}
+     try {
+         $proof.before=Wait-For {$w=[NativeFilenameWitness]::Read($dialog,$script:process.Id);$proof.focusSamples+=,$w;if($w.ready){$w}} 'actual owned native FileName Edit focus before typing' 5
++        $proof['typingPolicy']='one physical scalar once, recipient prefix/native selection acknowledgment; no replay'
++        $proof['nativeSelectAll']=$null;$proof['scalarAcknowledgments']=@()
++        $edit=[IntPtr]$proof.before.focusHwnd
++        $total=[Diagnostics.Stopwatch]::StartNew();$totalDeadline=[Diagnostics.Stopwatch]::GetTimestamp()+30*[Diagnostics.Stopwatch]::Frequency
+         [NormalLaunchInput]::Chord(0x11,0x41)
+-        [NormalLaunchInput]::Type($path);$proof.typedOnce=$true
++        $selected=Wait-For {$n=[NativeFilenameWitness]::ReadNative($dialog,$script:process.Id,$edit);$proof.nativeSelectAll=$n;if($n.lengthConsistent-and$n.selectionStart-eq0-and$n.selectionEnd-eq$n.value.Length){$n}} 'actual native filename Ctrl+A selection acknowledgment' 5
++        $acks=New-Object 'Collections.Generic.List[object]'
++        for($offset=0;$offset-lt$path.Length;) {
++            if($total.ElapsedMilliseconds-ge30000){throw 'Native filename total acknowledgment deadline expired; no further input'}
++            $units=if([char]::IsHighSurrogate($path[$offset])){2}else{1}
++            if($offset+$units-gt$path.Length){throw 'Incomplete native path scalar; no further input'}
++            $scalar=$path.Substring($offset,$units);$prefix=$path.Substring(0,$offset)
++            $row=[ordered]@{startUtf16=$offset;units=$units;acceptedInputs=$null;acknowledged=$false;polls=0;last=$null}
++            $acks.Add($row);$proof.scalarAcknowledgments=@($acks.ToArray());$proof.typedOnce=$true
++            $row.acceptedInputs=[NormalLaunchInput]::TypeNativeScalarOnce($dialog,$script:process.Id,$edit,$prefix,$scalar,$totalDeadline)
++            $offset+=$units;$prefix=$path.Substring(0,$offset);$one=[Diagnostics.Stopwatch]::StartNew()
++            do {
++                $n=[NativeFilenameWitness]::ReadNative($dialog,$script:process.Id,$edit);$row.last=$n;$row.polls++
++                if($n.lengthConsistent-and$n.value.StartsWith($prefix,[StringComparison]::Ordinal)-and$n.selectionStart-eq$offset-and$n.selectionEnd-eq$n.value.Length){$row.acknowledged=$true;break}
++                if($one.ElapsedMilliseconds-ge1500-or$total.ElapsedMilliseconds-ge30000){break}
++                Start-Sleep -Milliseconds 10 # Read-only polling only while acknowledgment is pending.
++            }while($true)
++            $proof.scalarAcknowledgments=@($acks.ToArray())
++            if(-not$row.acknowledged){throw 'Recipient did not acknowledge one native path scalar; refusing further input or replay'}
++        }
+         $samples=New-Object 'Collections.Generic.List[object]';$deadline=[DateTime]::UtcNow.AddSeconds(4)
+         do {
+             $w=[NativeFilenameWitness]::Read($dialog,$script:process.Id);$samples.Add($w)
+--- maintained/normal-launch-input.cs
++++ ack-candidate/normal-launch-input.cs
+@@ -108,6 +108,32 @@
+             INPUT input = new INPUT(); input.type=1; input.u.ki.scan=ch; input.u.ki.flags=4; Send(input);
+             input.u.ki.flags=6; Send(input);
+         }
++    }
++    // One physical scalar, only after the recipient's actual selection/value
++    // acknowledges the preceding prefix. No replay on any partial SendInput.
++    public static int TypeNativeScalarOnce(IntPtr dialog,int pid,IntPtr edit,string prefix,string scalar,long deadline) {
++        bool pair=scalar!=null&&scalar.Length==2&&char.IsSurrogatePair(scalar,0);
++        if(scalar==null||(!pair&&(scalar.Length!=1||char.IsSurrogate(scalar[0])))||scalar.IndexOfAny(new char[]{'\r','\n','\0'})>=0)
++            throw new InvalidOperationException("Native filename input requires one valid non-control Unicode scalar");
++        var state=NativeFilenameWitness.ReadNative(dialog,pid,edit);
++        if(!state.lengthConsistent||!state.value.StartsWith(prefix,StringComparison.Ordinal)||state.selectionStart!=prefix.Length||state.selectionEnd!=state.value.Length)
++            throw new InvalidOperationException("Recipient prefix/selection changed before scalar; no input sent");
++        var events=new INPUT[pair?4:2];
++        if(pair) {
++            events[0].type=events[1].type=events[2].type=events[3].type=1;
++            events[0].u.ki.scan=scalar[0];events[0].u.ki.flags=4;
++            events[1].u.ki.scan=scalar[1];events[1].u.ki.flags=4;
++            events[2].u.ki.scan=scalar[0];events[2].u.ki.flags=6;
++            events[3].u.ki.scan=scalar[1];events[3].u.ki.flags=6;
++        } else {
++            events[0].type=events[1].type=1;events[0].u.ki.scan=events[1].u.ki.scan=scalar[0];
++            events[0].u.ki.flags=4;events[1].u.ki.flags=6;
++        }
++        if(GetForegroundWindow()!=dialog)throw new InvalidOperationException("Exact filename dialog lost foreground before scalar; no input sent");
++        if(Stopwatch.GetTimestamp()>=deadline)throw new TimeoutException("Native filename total deadline expired before scalar; no input sent");
++        uint accepted=SendInput((uint)events.Length,events,Marshal.SizeOf(typeof(INPUT)));
++        if(accepted!=(uint)events.Length)throw new InvalidOperationException("Partial native scalar SendInput accepted "+accepted+" of "+events.Length+"; never replay");
++        return (int)accepted;
+     }
+     public static void RequireMenuClickBounds(System.Windows.Rect popup, System.Windows.Rect target) {
+         if(popup.IsEmpty || target.IsEmpty || !popup.Contains(target.Left+target.Width/2,target.Top+target.Height/2))
+@@ -459,6 +485,40 @@
+ }
+ 
+ public static class NativeFilenameWitness {
++ public sealed class NativeState {
++  public int processId,textLength,selectionStart,selectionEnd;public uint limit;
++  public long dialogHwnd,focusHwnd;public string value,observedUtc;public bool lengthConsistent;
++ }
++ [System.Runtime.InteropServices.DllImport("user32.dll",EntryPoint="SendMessageTimeoutW",SetLastError=true)]
++ static extern System.IntPtr NativeQuery(System.IntPtr hwnd,uint message,System.UIntPtr wparam,System.IntPtr lparam,uint flags,uint timeout,out System.UIntPtr result);
++ [System.Runtime.InteropServices.DllImport("user32.dll",EntryPoint="SendMessageTimeoutW",CharSet=System.Runtime.InteropServices.CharSet.Unicode,SetLastError=true)]
++ static extern System.IntPtr NativeTextQuery(System.IntPtr hwnd,uint message,System.UIntPtr capacity,System.Text.StringBuilder text,uint flags,uint timeout,out System.UIntPtr result);
++ static System.UIntPtr Query(System.IntPtr hwnd,uint message) {
++  System.UIntPtr result;
++  if(NativeQuery(hwnd,message,System.UIntPtr.Zero,System.IntPtr.Zero,2,250,out result)==System.IntPtr.Zero)
++   throw new System.TimeoutException("Owned filename read timed out/message="+message+" error="+System.Runtime.InteropServices.Marshal.GetLastWin32Error());
++  return result;
++ }
++ public static NativeState ReadNative(System.IntPtr dialog,int pid,System.IntPtr exactEdit) {
++  if(NormalLaunchInput.GetForegroundWindow()!=dialog)throw new System.InvalidOperationException("Exact native filename dialog is not foreground");
++  uint owner;var targetThread=GetWindowThreadProcessId(dialog,out owner);
++  if(targetThread==0||owner!=(uint)pid)throw new System.InvalidOperationException("Native filename dialog ownership changed");
++  var gui=new Gui();gui.size=System.Runtime.InteropServices.Marshal.SizeOf(typeof(Gui));
++  if(!GetGUIThreadInfo(targetThread,ref gui)||gui.focus!=exactEdit||exactEdit==System.IntPtr.Zero||GetAncestor(exactEdit,2)!=dialog)
++   throw new System.InvalidOperationException("Actual native filename focus changed; no further typing");
++  if(GetWindowThreadProcessId(exactEdit,out owner)==0||owner!=(uint)pid)throw new System.InvalidOperationException("Actual native filename Edit ownership changed");
++  int length=checked((int)Query(exactEdit,0x000e).ToUInt64()); // WM_GETTEXTLENGTH, read-only.
++  if(length<0||length>65534)throw new System.InvalidOperationException("Native filename length outside bounded observation");
++  var text=new System.Text.StringBuilder(length+1);System.UIntPtr count;
++  if(NativeTextQuery(exactEdit,0x000d,new System.UIntPtr((uint)(length+1)),text,2,250,out count)==System.IntPtr.Zero)
++   throw new System.TimeoutException("Native filename WM_GETTEXT timed out");
++  uint selection=unchecked((uint)Query(exactEdit,0x00b0).ToUInt64()); // EM_GETSEL packed offsets.
++  uint limit=unchecked((uint)Query(exactEdit,0x00d5).ToUInt64()); // EM_GETLIMITTEXT, diagnostic only.
++  if(NormalLaunchInput.GetForegroundWindow()!=dialog||!GetGUIThreadInfo(targetThread,ref gui)||gui.focus!=exactEdit)
++   throw new System.InvalidOperationException("Native filename focus changed during observation");
++  return new NativeState {processId=pid,dialogHwnd=dialog.ToInt64(),focusHwnd=exactEdit.ToInt64(),textLength=length,value=text.ToString(),
++   lengthConsistent=(length==text.Length&&count.ToUInt64()==(ulong)text.Length),selectionStart=(int)(selection&0xffff),selectionEnd=(int)(selection>>16),limit=limit,observedUtc=System.DateTime.UtcNow.ToString("o")};
++ }
+  [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)] struct Rect{public int l,t,r,b;}
+  [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)] struct Gui{public int size;public uint flags;public System.IntPtr active,focus,capture,menu,move,caret;public Rect rect;}
+  [System.Runtime.InteropServices.DllImport("user32.dll")]static extern bool GetGUIThreadInfo(uint thread,ref Gui info);

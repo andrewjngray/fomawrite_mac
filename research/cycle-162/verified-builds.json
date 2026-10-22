@@ -1680,6 +1680,769 @@
       ],
       "evidenceSummary": "research/cycle-162/evidence/theme-atomic-diagnostics/final-be99f89/summary.json",
       "evidenceSummarySha256": "6ceaa8885589aefd354c41137f6635b098c3453057f860cfb4a72428387d8870"
+    },
+    "macWindowsCaseIdentityAudit": {
+      "commit": "6c1256909f4af5a9c422808ee1e3e270ddcaf786",
+      "inputs": [
+        {
+          "path": "/private/tmp/fomawrite-6c12569-shared/mac-job.log",
+          "bytes": 380163,
+          "sha256": "1e507714ab330e1892f494dcaa0312f532ab5cf341705ba39aea94c9bbc4e209"
+        },
+        {
+          "path": "/private/tmp/fomawrite-6c12569-native-evidence/x64/build-tests/windows-x64/test.xml",
+          "bytes": 78046,
+          "sha256": "ba139d997c0f6ec6275ba9e91cef6d4f174b230961e4e196593fc87e038fe30a"
+        }
+      ],
+      "macCounts": {
+        "PASS": 414,
+        "SKIP": 13
+      },
+      "windowsX64Counts": {
+        "PASS": 390
+      },
+      "sharedCaseIdentities": 390,
+      "macOnlyRows": 37,
+      "missingApplicableFunctionNames": [],
+      "macOnlyMappings": [
+        {
+          "identity": "authorshipSetupPersistsSafelyWithoutLabellingDocument(windows-component)",
+          "macResult": "PASS",
+          "windowsCounterpart": "authorshipSetupPersistsSafelyWithoutLabellingDocument(production-platform)",
+          "windowsResult": "PASS",
+          "reason": "Duplicate Windows-component fixture omitted on Windows; production-platform row uses actual Windows platform.",
+          "dataSource": {
+            "path": "tests/tst_fomawrite.cpp",
+            "line": 4771,
+            "exactCommitBlobSha256": "d0a972b594cebd402672c2229d99ca5c24f005065d3d91e399132715e5902444"
+          }
+        },
+        {
+          "identity": "bundledHelpIsAllowlistedAndDoesNotEditDraft(windows-component)",
+          "macResult": "PASS",
+          "windowsCounterpart": "bundledHelpIsAllowlistedAndDoesNotEditDraft(production-platform)",
+          "windowsResult": "PASS",
+          "reason": "Duplicate Windows-component fixture omitted on Windows; production-platform row uses actual Windows platform.",
+          "dataSource": {
+            "path": "tests/tst_fomawrite.cpp",
+            "line": 1343,
+            "exactCommitBlobSha256": "d0a972b594cebd402672c2229d99ca5c24f005065d3d91e399132715e5902444"
+          }
+        },
+        {
+          "identity": "currentDocumentCompletionsAreExplicitAndMarkdownAware(windows-component)",
+          "macResult": "PASS",
+          "windowsCounterpart": "currentDocumentCompletionsAreExplicitAndMarkdownAware(production-platform)",
+          "windowsResult": "PASS",
+          "reason": "Duplicate Windows-component fixture omitted on Windows; production-platform row uses actual Windows platform.",
+          "dataSource": {
+            "path": "tests/tst_fomawrite.cpp",
+            "line": 3129,
+            "exactCommitBlobSha256": "d0a972b594cebd402672c2229d99ca5c24f005065d3d91e399132715e5902444"
+          }
+        },
+        {
+          "identity": "goMenuRoutesSavedQueriesHashtagsAndGuardedRecents(windows-component)",
+          "macResult": "PASS",
+          "windowsCounterpart": "goMenuRoutesSavedQueriesHashtagsAndGuardedRecents(production-platform)",
+          "windowsResult": "PASS",
+          "reason": "Duplicate Windows-component fixture omitted on Windows; production-platform row uses actual Windows platform.",
+          "dataSource": {
+            "path": "tests/tst_fomawrite.cpp",
+            "line": 2566,
+            "exactCommitBlobSha256": "d0a972b594cebd402672c2229d99ca5c24f005065d3d91e399132715e5902444"
+          }
+        },
+        {
+          "identity": "grammarChecksLongParagraphsInCachedChunks(native-checker)",
+          "macResult": "SKIP",
+          "windowsCounterpart": "grammarChecksLongParagraphsInCachedChunks(bundled-harper)",
+          "windowsResult": "PASS",
+          "reason": "Native macOS provider row omitted on Windows; real bundled-Harper counterpart passes.",
+          "dataSource": {
+            "path": "tests/cycle143-spellcheck.inc",
+            "line": 188,
+            "exactCommitBlobSha256": "3ce905a9db59f35c7ae122c255aa7c55acd4859645623c9bd6bf2f092e6e9905"
+          }
+        },
+        {
+          "identity": "ignoreGrammarFromAnySurfaceReachesEverySurface(native-checker)",
+          "macResult": "SKIP",
+          "windowsCounterpart": "ignoreGrammarFromAnySurfaceReachesEverySurface(bundled-harper)",
+          "windowsResult": "PASS",
+          "reason": "Native macOS provider row omitted on Windows; real bundled-Harper counterpart passes.",
+          "dataSource": {
+            "path": "tests/cycle144-review-pane.inc",
+            "line": 816,
+            "exactCommitBlobSha256": "f78646e63eba56a8412f48ce38819be19a68d1d8f874f5b7b62c27cfcc098061"
+          }
+        },
+        {
+          "identity": "liveGrammarUnderlinesFollowTheGrammarSetting(native-checker)",
+          "macResult": "SKIP",
+          "windowsCounterpart": "liveGrammarUnderlinesFollowTheGrammarSetting(bundled-harper)",
+          "windowsResult": "PASS",
+          "reason": "Native macOS provider row omitted on Windows; real bundled-Harper counterpart passes.",
+          "dataSource": {
+            "path": "tests/cycle144-live-grammar.inc",
+            "line": 18,
+            "exactCommitBlobSha256": "51443616310722ea23fa7e000cb5a03b58e43ce21afefa05942f178d1c1c56b7"
+          }
+        },
+        {
+          "identity": "liveSpellingUnderlinesMisspelledWordsAndFollowsTheSetting(native-checker)",
+          "macResult": "PASS",
+          "windowsCounterpart": "liveSpellingUnderlinesMisspelledWordsAndFollowsTheSetting(bundled-harper)",
+          "windowsResult": "PASS",
+          "reason": "Native macOS provider row omitted on Windows; real bundled-Harper counterpart passes.",
+          "dataSource": {
+            "path": "tests/cycle143-live-spelling.inc",
+            "line": 51,
+            "exactCommitBlobSha256": "5011bbddc88f2ae5273aa238dc2a29a53576c2202487526ab7eb6448488540c3"
+          }
+        },
+        {
+          "identity": "nativeWindowCenterMovesOnlyTargetAndPreservesDocument(windows-component)",
+          "macResult": "PASS",
+          "windowsCounterpart": "nativeWindowCenterMovesOnlyTargetAndPreservesDocument(production-platform)",
+          "windowsResult": "PASS",
+          "reason": "Duplicate Windows-component fixture omitted on Windows; production-platform row uses actual Windows platform.",
+          "dataSource": {
+            "path": "tests/tst_fomawrite.cpp",
+            "line": 1017,
+            "exactCommitBlobSha256": "d0a972b594cebd402672c2229d99ca5c24f005065d3d91e399132715e5902444"
+          }
+        },
+        {
+          "identity": "nextAndPreviousIssueWrapRoundTheDocument(native-checker)",
+          "macResult": "PASS",
+          "windowsCounterpart": "nextAndPreviousIssueWrapRoundTheDocument(bundled-harper)",
+          "windowsResult": "PASS",
+          "reason": "Native macOS provider row omitted on Windows; real bundled-Harper counterpart passes.",
+          "dataSource": {
+            "path": "tests/cycle144-review-pane.inc",
+            "line": 457,
+            "exactCommitBlobSha256": "f78646e63eba56a8412f48ce38819be19a68d1d8f874f5b7b62c27cfcc098061"
+          }
+        },
+        {
+          "identity": "recentMenuTracksLibraryAndGuardsOpen(windows-component)",
+          "macResult": "PASS",
+          "windowsCounterpart": "recentMenuTracksLibraryAndGuardsOpen(production-platform)",
+          "windowsResult": "PASS",
+          "reason": "Duplicate Windows-component fixture omitted on Windows; production-platform row uses actual Windows platform.",
+          "dataSource": {
+            "path": "tests/tst_fomawrite.cpp",
+            "line": 4044,
+            "exactCommitBlobSha256": "d0a972b594cebd402672c2229d99ca5c24f005065d3d91e399132715e5902444"
+          }
+        },
+        {
+          "identity": "reviewIssuesAreCappedAndTheCapIsReported(native-checker)",
+          "macResult": "PASS",
+          "windowsCounterpart": "reviewIssuesAreCappedAndTheCapIsReported(bundled-harper)",
+          "windowsResult": "PASS",
+          "reason": "Native macOS provider row omitted on Windows; real bundled-Harper counterpart passes.",
+          "dataSource": {
+            "path": "tests/cycle144-review-pane.inc",
+            "line": 208,
+            "exactCommitBlobSha256": "f78646e63eba56a8412f48ce38819be19a68d1d8f874f5b7b62c27cfcc098061"
+          }
+        },
+        {
+          "identity": "reviewIssuesAreRebuiltAfterAPauseAndTypingCoalesces(native-checker)",
+          "macResult": "PASS",
+          "windowsCounterpart": "reviewIssuesAreRebuiltAfterAPauseAndTypingCoalesces(bundled-harper)",
+          "windowsResult": "PASS",
+          "reason": "Native macOS provider row omitted on Windows; real bundled-Harper counterpart passes.",
+          "dataSource": {
+            "path": "tests/cycle144-review-pane.inc",
+            "line": 237,
+            "exactCommitBlobSha256": "f78646e63eba56a8412f48ce38819be19a68d1d8f874f5b7b62c27cfcc098061"
+          }
+        },
+        {
+          "identity": "reviewIssuesListSpellingAndGrammarInOrderWithDocumentOffsets(native-checker)",
+          "macResult": "SKIP",
+          "windowsCounterpart": "reviewIssuesListSpellingAndGrammarInOrderWithDocumentOffsets(bundled-harper)",
+          "windowsResult": "PASS",
+          "reason": "Native macOS provider row omitted on Windows; real bundled-Harper counterpart passes.",
+          "dataSource": {
+            "path": "tests/cycle144-review-pane.inc",
+            "line": 132,
+            "exactCommitBlobSha256": "f78646e63eba56a8412f48ce38819be19a68d1d8f874f5b7b62c27cfcc098061"
+          }
+        },
+        {
+          "identity": "reviewPaneFixesAndJumpsInTheLivePage(native-checker)",
+          "macResult": "PASS",
+          "windowsCounterpart": "reviewPaneFixesAndJumpsInTheLivePage(bundled-harper)",
+          "windowsResult": "PASS",
+          "reason": "Native macOS provider row omitted on Windows; real bundled-Harper counterpart passes.",
+          "dataSource": {
+            "path": "tests/cycle144-review-pane.inc",
+            "line": 631,
+            "exactCommitBlobSha256": "f78646e63eba56a8412f48ce38819be19a68d1d8f874f5b7b62c27cfcc098061"
+          }
+        },
+        {
+          "identity": "reviewPaneLeavesTheFooterControlsWhereTheyAre(native-checker)",
+          "macResult": "PASS",
+          "windowsCounterpart": "reviewPaneLeavesTheFooterControlsWhereTheyAre(bundled-harper)",
+          "windowsResult": "PASS",
+          "reason": "Native macOS provider row omitted on Windows; real bundled-Harper counterpart passes.",
+          "dataSource": {
+            "path": "tests/cycle144-review-pane.inc",
+            "line": 579,
+            "exactCommitBlobSha256": "f78646e63eba56a8412f48ce38819be19a68d1d8f874f5b7b62c27cfcc098061"
+          }
+        },
+        {
+          "identity": "reviewPaneRendersInLightAndDarkThemes(native-checker)",
+          "macResult": "SKIP",
+          "windowsCounterpart": "reviewPaneRendersInLightAndDarkThemes(bundled-harper)",
+          "windowsResult": "PASS",
+          "reason": "Native macOS provider row omitted on Windows; real bundled-Harper counterpart passes.",
+          "dataSource": {
+            "path": "tests/cycle144-review-pane.inc",
+            "line": 699,
+            "exactCommitBlobSha256": "f78646e63eba56a8412f48ce38819be19a68d1d8f874f5b7b62c27cfcc098061"
+          }
+        },
+        {
+          "identity": "reviewPaneResizesWithTheSplitViewAndItsWidthPersists(native-checker)",
+          "macResult": "PASS",
+          "windowsCounterpart": "reviewPaneResizesWithTheSplitViewAndItsWidthPersists(bundled-harper)",
+          "windowsResult": "PASS",
+          "reason": "Native macOS provider row omitted on Windows; real bundled-Harper counterpart passes.",
+          "dataSource": {
+            "path": "tests/cycle144-review-pane.inc",
+            "line": 511,
+            "exactCommitBlobSha256": "f78646e63eba56a8412f48ce38819be19a68d1d8f874f5b7b62c27cfcc098061"
+          }
+        },
+        {
+          "identity": "reviewPaneTogglesWithTheCommandAndTheMenuTickFollows(native-checker)",
+          "macResult": "PASS",
+          "windowsCounterpart": "reviewPaneTogglesWithTheCommandAndTheMenuTickFollows(bundled-harper)",
+          "windowsResult": "PASS",
+          "reason": "Native macOS provider row omitted on Windows; real bundled-Harper counterpart passes.",
+          "dataSource": {
+            "path": "tests/cycle144-review-pane.inc",
+            "line": 278,
+            "exactCommitBlobSha256": "f78646e63eba56a8412f48ce38819be19a68d1d8f874f5b7b62c27cfcc098061"
+          }
+        },
+        {
+          "identity": "reviewPaneWithholdsTheWordBeingTypedInLive(native-checker)",
+          "macResult": "PASS",
+          "windowsCounterpart": "reviewPaneWithholdsTheWordBeingTypedInLive(bundled-harper)",
+          "windowsResult": "PASS",
+          "reason": "Native macOS provider row omitted on Windows; real bundled-Harper counterpart passes.",
+          "dataSource": {
+            "path": "tests/cycle144-review-pane.inc",
+            "line": 738,
+            "exactCommitBlobSha256": "f78646e63eba56a8412f48ce38819be19a68d1d8f874f5b7b62c27cfcc098061"
+          }
+        },
+        {
+          "identity": "reviewRowClickMovesTheSourceCaret(native-checker)",
+          "macResult": "PASS",
+          "windowsCounterpart": "reviewRowClickMovesTheSourceCaret(bundled-harper)",
+          "windowsResult": "PASS",
+          "reason": "Native macOS provider row omitted on Windows; real bundled-Harper counterpart passes.",
+          "dataSource": {
+            "path": "tests/cycle144-review-pane.inc",
+            "line": 351,
+            "exactCommitBlobSha256": "f78646e63eba56a8412f48ce38819be19a68d1d8f874f5b7b62c27cfcc098061"
+          }
+        },
+        {
+          "identity": "reviewSuggestionAppliesAsOneUndoableEdit(native-checker)",
+          "macResult": "PASS",
+          "windowsCounterpart": "reviewSuggestionAppliesAsOneUndoableEdit(bundled-harper)",
+          "windowsResult": "PASS",
+          "reason": "Native macOS provider row omitted on Windows; real bundled-Harper counterpart passes.",
+          "dataSource": {
+            "path": "tests/cycle144-review-pane.inc",
+            "line": 404,
+            "exactCommitBlobSha256": "f78646e63eba56a8412f48ce38819be19a68d1d8f874f5b7b62c27cfcc098061"
+          }
+        },
+        {
+          "identity": "smartDashesAreOptInAtomicAndMarkdownAware(windows-component)",
+          "macResult": "PASS",
+          "windowsCounterpart": "smartDashesAreOptInAtomicAndMarkdownAware(production-platform)",
+          "windowsResult": "PASS",
+          "reason": "Duplicate Windows-component fixture omitted on Windows; production-platform row uses actual Windows platform.",
+          "dataSource": {
+            "path": "tests/tst_fomawrite.cpp",
+            "line": 3383,
+            "exactCommitBlobSha256": "d0a972b594cebd402672c2229d99ca5c24f005065d3d91e399132715e5902444"
+          }
+        },
+        {
+          "identity": "smartQuotesAreOptInAtomicAndMarkdownAware(windows-component)",
+          "macResult": "PASS",
+          "windowsCounterpart": "smartQuotesAreOptInAtomicAndMarkdownAware(production-platform)",
+          "windowsResult": "PASS",
+          "reason": "Duplicate Windows-component fixture omitted on Windows; production-platform row uses actual Windows platform.",
+          "dataSource": {
+            "path": "tests/tst_fomawrite.cpp",
+            "line": 3272,
+            "exactCommitBlobSha256": "d0a972b594cebd402672c2229d99ca5c24f005065d3d91e399132715e5902444"
+          }
+        },
+        {
+          "identity": "sourceGrammarContextMenuShowsTheMessageCorrectsAndIgnores(native-checker)",
+          "macResult": "SKIP",
+          "windowsCounterpart": "sourceGrammarContextMenuShowsTheMessageCorrectsAndIgnores(bundled-harper)",
+          "windowsResult": "PASS",
+          "reason": "Native macOS provider row omitted on Windows; real bundled-Harper counterpart passes.",
+          "dataSource": {
+            "path": "tests/cycle144-source-grammar.inc",
+            "line": 296,
+            "exactCommitBlobSha256": "e4e1b279b286ecdda32bfb333c47224b347c3babb30439ce2a7d3b66be2ed53f"
+          }
+        },
+        {
+          "identity": "sourceGrammarFollowsItsSettingAndKeepsSpelling(native-checker)",
+          "macResult": "SKIP",
+          "windowsCounterpart": "sourceGrammarFollowsItsSettingAndKeepsSpelling(bundled-harper)",
+          "windowsResult": "PASS",
+          "reason": "Native macOS provider row omitted on Windows; real bundled-Harper counterpart passes.",
+          "dataSource": {
+            "path": "tests/cycle144-source-grammar.inc",
+            "line": 138,
+            "exactCommitBlobSha256": "e4e1b279b286ecdda32bfb333c47224b347c3babb30439ce2a7d3b66be2ed53f"
+          }
+        },
+        {
+          "identity": "sourceGrammarIgnoreIsPerDocumentAndRestylesInPlace(native-checker)",
+          "macResult": "SKIP",
+          "windowsCounterpart": "sourceGrammarIgnoreIsPerDocumentAndRestylesInPlace(bundled-harper)",
+          "windowsResult": "PASS",
+          "reason": "Native macOS provider row omitted on Windows; real bundled-Harper counterpart passes.",
+          "dataSource": {
+            "path": "tests/cycle144-source-grammar.inc",
+            "line": 391,
+            "exactCommitBlobSha256": "e4e1b279b286ecdda32bfb333c47224b347c3babb30439ce2a7d3b66be2ed53f"
+          }
+        },
+        {
+          "identity": "sourceGrammarUnderlineIsBlueInTheRenderedWindow(native-checker)",
+          "macResult": "SKIP",
+          "windowsCounterpart": "sourceGrammarUnderlineIsBlueInTheRenderedWindow(bundled-harper)",
+          "windowsResult": "PASS",
+          "reason": "Native macOS provider row omitted on Windows; real bundled-Harper counterpart passes.",
+          "dataSource": {
+            "path": "tests/cycle144-source-grammar.inc",
+            "line": 241,
+            "exactCommitBlobSha256": "e4e1b279b286ecdda32bfb333c47224b347c3babb30439ce2a7d3b66be2ed53f"
+          }
+        },
+        {
+          "identity": "sourceGrammarUnderlinesDoubledWordsAndSpellingStaysRed(native-checker)",
+          "macResult": "SKIP",
+          "windowsCounterpart": "sourceGrammarUnderlinesDoubledWordsAndSpellingStaysRed(bundled-harper)",
+          "windowsResult": "PASS",
+          "reason": "Native macOS provider row omitted on Windows; real bundled-Harper counterpart passes.",
+          "dataSource": {
+            "path": "tests/cycle144-source-grammar.inc",
+            "line": 43,
+            "exactCommitBlobSha256": "e4e1b279b286ecdda32bfb333c47224b347c3babb30439ce2a7d3b66be2ed53f"
+          }
+        },
+        {
+          "identity": "sourceGrammarWithholdsTheRangeAtTheCaretWithoutARevision(native-checker)",
+          "macResult": "SKIP",
+          "windowsCounterpart": "sourceGrammarWithholdsTheRangeAtTheCaretWithoutARevision(bundled-harper)",
+          "windowsResult": "PASS",
+          "reason": "Native macOS provider row omitted on Windows; real bundled-Harper counterpart passes.",
+          "dataSource": {
+            "path": "tests/cycle144-source-grammar.inc",
+            "line": 171,
+            "exactCommitBlobSha256": "e4e1b279b286ecdda32bfb333c47224b347c3babb30439ce2a7d3b66be2ed53f"
+          }
+        },
+        {
+          "identity": "sourceSpellingContextMenuOffersSuggestionsAndCorrects(native-checker)",
+          "macResult": "PASS",
+          "windowsCounterpart": "sourceSpellingContextMenuOffersSuggestionsAndCorrects(bundled-harper)",
+          "windowsResult": "PASS",
+          "reason": "Native macOS provider row omitted on Windows; real bundled-Harper counterpart passes.",
+          "dataSource": {
+            "path": "tests/cycle143-source-spelling.inc",
+            "line": 375,
+            "exactCommitBlobSha256": "21d822bc3c9086755082de4093adc0b9a8439ae4e4475fb74ee759dd4a9ce90b"
+          }
+        },
+        {
+          "identity": "sourceSpellingFollowsTheSettingAndLearnedWords(native-checker)",
+          "macResult": "PASS",
+          "windowsCounterpart": "sourceSpellingFollowsTheSettingAndLearnedWords(bundled-harper)",
+          "windowsResult": "PASS",
+          "reason": "Native macOS provider row omitted on Windows; real bundled-Harper counterpart passes.",
+          "dataSource": {
+            "path": "tests/cycle143-source-spelling.inc",
+            "line": 188,
+            "exactCommitBlobSha256": "21d822bc3c9086755082de4093adc0b9a8439ae4e4475fb74ee759dd4a9ce90b"
+          }
+        },
+        {
+          "identity": "sourceSpellingUnderlineIsRedInTheRenderedWindow(native-checker)",
+          "macResult": "PASS",
+          "windowsCounterpart": "sourceSpellingUnderlineIsRedInTheRenderedWindow(bundled-harper)",
+          "windowsResult": "PASS",
+          "reason": "Native macOS provider row omitted on Windows; real bundled-Harper counterpart passes.",
+          "dataSource": {
+            "path": "tests/cycle143-source-spelling.inc",
+            "line": 331,
+            "exactCommitBlobSha256": "21d822bc3c9086755082de4093adc0b9a8439ae4e4475fb74ee759dd4a9ce90b"
+          }
+        },
+        {
+          "identity": "sourceSpellingUnderlinesProseOnly(native-checker)",
+          "macResult": "PASS",
+          "windowsCounterpart": "sourceSpellingUnderlinesProseOnly(bundled-harper)",
+          "windowsResult": "PASS",
+          "reason": "Native macOS provider row omitted on Windows; real bundled-Harper counterpart passes.",
+          "dataSource": {
+            "path": "tests/cycle143-source-spelling.inc",
+            "line": 72,
+            "exactCommitBlobSha256": "21d822bc3c9086755082de4093adc0b9a8439ae4e4475fb74ee759dd4a9ce90b"
+          }
+        },
+        {
+          "identity": "sourceSpellingWithholdsTheCaretWordAndDimmedText(native-checker)",
+          "macResult": "PASS",
+          "windowsCounterpart": "sourceSpellingWithholdsTheCaretWordAndDimmedText(bundled-harper)",
+          "windowsResult": "PASS",
+          "reason": "Native macOS provider row omitted on Windows; real bundled-Harper counterpart passes.",
+          "dataSource": {
+            "path": "tests/cycle143-source-spelling.inc",
+            "line": 441,
+            "exactCommitBlobSha256": "21d822bc3c9086755082de4093adc0b9a8439ae4e4475fb74ee759dd4a9ce90b"
+          }
+        },
+        {
+          "identity": "spellCheckServiceReportsGrammarIssuesWithCategory(native-checker)",
+          "macResult": "SKIP",
+          "windowsCounterpart": "spellCheckServiceReportsGrammarIssuesWithCategory(bundled-harper)",
+          "windowsResult": "PASS",
+          "reason": "Native macOS provider row omitted on Windows; real bundled-Harper counterpart passes.",
+          "dataSource": {
+            "path": "tests/cycle143-spellcheck.inc",
+            "line": 142,
+            "exactCommitBlobSha256": "3ce905a9db59f35c7ae122c255aa7c55acd4859645623c9bd6bf2f092e6e9905"
+          }
+        },
+        {
+          "identity": "titleCaseTransformationIsDistinctAndPreservesUndo(windows-component)",
+          "macResult": "PASS",
+          "windowsCounterpart": "titleCaseTransformationIsDistinctAndPreservesUndo(production-platform)",
+          "windowsResult": "PASS",
+          "reason": "Duplicate Windows-component fixture omitted on Windows; production-platform row uses actual Windows platform.",
+          "dataSource": {
+            "path": "tests/tst_fomawrite.cpp",
+            "line": 2994,
+            "exactCommitBlobSha256": "d0a972b594cebd402672c2229d99ca5c24f005065d3d91e399132715e5902444"
+          }
+        }
+      ],
+      "sourceConditionalBodyExclusions": [
+        {
+          "path": "tests/tst_fomawrite.cpp",
+          "line": 2246,
+          "source": "void automaticVersionsPreservePreviousSavedBytes() {\n#ifdef Q_OS_MACOS",
+          "exactCommitBlobSha256": "d0a972b594cebd402672c2229d99ca5c24f005065d3d91e399132715e5902444"
+        },
+        {
+          "path": "tests/tst_fomawrite.cpp",
+          "line": 2284,
+          "source": "void restoredVersionsRequireSaveAndDoNotInheritAuthorship() {\n#ifdef Q_OS_MACOS",
+          "exactCommitBlobSha256": "d0a972b594cebd402672c2229d99ca5c24f005065d3d91e399132715e5902444"
+        },
+        {
+          "path": "tests/tst_fomawrite.cpp",
+          "line": 1165,
+          "source": "#ifdef Q_OS_MACOS\n        QVERIFY(!backend.spellCheck()->languages().isEmpty());",
+          "exactCommitBlobSha256": "d0a972b594cebd402672c2229d99ca5c24f005065d3d91e399132715e5902444"
+        },
+        {
+          "path": "tests/windows-platform.inc",
+          "line": 72,
+          "source": "#ifndef Q_OS_WIN\n    QSKIP(\"Windows Qt appearance implementation; native Windows execution required\");",
+          "exactCommitBlobSha256": "c499329e124c862893251edf70e596bbebd2922d369330e4c58886aa050aec9e"
+        }
+      ],
+      "limits": [
+        "Successful Mac job uploaded no XML; complete retained Qt result lines are compared against Windows JUnit XML.",
+        "Identity comparison establishes execution coverage, not equivalent assertions within every conditional test body or ordinary desktop qualification.",
+        "Two NSFileVersion bodies are macOS-only; Windows PASS rows do not prove Versions support."
+      ],
+      "evidenceSummary": "research/cycle-162/evidence/mac-windows-case-identity/case-identity-evidence.json",
+      "evidenceSummarySha256": "f39d29e3bb7869d4e71899cdefd2a91e24d6200ee0f4b41506c075c04e70ec93",
+      "reproductionScriptSha256": "c74bb2082b02a360978b2b7032827055ebedd0d7846be171fe60260e0024627d",
+      "independentRootReproduction": true
+    },
+    "latestFullWindowsVerification": {
+      "recordedUtc": "2026-10-22T20:34:15.317614+00:00",
+      "runId": 39845554167,
+      "commit": "78b9d9c2540d44fc3fa73ae4a6e0a4ccc284d08b",
+      "runConclusion": "success",
+      "url": "https://github.com/andrewjngray/fomawrite_mac/actions/runs/39845554167",
+      "qualification": "All conclusions describe this exact hosted run. Any earlier ARM64 full-suite failure remains retained, regardless of this run outcome. No VM interaction or ordinary desktop qualification.",
+      "architectures": {
+        "arm64": {
+          "jobId": 120057765619,
+          "jobConclusion": "success",
+          "jobUrl": "https://github.com/andrewjngray/fomawrite_mac/actions/runs/39845554167/job/120057765619",
+          "evidenceArtifactId": 12456912021,
+          "evidenceArtifactSha256": "5d05ea94fe126295e48282f6fbc4643a24d5d111ec56d7a166c59f301e94fddb",
+          "guardCountsFromJobLog": {
+            "pythonCounts": [
+              37,
+              25,
+              13,
+              41,
+              14
+            ],
+            "powershellCounts": [
+              9,
+              20,
+              35,
+              6,
+              10
+            ],
+            "total": 210
+          },
+          "productSource": {
+            "applicationSourceHashesMatchB056": true,
+            "applicationSourcePaths": 191,
+            "differences": [],
+            "manifestSha256": "22b1825a5809a57c7343d074b74e4a473c11cd24074a0ba882dc550ef3b20bf9",
+            "executableSha256": "775cf9dc126a2c5534fb89aaa51300bd5bff7264999c767619ad9e2f774fa11a",
+            "nativeBuildFullSourceTreeSha256": "5449f420f9b9784c1a7a0a39a756e60499efb2625ee372b0fb3c00f389ca718f"
+          },
+          "deployed": {
+            "passed": true,
+            "scenarios": 124,
+            "failures": [],
+            "qmlWarnings": [],
+            "reportSha256": "934566988111ee7197d0d08817c46ca06a1ac7b1b4d260b5f087c4b7c038a428"
+          },
+          "independentTextLogCounts": {
+            "qtPassed": 390,
+            "qtFailed": 0,
+            "qtSkipped": 0,
+            "appearancePassed": 3,
+            "appearanceFailed": 0,
+            "appearanceSkipped": 0,
+            "atomicThemeCasePassed": true,
+            "testLogSha256": "7c07ad250171d3bb26b63d31a89f07c358a3e8c1fac5b27d35abb4bc256ee720",
+            "appearanceLogSha256": "944d8781007a1eb16490ced670d3b60df94a99bb343d9056e3e578aa463e17b3"
+          },
+          "failureDiagnosticLimit": "Atomic-theme case passed in this full-suite run; no failure-path owner evidence was emitted. Earlier6c failure remains unresolved.",
+          "qt": {
+            "name": "FomawriteTest",
+            "timestamp": "2026-10-22T13:14:22",
+            "hostname": "runnervm31itj",
+            "tests": "390",
+            "failures": "0",
+            "errors": "0",
+            "skipped": "0",
+            "time": "861.660"
+          },
+          "appearance": {
+            "name": "FomawriteTest",
+            "timestamp": "2026-10-22T13:14:22",
+            "hostname": "runnervm31itj",
+            "tests": "3",
+            "failures": "0",
+            "errors": "0",
+            "skipped": "0",
+            "time": "0.033"
+          },
+          "atomicThemeFailureCount": 0,
+          "nativeDiagnosticObjectsCount": 0,
+          "sdk": {
+            "lockSha256": "6c981f5d710a9b05127e899304c63764ddfe0596335c971618fcbc381a2b19e6",
+            "lockMatchesPriorSuccessfulRun": true,
+            "archiveCount": 9,
+            "archivesMatchPreviousSuccessfulRun": true,
+            "pinsMatchRepositoryLock": true
+          },
+          "detailedSummary": "arm64/verified-evidence-summary.json"
+        },
+        "x64": {
+          "jobId": 120057765256,
+          "jobConclusion": "success",
+          "jobUrl": "https://github.com/andrewjngray/fomawrite_mac/actions/runs/39845554167/job/120057765256",
+          "evidenceArtifactId": 12456677714,
+          "evidenceArtifactSha256": "a8c0e7169e7265e95c6af4388f543d920b9bb795b4d64470beded0503f901484",
+          "guardCountsFromJobLog": {
+            "pythonCounts": [
+              37,
+              25,
+              13,
+              41,
+              14
+            ],
+            "powershellCounts": [
+              9,
+              20,
+              35,
+              6,
+              10
+            ],
+            "total": 210
+          },
+          "productSource": {
+            "applicationSourceHashesMatchB056": true,
+            "applicationSourcePaths": 191,
+            "differences": [],
+            "manifestSha256": "95940624db621493f22ba966adf18f66289515c01f9cc9f12ef062d0abbb4b4c",
+            "executableSha256": "2070b42625d96dd3750faf44d0c856a4151bb02205b977392f1eb53cd76044f1",
+            "nativeBuildFullSourceTreeSha256": "5449f420f9b9784c1a7a0a39a756e60499efb2625ee372b0fb3c00f389ca718f"
+          },
+          "deployed": {
+            "passed": true,
+            "scenarios": 124,
+            "failures": [],
+            "qmlWarnings": [],
+            "reportSha256": "4d1b31ef38c75677964a8f90fb7ea80da16231c59a66ee7c444c953e46315b6c"
+          },
+          "independentTextLogCounts": {
+            "qtPassed": 390,
+            "qtFailed": 0,
+            "qtSkipped": 0,
+            "appearancePassed": 3,
+            "appearanceFailed": 0,
+            "appearanceSkipped": 0,
+            "atomicThemeCasePassed": true,
+            "testLogSha256": "82d9e8b1a6cd0008c20bb24d4fb6d8ed4e2e2538861fdd4c35d53299c6c9d210",
+            "appearanceLogSha256": "f61d507fa45aeae1e97a9db8e3f8e631a4862a5ba1c23d5177d3e9bda9b90aae"
+          },
+          "failureDiagnosticLimit": "Atomic-theme case passed in this full-suite run; no failure-path owner evidence was emitted. Earlier6c failure remains unresolved.",
+          "qt": {
+            "name": "FomawriteTest",
+            "timestamp": "2026-10-22T20:14:24",
+            "hostname": "runnervmgnbhw",
+            "tests": "390",
+            "failures": "0",
+            "errors": "0",
+            "skipped": "0",
+            "time": "929.664"
+          },
+          "appearance": {
+            "name": "FomawriteTest",
+            "timestamp": "2026-10-22T20:14:24",
+            "hostname": "runnervmgnbhw",
+            "tests": "3",
+            "failures": "0",
+            "errors": "0",
+            "skipped": "0",
+            "time": "0.035"
+          },
+          "atomicThemeFailureCount": 0,
+          "nativeDiagnosticObjectsCount": 0,
+          "sdk": {
+            "lockSha256": "6c981f5d710a9b05127e899304c63764ddfe0596335c971618fcbc381a2b19e6",
+            "lockMatchesPriorSuccessfulRun": true,
+            "archiveCount": 11,
+            "archivesMatchPreviousSuccessfulRun": true,
+            "pinsMatchRepositoryLock": true
+          },
+          "detailedSummary": "x64/verified-evidence-summary.json"
+        }
+      },
+      "summaryPath": "research/cycle-162/evidence/normal-78b9d9c/summary.json",
+      "summarySha256": "659615db54417b7a34370ff0b9b28fcc896dac4dc53811c020cd0add2bacfe20",
+      "rootReview": "Run conclusion and both jobs re-read from GitHub; retained summary inspected. No transfer of ordinary desktop qualification."
+    },
+    "renewedDesktopSupplementAttempt": {
+      "sourceCommit": "78b9d9c2540d44fc3fa73ae4a6e0a4ccc284d08b",
+      "packageCommit": "b056ab5e6a73078b69c99916a4c5bce52772dfa6",
+      "runPath": "dist/windows-testing/results/maintained-b056-supplement-ada6a49d4add497d86407ff2b94dc93b-run-unc",
+      "reportSha256": "b5636d0530c33dd1846636355b4f60017a0c34229261b8312a34239b6a4b5078",
+      "workflowPassed": false,
+      "sixActionsPassed": [
+        "open-path",
+        "palette",
+        "review-toggle",
+        "next-issue",
+        "previous-issue",
+        "center"
+      ],
+      "evidenceHashesVerified": 56,
+      "independentVisualReviewSha256": "1fbd939b7b8a3dc6f6c9876ca5a4da209a87c15866399aaf4a3fe291f332f0c2",
+      "reviewObserved": {
+        "engine": "Harper 2.10.0 (built-in)",
+        "cards": [
+          "flomptoid",
+          "recieve",
+          "quorbleflat"
+        ],
+        "closed": true
+      },
+      "centerObserved": "Three stable DWM visible frames centered exactly, same monitor/dimensions/Source selection.",
+      "failure": "Return to original sample: physical native filename input omitted a prefix; exact-value guard refused Enter. First earlier native Open used the identical full UNC path successfully.",
+      "priorSetupAttempt": "C:\\Mac\\Home alias resolved by app to \\\\Mac\\Home; profile comparison rejected before editing input. Preserved separately in sibling -run directory.",
+      "applicationChanged": false,
+      "clipboardTouched": false,
+      "originalClipboardRestoration": "unknown-r3",
+      "completeQualification": false
+    },
+    "finalDesktopSupplementVerification": {
+      "runPath": "dist/windows-testing/results/maintained-b056-supplement-ada6a49d4add497d86407ff2b94dc93b-run-ack",
+      "packageCommit": "b056ab5e6a73078b69c99916a4c5bce52772dfa6",
+      "driverSourceSnapshot": "dist/windows-testing/results/diagnosis/native-path-acknowledgment-r1",
+      "driverStatus": "Unmerged diagnostic copy; review patch committed separately, maintained drivers unchanged.",
+      "nativePreparationPassed": true,
+      "verifier": {
+        "scope": "review-center-supplement",
+        "fullM2Acceptance": false,
+        "passed": true,
+        "workflowPassed": true,
+        "qualificationPending": false,
+        "failures": [],
+        "report": "/Users/andrewgray/repo/projects/fomawrite_windows/dist/windows-testing/results/maintained-b056-supplement-ada6a49d4add497d86407ff2b94dc93b-run-ack/evidence/desktop-supplement-report.json",
+        "reportSha256": "b310ccbdc4d3c192e8cb394a365397d9b3de7e760e4aa6baadea4ae2dd6e453b"
+      },
+      "evidenceHashesVerified": 255,
+      "visualReviewSha256": "646fa96e39a40812d0e40e8eecc071659fac2c8a532e6f3bac1604696f57f71c",
+      "verificationSha256": "d7d915d7ec3f88a236ff92c94e3e79ad2dec3c7138fe7c27ba555d8dfecfc823",
+      "sixActions": [
+        "open-path",
+        "palette",
+        "review-toggle",
+        "next-issue",
+        "previous-issue",
+        "center"
+      ],
+      "threeReviewCardsVisuallyConfirmed": true,
+      "normalExitCodes": [
+        0,
+        0
+      ],
+      "nativeFilenameScalarsAcknowledgedEach": 194,
+      "applicationChanged": false,
+      "clipboardTouched": false,
+      "fullM2Acceptance": false,
+      "priorFailuresRetained": true,
+      "finishedUtc": "2026-10-22T20:47:52.0584628Z"
+    },
+    "sessionCloseout": {
+      "requestedBy": "Andrew: close session within 30 minutes for manual/independent LLM review",
+      "vmProcessCheck": {
+        "observedUtc": "2026-10-22T20:49:04.8959964Z",
+        "fomawriteCount": 0
+      },
+      "desktopTestingStopped": true,
+      "automaticCyclesToPauseAfterPush": true,
+      "handover": "SESSION-HANDOVER.md"
     }
   },
   "manualTestHandoff": {
