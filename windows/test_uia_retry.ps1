@@ -19,7 +19,7 @@ function Method([string]$Name,[bool]$Required=$false) {
     if($depth -ne 0){throw "Unclosed method $Name"}
     return $source.Substring($match.Index,$at-$match.Index)
 }
-$methods=(Method 'FindOwnedWindow')+"`n"+(Method 'ReadOwnedWindow')+"`n"+(Method 'OwnedWindowBounds')+"`n"+(Method 'OwnedWindowTitle')+"`n"+(Method 'RetryDisconnected')+"`n"+(Method 'ReacquireOwnedRoot')+"`n"+(Method 'Find' $true)+"`n"+(Method 'OpenedDocument')
+$methods=(Method 'OwnedMenuBounds' $true)+"`n"+(Method 'FindOwnedWindow')+"`n"+(Method 'ReadOwnedWindow')+"`n"+(Method 'OwnedWindowBounds')+"`n"+(Method 'OwnedWindowTitle')+"`n"+(Method 'RetryDisconnected')+"`n"+(Method 'ReacquireOwnedRoot')+"`n"+(Method 'Find' $true)+"`n"+(Method 'OpenedDocument')
 $prefix=@'
 using System;
 using System.Collections.Generic;
@@ -50,7 +50,7 @@ public sealed class AutomationElement {
         if(Probe.Mode=="wrong-title") e.Current.Name="Untitled.md - Fomawrite";
         if(Probe.Mode=="uia-owner-changes" && Probe.Calls>0) e.Current.ProcessId=8;
         if(Probe.Mode=="handle-changes" && Probe.Calls>0) e.Current.NativeWindowHandle=99;
-        if(Probe.Mode=="primitive-uia-owner-changes") e.Current.ProcessId=8;
+        if(Probe.Mode=="primitive-uia-owner-changes" || (Probe.Mode=="popup-uia-owner-changes"&&Probe.PopupCalls>0)) e.Current.ProcessId=8;
         return e;
     }
 }
@@ -58,8 +58,23 @@ public static class Probe {
     public static string Mode;
     public static int Calls, Reacquisitions;
     public static uint expectedProcessId=7; public static IntPtr expectedInputWindow=new IntPtr(42);
+    public static int PopupCalls;public static IntPtr LastNativeHandle;
+    public sealed class OwnedMenuPopupIdentity {public readonly IntPtr window=new IntPtr(42);}
+    static readonly OwnedMenuPopupIdentity PopupProof=new OwnedMenuPopupIdentity();
+    static System.Windows.Rect OwnedPopupBounds(OwnedMenuPopupIdentity proof,int pid) {
+        PopupCalls++;
+        if(!Object.ReferenceEquals(proof,PopupProof)||pid!=7||proof.window!=expectedInputWindow)throw new InvalidOperationException("immutable popup proof changed");
+        if(Mode=="popup-other-error")throw new COMException("access denied",unchecked((int)0x80070005));
+        if(Mode=="popup-proof-changes"&&PopupCalls>1)throw new InvalidOperationException("immutable popup proof changed");
+        if(Mode=="popup-late-result"){Thread.Sleep(4600);return new System.Windows.Rect(80,60,600,400);}
+        if(Mode=="popup-window-changes"&&PopupCalls==1)expectedInputWindow=new IntPtr(99);
+        if(Mode=="popup-always-fail"||PopupCalls==1)throw new COMException("provider E_FAIL",unchecked((int)0x80004005));
+        return new System.Windows.Rect(80,60,600,400);
+    }
     static bool IsWindow(IntPtr handle) { return Mode=="modal-open"; }
     static uint GetWindowThreadProcessId(IntPtr handle,out uint pid) {
+        LastNativeHandle=handle;
+        if(Mode=="popup-native-owner-changes"&&PopupCalls>0){pid=8;return 1;}
         pid=((Mode=="native-owner-changes" && Calls>0) || Mode=="primitive-native-owner-changes") ? 8u : 7u;
         return 1;
     }
@@ -77,6 +92,12 @@ public static class Probe {
     }
 '@
 $suffix=@'
+    public static string Popup(string mode) {
+        Mode=mode;Calls=0;PopupCalls=0;Reacquisitions=0;LastNativeHandle=IntPtr.Zero;
+        expectedProcessId=7;expectedInputWindow=new IntPtr(42);
+        try {return OwnedMenuBounds(PopupProof,7).ToString(System.Globalization.CultureInfo.InvariantCulture);}
+        catch(Exception error){return error.GetType().Name+":"+error.Message;}
+    }
     public static string InitialRead(string mode) {
         Mode=mode;Calls=0;Reacquisitions=0;expectedProcessId=7;expectedInputWindow=new IntPtr(42);
         var method=typeof(Probe).GetMethod("FindOwnedWindow");
@@ -182,7 +203,7 @@ foreach($mode in @('primitive-no-window','primitive-wrong-pid','primitive-window
 }
 # Execute the actual driver condition, so the former Library-row condition is red.
 $tokens=$null; $errors=$null
-$ast=[Management.Automation.Language.Parser]::ParseFile([IO.Path]::GetFullPath($DriverPath),[ref]$tokens,[ref]$errors)
+$ast=[Management.Automation.Language.Parser]::ParseInput([IO.File]::ReadAllText([IO.Path]::GetFullPath($DriverPath)),[ref]$tokens,[ref]$errors)
 if($errors.Count){throw 'Driver parse failed.'}
 $commands=@($ast.FindAll({param($node)
     $node -is [Management.Automation.Language.CommandAst] -and
@@ -201,5 +222,33 @@ Assert (-not (& $condition)) 'Wrong owned document title falsely established doc
 [Probe]::Mode='ready'
 Assert ([bool](& $condition)) 'Dismissed picker plus exact owned title was rejected.'
 $checks.Add('opened-document-requires-dismissed-picker-and-owned-title')
+if(-not$PrimitiveOnly -and -not$InitialOnly){
+# Exercise the actual retained-popup overload and its actual RetryDisconnected
+# method. The complete OwnedPopupBounds dependency is a failing/changed-provider
+# stub, matching this fixture's existing provider-injection approach. No input
+# method exists in Probe; an input call in the extracted read cannot compile.
+$result=[Probe]::Popup('popup-fail-once')
+Assert ($result-eq'80,60,600,400'-and[Probe]::PopupCalls-eq2-and[Probe]::Reacquisitions-eq1-and[Probe]::LastNativeHandle.ToInt64()-eq42) ('Retained popup did not restart the complete read on its exact owned HWND: '+$result)
+$checks.Add('popup-efail-restarts-whole-read-on-same-owned-hwnd')
+$result=[Probe]::Popup('popup-always-fail')
+Assert ($result-match'^COMException:'-and[Probe]::PopupCalls-eq3-and[Probe]::Reacquisitions-eq2) 'Persistent popup E_FAIL escaped exactly two retries.'
+$checks.Add('popup-persistent-provider-failure-stops-after-two-retries')
+foreach($mode in @('popup-native-owner-changes','popup-uia-owner-changes')) {
+    $result=[Probe]::Popup($mode)
+    Assert ($result-match'^InvalidOperationException:'-and[Probe]::PopupCalls-eq1) ('Changed popup root owner was accepted or reread: '+$mode+' '+$result)
+    $checks.Add($mode+'-aborts-retry')
+}
+foreach($mode in @('popup-window-changes','popup-proof-changes')) {
+    $result=[Probe]::Popup($mode)
+    Assert ($result-match'^InvalidOperationException:'-and[Probe]::PopupCalls-eq2) ('Whole immutable popup proof was not rerun or its failure was retried: '+$mode+' '+$result)
+    $checks.Add($mode+'-remains-fatal-on-whole-read')
+}
+$result=[Probe]::Popup('popup-other-error')
+Assert ($result-match'^COMException:'-and[Probe]::PopupCalls-eq1-and[Probe]::Reacquisitions-eq0) 'Popup retry allowed a different COM error.'
+$checks.Add('popup-unallowlisted-provider-error-is-not-retried')
+$result=[Probe]::Popup('popup-late-result')
+Assert ($result-match'^TimeoutException:'-and[Probe]::PopupCalls-eq1-and[Probe]::Reacquisitions-eq0) 'Popup read returned a result beyond the existing4500ms budget.'
+$checks.Add('popup-late-result-is-rejected-by-existing-shared-budget')
+}
 [ordered]@{ passed=$true; count=$checks.Count; checks=@($checks.ToArray());
     helper=[IO.Path]::GetFullPath($HelperPath); applicationStarted=$false; inputSent=$false } | ConvertTo-Json -Depth 4

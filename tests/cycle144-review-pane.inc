@@ -250,7 +250,7 @@ void FomawriteTest::reviewIssuesAreRebuiltAfterAPauseAndTypingCoalesces() {
     QVERIFY(f.mode(0));
     f.editor->setProperty("text", QStringLiteral("Start here.\n"));
     QTRY_VERIFY(f.backend.reviewIssues().isEmpty());
-    if (bundledHarper) QTRY_VERIFY(spell->issuesIfKnown(QStringLiteral("Start here.")).has_value());
+    if (bundledHarper) QTRY_VERIFY_WITH_TIMEOUT(spell->issuesIfKnown(QStringLiteral("Start here.")).has_value(), 15000);
     QTest::qWait(400); // let the load's own rebuild finish
     QSignalSpy changed(&f.backend, &Backend::reviewIssuesChanged);
     // Typing "recieve " one letter at a time, faster than the pause: nothing is
@@ -263,6 +263,11 @@ void FomawriteTest::reviewIssuesAreRebuiltAfterAPauseAndTypingCoalesces() {
     }
     QCOMPARE(changed.count(), 0);
     QVERIFY(f.backend.reviewIssues().isEmpty());
+    // The async checker must answer this exact typed paragraph before its
+    // result can test the unchanged one-rebuild/coalescing contract below.
+    if (bundledHarper)
+        QTRY_VERIFY2_WITH_TIMEOUT(cycle144ReviewTextKnown(spell, f.editor->property("text").toString()),
+                                 "Bundled Harper did not answer the actual typed Source paragraph", 15000);
     QTRY_COMPARE(changed.count(), 1);
     QCOMPARE(f.backend.reviewIssues().size(), 1);
     QCOMPARE(f.backend.reviewIssues().first().toMap()["word"].toString(), QStringLiteral("recieve"));
@@ -413,6 +418,9 @@ void FomawriteTest::reviewSuggestionAppliesAsOneUndoableEdit() {
     const QString text = QStringLiteral("We recieve the mail.\n\nA wrimblesnort here.\n");
     f.editor->setProperty("text", text);
     QVERIFY(cycle144Run(f.window.data(), "spelling"));
+    if (bundledHarper)
+        QTRY_VERIFY2_WITH_TIMEOUT(cycle144ReviewTextKnown(spell, text),
+                                 "Bundled Harper did not answer the actual Source paragraphs", 15000);
     QTRY_VERIFY(cycle144Row(f.window.data(), 1));
     auto *row = cycle144Row(f.window.data(), 0);
     QCOMPARE(cycle144RowButton(row, "reviewContext")->property("text").toString().contains("recieve"), true);

@@ -43,8 +43,9 @@ public static class NormalLaunchInput {
         if(!SetPhysicalCursorPos(x, y))
             throw new InvalidOperationException("Cannot position physical Windows pointer: " + Marshal.GetLastWin32Error());
         POINT observed;
-        if(!GetPhysicalCursorPos(out observed) || observed.x!=x || observed.y!=y)
-            throw new InvalidOperationException("Physical pointer position did not match the requested UIA coordinates");
+        bool read=GetPhysicalCursorPos(out observed);
+        if(!read || observed.x!=x || observed.y!=y)
+            throw new InvalidOperationException(String.Format("Physical pointer position did not match UIA: requested={0},{1}; observed={2},{3}; read={4}; nativeError={5}",x,y,observed.x,observed.y,read,read?0:Marshal.GetLastWin32Error()));
     }
     static IntPtr expectedInputWindow;
     [DllImport("user32.dll")] static extern uint GetWindowThreadProcessId(IntPtr hwnd, out uint pid);
@@ -108,12 +109,18 @@ public static class NormalLaunchInput {
             input.u.ki.flags=6; Send(input);
         }
     }
+    public static void RequireMenuClickBounds(System.Windows.Rect popup, System.Windows.Rect target) {
+        if(popup.IsEmpty || target.IsEmpty || !popup.Contains(target.Left+target.Width/2,target.Top+target.Height/2))
+            throw new InvalidOperationException("Menu item center is outside its owned popup; refusing input");
+    }
     public static void Click(AutomationElement element) {
         RequireInputForeground();
         var current=Bounded(delegate() { return element.Current; }, "click target bounds");
         if (!current.IsEnabled || current.IsOffscreen || current.BoundingRectangle.IsEmpty)
             throw new InvalidOperationException("Cannot click inaccessible control: " + current.Name);
         var rect=current.BoundingRectangle;
+        if(current.ControlType==ControlType.MenuItem)
+            RequireMenuClickBounds(OwnedMenuBounds(element,current.ProcessId),rect);
         MovePhysical((int)(rect.Left+rect.Width/2), (int)(rect.Top+rect.Height/2));
         RequireInputForeground();
         INPUT input=new INPUT(); input.type=0; input.u.mi.dwFlags=2; Send(input);
@@ -358,7 +365,11 @@ public static class NormalLaunchInput {
         return popup.BoundingRectangle;
     }
     public static System.Windows.Rect OwnedMenuBounds(OwnedMenuPopupIdentity proof, int pid) {
-        return Bounded(delegate(){return OwnedPopupBounds(proof,pid);},"current retained File popup bounds");
+        return Bounded(delegate() {
+            var budget=Stopwatch.StartNew();
+            return RetryDisconnected(delegate() { return OwnedPopupBounds(proof,pid); },
+                delegate() { ReacquireOwnedRoot(proof.window,(uint)pid); },budget);
+        },"current retained File popup bounds");
     }
     public static string ScrollOwnedMenuDown(AutomationElement item, int pid) {
         string proof=RequireOwnedMenuPopup(item,pid);
@@ -369,6 +380,18 @@ public static class NormalLaunchInput {
         INPUT input=new INPUT();input.type=0;input.u.mi.dwFlags=0x0800;
         input.u.mi.mouseData=unchecked((uint)-360);Send(input);
         return proof+" | physical wheel delta=-360";
+    }
+    public static string ScrollOwnedMenuDown(OwnedMenuPopupIdentity proof, int pid, System.Windows.Rect measured, long deadline) {
+        RequireInputForeground();
+        if(GetForegroundWindow()!=proof.window || OwnedMenuBounds(proof,pid)!=measured)
+            throw new InvalidOperationException("Owned File popup changed before bounded wheel");
+        MovePhysical((int)(measured.Left+measured.Width/2),(int)(measured.Top+measured.Height/2));
+        RequireInputForeground();
+        if(GetForegroundWindow()!=proof.window || OwnedMenuBounds(proof,pid)!=measured || Stopwatch.GetTimestamp()>=deadline)
+            throw new InvalidOperationException("Owned File popup changed or wheel deadline expired");
+        INPUT input=new INPUT();input.type=0;input.u.mi.dwFlags=0x0800;
+        input.u.mi.mouseData=unchecked((uint)-360);Send(input);
+        return proof.ToString()+" | bounded physical wheel delta=-360";
     }
     public static System.Windows.Rect OwnedMenuBounds(AutomationElement item, int pid) {
         RequireOwnedMenuPopup(item,pid);
@@ -433,4 +456,34 @@ public static class NormalLaunchInput {
             return new string[] { "UIA diagnostic incomplete: " + error.Message };
         }
     }
+}
+
+public static class NativeFilenameWitness {
+ [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)] struct Rect{public int l,t,r,b;}
+ [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)] struct Gui{public int size;public uint flags;public System.IntPtr active,focus,capture,menu,move,caret;public Rect rect;}
+ [System.Runtime.InteropServices.DllImport("user32.dll")]static extern bool GetGUIThreadInfo(uint thread,ref Gui info);
+ [System.Runtime.InteropServices.DllImport("user32.dll")]static extern uint GetWindowThreadProcessId(System.IntPtr window,out uint pid);
+ [System.Runtime.InteropServices.DllImport("user32.dll")]static extern System.IntPtr GetAncestor(System.IntPtr window,uint flags);
+ [System.Runtime.InteropServices.DllImport("user32.dll")]static extern System.IntPtr GetParent(System.IntPtr window);
+ [System.Runtime.InteropServices.DllImport("user32.dll")]static extern int GetDlgCtrlID(System.IntPtr window);
+ public sealed class State{public int processId,controlId;public long dialogHwnd,focusHwnd;public string value,windowClass,automationId,observedUtc;public bool ready,keyboardFocus,filenameParent,modernFilename;}
+ public static State Read(System.IntPtr dialog,int pid){
+  State result=null;System.Exception failure=null;var thread=new System.Threading.Thread(delegate(){try{
+   if(NormalLaunchInput.GetForegroundWindow()!=dialog)throw new System.InvalidOperationException("Exact native filename dialog is not foreground");
+   uint owner;var guiThread=GetWindowThreadProcessId(dialog,out owner);
+   if(dialog==System.IntPtr.Zero||guiThread==0||owner!=(uint)pid)throw new System.InvalidOperationException("Filename dialog owner changed");
+   var nativeDialog=System.Windows.Automation.AutomationElement.FromHandle(dialog).Current;
+   if(nativeDialog.ProcessId!=pid||nativeDialog.NativeWindowHandle!=dialog.ToInt64()||nativeDialog.ClassName!="#32770")throw new System.InvalidOperationException("Exact native file dialog identity changed");
+   var gui=new Gui();gui.size=System.Runtime.InteropServices.Marshal.SizeOf(typeof(Gui));
+   if(!GetGUIThreadInfo(guiThread,ref gui)||gui.focus==System.IntPtr.Zero||GetAncestor(gui.focus,2)!=dialog)throw new System.InvalidOperationException("Native keyboard focus is outside the exact owned picker");
+   GetWindowThreadProcessId(gui.focus,out owner);if(owner!=(uint)pid)throw new System.InvalidOperationException("Focused filename field belongs to another process");
+   bool filename=false;var parent=gui.focus;for(int i=0;i<12&&parent!=System.IntPtr.Zero&&parent!=dialog;i++,parent=GetParent(parent))if(GetDlgCtrlID(parent)==1148)filename=true;
+   var e=System.Windows.Automation.AutomationElement.FromHandle(gui.focus);var c=e.Current;
+   bool modern=GetDlgCtrlID(gui.focus)==1001&&c.AutomationId=="1001"&&c.Name=="File name:";
+   result=new State{processId=pid,dialogHwnd=dialog.ToInt64(),focusHwnd=gui.focus.ToInt64(),controlId=GetDlgCtrlID(gui.focus),windowClass=c.ClassName,automationId=c.AutomationId,keyboardFocus=c.HasKeyboardFocus,filenameParent=filename,modernFilename=modern,observedUtc=System.DateTime.UtcNow.ToString("o")};
+   if(c.ProcessId!=pid||c.NativeWindowHandle!=gui.focus.ToInt64())throw new System.InvalidOperationException("Filename provider identity changed");
+   if((filename||modern)&&c.ControlType==System.Windows.Automation.ControlType.Edit&&!c.IsOffscreen&&c.IsEnabled&&c.HasKeyboardFocus){object raw;if(!e.TryGetCurrentPattern(System.Windows.Automation.ValuePattern.Pattern,out raw))throw new System.InvalidOperationException("Native filename ValuePattern unavailable");result.value=((System.Windows.Automation.ValuePattern)raw).Current.Value;result.ready=true;}
+   if(NormalLaunchInput.GetForegroundWindow()!=dialog)throw new System.InvalidOperationException("Native filename dialog lost foreground during read");
+  }catch(System.Exception error){failure=error;}});thread.IsBackground=true;thread.SetApartmentState(System.Threading.ApartmentState.MTA);thread.Start();if(!thread.Join(6000))throw new System.TimeoutException("Native filename observation timed out");if(failure!=null)throw new System.InvalidOperationException("Native filename observation failed",failure);return result;
+ }
 }

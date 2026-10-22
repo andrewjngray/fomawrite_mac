@@ -135,6 +135,7 @@ function Read-ExitMenuTarget($anchor) {
         } })
     } finally { if($software){$software.Dispose()}; $stream.Dispose() }
     $text | Set-Content -LiteralPath (Join-Path $outputRoot ($prefix + '-ocr.txt')) -Encoding UTF8
+    $script:ExitMenuLastCrop=[ordered]@{key=((Hash $path)+':'+$popup.ToString());bounds=$popup;image=[IO.Path]::GetFileName($path);captureTicks=$capturedAt}
     if ($words.Count -eq 0) { return $null }
     if ($words.Count -ne 1) { throw 'Exit OCR match is not unique inside the owned File popup.' }
     $word=$words[0]; $x=[int][Math]::Round($left+$word.left+$word.width/2); $y=[int][Math]::Round($top+$word.top+$word.height/2)
@@ -143,12 +144,88 @@ function Read-ExitMenuTarget($anchor) {
     $observation | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath (Join-Path $outputRoot ($prefix + '-target.json')) -Encoding UTF8
     return $observation
 }
+function Read-ExportCropTarget($crop,$bounds,[string]$label) {
+    if($label-cnotin@('Export HTML','Export PDF')){throw 'Only two exact Export OCR labels are allowed'}
+    $path=Join-Path $outputRoot $crop.image
+    $file=Await-WinRt ([Windows.Storage.StorageFile]::GetFileFromPathAsync($path)) ([Windows.Storage.StorageFile])
+    $stream=Await-WinRt ($file.OpenAsync([Windows.Storage.FileAccessMode]::Read)) ([Windows.Storage.Streams.IRandomAccessStream]);$bitmap=$null
+    try {
+        $decoder=Await-WinRt ([Windows.Graphics.Imaging.BitmapDecoder]::CreateAsync($stream)) ([Windows.Graphics.Imaging.BitmapDecoder])
+        $bitmap=Await-WinRt ($decoder.GetSoftwareBitmapAsync()) ([Windows.Graphics.Imaging.SoftwareBitmap])
+        $engine=[Windows.Media.Ocr.OcrEngine]::TryCreateFromLanguage((New-Object Windows.Globalization.Language('en-US')))
+        if(-not$engine){throw 'English Windows OCR required for the owned Export popup'}
+        $result=Await-WinRt ($engine.RecognizeAsync($bitmap)) ([Windows.Media.Ocr.OcrResult])
+        (@($result.Lines|ForEach-Object{$_.Text})-join"`n")|Set-Content ([IO.Path]::ChangeExtension($path,'.ocr.txt')) -Encoding UTF8
+        $regex='^'+[regex]::Escape($label)+'(?:'+[char]0x2026+'|\.{3})$'
+        $lines=@($result.Lines|Where-Object{$_.Text-cmatch$regex})
+        if($lines.Count-eq0){return $null}
+        if($lines.Count-ne1){throw 'Owned Export popup exact OCR row is not unique'}
+        $words=@($lines[0].Words);$left=($words|ForEach-Object{$_.BoundingRect.X}|Measure-Object -Minimum).Minimum;$top=($words|ForEach-Object{$_.BoundingRect.Y}|Measure-Object -Minimum).Minimum
+        $right=($words|ForEach-Object{$_.BoundingRect.X+$_.BoundingRect.Width}|Measure-Object -Maximum).Maximum;$bottom=($words|ForEach-Object{$_.BoundingRect.Y+$_.BoundingRect.Height}|Measure-Object -Maximum).Maximum
+        $x=[int][Math]::Round([Math]::Ceiling($bounds.Left)+($left+$right)/2);$y=[int][Math]::Round([Math]::Ceiling($bounds.Top)+($top+$bottom)/2)
+        if(-not$bounds.Contains($x,$y)){throw 'Exact Export OCR row escaped its owned popup'}
+        return [ordered]@{name=$lines[0].Text;x=$x;y=$y}
+    }finally{if($bitmap){$bitmap.Dispose()};$stream.Dispose()}
+}
+function Click-OwnedExportRow([string]$pattern) {
+    $allowed=@(('^Export HTML'+[char]0x2026+'$'),('^Export PDF'+[char]0x2026+'$'))
+    if($pattern-cnotin$allowed){throw 'Only the two exact File Export rows are supported'}
+    $label=if($pattern-ceq$allowed[0]){'Export HTML'}else{'Export PDF'}
+    $first=Wait-For {$fileAnchor=Find-Control '^Save$';if($fileAnchor){$fileAnchor}else{Find-Control '^New Document$'}} 'visible owned File menu for Export'
+    $proof=[NormalLaunchInput]::RetainOwnedMenuPopup($first,$script:process.Id)
+    $mainHandle=[IntPtr]$script:main.Current.NativeWindowHandle
+    $deadline=[Diagnostics.Stopwatch]::GetTimestamp()+20*[Diagnostics.Stopwatch]::Frequency
+    $clock=[Diagnostics.Stopwatch]::StartNew();$gestures=0;$samples=New-Object 'Collections.Generic.List[object]';$key=$null;$stable=0;$since=0;$number=0
+    function Capture-ExportPopup($bounds) {
+        if([NormalLaunchInput]::GetForegroundWindow()-ne$mainHandle){throw 'Exact owned main foreground lost before Export capture'}
+        $left=[int][Math]::Ceiling($bounds.Left);$top=[int][Math]::Ceiling($bounds.Top);$width=[int][Math]::Floor($bounds.Right)-$left;$height=[int][Math]::Floor($bounds.Bottom)-$top
+        if($width-lt10-or$height-lt10){throw 'Owned Export menu crop is empty'}
+        $image=$stage+'-menu-'+$samples.Count+'-'+[Guid]::NewGuid().ToString('N')+'.png';$path=Join-Path $outputRoot $image
+        $bitmap=New-Object Drawing.Bitmap($width,$height);$graphics=[Drawing.Graphics]::FromImage($bitmap)
+        try{[NormalLaunchInput]::RequireInputForeground();if([NormalLaunchInput]::GetForegroundWindow()-ne$mainHandle){throw 'Exact main foreground lost before Export pixels'};$graphics.CopyFromScreen($left,$top,0,0,$bitmap.Size);$ticks=[Diagnostics.Stopwatch]::GetTimestamp();$bitmap.Save($path,[Drawing.Imaging.ImageFormat]::Png)}finally{$graphics.Dispose();$bitmap.Dispose()}
+        return [ordered]@{image=$image;imageSha256=Hash $path;captureTicks=$ticks}
+    }
+    try {
+        while($clock.ElapsedMilliseconds-lt20000){
+            if([NormalLaunchInput]::GetForegroundWindow()-ne$mainHandle){throw 'Exact owned main foreground lost during Export navigation'}
+            $bounds=[NormalLaunchInput]::OwnedMenuBounds($proof,$script:process.Id);$target=Find-Control $pattern;$current=if($target){$target.Current}else{$null};$visible=$false;$x=0;$y=0
+            if($current){
+                if($current.Name-cnotmatch$pattern-or$current.ControlType-ne[Windows.Automation.ControlType]::MenuItem-or$current.ProcessId-ne$script:process.Id-or-not$current.IsEnabled){throw 'Known Export provider target is disabled, foreign or not the exact menu row'}
+                $x=[int]($current.BoundingRectangle.Left+$current.BoundingRectangle.Width/2);$y=[int]($current.BoundingRectangle.Top+$current.BoundingRectangle.Height/2)
+                $visible=($current.Name-cmatch$pattern-and$current.ControlType-eq[Windows.Automation.ControlType]::MenuItem-and$current.ProcessId-eq$script:process.Id-and$current.IsEnabled-and-not$current.IsOffscreen-and$bounds.Contains($x,$y))
+                if($visible){$identity=[NormalLaunchInput]::RetainOwnedMenuPopup($target,$script:process.Id);if($identity.ToString()-cne$proof.ToString()){throw 'Exact Export row belongs to another popup'}}
+            }
+            $crop=Capture-ExportPopup $bounds;$method='uia';$uiaAbsent=($null-eq$current);$targetName=if($current){$current.Name}else{$null}
+            if(-not$visible){$ocrTarget=Read-ExportCropTarget $crop $bounds $label;if($ocrTarget){$visible=$true;$x=$ocrTarget.x;$y=$ocrTarget.y;$targetName=$ocrTarget.name;$method='owned-popup-exact-line-ocr'}}
+            $nowKey=$crop.imageSha256+'|'+$bounds.ToString()+'|'+$visible+'|'+$x+'|'+$y
+            $samples.Add([ordered]@{processId=$script:process.Id;mainHwnd=$mainHandle.ToInt64();popupIdentity=$proof.ToString();popupBounds=$bounds.ToString();targetPattern=$pattern;targetName=$targetName;targetMethod=$method;uiaTargetAbsent=$uiaAbsent;visible=$visible;x=$x;y=$y;gestures=$gestures;elapsedMs=$clock.ElapsedMilliseconds;image=$crop.image;imageSha256=$crop.imageSha256})
+            if($nowKey-ceq$key){$stable++}else{$key=$nowKey;$stable=1;$since=$clock.ElapsedMilliseconds}
+            if($stable-ge3-and($clock.ElapsedMilliseconds-$since)-ge300){
+                if($visible){
+                    if([NormalLaunchInput]::OwnedMenuBounds($proof,$script:process.Id)-ne$bounds){throw 'Owned Export popup geometry changed'}
+                    $fresh=Capture-ExportPopup $bounds
+                    if($fresh.imageSha256-cne$crop.imageSha256){$key=$null;$stable=0;continue}
+                    if([Diagnostics.Stopwatch]::GetTimestamp()-ge$deadline){throw 'Export navigation deadline expired before click'}
+                    $samples.Add([ordered]@{phase='fresh-target';processId=$script:process.Id;mainHwnd=$mainHandle.ToInt64();popupIdentity=$proof.ToString();popupBounds=$bounds.ToString();targetPattern=$pattern;targetName=$targetName;targetMethod=$method;uiaTargetAbsent=$uiaAbsent;visible=$true;x=$x;y=$y;gestures=$gestures;elapsedMs=$clock.ElapsedMilliseconds;image=$fresh.image;imageSha256=$fresh.imageSha256;captureTicks=$fresh.captureTicks})
+                    [NormalLaunchInput]::ClickOwnedMenuPoint($proof,$script:process.Id,$x,$y,$bounds,$fresh.captureTicks)
+                    return
+                }
+                if($gestures-ge12){throw 'Exact Export row absent after twelve owned wheel gestures'}
+                [NormalLaunchInput]::ScrollOwnedMenuDown($proof,$script:process.Id,$bounds,$deadline)|Add-Content (Join-Path $outputRoot ($stage+'-menu-scroll.txt')) -Encoding UTF8
+                $gestures++;$key=$null;$stable=0
+            }
+            $number++;Start-Sleep -Milliseconds 100
+        }
+        throw 'Exact visible Export row unavailable within twenty seconds'
+    } finally {$samples.ToArray()|ConvertTo-Json -Depth 8|Set-Content (Join-Path $outputRoot ($stage+'-menu-navigation.json')) -Encoding UTF8}
+}
 function Open-Menu([string]$menu, [string]$item) {
     Click-Control ('^' + [regex]::Escape($menu) + '$')
+    if($menu-ceq'File'-and$item-cin@(('^Export HTML'+[char]0x2026+'$'),('^Export PDF'+[char]0x2026+'$'))){Click-OwnedExportRow $item;return}
     if ($menu -ceq 'File' -and $item -ceq '^Exit$') {
         # Exit can be below the viewport in a short window. Scroll the actual
-        # owned File popup with one guarded physical wheel gesture, then click its exact item.
-        $first = Wait-For { Find-Control '^New Document$' } 'visible owned File menu'
+        # owned File popup with bounded guarded wheel gestures, then click its exact item.
+        $first = Wait-For { $fileAnchor=Find-Control '^Save$';if($fileAnchor){$fileAnchor}else{Find-Control '^New Document$'} } 'visible owned File menu'
         $proof = [NormalLaunchInput]::RequireOwnedMenuPopup($first, $script:process.Id)
         $proof | Add-Content -LiteralPath (Join-Path $outputRoot 'exit-menu-scroll.txt') -Encoding UTF8
         $anchor = [NormalLaunchInput]::RetainOwnedMenuPopup($first, $script:process.Id)
@@ -166,9 +243,24 @@ function Open-Menu([string]$menu, [string]$item) {
         Capture-Diagnostic ('exit-menu-visible-' + $script:process.Id)
         $script:ExitMenuOcrAttempt=0
         $script:ExitMenuStableKey=$null; $script:ExitMenuStable=@(); $script:ExitMenuStableClock=[Diagnostics.Stopwatch]::StartNew()
+        $script:ExitMenuMissingKey=$null;$script:ExitMenuMissingCount=0;$script:ExitMenuMissingClock=[Diagnostics.Stopwatch]::StartNew();$script:ExitMenuGestures=1
+        $script:ExitMenuDeadline=[Diagnostics.Stopwatch]::GetTimestamp()+20*[Diagnostics.Stopwatch]::Frequency
         $target = Wait-For {
             $candidate=Read-ExitMenuTarget $anchor
-            if (-not $candidate) { $script:ExitMenuStableKey=$null; $script:ExitMenuStable=@(); $script:ExitMenuStableClock=[Diagnostics.Stopwatch]::StartNew(); return $null }
+            if ([Diagnostics.Stopwatch]::GetTimestamp()-ge$script:ExitMenuDeadline){throw 'Owned Exit navigation exceeded twenty seconds'}
+            if (-not $candidate) {
+                $script:ExitMenuStableKey=$null;$script:ExitMenuStable=@();$script:ExitMenuStableClock.Restart()
+                $crop=$script:ExitMenuLastCrop
+                if($crop.key-ceq$script:ExitMenuMissingKey){$script:ExitMenuMissingCount++}else{$script:ExitMenuMissingKey=$crop.key;$script:ExitMenuMissingCount=1;$script:ExitMenuMissingClock.Restart()}
+                if($script:ExitMenuMissingCount-ge3-and$script:ExitMenuMissingClock.ElapsedMilliseconds-ge300){
+                    if($script:ExitMenuGestures-ge12){throw 'Exit absent after twelve owned wheel gestures'}
+                    [NormalLaunchInput]::ScrollOwnedMenuDown($anchor,$script:process.Id,$crop.bounds,$script:ExitMenuDeadline)|Add-Content -LiteralPath (Join-Path $outputRoot 'exit-menu-scroll.txt') -Encoding UTF8
+                    $script:ExitMenuGestures++;$script:ExitMenuMissingKey=$null;$script:ExitMenuMissingCount=0;$script:ExitMenuMissingClock.Restart()
+                }
+                return $null
+            }
+
+            $script:ExitMenuMissingKey=$null;$script:ExitMenuMissingCount=0;$script:ExitMenuMissingClock.Restart()
             $key=$candidate.contentSha256 + ':' + $candidate.x + ':' + $candidate.y
             if ($key -ceq $script:ExitMenuStableKey) { $script:ExitMenuStable+=,$candidate }
             else { $script:ExitMenuStableKey=$key; $script:ExitMenuStable=@($candidate); $script:ExitMenuStableClock.Restart() }
@@ -403,11 +495,15 @@ try {
 
     $stage = 'library-A-split-web'
     if (-not (Find-Control '^Add library location$')) { Open-Menu 'View' '^Organizer$' }
+    $folderParentTitle=[NormalLaunchInput]::OwnedWindowTitle($script:process.Id);$folderParentHandle=[IntPtr]$script:main.Current.NativeWindowHandle
     Click-Control '^Add library location$'
     $dialog = Picker '^Add writing location$'
+    $folderPickerHandle=[IntPtr]$dialog.Current.NativeWindowHandle
     [NormalLaunchInput]::Chord(0x12, 0x44); [NormalLaunchInput]::Type($writing); [NormalLaunchInput]::Press(0x0D)
     $select = Wait-For { [NormalLaunchInput]::Find($dialog, '^Select Folder$') } 'enabled Select Folder'
     [NormalLaunchInput]::Click($select)
+    Wait-For { [NormalLaunchInput]::OpenedDocument($script:main,$folderPickerHandle,$folderParentTitle) -and [NormalLaunchInput]::GetForegroundWindow()-eq$folderParentHandle } 'exact folder picker destroyed and original owned main foreground restored' | Out-Null
+    [ordered]@{pickerHwnd=$folderPickerHandle.ToInt64();mainHwnd=$folderParentHandle.ToInt64();mainTitle=$folderParentTitle;pickerDestroyed=$true;mainForeground=$true;observedUtc=[DateTime]::UtcNow.ToString('o')}|ConvertTo-Json|Set-Content (Join-Path $outputRoot 'folder-picker-completion.json') -Encoding UTF8
     Click-Control '^publishing-fixtures$'
     Open-Menu 'View' '^Source$'
     Select-LibraryDocument $documents[0]
@@ -479,6 +575,7 @@ try {
     $checks.Add([ordered]@{ stage = $stage; passed = $true; detail = 'File Exit terminated normally with zero status and no detected renderer failures.'; observedUtc = [DateTime]::UtcNow.ToString('o') })
 } catch {
     $failure = $_.Exception.Message
+    ($_.Exception.ToString()+"`nScript stack:`n"+$_.ScriptStackTrace)|Set-Content (Join-Path $outputRoot 'failure-exception.txt') -Encoding UTF8
     $checks.Add([ordered]@{ stage = $stage; passed = $false; detail = $failure; observedUtc = [DateTime]::UtcNow.ToString('o') })
     try { Capture-Diagnostic 'failure' | Out-Null } catch { Write-Warning "Failure capture unavailable: $_" }
 } finally {

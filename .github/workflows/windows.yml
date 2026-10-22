@@ -70,6 +70,8 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           powershell.exe -NoProfile -File windows/test_uia_retry.ps1
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          powershell.exe -NoProfile -File windows/test_menu_click_bounds.ps1 -HelperPath bin/windows/normal-launch-input.cs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Install pinned Qt SDK and WebEngine/PDF extensions
         run: |

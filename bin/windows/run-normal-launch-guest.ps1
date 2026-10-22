@@ -65,6 +65,25 @@ function Wait-For([scriptblock]$condition, [string]$reason, [int]$seconds = 20) 
     } while ([DateTime]::UtcNow -lt $deadline)
     throw "Timed out: $reason"
 }
+$script:NativeFilenameSequence=0
+function Type-NativeFilePath([IntPtr]$dialog,[string]$path) {
+    $script:NativeFilenameSequence++
+    $proof=[ordered]@{dialogHwnd=$dialog.ToInt64();expectedPublicPath=$path;typedOnce=$false;matched=$false;before=$null;focusSamples=@();samples=@();failure=$null}
+    try {
+        $proof.before=Wait-For {$w=[NativeFilenameWitness]::Read($dialog,$script:process.Id);$proof.focusSamples+=,$w;if($w.ready){$w}} 'actual owned native FileName Edit focus before typing' 5
+        [NormalLaunchInput]::Chord(0x11,0x41)
+        [NormalLaunchInput]::Type($path);$proof.typedOnce=$true
+        $samples=New-Object 'Collections.Generic.List[object]';$deadline=[DateTime]::UtcNow.AddSeconds(4)
+        do {
+            $w=[NativeFilenameWitness]::Read($dialog,$script:process.Id);$samples.Add($w)
+            if($w.ready-and$w.value-ceq$path){$proof.matched=$true;break}
+            Start-Sleep -Milliseconds 150
+        }while([DateTime]::UtcNow-lt$deadline)
+        $proof.samples=@($samples.ToArray())
+        if(-not$proof.matched){throw 'One typed native filename did not settle to the exact full path; refusing Enter or input replay'}
+    } catch {$proof.failure=$_.Exception.ToString();throw}
+    finally {$proof|ConvertTo-Json -Depth 8|Set-Content (Join-Path $outputRoot ('native-filename-readiness-'+$script:NativeFilenameSequence+'.json')) -Encoding UTF8}
+}
 function Find-Control([string]$pattern) { [NormalLaunchInput]::FindOwnedWindow($script:process.Id, $pattern) }
 function Click-Control([string]$pattern) {
     $element = Wait-For { Find-Control $pattern } "visible control $pattern"
@@ -178,6 +197,7 @@ function Read-ExitMenuTarget($anchor) {
         } })
     } finally { if($software){$software.Dispose()}; $stream.Dispose() }
     $text | Set-Content -LiteralPath (Join-Path $outputRoot ($prefix + '-ocr.txt')) -Encoding UTF8
+    $script:ExitMenuLastCrop=[ordered]@{key=((Hash $path)+':'+$popup.ToString());bounds=$popup;image=[IO.Path]::GetFileName($path);captureTicks=$capturedAt}
     if ($words.Count -eq 0) { return $null }
     if ($words.Count -ne 1) { throw 'Exit OCR match is not unique inside the owned File popup.' }
     $word=$words[0]; $x=[int][Math]::Round($left+$word.left+$word.width/2); $y=[int][Math]::Round($top+$word.top+$word.height/2)
@@ -190,8 +210,8 @@ function Open-Menu([string]$menu, [string]$item) {
     Click-Control ('^' + $menu + '$')
     if ($menu -ceq 'File' -and $item -ceq '^Exit$') {
         # Exit can be below the viewport in a short window. Scroll the actual
-        # owned File popup with one guarded physical wheel gesture, then click its exact item.
-        $first = Wait-For { Find-Control '^New Document$' } 'visible owned File menu'
+        # owned File popup with bounded guarded wheel gestures, then click its exact item.
+        $first = Wait-For { Find-Control '^(?:New Document|Save)$' } 'visible owned File menu'
         $proof = [NormalLaunchInput]::RequireOwnedMenuPopup($first, $script:process.Id)
         $proof | Add-Content -LiteralPath (Join-Path $outputRoot 'exit-menu-scroll.txt') -Encoding UTF8
         $anchor = [NormalLaunchInput]::RetainOwnedMenuPopup($first, $script:process.Id)
@@ -209,9 +229,24 @@ function Open-Menu([string]$menu, [string]$item) {
         Capture ('exit-menu-visible-' + $script:process.Id)
         $script:ExitMenuOcrAttempt=0
         $script:ExitMenuStableKey=$null; $script:ExitMenuStable=@(); $script:ExitMenuStableClock=[Diagnostics.Stopwatch]::StartNew()
+        $script:ExitMenuMissingKey=$null;$script:ExitMenuMissingCount=0;$script:ExitMenuMissingClock=[Diagnostics.Stopwatch]::StartNew();$script:ExitMenuGestures=1
+        $script:ExitMenuDeadline=[Diagnostics.Stopwatch]::GetTimestamp()+20*[Diagnostics.Stopwatch]::Frequency
         $target = Wait-For {
             $candidate=Read-ExitMenuTarget $anchor
-            if (-not $candidate) { $script:ExitMenuStableKey=$null; $script:ExitMenuStable=@(); $script:ExitMenuStableClock=[Diagnostics.Stopwatch]::StartNew(); return $null }
+            if ([Diagnostics.Stopwatch]::GetTimestamp()-ge$script:ExitMenuDeadline){throw 'Owned Exit navigation exceeded twenty seconds'}
+            if (-not $candidate) {
+                $script:ExitMenuStableKey=$null;$script:ExitMenuStable=@();$script:ExitMenuStableClock.Restart()
+                $crop=$script:ExitMenuLastCrop
+                if($crop.key-ceq$script:ExitMenuMissingKey){$script:ExitMenuMissingCount++}else{$script:ExitMenuMissingKey=$crop.key;$script:ExitMenuMissingCount=1;$script:ExitMenuMissingClock.Restart()}
+                if($script:ExitMenuMissingCount-ge3-and$script:ExitMenuMissingClock.ElapsedMilliseconds-ge300){
+                    if($script:ExitMenuGestures-ge12){throw 'Exit absent after twelve owned wheel gestures'}
+                    [NormalLaunchInput]::ScrollOwnedMenuDown($anchor,$script:process.Id,$crop.bounds,$script:ExitMenuDeadline)|Add-Content -LiteralPath (Join-Path $outputRoot 'exit-menu-scroll.txt') -Encoding UTF8
+                    $script:ExitMenuGestures++;$script:ExitMenuMissingKey=$null;$script:ExitMenuMissingCount=0;$script:ExitMenuMissingClock.Restart()
+                }
+                return $null
+            }
+
+            $script:ExitMenuMissingKey=$null;$script:ExitMenuMissingCount=0;$script:ExitMenuMissingClock.Restart()
             $key=$candidate.contentSha256 + ':' + $candidate.x + ':' + $candidate.y
             if ($key -ceq $script:ExitMenuStableKey) { $script:ExitMenuStable+=,$candidate }
             else { $script:ExitMenuStableKey=$key; $script:ExitMenuStable=@($candidate); $script:ExitMenuStableClock.Restart() }
@@ -296,7 +331,7 @@ try {
     $openPickerHandle = [IntPtr]$dialog.Current.NativeWindowHandle
     [NormalLaunchInput]::RequireInputForeground()
     [NormalLaunchInput]::Chord(0x12, 0x4E) # Alt+N: native File name
-    [NormalLaunchInput]::Type($sample)
+    Type-NativeFilePath $openPickerHandle $sample
     [NormalLaunchInput]::Press(0x0D)
     Wait-For { [NormalLaunchInput]::OpenedDocument($script:main, $openPickerHandle, 'normal-launch-sample.md - Fomawrite') } 'opened document title' | Out-Null
     # Require a readable editor with exact source before altering the fixture.
