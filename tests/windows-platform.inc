@@ -8,43 +8,27 @@ void FomawriteTest::platformWritingCheckerCapabilitiesAndBundledPolicy() {
     Cycle146Sandbox sandbox;
     HarperUpdater updater;
 #ifdef Q_OS_WIN
-    QVERIFY(!updater.updatesSupported());
-    const QString bundled = updater.bundledVersion();
+    QVERIFY(updater.updatesSupported());
+    QVERIFY(QDir::isAbsolutePath(HarperUpdater::archiveTool()));
+    QVERIFY(HarperUpdater::archiveTool().endsWith(QStringLiteral("/tar.exe"), Qt::CaseInsensitive));
+    const QString bundled = updater.bundledVersion(), root = HarperSchemeHandler::harperRoot();
     QVERIFY(HarperSchemeHandler::isValidVersion(bundled));
-    // A complete pre-existing override must not bypass the disabled updater.
-    const QString current = HarperSchemeHandler::harperRoot() + QStringLiteral("/current");
-    for (const char *name : {"index.js", "binary.js", "BinaryModule.js", "harper_wasm_bg.wasm"})
-        QVERIFY(cycle146Write(current + QLatin1Char('/') + QString::fromLatin1(name), "untrusted override"));
-    QVERIFY(cycle146Write(current + QStringLiteral("/VERSION"), "99.0.1\n"));
-    QVERIFY(HarperSchemeHandler::overrideDirectory().isEmpty());
-    QVERIFY(updater.installedVersion().isEmpty());
+    // A legacy directory and an unactivated complete version cannot self-enable.
+    QVERIFY(cycle146Write(root + "/current/VERSION", "99.0.1\n"));
+    const QString folder = root + QStringLiteral("/99.0.1");
+    for (const char *name : {"index.js", "binary.js", "BinaryModule.js"}) QVERIFY(cycle146Write(folder + '/' + name, "engine"));
+    QVERIFY(cycle146Write(folder + "/VERSION", "99.0.1\n"));
+    QVERIFY(cycle146Write(folder + "/harper_wasm_bg.wasm", Cycle146Wasm));
+    QCOMPARE(updater.servedVersion(), bundled); QVERIFY(!updater.hasOverride());
+    QString error; QVERIFY(HarperActivation::commit(root, "99.0.1", &error));
+    QCOMPARE(updater.installedVersion(), QStringLiteral("99.0.1"));
+    QCOMPARE(HarperSchemeHandler::resolvePath(QUrl("fomawrite://harper/99.0.1/index.js")), folder + "/index.js");
+    QVERIFY(cycle146Write(root + "/current-version", "../99.0.1\n"));
     QCOMPARE(updater.servedVersion(), bundled);
-    QVERIFY(!updater.hasOverride());
-    QVERIFY(HarperSchemeHandler::resolvePath(QUrl(QStringLiteral("fomawrite://harper/%1/index.js").arg(bundled))).startsWith(QLatin1String(":/editor/dist/harper/")));
-    QVERIFY(HarperSchemeHandler::resolvePath(QUrl(QStringLiteral("fomawrite://harper/99.0.1/index.js"))).isEmpty());
-    Cycle146Server server; QVERIFY(server.start());
-    updater.setRegistryUrl(server.url(QStringLiteral("/harper.js/latest")));
-    QSettings().setValue(QStringLiteral("harper/autoCheck"), true);
-    const QVariant beforeAuto = QSettings().value(QStringLiteral("harper/autoCheck"));
-    QSignalSpy failed(&updater, &HarperUpdater::failed), notices(&updater, &HarperUpdater::notice);
-    QSignalSpy served(&updater, &HarperUpdater::servedChanged);
-    updater.setAutoCheck(false);
-    QCOMPARE(QSettings().value(QStringLiteral("harper/autoCheck")), beforeAuto);
-    QVERIFY(!updater.autoCheck());
-    updater.runScheduledCheck();
-    QCOMPARE(failed.count(), 0);
-    QCOMPARE(notices.count(), 0);
-    updater.checkNow(); updater.checkAndInstall(); updater.install(); updater.rollback();
-    QCOMPARE(failed.count(), 4);
-    QCOMPARE(notices.count(), 4);
-    QVERIFY(updater.status().contains(QStringLiteral("unavailable on Windows")));
-    QTest::qWait(100);
-    QVERIFY(server.requests.isEmpty());
-    QVERIFY(!updater.checking() && !updater.installing() && !updater.hasUpdate());
-    QVERIFY(!updater.lastCheck().isValid());
-    QCOMPARE(served.count(), 0);
-    QCOMPARE(cycle146Slurp(current + QStringLiteral("/VERSION")), QStringLiteral("99.0.1\n"));
-    QCOMPARE(updater.servedVersion(), bundled);
+    QVERIFY(HarperActivation::commit(root, "99.0.1", &error));
+    QVERIFY(QFile::remove(folder + "/BinaryModule.js")); QCOMPARE(updater.servedVersion(), bundled);
+    QVERIFY(HarperActivation::commit(root, "bundled", &error)); QCOMPARE(updater.servedVersion(), bundled);
+    QSettings().setValue("harper/autoCheck", true); updater.setAutoCheck(false); QVERIFY(!updater.autoCheck());
 #else
     QVERIFY(updater.updatesSupported());
 #endif

@@ -1,6 +1,6 @@
 # Windows M2 — writing checker regression parity
 
-22 October 2026. Windows branch only; primary Mac checkout and installed apps are untouched.
+22 October 2026. Candidate code `d145a0f61ef5fb1f33d11c319efd240313f3fcda`. Windows branch only; primary Mac checkout and installed apps are untouched.
 
 ## Change and findings
 
@@ -25,7 +25,13 @@ Local logs are `/tmp/fomawrite-source-spelling-final.log`, `/tmp/fomawrite-revie
 
 The first full integration run built successfully and returned **339 passed, 1 failed, 1 skipped**. The failure was an existing tag-watcher test accepting any non-Scanning status, including a pending debounced refresh. Its isolated recheck passed; the affected three watcher cases passed after tightening initial readiness (5 including setup/cleanup). The final wait also requires the expected final tag, so a completed older scan cannot satisfy it. No FileLibrary production code changed. The original failure remains in `/tmp/fomawrite-parity-suite.log`.
 
-The final full-suite rerun, Windows CI and packaged VM validation are pending. Existing shelf builds remain identified in [Windows status](STATUS.md); they do not contain this change until a new exact package is qualified.
+Final local `./bin/build` passed and `./bin/test` returned **340 passed, 0 failed, 1 skipped**, 408.2 seconds. The only skip is the Windows Qt appearance test on this Mac host. Deployment/verifier unit tests also passed (61). Final log: `/tmp/fomawrite-parity-suite-final.log`.
+
+[Shared CI 39750393669](https://github.com/andrewjngray/fomawrite_mac/actions/runs/39750393669) passed: **328 Mac Qt tests, 0 failed, 13 skipped**, plus **324 editor tests** and asset/type checks.
+
+[Windows CI 39750393727](https://github.com/andrewjngray/fomawrite_mac/actions/runs/39750393727) passed **302 Qt tests on x64, 0 failed, 11 skipped**. ARM64 returned **301 passed, 1 failed, 11 skipped**: `publishingFolderThemesReloadAndAtomicResourcesSettle`, `tests/cycle125-theme-folder.inc:156`, could not write the imported CSS fixture. The log omitted the file error, so its underlying cause is not yet established. All new checker rows passed on both architectures. Both native appearance gates passed three checks; both separate deployed diagnostics passed 124 scenarios with zero failures or QML warnings. This failed run is not a completed qualification checkpoint. Local CI evidence is `/private/tmp/fomawrite-ci-39750393727-summary.json` and architecture-specific evidence folders beside it.
+
+The theme-write failure is being investigated before a new candidate is promoted. Ordinary packaged VM qualification remains pending. Existing shelf builds remain identified in [Windows status](STATUS.md); they do not contain this change until a new exact package is qualified.
 
 ## Remaining gaps
 

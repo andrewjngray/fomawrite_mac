@@ -1,4 +1,6 @@
 #include "harperscheme.h"
+#include "harperactivation_p.h"
+#include "harperarchive_p.h"
 
 #include <QBuffer>
 #include <QDir>
@@ -35,9 +37,7 @@ QString readVersionFile(const QString &path) {
 HarperSchemeHandler::HarperSchemeHandler(QObject *parent) : QWebEngineUrlSchemeHandler(parent) {}
 
 bool HarperSchemeHandler::isValidVersion(const QString &version) {
-    // \A…\z, not ^…$: PCRE's $ matches before a trailing newline, which would make "1.2.3\n" a folder name.
-    static const QRegularExpression pattern(QStringLiteral("\\A\\d{1,6}\\.\\d{1,6}\\.\\d{1,6}\\z"));
-    return pattern.match(version).hasMatch();
+    return HarperActivation::validVersion(version);
 }
 
 QString HarperSchemeHandler::harperRoot() {
@@ -47,9 +47,12 @@ QString HarperSchemeHandler::harperRoot() {
 
 QString HarperSchemeHandler::overrideDirectory() {
 #ifdef Q_OS_WIN
-    // W12 has not qualified Windows extraction/activation/rollback. Ignore even
-    // an existing current directory so this build always serves the pinned bundle.
-    return {};
+    const QString root = harperRoot();
+    const QString version = HarperActivation::selectedVersion(root);
+    if (version.isEmpty() || version == QLatin1String("bundled")) return {};
+    const QString bundled = bundledVersion();
+    if (!bundled.isEmpty() && QVersionNumber::compare(QVersionNumber::fromString(version), QVersionNumber::fromString(bundled)) <= 0) return {};
+    return HarperActivation::directory(root, version);
 #else
     const QString root = harperRoot();
     if (root.isEmpty()) return {};
@@ -90,12 +93,21 @@ QString HarperSchemeHandler::resolvePath(const QUrl &url, QByteArray *mime) {
         if (parts.size() != 3 || !parts.at(0).isEmpty()) return {};
         version = parts.at(1);
         file = parts.at(2);
+#ifdef Q_OS_WIN
+        if (!HarperArchive::pathAllowed(QStringLiteral("package/dist/") + file)) return {};
+#endif
         if (!isValidVersion(version) || file.isEmpty() || file.contains(QLatin1String("..")) || file.contains(QLatin1Char('\\'))
             || file == QLatin1String("VERSION"))
             return {};
     }
     const QString override = overrideDirectory();
+#ifdef Q_OS_WIN
+    // Keep the validated directory/version as one snapshot. Re-reading the
+    // marker here could label the old directory's bytes with a newer version.
+    const QString overrideVer = override.isEmpty() ? QString() : readVersionFile(override + QStringLiteral("/VERSION"));
+#else
     const QString overrideVer = override.isEmpty() ? QString() : overrideVersion();
+#endif
     QString resolved;
     if (version.isEmpty()) {
         // The version to use: the override's when valid, else the bundled one.
@@ -106,6 +118,10 @@ QString HarperSchemeHandler::resolvePath(const QUrl &url, QByteArray *mime) {
         resolved = QString::fromLatin1(BundledRoot) + file;
     }
     if (resolved.isEmpty() || !QFileInfo(resolved).isFile()) return {};
+#ifdef Q_OS_WIN
+    if (!resolved.startsWith(QLatin1Char(':')) && (!HarperActivation::plain(resolved, false)
+        || QFileInfo(resolved).canonicalPath() != QFileInfo(override).canonicalFilePath())) return {};
+#endif
     if (mime) *mime = mimeFor(file);
     return resolved;
 }

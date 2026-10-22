@@ -16,6 +16,7 @@
 #include <QTimer>
 #include <QVersionNumber>
 #include <algorithm>
+#include <iterator>
 
 #ifndef Q_OS_WIN
 #include <unistd.h>
@@ -23,12 +24,15 @@
 #endif
 
 #include "harperscheme.h"
+#include "harperarchive_p.h"
+#include "harperactivation_p.h"
+#include <QLockFile>
+#include <QUuid>
 
 QList<HarperUpdater *> HarperUpdater::s_instances;
 
 namespace {
 const char *const DefaultRegistry = "https://registry.npmjs.org/harper.js/latest";
-const char *const TarProgram = "/usr/bin/tar";
 const char *const AutoAttemptedKey = "harper/autoAttempted";
 
 bool isLoopback(const QString &host) {
@@ -46,6 +50,17 @@ bool folderHolds(const QString &folder, const QString &version) {
     return file.open(QIODevice::ReadOnly) && QString::fromUtf8(file.read(64)).trimmed() == version;
 }
 
+bool removePlainFolder(const QString &path, int depth = 0) {
+    if (depth > 4 || !HarperActivation::plain(path, true)) return false;
+    const auto entries = QDir(path).entryInfoList(QDir::AllEntries | QDir::NoDotAndDotDot | QDir::Hidden | QDir::System);
+    if (entries.size() > 128) return false;
+    for (const auto &entry : entries) {
+        if (entry.isDir()) { if (!removePlainFolder(entry.absoluteFilePath(), depth + 1)) return false; }
+        else if (!HarperActivation::plain(entry.absoluteFilePath(), false) || !QFile::remove(entry.absoluteFilePath())) return false;
+    }
+    return QDir().rmdir(path);
+}
+
 bool writeFile(const QString &path, const QByteArray &bytes) {
     QFile file(path);
     return file.open(QIODevice::WriteOnly | QIODevice::Truncate) && file.write(bytes) == bytes.size();
@@ -55,7 +70,7 @@ bool writeFile(const QString &path, const QByteArray &bytes) {
 HarperUpdater::HarperUpdater(QObject *parent) : QObject(parent), m_registryUrl(QString::fromLatin1(DefaultRegistry)) {
     s_instances.append(this);
     if (!updatesSupported())
-        m_status = QStringLiteral("Harper updates are unavailable on Windows; the bundled checker is used.");
+        m_status = QStringLiteral("The trusted Windows archive tool is unavailable; the bundled checker is used.");
 }
 
 HarperUpdater::~HarperUpdater() {
@@ -71,7 +86,7 @@ QNetworkAccessManager *HarperUpdater::network() {
 
 bool HarperUpdater::updatesSupported() const {
 #ifdef Q_OS_WIN
-    return false;
+    return QFileInfo(archiveTool()).isFile();
 #else
     return true;
 #endif
@@ -79,7 +94,7 @@ bool HarperUpdater::updatesSupported() const {
 
 bool HarperUpdater::rejectUnsupported() {
     if (updatesSupported()) return false;
-    m_error = QStringLiteral("Harper updates are unavailable on Windows; the bundled checker is used.");
+    m_error = QStringLiteral("The trusted Windows archive tool is unavailable; the bundled checker is used.");
     setStatus(m_error);
     emit failed(m_error);
     emit notice(m_error);
@@ -151,27 +166,18 @@ QByteArray HarperUpdater::digestFromIntegrity(const QString &integrity) {
     return {};
 }
 
-bool HarperUpdater::tarEntryAllowed(const QString &entry) {
-    for (const QChar c : entry)
-        if (c.unicode() < 0x20 || c == QLatin1Char('\\') || c.unicode() == 0x7f) return false;
-    if (entry.isEmpty() || entry.startsWith(QLatin1Char('/'))) return false;
-    const bool directory = entry.endsWith(QLatin1Char('/'));
-    QStringList parts = entry.split(QLatin1Char('/'));
-    if (directory) parts.removeLast();
-    if (parts.isEmpty()) return false;
-    for (const QString &part : parts)
-        if (part.isEmpty() || part == QLatin1String(".") || part == QLatin1String("..")) return false;
-    if (parts.first() != QLatin1String("package")) return false;
-    if (parts.size() == 1) return directory;                                   // the package/ folder itself
-    if (parts.size() == 2) return !directory || parts.at(1) == QLatin1String("dist"); // package.json, LICENSE, README; or package/dist/
-    if (parts.at(1) != QLatin1String("dist")) return false;
-    if (parts.size() != 3 || directory) return false;                           // nothing nested under dist (package/dist/ itself is the size-2 case)
-    // Only the kinds of file a release holds; a package of other names is refused before extraction.
-    const QString name = parts.at(2);
-    return name == QLatin1String("harper_wasm_bg.wasm") || name == QLatin1String("harper_wasm_slim_bg.wasm")
-        || name.startsWith(QLatin1String("LICENSE")) || name.endsWith(QLatin1String(".js")) || name.endsWith(QLatin1String(".d.ts"))
-        || name.endsWith(QLatin1String(".json"));
+QString HarperUpdater::archiveTool() {
+#ifdef Q_OS_WIN
+    wchar_t directory[32768];
+    const UINT length = GetSystemDirectoryW(directory, UINT(std::size(directory)));
+    if (!length || length >= std::size(directory)) return {};
+    return QDir(QString::fromWCharArray(directory, int(length))).filePath(QStringLiteral("tar.exe"));
+#else
+    return QStringLiteral("/usr/bin/tar");
+#endif
 }
+
+bool HarperUpdater::tarEntryAllowed(const QString &entry) { return HarperArchive::pathAllowed(entry); }
 
 bool HarperUpdater::registryAllowed(const QUrl &url, QString *why) const {
     const bool overridden = m_registryUrl != QLatin1String(DefaultRegistry);
@@ -341,16 +347,29 @@ void HarperUpdater::install() {
     if (rejectUnsupported()) return;
     if (m_checking || m_installing) return;
     // One install at a time across windows: each window has its own updater.
-    for (HarperUpdater *other : std::as_const(s_instances)) if (other != this && other->m_installing) { finishInstall(false, QStringLiteral("another window is installing an update"), false); return; }
+    for (HarperUpdater *other : std::as_const(s_instances)) if (other != this && other->m_installing) { finishInstall(false, QStringLiteral("another window is installing an update"), true); return; }
     if (m_mode == Mode::Idle) m_mode = Mode::Plain;
     if (m_latest.isEmpty() || !HarperSchemeHandler::isValidVersion(m_latest) || m_digest.size() != 64 || !m_tarball.isValid()) {
         finishInstall(false, QStringLiteral("check for updates first"), false);
         return;
     }
+#ifdef Q_OS_WIN
+    if (!hasUpdate()) { finishInstall(false, QStringLiteral("there is no newer verified release to install"), false); return; }
+#endif
     const QString base = root();
     if (base.isEmpty() || !QDir().mkpath(base)) {
-        finishInstall(false, QStringLiteral("the app's data folder is not available"), false);
+        finishInstall(false, QStringLiteral("the app's data folder is not available"), true);
         return;
+    }
+#ifdef Q_OS_WIN
+    if (!HarperActivation::plain(base, true)) {
+        finishInstall(false, QStringLiteral("the Harper data folder is a link or unavailable"), true); return;
+    }
+#endif
+    m_rootLock = std::make_unique<QLockFile>(base + QStringLiteral("/.install.lock"));
+    m_rootLock->setStaleLockTime(0);
+    if (!m_rootLock->tryLock(0)) {
+        finishInstall(false, QStringLiteral("another process is installing or activating Harper; try again"), true); return;
     }
     m_installing = true;
     m_error.clear();
@@ -358,21 +377,31 @@ void HarperUpdater::install() {
     setStatus(QStringLiteral("Installing Harper %1…").arg(m_latest));
     // Leftovers of an interrupted install (the app quit mid-download) are not kept.
     for (const QFileInfo &stale : QDir(base).entryInfoList({QStringLiteral(".work-*")}, QDir::Dirs | QDir::Hidden | QDir::NoDotAndDotDot))
-        if (stale.lastModified().secsTo(QDateTime::currentDateTime()) > 3600) QDir(stale.absoluteFilePath()).removeRecursively();
+        if (stale.lastModified().secsTo(QDateTime::currentDateTime()) > 3600) {
+#ifdef Q_OS_WIN
+            removePlainFolder(stale.absoluteFilePath());
+#else
+            QDir(stale.absoluteFilePath()).removeRecursively();
+#endif
+        }
     m_work = std::make_unique<QTemporaryDir>(base + QStringLiteral("/.work-XXXXXX"));
     if (!m_work->isValid()) {
-        finishInstall(false, QStringLiteral("could not make a working folder"), false);
+        finishInstall(false, QStringLiteral("could not make a working folder"), true);
         return;
     }
     // A folder for this version that is already complete (a rollback kept it) needs no download.
+#ifndef Q_OS_WIN
     if (folderHolds(base + QLatin1Char('/') + m_latest, m_latest)) {
         QTimer::singleShot(0, this, [this] { if (m_installing) activate(m_latest); });
         return;
     }
+#endif
+    // Windows always re-downloads and verifies a kept version; existence alone
+    // cannot prove it still matches the registry digest after rollback.
     m_archivePath = m_work->filePath(QStringLiteral("harper.tgz"));
     m_file = std::make_unique<QFile>(m_archivePath);
     if (!m_file->open(QIODevice::WriteOnly)) {
-        finishInstall(false, QStringLiteral("could not write the download"), false);
+        finishInstall(false, QStringLiteral("could not write the download"), true);
         return;
     }
     m_hash = std::make_unique<QCryptographicHash>(QCryptographicHash::Sha512);
@@ -395,57 +424,76 @@ void HarperUpdater::onTarballFinished() {
         finishInstall(false, QStringLiteral("the download does not match the sha512 hash npm publishes for Harper %1; it was discarded and nothing was installed").arg(m_latest), false);
         return;
     }
-    runTar({QStringLiteral("-tzf"), m_archivePath}, 0);
+    runTar({QStringLiteral("-cf"), QStringLiteral("-"), QStringLiteral("--format=ustar"), QStringLiteral("@") + m_archivePath});
 }
 
-void HarperUpdater::runTar(const QStringList &arguments, int stage) {
-    if (!QFileInfo::exists(QString::fromLatin1(TarProgram))) {
-        finishInstall(false, QStringLiteral("/usr/bin/tar is not available to unpack the download"), false);
-        return;
+void HarperUpdater::runTar(const QStringList &arguments) {
+    const QString program = archiveTool();
+    if (program.isEmpty() || !QFileInfo(program).isFile()) {
+        finishInstall(false, QStringLiteral("the trusted system tar is unavailable to unpack the download"), true); return;
     }
     auto *process = new QProcess(this);
     m_process = process;
-    process->setProgram(QString::fromLatin1(TarProgram));
-    process->setArguments(arguments);
-    auto *timeout = new QTimer(process);
-    timeout->setSingleShot(true);
-    connect(timeout, &QTimer::timeout, process, [process] { process->kill(); });
+    process->setProgram(program); process->setArguments(arguments);
+#ifdef Q_OS_WIN
+    process->setCreateProcessArgumentsModifier([](QProcess::CreateProcessArguments *args) { args->flags |= CREATE_NO_WINDOW; });
+#endif
+    m_tarOutput.clear(); m_tarError.clear(); m_tarOverflow = false; m_tarTimedOut = false;
+    const auto drainOutput = [this, process] {
+        process->setReadChannel(QProcess::StandardOutput);
+        while (process->bytesAvailable()) {
+            const QByteArray chunk = process->read(64 * 1024);
+            if (chunk.isEmpty()) break;
+            if (m_tarOutput.size() + chunk.size() > HarperArchive::MaxOutputBytes) {
+                m_tarOverflow = true; process->kill(); return;
+            }
+            m_tarOutput += chunk;
+        }
+    };
+    const auto drainError = [this, process] {
+        const QByteArray chunk = process->readAllStandardError();
+        if (m_tarError.size() < 4096) m_tarError += chunk.left(4096 - m_tarError.size());
+    };
+    connect(process, &QProcess::readyReadStandardOutput, this, drainOutput);
+    connect(process, &QProcess::readyReadStandardError, this, drainError);
+    auto *timeout = new QTimer(process); timeout->setSingleShot(true);
+    connect(timeout, &QTimer::timeout, process, [this, process] { m_tarTimedOut = true; process->kill(); });
     connect(process, &QProcess::errorOccurred, this, [this, process](QProcess::ProcessError error) {
         if (error != QProcess::FailedToStart) return;
-        process->deleteLater();
-        finishInstall(false, QStringLiteral("could not run /usr/bin/tar"), false);
+        m_process.clear(); process->deleteLater();
+        finishInstall(false, QStringLiteral("could not start the trusted system tar"), true);
     });
-    connect(process, &QProcess::finished, this, [this, process, stage](int code, QProcess::ExitStatus exit) {
-        const QByteArray out = process->readAllStandardOutput();
-        const QString err = QString::fromUtf8(process->readAllStandardError()).trimmed().section(QLatin1Char('\n'), 0, 0);
-        process->deleteLater();
+    connect(process, &QProcess::finished, this, [this, process, drainOutput, drainError](int code, QProcess::ExitStatus exit) {
+        drainOutput(); drainError(); process->disconnect(this); m_process.clear(); process->deleteLater();
         if (!m_installing) return;
+        if (m_tarOverflow) { finishInstall(false, QStringLiteral("the archive exceeded its uncompressed output bound"), false); return; }
+        if (m_tarTimedOut) { finishInstall(false, QStringLiteral("the trusted archive tool timed out"), true); return; }
         if (exit != QProcess::NormalExit || code != 0) {
-            finishInstall(false, QStringLiteral("the download could not be unpacked") + (err.isEmpty() ? QString() : QStringLiteral(" (") + err + QLatin1Char(')')), false);
-            return;
+            finishInstall(false, QStringLiteral("the download could not be unpacked (") + QString::fromUtf8(m_tarError).trimmed().left(240) + ')', false); return;
         }
-        if (stage == 0) {
-            // Every entry must be acceptable before anything is extracted, and
-            // there must be few of them (the real package has 17).
-            const QStringList entries = QString::fromUtf8(out).split(QLatin1Char('\n'), Qt::SkipEmptyParts);
-            if (entries.size() > 64) {
-                finishInstall(false, QStringLiteral("the package holds %1 entries; a Harper release has about 17; nothing was installed").arg(entries.size()), false);
-                return;
+        QList<HarperArchive::Entry> entries;
+        QString error;
+        if (!HarperArchive::parse(m_tarOutput, &entries, &error)) { finishInstall(false, error, false); return; }
+        // Parse the complete inventory first, then write only engine/license
+        // files. OS tar never extracts a file, link or special entry to disk.
+        const QString extracted = m_work->filePath(QStringLiteral("x"));
+        for (const auto &entry : entries) {
+            if (entry.directory) continue;
+            const QString name = entry.name;
+            const bool engine = name.startsWith(QLatin1String("package/dist/"))
+                && (name.endsWith(QLatin1String(".js")) || name.endsWith(QLatin1String(".wasm")) || QFileInfo(name).fileName().startsWith(QLatin1String("LICENSE")));
+            const bool license = name.startsWith(QLatin1String("package/LICENSE"));
+            if (!engine && !license) continue;
+            const QString destination = extracted + '/' + name;
+            if (!QDir().mkpath(QFileInfo(destination).absolutePath())
+                || !writeFile(destination, m_tarOutput.mid(entry.offset, entry.size))) {
+                finishInstall(false, QStringLiteral("the validated engine files could not be written"), true); return;
             }
-            for (const QString &entry : entries) {
-                if (!tarEntryAllowed(entry)) {
-                    finishInstall(false, QStringLiteral("the package holds an entry outside package/dist: %1; nothing was installed").arg(entry.left(80)), false);
-                    return;
-                }
-            }
-            QDir().mkpath(m_work->filePath(QStringLiteral("x")));
-            runTar({QStringLiteral("-xzf"), m_archivePath, QStringLiteral("-C"), m_work->filePath(QStringLiteral("x"))}, 1);
-        } else {
-            buildAndActivate();
         }
+        m_tarOutput.clear();
+        buildAndActivate();
     });
-    timeout->start(60000);
-    process->start();
+    timeout->start(60000); process->start();
 }
 
 void HarperUpdater::buildAndActivate() {
@@ -463,7 +511,7 @@ void HarperUpdater::buildAndActivate() {
     const QDir dist(extracted + QStringLiteral("/package/dist"));
     const QStringList glues = dist.entryList({QStringLiteral("BinaryModule-*.js")}, QDir::Files, QDir::Name);
     const QString indexPath = dist.filePath(QStringLiteral("index.js")), binaryPath = dist.filePath(QStringLiteral("binary.js")), wasmPath = dist.filePath(QStringLiteral("harper_wasm_bg.wasm"));
-    if (glues.isEmpty() || !QFileInfo(indexPath).isFile() || !QFileInfo(binaryPath).isFile() || !QFileInfo(wasmPath).isFile()) {
+    if (glues.size() != 1 || !QFileInfo(indexPath).isFile() || !QFileInfo(binaryPath).isFile() || !QFileInfo(wasmPath).isFile()) {
         finishInstall(false, QStringLiteral("the package does not have the layout the app expects (index.js, binary.js, BinaryModule-*.js, harper_wasm_bg.wasm)"), false);
         return;
     }
@@ -472,10 +520,12 @@ void HarperUpdater::buildAndActivate() {
     const QByteArray from = "./" + glue.toUtf8(), to = QByteArrayLiteral("./BinaryModule.js");
     QFile indexFile(indexPath), binaryFile(binaryPath), wasmFile(wasmPath);
     if (!indexFile.open(QIODevice::ReadOnly) || !binaryFile.open(QIODevice::ReadOnly) || !wasmFile.open(QIODevice::ReadOnly)) {
-        finishInstall(false, QStringLiteral("the package's files could not be read"), false);
+        indexFile.close(); binaryFile.close(); wasmFile.close();
+        finishInstall(false, QStringLiteral("the package's files could not be read"), true);
         return;
     }
     QByteArray index = indexFile.readAll(), binary = binaryFile.readAll();
+    indexFile.close(); binaryFile.close();
     const QByteArray magic = wasmFile.read(4);
     wasmFile.close();
     if (index.isEmpty() || binary.isEmpty() || magic != QByteArrayLiteral("\0asm")) {
@@ -492,25 +542,51 @@ void HarperUpdater::buildAndActivate() {
         wrote = wrote && QFile::copy(extracted + QStringLiteral("/package/") + licence, stage + QLatin1Char('/') + licence);
     wrote = wrote && writeFile(stage + QStringLiteral("/VERSION"), m_latest.toUtf8() + '\n');
     if (!wrote) {
-        finishInstall(false, QStringLiteral("the engine files could not be written"), false);
+        finishInstall(false, QStringLiteral("the engine files could not be written"), true);
         return;
     }
     // One rename moves the finished folder into place.
     const QString target = root() + QLatin1Char('/') + m_latest;
+#ifdef Q_OS_WIN
+    if (HarperActivation::selectedVersion(root()) == m_latest) {
+        finishInstall(false, QStringLiteral("the selected engine must not be overwritten"), true); return;
+    }
+    QString replaced;
+    if (QFileInfo::exists(target)) {
+        if (!HarperActivation::plain(target, true)) { finishInstall(false, QStringLiteral("the kept engine folder is not a plain directory"), true); return; }
+        replaced = root() + QStringLiteral("/.replaced-") + QUuid::createUuid().toString(QUuid::WithoutBraces);
+        if (!QDir().rename(target, replaced)) { finishInstall(false, QStringLiteral("the kept engine is in use; try again"), true); return; }
+    }
+#else
     if (QFileInfo::exists(target)) QDir(target).removeRecursively(); // a half-made folder of this version
+#endif
     if (!QDir().rename(stage, target)) {
-        finishInstall(false, QStringLiteral("the new engine could not be moved into place"), false);
+#ifdef Q_OS_WIN
+        if (!replaced.isEmpty()) QDir().rename(replaced, target);
+#endif
+        finishInstall(false, QStringLiteral("the new engine could not be moved into place"), true);
         return;
     }
+#ifdef Q_OS_WIN
+    // A retained unselected directory may still be open in another process.
+    // Leaving it behind is preferable to making a verified activation fail.
+    if (!replaced.isEmpty()) removePlainFolder(replaced);
+#endif
     activate(m_latest);
 }
 
-// Points harper/current at harper/<version>: a symlink made beside it and renamed over it, so a reader sees either the
-// old target or the new one, never none.
+// Select a completed engine atomically: a QSaveFile marker on Windows, and
+// the original same-parent current symlink rename on Mac.
 void HarperUpdater::activate(const QString &version) {
 #ifdef Q_OS_WIN
-    Q_UNUSED(version);
-    rejectUnsupported();
+    QString error;
+    const QString previous = HarperSchemeHandler::overrideVersion();
+    if (HarperActivation::directory(root(), version).isEmpty()
+            || !HarperActivation::commit(root(), version, &error)) {
+        finishInstall(false, error.isEmpty() ? QStringLiteral("the finished engine is incomplete") : error, true); return;
+    }
+    prune(version, previous);
+    finishInstall(true, version, false);
 #else
     const QString base = root();
     const QString current = base + QStringLiteral("/current");
@@ -538,15 +614,23 @@ void HarperUpdater::activate(const QString &version) {
 void HarperUpdater::prune(const QString &keepA, const QString &keepB) {
     for (const QFileInfo &info : QDir(root()).entryInfoList(QDir::Dirs | QDir::NoDotAndDotDot)) {
         const QString name = info.fileName();
-        if (HarperSchemeHandler::isValidVersion(name) && name != keepA && name != keepB && !info.isSymLink()) QDir(info.absoluteFilePath()).removeRecursively();
+        if (HarperSchemeHandler::isValidVersion(name) && name != keepA && name != keepB && !info.isSymLink()) {
+#ifdef Q_OS_WIN
+            if (name != HarperActivation::selectedVersion(root())) removePlainFolder(info.absoluteFilePath());
+#else
+            QDir(info.absoluteFilePath()).removeRecursively();
+#endif
+        }
     }
 }
 
-void HarperUpdater::finishInstall(bool ok, const QString &message, bool network) {
+void HarperUpdater::finishInstall(bool ok, const QString &message, bool retryable) {
     m_installing = false;
-    m_work.reset();
     m_file.reset();
+    m_work.reset();
     m_hash.reset();
+    m_tarOutput.clear(); m_tarError.clear();
+    m_rootLock.reset();
     const Mode mode = m_mode;
     m_mode = Mode::Idle;
     if (ok) {
@@ -562,20 +646,31 @@ void HarperUpdater::finishInstall(bool ok, const QString &message, bool network)
     }
     m_error = message;
     setStatus(QStringLiteral("Harper update failed: ") + message);
-    // An automatic install that failed verification is not tried again for this version; a network failure is.
-    if (mode == Mode::Scheduled && !network) QSettings().setValue(QLatin1String(AutoAttemptedKey), m_latest);
+    // Failed verification is not retried for this release. Busy locks and local
+    // I/O/network failures stay retryable and do not suppress the release.
+    if (mode == Mode::Scheduled && !retryable) QSettings().setValue(QLatin1String(AutoAttemptedKey), m_latest);
     emit failed(message);
-    if (mode == Mode::Manual || (mode == Mode::Scheduled && !network)) emit notice(m_status);
+    if (mode == Mode::Manual || (mode == Mode::Scheduled && !retryable)) emit notice(m_status);
 }
 
 void HarperUpdater::rollback() {
     if (rejectUnsupported()) return;
     if (m_installing || root().isEmpty()) return;
+    if (!QDir().mkpath(root())) { m_error = QStringLiteral("the Harper folder is unavailable"); setStatus(m_error); emit failed(m_error); return; }
+    QLockFile lock(root() + QStringLiteral("/.install.lock")); lock.setStaleLockTime(0);
+    if (!lock.tryLock(0)) { m_error = QStringLiteral("another process is installing or activating Harper; try again"); setStatus(m_error); emit failed(m_error); emit notice(m_error); return; }
     const QString current = root() + QStringLiteral("/current");
     const QString was = installedVersion();
+#ifdef Q_OS_WIN
+    QString error;
+    if (!HarperActivation::commit(root(), QStringLiteral("bundled"), &error)) {
+        m_error = error; setStatus(QStringLiteral("Harper rollback failed: ") + error); emit failed(error); emit notice(m_status); return;
+    }
+#else
     const QFileInfo info(current);
     if (info.isSymLink()) QFile::remove(current);
     else if (info.exists()) QDir(current).removeRecursively();
+#endif
     // A version given up is not installed again by the weekly check (only by asking).
     if (!was.isEmpty()) QSettings().setValue(QLatin1String(AutoAttemptedKey), was);
     m_error.clear();

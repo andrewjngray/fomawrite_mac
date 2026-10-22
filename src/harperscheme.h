@@ -19,8 +19,9 @@
 //                                           bundled VERSION, else 404
 //
 // and every reply carries Cache-Control: no-store. The override is the folder
-// <AppDataLocation>/harper/current (a symlink to harper/<version>/, written by
-// HarperUpdater); the bundled copy is bin/fetch-harper's, pinned in
+// <AppDataLocation>/harper/<version>/, selected by HarperUpdater's atomic
+// current-version marker on Windows (one version or the bundled sentinel), or
+// current symlink on Mac; the bundled copy is bin/fetch-harper's, pinned in
 // harper.lock.json. Nothing in the override folder is ever executed by the app:
 // it is only served to the page, which runs in Chromium's sandbox.
 
@@ -36,7 +37,7 @@ public:
     explicit HarperSchemeHandler(QObject *parent = nullptr);
     void requestStarted(QWebEngineUrlRequestJob *job) override;
     // <AppDataLocation>/harper: where HarperUpdater keeps <version>/ folders and
-    // the `current` link.
+    // the platform's current-version marker/current symlink.
     static QString harperRoot();
     // Folder holding a downloaded engine (index.js, binary.js, BinaryModule.js,
     // harper_wasm_bg.wasm, VERSION) that is installed and valid: the files are

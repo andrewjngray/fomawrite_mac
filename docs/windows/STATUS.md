@@ -18,12 +18,12 @@ The candidate reserves the Organizer scrollbar gutter so invisible scrollbars ca
 
 ## Checker parity cycle in verification
 
-Twenty-eight existing Source/Live spelling, grammar and Review cases now run against real bundled Harper in addition to native Mac rows. They exposed and now cover a nested-list prose bug caused by parsing already-masked prose as Markdown again. Local focused checks and 324 editor tests pass; full integration, Windows CI and new package qualification are pending. [Evidence and remaining gaps](M2-CHECKER-PARITY.md). The shelf candidate above remains the last qualified package.
+Twenty-eight existing Source/Live spelling, grammar and Review cases now run against real bundled Harper in addition to native Mac rows. They exposed and now cover a nested-list prose bug caused by parsing already-masked prose as Markdown again. Candidate code `d145a0f` passes the full local build and Qt suite (340 passed, 0 failed, one Windows-only skip), focused checks and 324 editor tests. Shared CI passed 328 Mac Qt and 324 editor tests. Windows x64 passed 302 Qt tests; ARM64 passed 301 and failed one imported-theme CSS fixture write, with 11 skips on each architecture. Both deployed diagnostics passed 124 scenarios. The theme-write failure is under investigation; new package qualification is pending. [Evidence and remaining gaps](M2-CHECKER-PARITY.md). The shelf candidate above remains the last qualified package.
 
 ## Next stability cycle
 
-- Port applicable Mac regression fixtures onto the bundled Harper backend and Windows menu objects. Audit the 39 Windows skips individually; do not count skips as passes.
-- Extend actual desktop acceptance beyond the completed ARM64 workflow to the remaining capabilities in the test matrix.
+- Resolve the ARM64 theme-fixture write failure. Twenty-eight checker skips have been replaced with actual Harper cases; the ten updater cases now have a Windows implementation and focused host coverage, pending native CI. [Updater evidence](M2-UPDATER-PARITY.md). The remaining native Mac menu exclusion is platform-specific.
+- Extend actual desktop acceptance beyond the completed ARM64 workflow. The [ordinary publishing supplement](PUBLISHING-ACCEPTANCE.md) passed document identity, Web/PDF and native exports on d573; visual review exposed a Modern Sans fallback defect, now under repair. Repeat on the final candidate. Settled Live typing/save/undo/redo and reopening passed on d573. Rapid Undo→Save reproducibly saved the earlier text while the editor remained dirty; a persistence barrier and regression tests are in progress.
 - Both architectures now pass the ordinary VM workflow. Broaden the coverage beyond this six-stage gate; physical x64 hardware remains untested.
 
 The separate ARM64 guest diagnostic passed **124 scenarios, 0 failures, 0 QML warnings**, with exact package/receipt verification. The original ZIPs, extracted applications and copy receipts are in the versioned testing folders; older packages remain preserved.
@@ -48,6 +48,6 @@ Toolchain baseline: Qt 6.11.3, MSVC 2022 v143 `14.44.35207`, Windows SDK `10.0.2
 
 ## Remaining scope
 
-M1's synthetic Qt input does not qualify ordinary startup/restore or hardware input. Wider profiles, storage paths, DPI, desktop parity, installer execution/upgrade/uninstall and distribution/licensing acceptance remain open. Windows updater commands stay disabled until W12; bundled Harper is supported. [Skip scope](M1-EVIDENCE.md#windows-skip-scope), [M2 menu limits](M1-EVIDENCE.md#windows-m2-menu-limits), [plan](PLAN.md) and [test matrix](TEST-MATRIX.md).
+M1's synthetic Qt input does not qualify ordinary startup/restore or hardware input. Wider profiles, storage paths, DPI, desktop parity, installer execution/upgrade/uninstall and distribution/licensing acceptance remain open. The shelf package still uses bundled Harper; the new updater candidate is awaiting Windows qualification. [Skip scope](M1-EVIDENCE.md#windows-skip-scope), [M2 menu limits](M1-EVIDENCE.md#windows-m2-menu-limits), [plan](PLAN.md) and [test matrix](TEST-MATRIX.md).
 
 This is an internal repair candidate, not a qualified beta or release. Its inherited `0.3.0-dev49` label is insufficient identity; use architecture, commit and manifest hashes. See [testing builds](TESTING-BUILDS.md) and [portable starter](PORTABLE-STARTER.md).

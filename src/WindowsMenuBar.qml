@@ -154,6 +154,10 @@ MenuBar {
         MenuItem { text: "Fomawrite Help"; onTriggered: root.dispatch(function() { helpDialog.showPage("help", "Fomawrite Help") }) }
         MenuItem { text: "Keyboard Shortcuts"; onTriggered: root.dispatch(function() { shortcutsDialog.open() }) }
         MenuSeparator {}
+        Command { commandId: "checkWritingCheckerUpdates" }
+        Command { commandId: "useBuiltInWritingChecker" }
+        Command { commandId: "checkWritingCheckerAutomatically" }
+        MenuSeparator {}
         MenuItem { text: "About Fomawrite"; onTriggered: root.dispatch(function() { aboutDialog.open() }) }
     }
 }

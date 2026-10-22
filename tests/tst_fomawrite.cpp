@@ -228,6 +228,10 @@ private slots:
     void liveSpellingRequestWaitsForHarperAndRepliesOnce();
     void writingCheckerCommandsMenuAndPaneFollowTheEngine();
     void harperDrivesSourceTheLivePageAndThePaneInTheRealPage();
+    void harperArchiveRejectsWindowsAliasesAndMalformedStreams();
+    void harperWindowsActivationRejectsBrokenMarkersAndCommitsAtomically();
+    void harperUpdaterBusyLockDoesNotSuppressScheduledRetry();
+    void harperUpdaterBoundsConvertedOutputAndIgnoresPathShadow();
     void harperSchemeServesVersionedPathsFromTheOverrideThenTheBundle();
     void platformWritingCheckerCapabilitiesAndBundledPolicy();
     void spellCheckPlatformAvailabilityFollowsHarper();

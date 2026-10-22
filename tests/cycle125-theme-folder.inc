@@ -108,9 +108,27 @@ struct Cycle125WatchedThemeFixture {
             && write(imported, "#write{color:#123456;background-image:url(images/paper.png)}")
             && write(theme, ("@import '" + id + "-assets/styles/base.css';").toUtf8());
     }
-    static bool write(const QString &path, const QByteArray &bytes) {
+    static bool write(const QString &path, const QByteArray &bytes, QString *error = nullptr) {
         QSaveFile file(path);
-        return file.open(QIODevice::WriteOnly) && file.write(bytes) == bytes.size() && file.commit();
+        const auto failed = [&](const char *phase) {
+#ifdef Q_OS_WIN
+            const DWORD nativeError = GetLastError();
+#endif
+            QString message = QStringLiteral("Atomic theme fixture %1 failed for %2: %3 (QFileDevice::FileError=%4)")
+                .arg(QString::fromLatin1(phase), path, file.errorString()).arg(int(file.error()));
+#ifdef Q_OS_WIN
+            message += QStringLiteral("; GetLastError immediately after failure=%1").arg(nativeError);
+#endif
+            if (error) *error = message;
+            qWarning().noquote() << message;
+            return false;
+        };
+        // Preserve the first failed operation: no retry, direct-write fallback
+        // or delayed acceptance can hide the Windows atomic-replacement error.
+        if (!file.open(QIODevice::WriteOnly)) return failed("open");
+        if (file.write(bytes) != bytes.size()) return failed("write");
+        if (!file.commit()) return failed("commit");
+        return true;
     }
     ~Cycle125WatchedThemeFixture() { QFile::remove(theme); QDir(assets).removeRecursively(); }
 };
@@ -152,8 +170,9 @@ void FomawriteTest::publishingFolderThemesReloadAndAtomicResourcesSettle() {
     firstChanged.clear(); secondChanged.clear();
     // A real editor's atomic replacement changes a nested dependency, while
     // the theme entry itself stays unchanged. Every window must refresh once.
-    QVERIFY(Cycle125WatchedThemeFixture::write(fixture.imported,
-        "#write{color:#654321;background-image:url(images/paper.png)}"));
+    QString writeError;
+    QVERIFY2(Cycle125WatchedThemeFixture::write(fixture.imported,
+        "#write{color:#654321;background-image:url(images/paper.png)}", &writeError), qPrintable(writeError));
     QTRY_VERIFY_WITH_TIMEOUT(firstChanged.count() >= 1 && secondChanged.count() >= 1, 3000);
     QString error;
     const auto updatedFirst = PublishingThemes::css(first.publishingThemeId(), &error);
@@ -165,7 +184,7 @@ void FomawriteTest::publishingFolderThemesReloadAndAtomicResourcesSettle() {
     QCOMPARE(secondChanged.count(), 1);
     // The replacement remains watched after its old inode disappears.
     firstChanged.clear(); secondChanged.clear();
-    QVERIFY(Cycle125WatchedThemeFixture::write(fixture.imported, "#write{color:#abcdef}"));
+    QVERIFY2(Cycle125WatchedThemeFixture::write(fixture.imported, "#write{color:#abcdef}", &writeError), qPrintable(writeError));
     QTRY_VERIFY_WITH_TIMEOUT(firstChanged.count() >= 1 && secondChanged.count() >= 1, 3000);
     const auto secondEdit = PublishingThemes::css(first.publishingThemeId(), &error);
     QVERIFY2(secondEdit, qPrintable(error)); QVERIFY(secondEdit->contains("#abcdef"));

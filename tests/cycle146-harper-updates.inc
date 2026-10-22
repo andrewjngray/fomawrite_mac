@@ -9,6 +9,10 @@
 
 #include "harperupdater.h"
 #include "harperscheme.h"
+#include "harperarchive_p.h"
+#include "harperactivation_p.h"
+#include <QLockFile>
+#include <QScopeGuard>
 
 #include <QCryptographicHash>
 #include <QProcess>
@@ -79,33 +83,65 @@ bool cycle146Write(const QString &path, const QByteArray &bytes) {
 
 const QByteArray Cycle146Wasm = QByteArray("\0asm\1\0\0\0stand-in", 16);
 
-// A harper.js-shaped tarball made with tar: package/dist/{index.js, binary.js, BinaryModule-abc.js, harper_wasm_bg.wasm},
-// package/LICENSE and package.json. `mode` plants a flaw: "evil-folder" (package/evil/x.txt), "dotdot" (../escape.txt),
-// "link" (package/dist/link.js -> /etc/hosts), "no-glue", "bad-wasm".
+// Typed USTAR fixtures do not require host symlink privileges or /etc/hosts.
+QByteArray cycle146TarEntry(const QString &name, const QByteArray &body = {}, char type = '0', const QString &link = {}) {
+    QByteArray header(512, '\0');
+    const auto put = [&](int at, int count, const QByteArray &bytes) { header.replace(at, qMin(count, int(bytes.size())), bytes.left(count)); };
+    put(0, 100, name.toUtf8()); put(100, 8, "0000644"); put(108, 8, "0000000"); put(116, 8, "0000000");
+    put(124, 12, QByteArray::number(body.size(), 8).rightJustified(11, '0')); put(136, 12, "00000000000");
+    header[156] = type; put(157, 100, link.toUtf8()); put(257, 6, QByteArray("ustar\0", 6)); put(263, 2, "00");
+    header.replace(148, 8, QByteArray(8, ' '));
+    quint64 checksum = 0; for (char c : header) checksum += uchar(c);
+    put(148, 8, QByteArray::number(checksum, 8).rightJustified(6, '0') + QByteArray("\0 ", 2));
+    return header + body + QByteArray((512 - body.size() % 512) % 512, '\0');
+}
 Cycle146Package cycle146Package(const QString &version, const QString &mode = QString()) {
-    Cycle146Package package;
-    package.version = version;
+    Cycle146Package package; package.version = version;
+    package.bytes = cycle146TarEntry("package/dist/index.js", "import { glue } from \"./BinaryModule-abc.js\";\nexport const marker = \"" + version.toUtf8() + "\";\n")
+        + cycle146TarEntry("package/dist/binary.js", "import \"./BinaryModule-abc.js\";\nexport const binary = 1;\n");
+    if (mode != QLatin1String("no-glue")) package.bytes += cycle146TarEntry("package/dist/BinaryModule-abc.js", "export const glue = \"glue " + version.toUtf8() + "\";\n");
+    package.bytes += cycle146TarEntry("package/dist/harper_wasm_bg.wasm", mode == QLatin1String("bad-wasm") ? QByteArrayLiteral("not wasm at all") : Cycle146Wasm);
+    package.bytes += cycle146TarEntry("package/LICENSE", "Apache-2.0 stand-in\n") + cycle146TarEntry("package/package.json", "{\"name\":\"harper.js\"}\n");
+    if (mode == QLatin1String("evil-folder")) package.bytes += cycle146TarEntry("package/evil/x.txt", "x");
+    if (mode == QLatin1String("link")) package.bytes += cycle146TarEntry("package/dist/link.js", {}, '2', "index.js");
+    if (mode == QLatin1String("hard-link")) package.bytes += cycle146TarEntry("package/dist/link.js", {}, '1', "package/dist/index.js");
+    if (mode == QLatin1String("dotdot")) package.bytes += cycle146TarEntry("../escape.txt", "escaped");
+    if (mode == QLatin1String("empty-name")) package.bytes += cycle146TarEntry({}, "empty");
+    if (mode == QLatin1String("case-collision")) package.bytes += cycle146TarEntry("package/dist/INDEX.js", "collision");
+    if (mode.startsWith(QLatin1String("alias:"))) package.bytes += cycle146TarEntry("package/dist/" + mode.mid(6), "alias");
+    package.bytes += QByteArray(1024, '\0');
+    package.integrity = cycle146Integrity(package.bytes);
+    return package;
+}
+
+Cycle146Package cycle146RealPackage(const QString &version) {
+    Cycle146Package package; package.version = version;
     QTemporaryDir staging;
-    const QString inner = staging.filePath(QStringLiteral("inner")), dist = inner + QStringLiteral("/package/dist");
-    QDir().mkpath(dist);
-    cycle146Write(dist + QStringLiteral("/index.js"), "import { glue } from \"./BinaryModule-abc.js\";\nexport const marker = \"" + version.toUtf8() + "\";\n");
-    cycle146Write(dist + QStringLiteral("/binary.js"), "import \"./BinaryModule-abc.js\";\nexport const binary = 1;\n");
-    if (mode != QLatin1String("no-glue")) cycle146Write(dist + QStringLiteral("/BinaryModule-abc.js"), "export const glue = \"glue " + version.toUtf8() + "\";\n");
-    cycle146Write(dist + QStringLiteral("/harper_wasm_bg.wasm"), mode == QLatin1String("bad-wasm") ? QByteArrayLiteral("not wasm at all") : Cycle146Wasm);
-    cycle146Write(inner + QStringLiteral("/package/LICENSE"), "Apache-2.0 stand-in\n");
-    cycle146Write(inner + QStringLiteral("/package/package.json"), "{\"name\":\"harper.js\"}\n");
-    QStringList arguments{QStringLiteral("-czf"), staging.filePath(QStringLiteral("harper.tgz")), QStringLiteral("-C"), inner, QStringLiteral("package")};
-    if (mode == QLatin1String("evil-folder")) cycle146Write(inner + QStringLiteral("/package/evil/x.txt"), "x");
-    if (mode == QLatin1String("link")) QFile::link(QStringLiteral("/etc/hosts"), dist + QStringLiteral("/link.js"));
-    if (mode == QLatin1String("dotdot")) {
-        cycle146Write(staging.filePath(QStringLiteral("escape.txt")), "escaped");
-        arguments = {QStringLiteral("-czPf"), staging.filePath(QStringLiteral("harper.tgz")), QStringLiteral("-C"), inner, QStringLiteral("package"), QStringLiteral("../escape.txt")};
-    }
-    if (QProcess::execute(QStringLiteral("/usr/bin/tar"), arguments) != 0) return package;
-    QFile file(staging.filePath(QStringLiteral("harper.tgz")));
+    const QString dist = staging.filePath(QStringLiteral("package/dist"));
+    const auto bundled = [](const char *name) { QFile file(QStringLiteral(":/editor/dist/harper/") + QString::fromLatin1(name)); return file.open(QIODevice::ReadOnly) ? file.readAll() : QByteArray(); };
+    QByteArray index = bundled("index.js"), binary = bundled("binary.js");
+    if (index.isEmpty() || binary.isEmpty()) return package;
+    index.replace("./BinaryModule.js", "./BinaryModule-real.js"); binary.replace("./BinaryModule.js", "./BinaryModule-real.js");
+    index += "\nglobalThis.__harperMarker = \"" + version.toUtf8() + "\";\n";
+    if (!cycle146Write(dist + "/index.js", index) || !cycle146Write(dist + "/binary.js", binary)
+        || !cycle146Write(dist + "/BinaryModule-real.js", bundled("BinaryModule.js"))
+        || !cycle146Write(dist + "/harper_wasm_bg.wasm", bundled("harper_wasm_bg.wasm"))
+        || !cycle146Write(staging.filePath("package/LICENSE"), "Apache-2.0\n")) return package;
+    const QString archive = staging.filePath(QStringLiteral("real.tgz"));
+    if (QProcess::execute(HarperUpdater::archiveTool(), {"-czf", archive, "--format=ustar", "-C", staging.path(), "package"}) != 0) return package;
+    QFile file(archive);
     if (file.open(QIODevice::ReadOnly)) package.bytes = file.readAll();
     package.integrity = cycle146Integrity(package.bytes);
     return package;
+}
+
+bool cycle146SelectOverride(const QString &folder) {
+#ifdef Q_OS_WIN
+    QString error;
+    return HarperActivation::commit(QFileInfo(folder).absolutePath(), QFileInfo(folder).fileName(), &error);
+#else
+    return QFile::link(folder, QFileInfo(folder).absolutePath() + QStringLiteral("/current"));
+#endif
 }
 
 // What the registry's `latest` says: the version and where its tarball is.
@@ -132,6 +168,141 @@ QStringList cycle146Entries(const QString &folder) {
 // The newest version no test registry could be behind.
 const QString Cycle146Newer = QStringLiteral("99.0.1");
 } // namespace
+
+void FomawriteTest::harperArchiveRejectsWindowsAliasesAndMalformedStreams() {
+    for (const QString &name : {QStringLiteral("package/dist/AUX.js"), QStringLiteral("package/dist/CON.txt.js"),
+            QStringLiteral("package/dist/index.js:stream"), QStringLiteral("package/dist/index .js "),
+            QStringLiteral("package/dist/COM¹.js"), QStringLiteral("package/dist/LPT9.json"),
+            QStringLiteral("package/dist/AUX .js"), QStringLiteral("package/dist/INDEX~1.js")})
+        QVERIFY2(!HarperUpdater::tarEntryAllowed(name), qPrintable(name));
+    const auto checksum = [](QByteArray &bytes) {
+        bytes.replace(148, 8, QByteArray(8, ' ')); quint64 sum = 0;
+        for (int i = 0; i < 512; ++i) sum += uchar(bytes.at(i));
+        bytes.replace(148, 8, QByteArray::number(sum, 8).rightJustified(6, '0') + QByteArray("\0 ", 2));
+    };
+    const QByteArray entry = cycle146TarEntry("package/dist/index.js", "engine");
+    const QByteArray good = entry + QByteArray(1024, '\0');
+    QList<HarperArchive::Entry> parsed; QString error;
+    QVERIFY2(HarperArchive::parse(good, &parsed, &error), qPrintable(error));
+    QCOMPARE(parsed.size(), 1); QCOMPARE(good.mid(parsed.first().offset, parsed.first().size), QByteArray("engine"));
+    const auto refused = [&](const QByteArray &bytes) {
+        QVERIFY(!HarperArchive::parse(bytes, &parsed, &error));
+        QVERIFY(!error.isEmpty()); QVERIFY(parsed.isEmpty());
+        QVERIFY(HarperArchive::parse(good, &parsed, &error));
+    };
+    refused(cycle146TarEntry({}, "x") + QByteArray(1024, '\0')); // real Windows long-name conversion counterexample
+    for (char type : {'1', '2', '3', '4', '6', 'x', 'g', 'L'})
+        refused(cycle146TarEntry("package/dist/link.js", {}, type, "package/dist/index.js") + QByteArray(1024, '\0'));
+    refused(entry + cycle146TarEntry("package/dist/INDEX.js", "duplicate") + QByteArray(1024, '\0'));
+    QByteArray bad = good; bad[0] = 'X'; refused(bad); // checksum
+    bad = good; bad[512 + 6] = 'X'; refused(bad); // payload padding
+    bad = good; bad[20] = '\0'; bad[21] = 'x'; checksum(bad); refused(bad); // hidden name after NUL
+    bad = good; bad[124] = char(0x80); checksum(bad); refused(bad); // binary/base-256 size is not USTAR octal
+    bad = good; bad[257] = 'x'; checksum(bad); refused(bad);
+    refused(entry + entry + QByteArray(1024, '\0'));
+    refused(cycle146TarEntry("package/dist") + entry + QByteArray(1024, '\0'));
+    refused(cycle146TarEntry("package/dist/index.js", {}, '0', "target") + QByteArray(1024, '\0'));
+    refused(good.left(good.size() - 1)); refused(good.left(512));
+    bad = good; bad[good.size() - 1] = 'X'; refused(bad);
+    QByteArray many;
+    for (int i = 0; i <= HarperArchive::MaxEntries; ++i) many += cycle146TarEntry(QStringLiteral("package/file%1").arg(i));
+    refused(many + QByteArray(1024, '\0'));
+    // An oversized declared payload fails before allocation/materialization.
+    bad = cycle146TarEntry("package/dist/large.js");
+    bad.replace(124, 12, QByteArray::number(HarperArchive::MaxFileBytes + 1, 8).rightJustified(11, '0') + '\0');
+    bad.replace(148, 8, QByteArray(8, ' ')); quint64 sum = 0; for (char c : bad) sum += uchar(c);
+    bad.replace(148, 8, QByteArray::number(sum, 8).rightJustified(6, '0') + QByteArray("\0 ", 2));
+    refused(bad + QByteArray(1024, '\0'));
+}
+
+void FomawriteTest::harperWindowsActivationRejectsBrokenMarkersAndCommitsAtomically() {
+    QTemporaryDir temporary; QVERIFY(temporary.isValid());
+    const QString root = temporary.path(), folder = root + QStringLiteral("/99.0.1");
+    for (const char *name : {"index.js", "binary.js", "BinaryModule.js"}) QVERIFY(cycle146Write(folder + '/' + name, "engine"));
+    QVERIFY(cycle146Write(folder + "/VERSION", "99.0.1\n"));
+    QVERIFY(cycle146Write(folder + "/harper_wasm_bg.wasm", Cycle146Wasm));
+    QVERIFY(HarperActivation::selectedVersion(root).isEmpty());
+    QString error;
+    QVERIFY2(HarperActivation::commit(root, "99.0.1", &error), qPrintable(error));
+    QCOMPARE(HarperActivation::selectedVersion(root), QStringLiteral("99.0.1"));
+    QCOMPARE(HarperActivation::directory(root, "99.0.1"), folder);
+    const QString marker = root + QStringLiteral("/current-version");
+    const QString previous = cycle146Slurp(marker);
+    QVERIFY(!HarperActivation::commit(root, "../escape", &error));
+    QCOMPARE(cycle146Slurp(marker), previous);
+#ifdef Q_OS_WIN
+    // Open without FILE_SHARE_DELETE: QSaveFile can write its temporary file
+    // but cannot atomically replace the marker. It must preserve the old one.
+    const QString native = QDir::toNativeSeparators(marker);
+    HANDLE handle = CreateFileW(reinterpret_cast<LPCWSTR>(native.utf16()), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, 0, nullptr);
+    QVERIFY(handle != INVALID_HANDLE_VALUE);
+    const bool replaced = HarperActivation::commit(root, "bundled", &error);
+    CloseHandle(handle);
+    QVERIFY(!replaced); QCOMPARE(cycle146Slurp(marker), previous);
+#endif
+    for (const QByteArray &bad : {QByteArray("../99.0.1\n"), QByteArray("99.0.1\nextra"), QByteArray("99.0.1 "), QByteArray("99.0.1\r\n")}) {
+        QVERIFY(cycle146Write(marker, bad)); QVERIFY(HarperActivation::selectedVersion(root).isEmpty());
+    }
+    QVERIFY(HarperActivation::commit(root, "99.0.1", &error));
+    QVERIFY(cycle146Write(folder + "/VERSION", "99.0.2\n")); QVERIFY(HarperActivation::directory(root, "99.0.1").isEmpty());
+    QVERIFY(cycle146Write(folder + "/VERSION", "99.0.1\n"));
+    QVERIFY(QFile::remove(folder + "/BinaryModule.js")); QVERIFY(HarperActivation::directory(root, "99.0.1").isEmpty());
+    QVERIFY(HarperActivation::commit(root, "bundled", &error)); QCOMPARE(HarperActivation::selectedVersion(root), QStringLiteral("bundled"));
+    QVERIFY(QDir(folder).exists());
+    QVERIFY(QFile::remove(marker)); QVERIFY(QDir().mkpath(marker));
+    QVERIFY(!HarperActivation::commit(root, "99.0.1", &error)); QVERIFY(QFileInfo(marker).isDir());
+}
+
+void FomawriteTest::harperUpdaterBusyLockDoesNotSuppressScheduledRetry() {
+    Cycle146Sandbox sandbox; Backend backend;
+    auto *updater = backend.harperUpdater();
+    Cycle146Server server; QVERIFY(server.start()); cycle146Publish(server, cycle146Package(Cycle146Newer));
+    updater->setRegistryUrl(server.url("/harper.js/latest"));
+    const QString root = HarperSchemeHandler::harperRoot(); QVERIFY(QDir().mkpath(root));
+    QLockFile busy(root + QStringLiteral("/.install.lock")); busy.setStaleLockTime(0); QVERIFY(busy.tryLock(0));
+    QSignalSpy failed(updater, &HarperUpdater::failed), installed(updater, &HarperUpdater::installed);
+    updater->runScheduledCheck(); QTRY_COMPARE_WITH_TIMEOUT(failed.count(), 1, 10000);
+    QVERIFY(failed.first().first().toString().contains("another process"));
+    QVERIFY(!QSettings().contains("harper/autoAttempted")); QVERIFY(!updater->installing());
+    QCOMPARE(updater->servedVersion(), HarperSchemeHandler::bundledVersion());
+    busy.unlock();
+    QSettings().setValue("harper/lastCheck", QDateTime::currentDateTime().addDays(-8).toString(Qt::ISODate));
+    updater->runScheduledCheck(); QTRY_COMPARE_WITH_TIMEOUT(installed.count(), 1, 20000);
+    QCOMPARE(updater->servedVersion(), Cycle146Newer);
+}
+
+void FomawriteTest::harperUpdaterBoundsConvertedOutputAndIgnoresPathShadow() {
+    Cycle146Sandbox sandbox; Backend backend; auto *updater = backend.harperUpdater();
+    QTemporaryDir staging; QVERIFY(staging.isValid());
+    const QString payload = staging.filePath("package/dist/oversized.js");
+    QVERIFY(QDir().mkpath(QFileInfo(payload).absolutePath()));
+    QFile zero(payload); QVERIFY(zero.open(QIODevice::WriteOnly));
+    QVERIFY(zero.resize(HarperArchive::MaxOutputBytes + 512)); zero.close();
+    const QString archive = staging.filePath("oversized.tgz");
+    QProcess pack; pack.start(HarperUpdater::archiveTool(), {"-czf", archive, "--format=ustar", "-C", staging.path(), "package"});
+    if (!pack.waitForFinished(60000)) { pack.kill(); pack.waitForFinished(2000); QFAIL("Native tar could not create the bounded-output fixture in time"); }
+    QCOMPARE(pack.exitCode(), 0);
+    QFile compressed(archive); QVERIFY(compressed.open(QIODevice::ReadOnly));
+    Cycle146Package package; package.version = Cycle146Newer; package.bytes = compressed.readAll(); package.integrity = cycle146Integrity(package.bytes);
+    QVERIFY(!package.bytes.isEmpty() && package.bytes.size() < HarperUpdater::MaxTarballBytes);
+    Cycle146Server server; QVERIFY(server.start()); cycle146Publish(server, package);
+    updater->setRegistryUrl(server.url("/harper.js/latest"));
+    QTemporaryDir shadow; QVERIFY(shadow.isValid());
+    QVERIFY(cycle146Write(shadow.filePath("tar"), "must never execute"));
+    QVERIFY(cycle146Write(shadow.filePath("tar.exe"), "must never execute"));
+    const QByteArray previousPath = qgetenv("PATH"); const bool hadPath = qEnvironmentVariableIsSet("PATH");
+    const auto restore = qScopeGuard([&] { if (hadPath) qputenv("PATH", previousPath); else qunsetenv("PATH"); });
+    qputenv("PATH", shadow.path().toUtf8());
+    QSignalSpy failed(updater, &HarperUpdater::failed), installed(updater, &HarperUpdater::installed);
+    updater->checkAndInstall(); QTRY_COMPARE_WITH_TIMEOUT(failed.count(), 1, 70000);
+    QVERIFY2(failed.first().first().toString().contains("uncompressed output bound"), qPrintable(updater->error()));
+    QCOMPARE(installed.count(), 0); QVERIFY(!updater->installing());
+    QCOMPARE(updater->servedVersion(), HarperSchemeHandler::bundledVersion());
+    QVERIFY(cycle146Entries(HarperSchemeHandler::harperRoot()).isEmpty());
+    // The same trusted program still works with PATH shadowed after rejection.
+    cycle146Publish(server, cycle146Package(Cycle146Newer));
+    updater->checkAndInstall(); QTRY_COMPARE_WITH_TIMEOUT(installed.count(), 1, 20000);
+}
 
 // ---- the scheme ------------------------------------------------------------------------------------------------------
 
@@ -160,14 +331,16 @@ void FomawriteTest::harperSchemeServesVersionedPathsFromTheOverrideThenTheBundle
                                 QStringLiteral("/") + bundled + QStringLiteral("/%2fetc%2fpasswd")})
         QVERIFY2(HarperSchemeHandler::resolvePath(QUrl(QStringLiteral("fomawrite://harper") + path)).isEmpty(), qPrintable(path));
     // An override: VERSION says it, its versioned files come from it, the bundled version still resolves to the bundle.
-    if (!HarperUpdater().updatesSupported())
-        QSKIP("Bundled scheme/path checks passed; downloaded overrides are disabled on Windows until W12");
+    QVERIFY(HarperUpdater().updatesSupported());
     const QString root = HarperSchemeHandler::harperRoot();
     const QString folder = root + QStringLiteral("/") + Cycle146Newer;
     for (const char *name : {"index.js", "binary.js", "BinaryModule.js", "harper_wasm_bg.wasm", "LICENSE"}) QVERIFY(cycle146Write(folder + QLatin1Char('/') + QString::fromLatin1(name), name));
     QVERIFY(cycle146Write(folder + QStringLiteral("/VERSION"), (Cycle146Newer + QLatin1Char('\n')).toUtf8()));
+#ifdef Q_OS_WIN
+    QVERIFY(cycle146Write(folder + QStringLiteral("/harper_wasm_bg.wasm"), Cycle146Wasm));
+#endif
     QVERIFY2(HarperSchemeHandler::overrideDirectory().isEmpty(), "a folder is not an override until `current` points at it");
-    QVERIFY(QFile::link(folder, root + QStringLiteral("/current")));
+    QVERIFY(cycle146SelectOverride(folder));
     QCOMPARE(HarperSchemeHandler::overrideVersion(), Cycle146Newer);
     QCOMPARE(HarperSchemeHandler::servedVersion(), Cycle146Newer);
     QCOMPARE(cycle146Slurp(HarperSchemeHandler::resolvePath(QUrl(QStringLiteral("fomawrite://harper/VERSION")))).trimmed(), Cycle146Newer);
@@ -191,8 +364,7 @@ void FomawriteTest::harperSchemeServesVersionedPathsFromTheOverrideThenTheBundle
 // ---- checking and installing ------------------------------------------------------------------------------------------
 
 void FomawriteTest::harperUpdaterReportsUpToDateAndUpdateAvailable() {
-    if (!HarperUpdater().updatesSupported())
-        QSKIP("Harper downloads/activation are explicitly disabled on Windows until W12; bundled policy is covered separately");
+    QVERIFY(HarperUpdater().updatesSupported());
     Cycle146Sandbox sandbox;
     Backend backend;
     HarperUpdater *updater = backend.harperUpdater();
@@ -257,8 +429,7 @@ void FomawriteTest::harperUpdaterReportsUpToDateAndUpdateAvailable() {
 }
 
 void FomawriteTest::harperUpdaterInstallsAnUpdateServesItAndReloadsTheEngine() {
-    if (!HarperUpdater().updatesSupported())
-        QSKIP("Harper downloads/activation are explicitly disabled on Windows until W12; bundled policy is covered separately");
+    QVERIFY(HarperUpdater().updatesSupported());
     Cycle146Sandbox sandbox;
     Backend backend;
     HarperUpdater *updater = backend.harperUpdater();
@@ -306,11 +477,20 @@ void FomawriteTest::harperUpdaterInstallsAnUpdateServesItAndReloadsTheEngine() {
     QCOMPARE(wasm.readAll(), Cycle146Wasm);
     QCOMPARE(cycle146Slurp(folder + QStringLiteral("/VERSION")), Cycle146Newer + QLatin1Char('\n'));
     // Nothing else is left in the data folder: no download, no working folder, no temporary link.
+#ifdef Q_OS_WIN
+    QCOMPARE(cycle146Entries(root), (QStringList{"99.0.1", "current-version"}));
+    QCOMPARE(cycle146Slurp(root + QStringLiteral("/current-version")), Cycle146Newer + QLatin1Char('\n'));
+#else
     QCOMPARE(cycle146Entries(root), (QStringList{"99.0.1", "current"}));
+#endif
     // `current` points at it, the scheme serves it, and the page would import its own versioned path.
+#ifndef Q_OS_WIN
     const QFileInfo current(root + QStringLiteral("/current"));
     QVERIFY(current.isSymLink());
     QCOMPARE(QFileInfo(current.symLinkTarget()).canonicalFilePath(), QFileInfo(folder).canonicalFilePath());
+#else
+    QVERIFY(!QFileInfo(root + QStringLiteral("/current-version")).isSymLink());
+#endif
     QCOMPARE(updater->installedVersion(), Cycle146Newer);
     QCOMPARE(updater->servedVersion(), Cycle146Newer);
     QCOMPARE(HarperSchemeHandler::servedVersion(), Cycle146Newer);
@@ -333,8 +513,7 @@ void FomawriteTest::harperUpdaterInstallsAnUpdateServesItAndReloadsTheEngine() {
 }
 
 void FomawriteTest::harperUpdaterRollbackRestoresTheBundledVersionAndKeepsTheFolders() {
-    if (!HarperUpdater().updatesSupported())
-        QSKIP("Harper downloads/activation are explicitly disabled on Windows until W12; bundled policy is covered separately");
+    QVERIFY(HarperUpdater().updatesSupported());
     Cycle146Sandbox sandbox;
     Backend backend;
     HarperUpdater *updater = backend.harperUpdater();
@@ -351,9 +530,26 @@ void FomawriteTest::harperUpdaterRollbackRestoresTheBundledVersionAndKeepsTheFol
     QCOMPARE(updater->servedVersion(), Cycle146Newer);
     QSignalSpy loads(bridge, &EditorBridge::harperLoad);
     const QString root = HarperSchemeHandler::harperRoot();
+#ifdef Q_OS_WIN
+    {
+        const QString native = QDir::toNativeSeparators(root + QStringLiteral("/current-version"));
+        HANDLE handle = CreateFileW(reinterpret_cast<LPCWSTR>(native.utf16()), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, 0, nullptr);
+        QVERIFY(handle != INVALID_HANDLE_VALUE);
+        const auto close = qScopeGuard([&] { CloseHandle(handle); });
+        QSignalSpy failed(updater, &HarperUpdater::failed), changed(updater, &HarperUpdater::servedChanged);
+        updater->rollback();
+        QCOMPARE(failed.count(), 1); QCOMPARE(rolledBack.count(), 0); QCOMPARE(changed.count(), 0);
+        QCOMPARE(updater->servedVersion(), Cycle146Newer); QCOMPARE(HarperActivation::selectedVersion(root), Cycle146Newer);
+        QVERIFY(!QSettings().contains("harper/autoAttempted"));
+    }
+#endif
     updater->rollback();
     QCOMPARE(rolledBack.count(), 1);
+#ifdef Q_OS_WIN
+    QCOMPARE(cycle146Slurp(root + QStringLiteral("/current-version")), QStringLiteral("bundled\n"));
+#else
     QVERIFY(!QFileInfo(root + QStringLiteral("/current")).isSymLink() && !QFileInfo::exists(root + QStringLiteral("/current")));
+#endif
     QVERIFY2(QDir(root + QStringLiteral("/") + Cycle146Newer).exists(), "the folders stay");
     QVERIFY(updater->installedVersion().isEmpty() && !updater->hasOverride());
     QCOMPARE(updater->servedVersion(), bundled);
@@ -375,15 +571,18 @@ void FomawriteTest::harperUpdaterRollbackRestoresTheBundledVersionAndKeepsTheFol
     installed.clear();
     updater->install();
     QTRY_COMPARE_WITH_TIMEOUT(installed.count(), 1, 10000);
+#ifdef Q_OS_WIN
+    QCOMPARE(server.requests.count(QStringLiteral("/harper.js/-/harper.js-%1.tgz").arg(Cycle146Newer)), fetched + 1);
+#else
     QCOMPARE(server.requests.count(QStringLiteral("/harper.js/-/harper.js-%1.tgz").arg(Cycle146Newer)), fetched);
+#endif
     QCOMPARE(updater->servedVersion(), Cycle146Newer);
 }
 
 // ---- refusals ----------------------------------------------------------------------------------------------------------
 
 void FomawriteTest::harperUpdaterRefusesAWrongIntegrityAndLeavesNothingBehind() {
-    if (!HarperUpdater().updatesSupported())
-        QSKIP("Harper downloads/activation are explicitly disabled on Windows until W12; bundled policy is covered separately");
+    QVERIFY(HarperUpdater().updatesSupported());
     Cycle146Sandbox sandbox;
     Backend backend;
     HarperUpdater *updater = backend.harperUpdater();
@@ -431,8 +630,7 @@ void FomawriteTest::harperUpdaterRefusesPackagesThatReachOutsideDist() {
                               "package/dist/sub/deeper.js", "package/dist/sub/", "package/dist/run.sh", "package/dist/image.png"}) // nothing nested under dist, only the kinds a release holds
         QVERIFY2(!HarperUpdater::tarEntryAllowed(QString::fromLatin1(entry)), entry);
 
-    if (!HarperUpdater().updatesSupported())
-        QSKIP("Portable validation assertions passed; updater network/extraction are disabled on Windows until W12");
+    QVERIFY(HarperUpdater().updatesSupported());
     Backend backend;
     HarperUpdater *updater = backend.harperUpdater();
     Cycle146Server server; QVERIFY(server.start());
@@ -448,6 +646,7 @@ void FomawriteTest::harperUpdaterRefusesPackagesThatReachOutsideDist() {
         QTRY_COMPARE_WITH_TIMEOUT(available.count(), round, 10000);
         updater->install();
         QTRY_COMPARE_WITH_TIMEOUT(failed.count(), round, 20000);
+        QVERIFY(!failed.last().at(0).toString().isEmpty());
         QVERIFY2(failed.last().at(0).toString().contains(needle), qPrintable(mode + ": " + failed.last().at(0).toString()));
         QCOMPARE(installed.count(), 0);
         QVERIFY2(cycle146Entries(HarperSchemeHandler::harperRoot()).isEmpty(), qPrintable(mode + ": " + cycle146Entries(HarperSchemeHandler::harperRoot()).join(',')));
@@ -457,6 +656,11 @@ void FomawriteTest::harperUpdaterRefusesPackagesThatReachOutsideDist() {
     refused(QStringLiteral("dotdot"), QStringLiteral("outside package/dist"));
     QVERIFY2(!QFileInfo::exists(QFileInfo(HarperSchemeHandler::harperRoot()).absolutePath() + QStringLiteral("/escape.txt")), "nothing was extracted");
     refused(QStringLiteral("link"), QStringLiteral("link or special file"));
+    refused(QStringLiteral("hard-link"), QStringLiteral("link or special file"));
+    refused(QStringLiteral("empty-name"), QString());
+    refused(QStringLiteral("case-collision"), QStringLiteral("case-colliding"));
+    for (const QString &alias : {QStringLiteral("index.js:stream"), QStringLiteral("CON.js"), QStringLiteral("index.js."), QStringLiteral("AUX .js")})
+        refused(QStringLiteral("alias:") + alias, QStringLiteral("Windows path alias"));
     refused(QStringLiteral("no-glue"), QStringLiteral("layout"));
     refused(QStringLiteral("bad-wasm"), QStringLiteral("WebAssembly"));
     // The same package without the flaw installs.
@@ -481,8 +685,7 @@ void FomawriteTest::harperUpdaterAcceptsOnlyHttpsAddressesOnTheRegistrysHost() {
     QVERIFY(!HarperUpdater::isNewer(QStringLiteral("2.10.0"), QStringLiteral("2.10.0")));
     QVERIFY(!HarperUpdater::isNewer(QStringLiteral("2.9.0"), QStringLiteral("2.10.0")));
 
-    if (!HarperUpdater().updatesSupported())
-        QSKIP("Portable validation assertions passed; updater network/extraction are disabled on Windows until W12");
+    QVERIFY(HarperUpdater().updatesSupported());
     Backend backend;
     HarperUpdater *updater = backend.harperUpdater();
     QSignalSpy available(updater, &HarperUpdater::updateAvailable), failed(updater, &HarperUpdater::failed);
@@ -531,8 +734,7 @@ void FomawriteTest::harperUpdaterAcceptsOnlyHttpsAddressesOnTheRegistrysHost() {
 // ---- the weekly check --------------------------------------------------------------------------------------------------
 
 void FomawriteTest::harperUpdaterWeeklyCheckRespectsLastCheckAndAutoCheckAndInstallsOnce() {
-    if (!HarperUpdater().updatesSupported())
-        QSKIP("Harper downloads/activation are explicitly disabled on Windows until W12; bundled policy is covered separately");
+    QVERIFY(HarperUpdater().updatesSupported());
     Cycle146Sandbox sandbox;
     Backend backend;
     HarperUpdater *updater = backend.harperUpdater();
@@ -648,23 +850,34 @@ void FomawriteTest::harperUpdaterWeeklyCheckRespectsLastCheckAndAutoCheckAndInst
 // ---- the Help menu, the banner and the pane ------------------------------------------------------------------------------
 
 void FomawriteTest::helpMenuOffersWritingCheckerUpdatesWithBannerAndPaneStatus() {
-    if (!HarperUpdater().updatesSupported())
-        QSKIP("Harper downloads/activation are explicitly disabled on Windows until W12; bundled policy is covered separately");
+    QVERIFY(HarperUpdater().updatesSupported());
     Cycle146Sandbox sandbox;
     Cycle103SettingsSnapshot settings;
     Cycle117Window f; QVERIFY2(f.start(1200), qPrintable(f.error));
     auto *spell = f.backend.spellCheck();
-    if (!spell->available()) QSKIP("the system spell checker exists only on macOS");
+#ifdef Q_OS_WIN
+    QString checkerError;
+    QVERIFY2(cycle144StartBundledReviewChecker(f, &checkerError), qPrintable(checkerError));
+#endif
+    QVERIFY(spell->available());
     QObject *window = f.window.data();
     HarperUpdater *updater = f.backend.harperUpdater();
     QVERIFY2(!f.backend.checksHarperUpdates(), "the suite never runs the weekly check from a window (no network in tests)");
     const QString bundled = HarperSchemeHandler::bundledVersion();
     // The Help menu has the three commands, with state: check enabled, use-built-in dimmed until an update is installed, the toggle ticked.
+#ifdef Q_OS_WIN
+    QVERIFY(testDesktopMenusMatchPlatform(window));
+    auto *check = testDesktopCommand(window, "checkWritingCheckerUpdates");
+    auto *builtIn = testDesktopCommand(window, "useBuiltInWritingChecker");
+    auto *automatic = testDesktopCommand(window, "checkWritingCheckerAutomatically");
+    QVERIFY(check && builtIn && automatic);
+#else
     for (const char *name : {"helpCheckWritingCheckerUpdates", "helpUseBuiltInWritingChecker", "helpCheckWritingCheckerAutomatically"})
         QVERIFY2(window->findChild<QObject *>(QString::fromLatin1(name)), name);
     auto *check = window->findChild<QObject *>("helpCheckWritingCheckerUpdates");
     auto *builtIn = window->findChild<QObject *>("helpUseBuiltInWritingChecker");
     auto *automatic = window->findChild<QObject *>("helpCheckWritingCheckerAutomatically");
+#endif
     QCOMPARE(check->property("text").toString(), QStringLiteral("Check for Writing Checker Updates…"));
     QCOMPARE(builtIn->property("text").toString(), QStringLiteral("Use Built-in Writing Checker"));
     QCOMPARE(automatic->property("text").toString(), QStringLiteral("Check for Updates Automatically"));
@@ -680,7 +893,9 @@ void FomawriteTest::helpMenuOffersWritingCheckerUpdatesWithBannerAndPaneStatus()
     // Harper is up in the page; the pane's status line says where it came from.
     spell->setEnabled(true);
     auto *bridge = f.backend.editorBridge();
+#ifndef Q_OS_WIN
     bridge->ready(); bridge->harperReady(bundled);
+#endif
     QVERIFY(f.mode(0));
     QVERIFY(cycle144Run(window, "spelling"));
     QTRY_VERIFY(cycle144Control(window, "reviewFilterStyle"));
@@ -693,7 +908,12 @@ void FomawriteTest::helpMenuOffersWritingCheckerUpdatesWithBannerAndPaneStatus()
     QVERIFY(cycle144Run(window, "checkWritingCheckerUpdates"));
     QTRY_COMPARE_WITH_TIMEOUT(window->property("navigationNotice").toString(), QStringLiteral("Harper is up to date (%1)").arg(bundled), 10000);
     // A newer one: "available — installing…", then the result; the pane and the menu follow.
+#ifdef Q_OS_WIN
+    const Cycle146Package package = cycle146RealPackage(Cycle146Newer);
+#else
     const Cycle146Package package = cycle146Package(Cycle146Newer);
+#endif
+    QVERIFY(!package.bytes.isEmpty());
     cycle146Publish(server, package);
     QSignalSpy notices(updater, &HarperUpdater::notice), installed(updater, &HarperUpdater::installed);
     QVERIFY(cycle144Run(window, "checkWritingCheckerUpdates"));
@@ -705,14 +925,23 @@ void FomawriteTest::helpMenuOffersWritingCheckerUpdatesWithBannerAndPaneStatus()
     QTRY_VERIFY(cycle145Enabled(window, "checkWritingCheckerUpdates"));
     QVERIFY(cycle145Enabled(window, "useBuiltInWritingChecker") && builtIn->property("enabled").toBool());
     // The page reloads the engine and announces the new version.
+#ifdef Q_OS_WIN
+    QTRY_COMPARE_WITH_TIMEOUT(spell->harperVersion(), Cycle146Newer, 60000);
+    QVERIFY(spell->harperReady());
+#else
     QTRY_VERIFY(cycle145Label(window, "reviewEngine").startsWith(QStringLiteral("macOS checker"))); // while the new engine loads
     bridge->harperReady(Cycle146Newer);
+#endif
     QTRY_COMPARE(cycle145Label(window, "reviewEngine"), QStringLiteral("Harper %1 (installed)").arg(Cycle146Newer));
     // Back to the built-in one from the menu.
     QVERIFY(cycle144Run(window, "useBuiltInWritingChecker"));
     QCOMPARE(window->property("navigationNotice").toString(), QStringLiteral("Using the built-in Harper %1").arg(bundled));
     QVERIFY(!cycle145Enabled(window, "useBuiltInWritingChecker"));
+#ifdef Q_OS_WIN
+    QTRY_VERIFY_WITH_TIMEOUT(spell->harperReady() && spell->harperVersion() == bundled, 60000);
+#else
     bridge->harperReady(bundled);
+#endif
     QTRY_COMPARE(cycle145Label(window, "reviewEngine"), QStringLiteral("Harper %1 · %2 available (built-in)").arg(bundled, Cycle146Newer));
     // A failing check puts the reason on the banner.
     server.stop();
@@ -725,8 +954,7 @@ void FomawriteTest::helpMenuOffersWritingCheckerUpdatesWithBannerAndPaneStatus()
 // The real engine in the real page, updated and rolled back: a package made from the bundled engine under a new version
 // is installed, the page re-reads VERSION, imports fomawrite://harper/<new>/index.js (a URL it has never seen) and lints with it.
 void FomawriteTest::harperUpdateLoadsInTheRealPageUnderItsOwnVersionedUrlAndRollsBack() {
-    if (!HarperUpdater().updatesSupported())
-        QSKIP("Harper downloads/activation are explicitly disabled on Windows until W12; bundled policy is covered separately");
+    QVERIFY(HarperUpdater().updatesSupported());
     Cycle146Sandbox sandbox;
     Cycle103SettingsSnapshot settings;
     Backend backend;
@@ -750,22 +978,9 @@ void FomawriteTest::harperUpdateLoadsInTheRealPageUnderItsOwnVersionedUrlAndRoll
     Q_UNUSED(header);
     QTRY_COMPARE_WITH_TIMEOUT(cycle145PageResult(view, QStringLiteral("window.__hdr || null")).toString(), QStringLiteral("no-store|%1").arg(bundled), 5000);
 
-    // A package made from the real bundled engine, as a newer release.
-    QTemporaryDir staging; QVERIFY(staging.isValid());
-    const QString dist = staging.filePath(QStringLiteral("package/dist"));
-    QDir().mkpath(dist);
-    const auto bundledFile = [](const char *name) { QFile f(QStringLiteral(":/editor/dist/harper/") + QString::fromLatin1(name)); return f.open(QIODevice::ReadOnly) ? f.readAll() : QByteArray(); };
-    QByteArray index = bundledFile("index.js"), binary = bundledFile("binary.js");
-    QVERIFY(!index.isEmpty() && !binary.isEmpty());
-    index.replace("./BinaryModule.js", "./BinaryModule-real.js"); binary.replace("./BinaryModule.js", "./BinaryModule-real.js");
-    index += "\nglobalThis.__harperMarker = \"99.0.1\"; // proves which module the page ran\n";
-    QVERIFY(cycle146Write(dist + QStringLiteral("/index.js"), index) && cycle146Write(dist + QStringLiteral("/binary.js"), binary));
-    QVERIFY(cycle146Write(dist + QStringLiteral("/BinaryModule-real.js"), bundledFile("BinaryModule.js")) && cycle146Write(dist + QStringLiteral("/harper_wasm_bg.wasm"), bundledFile("harper_wasm_bg.wasm")));
-    QVERIFY(cycle146Write(staging.filePath(QStringLiteral("package/LICENSE")), "Apache-2.0\n"));
-    const QString archive = staging.filePath(QStringLiteral("real.tgz"));
-    QCOMPARE(QProcess::execute(QStringLiteral("/usr/bin/tar"), {QStringLiteral("-czf"), archive, QStringLiteral("-C"), staging.path(), QStringLiteral("package")}), 0);
-    Cycle146Package package; package.version = Cycle146Newer;
-    { QFile f(archive); QVERIFY(f.open(QIODevice::ReadOnly)); package.bytes = f.readAll(); package.integrity = cycle146Integrity(package.bytes); }
+    // Compressed by the trusted native tar, with genuine shipped JS/WASM.
+    const Cycle146Package package = cycle146RealPackage(Cycle146Newer);
+    QVERIFY(!package.bytes.isEmpty());
     Cycle146Server server; QVERIFY(server.start());
     cycle146Publish(server, package);
     backend.harperUpdater()->setRegistryUrl(server.url(QStringLiteral("/harper.js/latest")));
@@ -778,13 +993,29 @@ void FomawriteTest::harperUpdateLoadsInTheRealPageUnderItsOwnVersionedUrlAndRoll
     // The module that ran is the new one, imported from its own versioned URL (its marker is set; the bundled module has none).
     QCOMPARE(cycle145PageResult(view, QStringLiteral("window.__harperMarker || null")).toString(), Cycle146Newer);
     // And it lints.
-    const QString text = QStringLiteral("We recieve the the mail.");
+    const QString text = QString::fromUtf8("😀 We recieve the the mail.");
     emit bridge->harperLint(41, text);
-    QTRY_VERIFY_WITH_TIMEOUT(([&] { for (const auto &r : replied) if (r.at(0).toInt() == 41) return true; return false; })(), 20000);
+    const auto workingReply = [&](int token) {
+        for (const auto &reply : replied) {
+            if (reply.at(0).toInt() != token) continue;
+            bool spelling = false, repetition = false;
+            for (const auto &value : QJsonDocument::fromJson(reply.at(1).toString().toUtf8()).array()) {
+                const auto issue = value.toObject();
+                const int from = issue.value("start").toInt(-1), to = issue.value("end").toInt(-1);
+                if (issue.value("kind") == QLatin1String("Spelling") && from == text.indexOf("recieve")
+                    && text.mid(from, to - from) == QLatin1String("recieve")) spelling = true;
+                if (issue.value("kind") == QLatin1String("Repetition") && from == text.indexOf("the the")
+                    && text.mid(from, to - from) == QLatin1String("the the")) repetition = true;
+            }
+            return spelling && repetition;
+        }
+        return false;
+    };
+    QTRY_VERIFY_WITH_TIMEOUT(workingReply(41), 20000);
     // Rolled back: the page loads the bundled version again, from its own versioned URL.
     backend.harperUpdater()->rollback();
     QTRY_COMPARE_WITH_TIMEOUT(readied.last().at(0).toString(), bundled, 60000);
     emit bridge->harperLint(42, text);
-    QTRY_VERIFY_WITH_TIMEOUT(([&] { for (const auto &r : replied) if (r.at(0).toInt() == 42) return true; return false; })(), 20000);
+    QTRY_VERIFY_WITH_TIMEOUT(workingReply(42), 20000);
     backend.discardRecovery();
 }

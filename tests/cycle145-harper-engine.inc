@@ -534,7 +534,8 @@ void FomawriteTest::writingCheckerCommandsMenuAndPaneFollowTheEngine() {
 #elif defined(Q_OS_WIN)
     QVERIFY(window->findChild<QObject *>("windowsMenuBar"));
     QVERIFY(!window->findChild<QObject *>("windows_engineMacos"));
-    QVERIFY(!window->findChild<QObject *>("windows_checkWritingCheckerUpdates"));
+    auto *updates = window->findChild<QObject *>("windows_checkWritingCheckerUpdates");
+    QVERIFY(updates && updates->property("enabled").toBool());
 #endif
     // Ticks follow the settings; the dialects are Harper's, so they dim with the macOS engine.
     QVERIFY(cycle145Checked(window, "engineHarper")); QVERIFY(!cycle145Checked(window, "engineMacos"));

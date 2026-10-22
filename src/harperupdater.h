@@ -6,10 +6,11 @@
 // rules" means a newer harper.js release: this object asks the npm registry for
 // the latest version, downloads its tarball, verifies the published sha512,
 // unpacks the files the page needs into <AppDataLocation>/harper/<version>/ and
-// points <AppDataLocation>/harper/current at it. HarperSchemeHandler serves that
+// activates it atomically (current symlink on Mac; current-version marker on
+// Windows). HarperSchemeHandler serves that
 // folder to the editor page in place of the bundled copy (bin/fetch-harper,
 // harper.lock.json), the page imports it from its own versioned URL, and
-// HarperEngine::reload() makes the page do that. Rolling back removes the link;
+// HarperEngine::reload() makes the page do that. Rollback selects the bundle;
 // the folders stay, and the bundled engine serves again.
 //
 // What is verified: the tarball's sha512 equals the `dist.integrity` the
@@ -40,10 +41,10 @@ class QFile;
 class QProcess;
 class QTemporaryDir;
 class QCryptographicHash;
+class QLockFile;
 
 class HarperUpdater : public QObject {
     Q_OBJECT
-    // Windows uses only the pinned bundle until W12 qualifies native activation.
     Q_PROPERTY(bool updatesSupported READ updatesSupported CONSTANT)
     Q_PROPERTY(QString bundledVersion READ bundledVersion NOTIFY changed)
     Q_PROPERTY(QString installedVersion READ installedVersion NOTIFY changed)
@@ -99,8 +100,8 @@ public:
     // something newer, with notices all the way ("up to date", "available —
     // installing…", the result, or the error).
     Q_INVOKABLE void checkAndInstall();
-    // Help > Use Built-in Writing Checker: removes the `current` link (the version
-    // folders stay) so the bundled engine serves again.
+    // Help > Use Built-in Writing Checker: atomically selects the bundle on
+    // Windows, or removes the Mac current link. Version folders stay.
     Q_INVOKABLE void rollback();
     // Ten seconds after the window shows: when autoCheck is on and the last check
     // is older than a week, check and install silently (a notice only when something
@@ -117,6 +118,8 @@ public:
     static QByteArray digestFromIntegrity(const QString &integrity);
     // Whether `entry` (a path inside the tarball) is acceptable: package/<file>, or anything under package/dist/.
     static bool tarEntryAllowed(const QString &entry);
+    // Absolute trusted OS archive executable, never resolved through PATH.
+    static QString archiveTool();
 
 signals:
     void changed();
@@ -143,11 +146,11 @@ private:
     void finishCheck(bool ok, const QString &message, bool network);
     void buildAndActivate();
     void activate(const QString &version);
-    void finishInstall(bool ok, const QString &message, bool network);
+    void finishInstall(bool ok, const QString &message, bool retryable);
     void setStatus(const QString &status);
     bool registryAllowed(const QUrl &url, QString *why) const;
     bool tarballAllowed(const QUrl &url, QString *why) const;
-    void runTar(const QStringList &arguments, int stage);
+    void runTar(const QStringList &arguments);
     void notifyServedChanged();
     void prune(const QString &keepA, const QString &keepB);
     QString root() const;
@@ -161,6 +164,9 @@ private:
     std::unique_ptr<QTemporaryDir> m_work;
     std::unique_ptr<QFile> m_file;
     std::unique_ptr<QCryptographicHash> m_hash;
+    std::unique_ptr<QLockFile> m_rootLock;
+    QByteArray m_tarOutput, m_tarError;
+    bool m_tarOverflow = false, m_tarTimedOut = false;
     QByteArray m_body;
     qint64 m_received = 0;
     qint64 m_limit = 0;
