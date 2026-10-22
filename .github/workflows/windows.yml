@@ -6,6 +6,11 @@ on:
   pull_request:
   workflow_dispatch:
     inputs:
+      theme_atomic_diagnostics:
+        description: 'Run only the bounded ARM64 atomic-theme diagnostic (no full-suite qualification)'
+        required: false
+        type: boolean
+        default: false
       menu_baseline_revision:
         description: 'Optional full commit SHA for native Focus/chrome/Go menu red/green proof'
         required: false
@@ -20,7 +25,11 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  theme-diagnostics:
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.theme_atomic_diagnostics }}
+    uses: ./.github/workflows/windows-theme-diagnostics.yml
   native:
+    if: ${{ github.event_name != 'workflow_dispatch' || !inputs.theme_atomic_diagnostics }}
     name: Native ${{ matrix.architecture }} / Qt 6.11.3 / MSVC2022 v143
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 90
