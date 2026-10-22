@@ -39,7 +39,10 @@ jobs:
           python-version: '3.12'
 
       - name: Check deployment-evidence guards
-        run: python windows/test_ci.py
+        run: |
+          python windows/test_ci.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python windows/test_normal_launch.py
 
       - name: Install pinned Qt SDK and WebEngine/PDF extensions
         run: |

@@ -231,6 +231,8 @@ private slots:
     void spellCheckPlatformAvailabilityFollowsHarper();
     void windowsAppearanceTracksQtColorScheme();
     void windowsMenuRoutesPortableCommands();
+    void acceptanceProfileRejectsInvalidRoots();
+    void acceptanceProfileKeepsStableCanonicalNamespaceAndExistingFiles();
     void harperUpdaterReportsUpToDateAndUpdateAvailable();
     void harperUpdaterInstallsAnUpdateServesItAndReloadsTheEngine();
     void harperUpdaterRollbackRestoresTheBundledVersionAndKeepsTheFolders();
@@ -5785,6 +5787,7 @@ private:
 #include "cycle146-harper-updates.inc"
 #include "windows-platform.inc"
 #include "windows-menu.inc"
+#include "acceptance-profile.inc"
 
 int main(int argc, char **argv) {
     registerHarperScheme();

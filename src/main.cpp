@@ -20,12 +20,14 @@
 #include <QStandardPaths>
 #include <QDir>
 #include <QJsonObject>
+#include <QJsonDocument>
 #include <QJSValue>
 #include <QCryptographicHash>
 #include <QMessageBox>
 #include <QScreen>
 #include <QSet>
 #include "workspace.h"
+#include "acceptanceprofile.h"
 
 #include "backend.h"
 #include "harperscheme.h"
@@ -36,7 +38,6 @@
 #include <QQuickItem>
 #include <QQuickWindow>
 #include <QElapsedTimer>
-#include <QJsonDocument>
 #include <QPdfDocument>
 #include <QTextDocument>
 #endif
@@ -59,9 +60,17 @@ void migrateMacPreferences();
 bool setMacRunningDockIcon(bool running);
 #endif
 
-static QString workspaceIdentity(const QString &executablePath) {
+static QString workspaceIdentity(const QString &executablePath,
+                                 const QString &applicationNamespace = QString()) {
+    QByteArray input = (QDir::homePath() + executablePath).toUtf8();
+    // Preserve existing production workspace names, while ensuring acceptance
+    // launches at the same executable cannot forward into another profile.
+    if (!applicationNamespace.isEmpty()) {
+        input.append('\0');
+        input.append(applicationNamespace.toUtf8());
+    }
     return QString::fromLatin1(QCryptographicHash::hash(
-        (QDir::homePath() + executablePath).toUtf8(), QCryptographicHash::Sha256).toHex().left(20));
+        input, QCryptographicHash::Sha256).toHex().left(20));
 }
 
 // A renamed bundle has a new application-data directory and executable path.
@@ -163,6 +172,20 @@ int main(int argc, char *argv[]) {
         }
         return runDocumentViewCheck(app, destination);
     }
+    AcceptanceProfile acceptanceProfile;
+#ifdef Q_OS_WIN
+    if (qEnvironmentVariableIsSet("FOMAWRITE_PROFILE_ROOT")) {
+        QString profileError;
+        if (!prepareAcceptanceProfile(qEnvironmentVariable("FOMAWRITE_PROFILE_ROOT"),
+                                      &acceptanceProfile, &profileError)) {
+            qCritical().noquote() << profileError;
+            return 2;
+        }
+        // Do this before any normal settings or standard-data path is read.
+        // Native settings, disk cache, IPC and session restoration stay enabled.
+        app.setApplicationName(acceptanceProfile.applicationName);
+    }
+#endif
 #ifdef FOMAWRITE_STARTUP_PREVIEW_CHECK
 #include "../tests/startup-preview-setup.inc"
 #endif
@@ -184,13 +207,28 @@ int main(int argc, char *argv[]) {
 
     QQuickStyle::setStyle(QStringLiteral("Material"));
 
-    const QString identity = workspaceIdentity(QCoreApplication::applicationFilePath());
+    const QString identity = workspaceIdentity(QCoreApplication::applicationFilePath(),
+                                               acceptanceProfile.applicationName);
     const QString stateDirectory = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
     QDir().mkpath(stateDirectory);
     const QString workspacePath = QDir(stateDirectory).filePath("workspace-" + identity + ".json");
 #if !defined(FOMAWRITE_CONTEXT_SMOKE) && !defined(FOMAWRITE_STARTUP_PREVIEW_CHECK)
-    migrateLegacyWorkspace(stateDirectory, workspacePath);
+    if (acceptanceProfile.root.isEmpty()) migrateLegacyWorkspace(stateDirectory, workspacePath);
 #endif
+    if (!acceptanceProfile.root.isEmpty()) {
+        const QJsonObject receipt{{"profileRoot", acceptanceProfile.root},
+            {"normalStartup", true}, {"applicationName", app.applicationName()},
+            {"settingsPath", QSettings().fileName()}, {"dataPath", stateDirectory},
+            {"cachePath", QStandardPaths::writableLocation(QStandardPaths::CacheLocation)},
+            {"workspacePath", workspacePath}, {"identity", identity},
+            {"executable", QCoreApplication::applicationFilePath()}};
+        const QByteArray bytes = QJsonDocument(receipt).toJson(QJsonDocument::Indented);
+        QSaveFile output(QDir(acceptanceProfile.root).filePath(QStringLiteral("profile.json")));
+        if (!output.open(QIODevice::WriteOnly) || output.write(bytes) != bytes.size() || !output.commit()) {
+            qCritical().noquote() << "Cannot write normal-launch profile receipt:" << output.errorString();
+            return 2;
+        }
+    }
     QStringList launchPaths;
     for (const auto &arg : app.arguments().mid(1))
         if (!arg.startsWith('-')) launchPaths.append(QFileInfo(arg).absoluteFilePath());
