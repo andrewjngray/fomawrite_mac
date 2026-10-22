@@ -1,4 +1,5 @@
 #include "editorbridge.h"
+#include <QTimer>
 
 EditorBridge::EditorBridge(QObject *parent) : QObject(parent) {}
 
@@ -32,7 +33,13 @@ void EditorBridge::focus() {
 
 int EditorBridge::fetchText() {
     const int token = ++m_nextToken;
-    if (m_ready) emit requestText(token);
+    if (m_ready) {
+        m_textRequests.insert(token, m_pageGeneration);
+        // Give the caller time to install its token before even a local reply.
+        QTimer::singleShot(0, this, [this, token] {
+            if (m_ready && m_textRequests.value(token, -1) == m_pageGeneration) emit requestText(token);
+        });
+    }
     return token;
 }
 
@@ -61,7 +68,18 @@ void EditorBridge::pushChanges(const QString &changesJson) {
 }
 void EditorBridge::scrolled(double fraction) { emit scrollFractionChanged(fraction); }
 
+void EditorBridge::invalidatePage() {
+    ++m_pageGeneration;
+    m_textRequests.clear();
+    m_selectionRequestInFlight = 0;
+    m_ready = false;
+    emit readyChanged();
+}
+
+void EditorBridge::cancelTextRequest(int token) { m_textRequests.remove(token); }
+
 void EditorBridge::ready() {
+    ++m_pageGeneration;
     m_ready = true;
     // Replay what the app pushed while the page was still loading.
     if (!m_appearance.isEmpty()) emit setAppearance(m_appearance);
@@ -73,6 +91,7 @@ void EditorBridge::ready() {
 }
 
 void EditorBridge::documentChanged(const QString &changesJson, int revision) {
+    if (!m_ready) return;
     m_revision = revision;
     emit revisionChanged();
     emit changesReceived(changesJson, revision);
@@ -88,7 +107,10 @@ void EditorBridge::placeCursor(int position) {
 }
 void EditorBridge::metric(const QString &name, double ms) { emit metricRecorded(name, ms); }
 void EditorBridge::log(const QString &message) { emit messageLogged(message); }
-void EditorBridge::textReply(int token, const QString &text) { emit textReceived(token, text); }
+void EditorBridge::textReply(int token, const QString &text) {
+    if (!m_ready || m_textRequests.take(token) != m_pageGeneration) return;
+    emit textReceived(token, text);
+}
 void EditorBridge::selectionReply(int token, int anchor, int head) {
     // Only the request still in flight may refresh the last-known selection;
     // a reply that arrives after the host fell back is stale.

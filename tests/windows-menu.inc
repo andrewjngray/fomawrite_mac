@@ -9,7 +9,23 @@ void FomawriteTest::windowsMenuRoutesPortableCommands() {
     QTRY_VERIFY(f.window->findChild<QObject *>("windowsMenuBar"));
     auto *menu = f.window->findChild<QObject *>("windowsMenuBar");
     QVERIFY(!menu->findChild<QObject *>("windows_engineMacos"));
-    QVERIFY(!menu->findChild<QObject *>("windows_checkWritingCheckerUpdates"));
+    QObject *helpMenu = nullptr;
+    for (QObject *candidate : menu->findChildren<QObject *>())
+        if (candidate->property("title").toString() == QStringLiteral("&Help")) { helpMenu = candidate; break; }
+    QVERIFY(helpMenu);
+    auto *checkUpdates = helpMenu->findChild<QObject *>("windows_checkWritingCheckerUpdates");
+    auto *useBundled = helpMenu->findChild<QObject *>("windows_useBuiltInWritingChecker");
+    auto *automaticUpdates = helpMenu->findChild<QObject *>("windows_checkWritingCheckerAutomatically");
+    QVERIFY(checkUpdates && useBundled && automaticUpdates);
+    auto *updater = f.backend.harperUpdater();
+    QVERIFY(updater->updatesSupported() && !updater->checking() && !updater->installing());
+    QVERIFY(checkUpdates->property("enabled").toBool());
+    QVERIFY(!checkUpdates->property("checkable").toBool());
+    QCOMPARE(useBundled->property("enabled").toBool(), updater->hasOverride());
+    QVERIFY(!useBundled->property("checkable").toBool());
+    QVERIFY(automaticUpdates->property("enabled").toBool());
+    QVERIFY(automaticUpdates->property("checkable").toBool());
+    QVERIFY(updater->autoCheck() && automaticUpdates->property("checked").toBool());
     auto *source = menu->findChild<QObject *>("windows_sourceEditing");
     auto *live = menu->findChild<QObject *>("windows_liveEditing");
     auto *web = menu->findChild<QObject *>("windows_webPreview");

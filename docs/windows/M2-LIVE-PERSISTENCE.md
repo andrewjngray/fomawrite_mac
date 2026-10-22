@@ -1,0 +1,33 @@
+# Windows M2 — Live persistence and output typography
+
+22 October 2026. This repair is under verification on the Windows branch. The primary Mac checkout/apps are untouched. Do not promote a package based on this record until final CI and ordinary VM repetitions are recorded.
+
+## Confirmed ordinary-app defects
+
+The d573 ARM64 app passed settled Live typing, exact-byte Save, Undo/Save, Redo/Save, Source switching and two normal launches. The receipt is `dist/windows-testing/results/live-edit-d573-ff95c919d5304912abfaf83dd181aed9/supplemental-verification.json`; its report SHA-256 is `813276babf25c572c7a7e13a854181fe3b3697c5e97cfae9a593cbd1ab96cd78`.
+
+Back-to-back Undo then Save reproduced a different result twice: Live and Source contained the undone text, but disk retained the previously saved text and the window stayed dirty for at least 20 seconds. The second receipt is `dist/windows-testing/results/live-edit-rapid-d573-8c52139e0c2345b58af4980cc43faa12/rapid-verification.json`; report SHA-256 `f969a5802cfefec124a233d1f644dd13bd09ea0a43e8e1e6f6fcd67f6928744d`. The measured helper dispatch gap was 0.020708 ms. These were actual Windows SendInput events, not physical-keyboard timing measurements or Backend test calls.
+
+The cause is an asynchronous boundary: the window sends Undo to the browser editor, then Save immediately writes the host mirror before Undo's change list returns. Waiting longer in the input driver hides the problem and is not a product fix. A real QRC-editor regression reproduced the same disk mismatch before the repair (two setup/cleanup passes, one failure; `/tmp/fomawrite-live-save-order-red.log`).
+
+Separately, the ordinary publishing workflow passed content/identity/export checks, but review of all eight format captures found that Modern Sans rendered as serif on Windows. Its unavailable Helvetica Neue family fell back to `serif`. The fallback repair preserves stored family names while selecting portable sans, serif or monospace fallback stacks. A browser glyph-width test with the primary family unavailable failed before the fix; the corrected preview/export test passed 12 preset/custom cases. A second red/green case protects Arial Unicode MS from accidentally matching the word Code as a monospace hint.
+
+## Intended persistence contract
+
+Save must await preceding Live commands and the matching page's current text before committing. A stale document/page reply, synchronization mismatch, timeout or renderer loss must not save stale text or close the document. Source-only saves remain synchronous. Save As is bound to the originating document. Close, quit and navigation must synchronize before deciding whether unsaved changes exist. Explicit recovery to Source remains available after renderer failure.
+
+The continued acceptance driver preserves settled and rapid cases separately. The final candidate must repeat the original failure without inserting a completion wait between Undo and Save, alongside practical 50/100/150 ms gaps. Source, disk, dirty state and normal reopen must agree.
+
+## Verification state
+
+Focused persistence verification passed 14 tests, zero failures/skips, in 14.583 seconds (`/tmp/fomawrite-live-persistence-final-green.log`). Seven new cases cover Undo/Redo→Save, Save As and prior formatting, close/cancel/save, post-snapshot input suspension, multiwindow quit cancellation, stale document/rename/renderer identities, and mismatch/timeout with explicit Source recovery. Existing bridge/quit contracts remain tested. Renderer termination exercises the real lifecycle handler without killing Chromium; the subsequent real page reconnect and editing are verified. Independent review found no remaining production blocker. New typography checks passed on the host; Windows rendering and the complete integration suite remain pending. These results do not qualify the current download, which is still identified separately in [Windows status](STATUS.md).
+
+## Integration and maintained desktop regression
+
+The first complete integration run reported 342 passed, nine failed and one Windows-only skip (480.101 seconds). Its retained log is `/tmp/fomawrite-stability-suite-final.log`. The failures exposed outdated synchronous Source-transition assumptions, a readiness spy counting disconnections as connections, a fixture mutating hidden Source after entering Live, and the obsolete updater-menu absence assertion. Tests now await the actual acknowledged mode before further editing, distinguish connection/disconnection, and prepare a coherent real page. Content, history, geometry, menus and recovery assertions remain.
+
+Review also found two real latest-choice regressions introduced by the asynchronous transition: delayed Source could replace a newer Live choice or restore editing over a newer Preview Only choice. Both failed before the narrow correction (`/tmp/fomawrite-latest-mode-choice-red.log`, two failures). A newer Live choice now cancels only its pending Source transition; a newer layout choice survives Source acknowledgement. Save/close/quit barriers are not canceled. The combined regression run passed 19 tests, no failures/skips, in 44.984 seconds (`/tmp/fomawrite-stability-fixtures-and-choices-green.log`), including all seven persistence cases. A fresh complete build/test and final native CI are required after this checkpoint.
+
+The maintained ordinary ARM64 driver independently confirms the original defect on d573: settled case `maintained-live-d573-settled-696c81b3cb2f449abc01e353a630480d` passed; immediate case `maintained-live-d573-immediate-668cadbe1826460ebcd3062a4872147c` failed and was rejected. Their report hashes are `4e96dcf0c305296b51d8b58db35cc2b30977b0c234015a39c92dd53797cd783b` and `48eb49a803a541b55dd843354109516e47cbfe6637755b2389b47f58c9b7f9c2`. The immediate measured helper gap was 0.000125 ms. No completion wait was inserted between Undo and Save.
+
+The maintained driver's 74 offline rejection/CI tests, 11 Windows UIA/readiness contract checks and three existing folder-readiness checks passed. Two independently reproduced harness defects were repaired: a disconnected accessibility provider now permits at most two complete, owner-validated traversals within the existing deadline, and document-open readiness requires the native picker to disappear plus the exact owned window title. A sidebar filename cannot establish success. The [driver contract](LIVE-EDIT-ACCEPTANCE.md) preserves failed attempts and separates these observations from product acceptance. All five timing cases still need the final repaired package.

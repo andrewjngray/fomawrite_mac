@@ -2,6 +2,7 @@
 
 #include <QObject>
 #include <QString>
+#include <QHash>
 
 // The QWebChannel object ("bridge") between the app and the CodeMirror editor
 // page (src/editor). Direction of each member:
@@ -21,6 +22,9 @@ public:
 
     bool isReady() const { return m_ready; }
     int revision() const { return m_revision; }
+    int pageGeneration() const { return m_pageGeneration; }
+    Q_INVOKABLE void invalidatePage();
+    void cancelTextRequest(int token);
 
     // App → page.
     Q_INVOKABLE void loadDocument(const QString &text);
@@ -157,6 +161,8 @@ private:
     bool m_ready = false;
     int m_revision = 0;
     int m_nextToken = 0;
+    int m_pageGeneration = 0;
+    QHash<int, int> m_textRequests;
     int m_lastCursor = -1;
     bool m_caretMovedByUser = false;
     int m_lastAnchor = -1;

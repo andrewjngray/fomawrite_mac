@@ -55,13 +55,14 @@ def parse_timestamp(value):
     return datetime.fromisoformat(normalized), int(fraction[6])
 
 
-def verify(report, package, evidence, expected_executable, driver_root=None):
+def verify(report, package, evidence, expected_executable, driver_root=None, *,
+           gate_id="windows-normal-launch", stages=STAGES, expected_sample=EXPECTED_SAMPLE):
     """Fail closed on incomplete workflows, stale/missing evidence and identity."""
     errors = []
     manifest_path = package / "manifest.json"
     manifest = json.loads(manifest_path.read_text(encoding="utf-8-sig"))
     executable = package / "Fomawrite.exe"
-    if (report.get("schemaVersion") != 1 or report.get("gate") != "windows-normal-launch"
+    if (report.get("schemaVersion") != 1 or report.get("gate") != gate_id
             or report.get("passed") is not True):
         errors.append("Gate did not report an unconditional normal-launch pass")
     if (not same_executable(report.get("executable"), expected_executable)
@@ -77,7 +78,7 @@ def verify(report, package, evidence, expected_executable, driver_root=None):
             or report.get("discoveryMethod") != "read-only-UIAutomation"):
         errors.append("Required Windows input and read-only discovery were not used")
     checks = report.get("checks", [])
-    if ([check.get("name") for check in checks] != list(STAGES)
+    if ([check.get("name") for check in checks] != list(stages)
             or any(check.get("passed") is not True for check in checks)):
         errors.append("Required workflow stage is missing, failed, reordered or duplicated")
     launches = report.get("launches", [])
@@ -96,7 +97,7 @@ def verify(report, package, evidence, expected_executable, driver_root=None):
     except (KeyError, TypeError, ValueError):
         errors.append("Invalid run interval or stale stage observation")
     hashes = report.get("evidenceSha256", {})
-    required = {f"{stage}{suffix}" for stage in STAGES for suffix in (".png", "-uia.txt")}
+    required = {f"{stage}{suffix}" for stage in stages for suffix in (".png", "-uia.txt")}
     required |= {f"launch-{n}-{stream}.log" for n in (1, 2) for stream in ("stdout", "stderr")}
     required |= {f"{stage}-picker-uia.txt" for stage in ("folder-picker-and-navigation", "file-menu-and-native-picker")}
     required |= {"live-editor-content.png", "live-editor-ocr.txt", "live-mode-rendered.png", "live-mode-rendered-uia.txt"}
@@ -106,7 +107,7 @@ def verify(report, package, evidence, expected_executable, driver_root=None):
         path = (evidence / name).resolve()
         if not path.is_relative_to(evidence.resolve()) or not path.is_file() or sha(path) != expected:
             errors.append(f"Evidence is missing, modified or unsafe: {name}")
-    for stage in STAGES:
+    for stage in stages:
         screenshot = evidence / f"{stage}.png"
         tree = evidence / f"{stage}-uia.txt"
         if screenshot.is_file() and not screenshot.read_bytes().startswith(b"\x89PNG\r\n\x1a\n"):
@@ -137,7 +138,7 @@ def verify(report, package, evidence, expected_executable, driver_root=None):
     except (OSError, ValueError, TypeError, KeyError, struct.error):
         errors.append("Live writing-region screenshot is missing or differs from the observed render region")
     sample = evidence / "writing-normal-launch/normal-launch-sample.md"
-    if (not sample.is_file() or sample.read_bytes().replace(b"\r\n", b"\n") != EXPECTED_SAMPLE
+    if (not sample.is_file() or sample.read_bytes().replace(b"\r\n", b"\n") != expected_sample
             or report.get("sampleSha256") != sha(sample)):
         errors.append("Saved sample differs from exact expected Markdown")
     profile_receipt = evidence / "profile/profile.json"

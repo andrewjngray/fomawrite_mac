@@ -10,6 +10,7 @@
 #include <QTextFragment>
 #include <QTextLayout>
 #include <QFontMetricsF>
+#include <QFontDatabase>
 #include <QTextTable>
 #include <QJsonArray>
 #include <QPdfWriter>
@@ -27,6 +28,7 @@
 #include <QTextBoundaryFinder>
 #include <QStringDecoder>
 #include "backend.h"
+#include <utility>
 #include "harperscheme.h"
 #include "macbridge.h"
 #include <QClipboard>
@@ -540,6 +542,11 @@ Backend::Backend(QObject *parent, bool outputOnly, const QString &omarchyCurrent
           ? QDir::homePath() + QStringLiteral("/.local/state/omarchy/current")
           : omarchyCurrentDirectory) {
     if (!outputOnly) liveBackends.insert(this);
+    connect(this, &Backend::quitCanceled, this, [] {
+        QList<QPointer<Backend>> windows;
+        for (auto *backend : liveBackends) windows.append(backend);
+        for (const auto &backend : windows) if (backend) emit backend->quitPreparationCanceled();
+    });
     connect(&m_library, &FileLibrary::rootFolderChanged, this, &Backend::fileUrlChanged);
     const QString stateDirectory = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
     QDir().mkpath(stateDirectory);
@@ -613,6 +620,11 @@ Backend::Backend(QObject *parent, bool outputOnly, const QString &omarchyCurrent
     // mirrored here so saving, recovery, publishing and the other panes agree.
     m_editorBridge = std::make_unique<EditorBridge>();
     connect(m_editorBridge.get(), &EditorBridge::changesReceived, this, &Backend::applyLiveChanges);
+    connect(m_editorBridge.get(), &EditorBridge::textReceived, this, &Backend::finishLivePersistence);
+    connect(m_editorBridge.get(), &EditorBridge::readyChanged, this, [this] {
+        if (!m_livePersistenceQueue.empty())
+            failLivePersistence(QStringLiteral("Save paused: the Live editor reconnected or stopped. Retry after it is ready."));
+    });
     connect(m_editorBridge.get(), &EditorBridge::selectionReceived, this, [this](int token, int, int) {
         if (token == m_liveSelectionToken) finishLiveSelection(m_editorBridge->lastSelectionStart(), m_editorBridge->lastSelectionEnd());
     });
@@ -2100,15 +2112,24 @@ void Backend::save() {
 }
 
 void Backend::saveAsDialog() {
-    emit saveDialogRequested(suggestedSaveUrl());
+    withCurrentLiveDocument([this](bool success) {
+        if (!success) { emit saveFailed(); emit quitCanceled(); return; }
+        m_saveDialogDocument = m_documentIdentityGeneration;
+        emit saveDialogRequested(suggestedSaveUrl());
+    });
 }
 
 void Backend::saveAs(const QUrl &url) {
+    const int document = std::exchange(m_saveDialogDocument, -1);
+    if (document >= 0 && document != m_documentIdentityGeneration) {
+        setStatus(QStringLiteral("Save As canceled: the document changed while the file dialog was open."));
+        emit saveFailed(); emit quitCanceled(); return;
+    }
     saveTo(url);
 }
 
 void Backend::fileDialogCanceled() {
-    // Close-after-save is owned by the window's pending action; nothing to reset.
+    m_saveDialogDocument = -1;
 }
 
 void Backend::discardRecovery() {
@@ -2544,6 +2565,9 @@ void Backend::saveWindowGeometry(int x, int y, int width, int height, bool maxim
 }
 
 void Backend::loadDocumentText(const QString &text) {
+    ++m_documentIdentityGeneration;
+    if (!m_livePersistenceQueue.empty())
+        failLivePersistence(QStringLiteral("Save canceled: the document changed before Live finished synchronizing."));
     if (!m_document) {
         setStatus(QStringLiteral("Could not attach the Markdown renderer."));
         return;
@@ -2567,6 +2591,7 @@ void Backend::setFileUrl(const QUrl &url) {
         return;
 
     m_fileUrl = url;
+    ++m_documentIdentityGeneration; // Pending saves/dialogs must not retain a renamed or moved path.
     invalidatePublishingDocument();
     if (m_highlighter) m_highlighter->setCodeLanguage(QFileInfo(url.toLocalFile()).suffix());
     emit fileUrlChanged();
@@ -2590,6 +2615,13 @@ void Backend::setStatus(const QString &status) {
 }
 
 void Backend::saveTo(const QUrl &url, bool protectExternalChanges) {
+    withCurrentLiveDocument([this, url, protectExternalChanges](bool success) {
+        if (!success) { emit saveFailed(); emit quitCanceled(); return; }
+        saveCurrentTextTo(url, protectExternalChanges);
+    });
+}
+
+void Backend::saveCurrentTextTo(const QUrl &url, bool protectExternalChanges) {
     const bool sameDocument = !m_fileUrl.isEmpty() && (url == m_fileUrl
         || (!QFileInfo(url.toLocalFile()).canonicalFilePath().isEmpty()
             && QFileInfo(url.toLocalFile()).canonicalFilePath() == QFileInfo(m_fileUrl.toLocalFile()).canonicalFilePath()));
@@ -3636,9 +3668,25 @@ QString Backend::titlePageHtml() const {
     return "<section class=\"fomawrite-title-page\"><h1>" + fileName().toHtmlEscaped() + "</h1></section>";
 }
 QString Backend::basicStyleCss() const {
+    const QString family = outputFont();
+    // Keep the selected/stored family as the first choice, with a portable
+    // fallback matching the preset. Helvetica Neue is absent on Windows.
+    static const QRegularExpression monoFamily(QStringLiteral("mono|courier|consolas|menlo|monaco|\\bcode\\b"), QRegularExpression::CaseInsensitiveOption);
+    static const QRegularExpression sansFamily(QStringLiteral("sans|^(?:arial|helvetica|segoe|calibri|candara|corbel|aptos|verdana|tahoma|roboto|inter|avenir|futura|sf pro)(?:\\b|$)"), QRegularExpression::CaseInsensitiveOption);
+    const bool custom = m_outputStyle == 3;
+    const bool mono = m_outputStyle == 2 || (custom && (monoFamily.match(family).hasMatch()
+        || (QFontDatabase::families().contains(family, Qt::CaseInsensitive) && QFontDatabase::isFixedPitch(family))));
+    const bool sans = m_outputStyle == 0 || m_outputStyle == 4 || m_outputStyle == 5
+        || (custom && sansFamily.match(family).hasMatch());
+    const QString fallback = mono ? QStringLiteral("Consolas, Menlo, \"Liberation Mono\", monospace")
+        : sans ? QStringLiteral("Arial, Helvetica, sans-serif")
+        : m_outputStyle == 6 ? QStringLiteral("\"Palatino Linotype\", \"Book Antiqua\", Georgia, \"Times New Roman\", serif")
+        : QStringLiteral("Georgia, \"Times New Roman\", Times, serif");
+    // Unknown custom families retain the previous serif default.
+    const QString fontStack = cssString(family) + QStringLiteral(", ") + fallback;
     QString css = QStringLiteral(R"CSS(
 html { font-size: %1pt; background: white; color: #24292f; }
-body { margin: 0; font-family: %2, serif; line-height: %3; }
+body { margin: 0; font-family: %2; line-height: %3; }
 #write { max-width: 800px; padding: 32px; margin: auto; overflow-wrap: anywhere; }
 h1,h2,h3,h4,h5,h6 { line-height: 1.25; margin: 1.3em 0 .6em; font-weight: 700; }
 h1 { font-size: 2em; } h2 { font-size: 1.5em; } h3 { font-size: 1.25em; }
@@ -3651,7 +3699,7 @@ pre code { background: transparent; padding: 0; }
 table { border-collapse: collapse; width: 100%%; } th,td { border: 1px solid #d0d7de; padding: .5em; text-align: left; }
 th { font-weight: bold; } tr:nth-child(even) { background: #f8f9fa; }
 a { color: #245da8; } hr { border: 0; border-top: 1px solid #d0d7de; margin: 1.5em 0; }
-)CSS").arg(outputPointSize()).arg(cssString(outputFont())).arg(m_outputStyle == 2 || m_outputStyle == 7 ? "2" : "1.5");
+)CSS").arg(outputPointSize()).arg(fontStack).arg(m_outputStyle == 2 || m_outputStyle == 7 ? "2" : "1.5");
     css.replace("100%%", "100%");
     if (m_outputStyle == 7) css += "#write > p { text-indent: 3em; } h1 { text-align: center; font-size: 1em; font-weight: normal; }";
     return css;
@@ -3695,6 +3743,82 @@ QVariantMap Backend::requestPublishingPreview(const QString &format, QObject *co
 void Backend::cancelPublishingPreview(QObject *consumer) { m_publisher->cancelPreview(consumer); }
 void Backend::invalidatePublishingDocument() { m_publisher->invalidateDocument(); }
 
+int Backend::requestDocumentBarrier() {
+    if (!m_liveEditingActive) return 0;
+    const int request = m_nextPersistenceId + 1;
+    return withCurrentLiveDocument([this, request](bool success) { emit documentBarrierFinished(request, success); });
+}
+
+void Backend::cancelDocumentBarrier(int request) {
+    for (auto it = m_livePersistenceQueue.begin(); it != m_livePersistenceQueue.end(); ++it) {
+        if (it->id != request) continue;
+        if (it == m_livePersistenceQueue.begin()) {
+            m_editorBridge->cancelTextRequest(m_livePersistenceToken);
+            m_livePersistenceToken = 0;
+        }
+        m_livePersistenceQueue.erase(it);
+        QTimer::singleShot(0, this, &Backend::pumpLivePersistence);
+        return;
+    }
+}
+
+int Backend::withCurrentLiveDocument(std::function<void(bool)> finish) {
+    if (!m_liveEditingActive) { finish(true); return 0; }
+    const int id = ++m_nextPersistenceId;
+    m_livePersistenceQueue.push_back({id, m_liveDocumentGeneration, m_editorBridge->pageGeneration(), m_documentIdentityGeneration, std::move(finish)});
+    // This deadline includes selection commands that were issued before Save.
+    QTimer::singleShot(LivePersistenceTimeout, this, [this, id] {
+        for (const auto &operation : m_livePersistenceQueue) if (operation.id == id) {
+            failLivePersistence(QStringLiteral("Save paused: the Live editor did not respond. Your document remains open; retry when Live is ready."));
+            return;
+        }
+    });
+    QTimer::singleShot(0, this, &Backend::pumpLivePersistence);
+    return id;
+}
+
+void Backend::pumpLivePersistence() {
+    if (m_livePersistenceQueue.empty() || m_livePersistenceToken) return;
+    const auto &operation = m_livePersistenceQueue.front();
+    if (!m_editorBridge->isReady() || operation.page != m_editorBridge->pageGeneration()
+            || operation.generation != m_liveDocumentGeneration || operation.document != m_documentIdentityGeneration) {
+        failLivePersistence(QStringLiteral("Save paused: the Live document is no longer available. Retry after it is ready."));
+        return;
+    }
+    if (m_liveSelectionToken || !m_liveSelectionQueue.empty()) return;
+    m_livePersistenceToken = m_editorBridge->fetchText();
+}
+
+void Backend::finishLivePersistence(int token, const QString &text) {
+    if (!token || token != m_livePersistenceToken || m_livePersistenceQueue.empty()) return;
+    const auto &operation = m_livePersistenceQueue.front();
+    if (operation.generation != m_liveDocumentGeneration || operation.page != m_editorBridge->pageGeneration()
+            || operation.document != m_documentIdentityGeneration || text != currentDocumentText()) {
+        failLivePersistence(QStringLiteral("Save paused: Live and Source have not synchronized. Your edits remain open; retry Save."));
+        return;
+    }
+    auto finish = std::move(m_livePersistenceQueue.front().finish);
+    m_livePersistenceQueue.pop_front();
+    m_livePersistenceToken = 0;
+    finish(true);
+    QTimer::singleShot(0, this, &Backend::pumpLivePersistence);
+}
+
+void Backend::failLivePersistence(const QString &reason) {
+    if (m_livePersistenceQueue.empty()) return;
+    m_editorBridge->cancelTextRequest(m_livePersistenceToken);
+    m_livePersistenceToken = 0;
+    auto operations = std::move(m_livePersistenceQueue);
+    m_livePersistenceQueue.clear();
+    // A late request for an old document must not dirty its replacement.
+    const bool currentDocument = std::any_of(operations.begin(), operations.end(), [this](const auto &operation) {
+        return operation.document == m_documentIdentityGeneration;
+    });
+    if (currentDocument) { setModified(true); scheduleRecovery(); }
+    setStatus(reason);
+    for (auto &operation : operations) operation.finish(false);
+}
+
 void Backend::syncLiveEditor(int cursor) {
     ++m_liveDocumentGeneration; // commands issued for the previous text must not run on this one
     // Appearance (fonts, focus, typewriter, dark) is pushed by LiveEditorPane,
@@ -3733,6 +3857,12 @@ void Backend::pumpLiveSelection() {
     QTimer::singleShot(1000, this, [this, token] {
         if (m_liveSelectionToken != token) return;
         m_editorBridge->cancelSelectionRequest(token);
+        if (!m_livePersistenceQueue.empty()) {
+            m_liveSelectionToken = 0;
+            m_liveSelectionQueue.clear();
+            failLivePersistence(QStringLiteral("Save paused: an earlier Live command did not respond. Retry when Live is ready."));
+            return;
+        }
         finishLiveSelection(m_editorBridge->lastSelectionStart(), m_editorBridge->lastSelectionEnd());
     });
 }
@@ -3744,6 +3874,7 @@ void Backend::finishLiveSelection(int start, int end) {
     m_liveSelectionQueue.pop_front();
     if (operation.generation == m_liveDocumentGeneration) operation.run(start, end);
     pumpLiveSelection();
+    pumpLivePersistence();
 }
 
 bool Backend::liveWrapSelection(const QString &before, const QString &after) {

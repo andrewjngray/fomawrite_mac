@@ -44,9 +44,13 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           python windows/test_normal_launch.py
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python -m unittest windows.test_live_edit
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           powershell.exe -NoProfile -File windows/test_launch_local.ps1
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           powershell.exe -NoProfile -File windows/test_normal_launch_wait.ps1
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          powershell.exe -NoProfile -File windows/test_uia_retry.ps1
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Install pinned Qt SDK and WebEngine/PDF extensions

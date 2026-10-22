@@ -96,6 +96,7 @@ ApplicationWindow {
         documentChromeHidden = true;
     }
     function undoEditing() {
+        if (lifecycleInputBlocked) return;
         // The Live editor keeps its own history; undoing the mirrored document
         // underneath it would diverge the two. Route to the page instead.
         if (canFormatLive) { backend.editorBridge.requestUndo(); return; }
@@ -103,11 +104,13 @@ ApplicationWindow {
         else editTarget.undo();
     }
     function redoEditing() {
+        if (lifecycleInputBlocked) return;
         if (canFormatLive) { backend.editorBridge.requestRedo(); return; }
         if (editTarget === editor) editor.cursorPosition = backend.redoSource(editor.cursorPosition);
         else editTarget.redo();
     }
     function performDocumentEdit(action) {
+        if (lifecycleInputBlocked) return;
         var before = editor.text;
         action();
         if (editor.text !== before) writingActivity();
@@ -119,6 +122,7 @@ ApplicationWindow {
     }
     property bool synchronizingScroll: false
     property var documentViewportTransition: null
+    property int documentViewChoice: 0
     property var zoomViewportCheckpoint: null
     readonly property bool changingDocumentView: documentViewportTransition !== null
 
@@ -232,6 +236,22 @@ ApplicationWindow {
     property string pendingAction: ""
     property bool replaceOpen: false
     property bool awaitingPendingSave: false
+    property bool quitPreparationActive: false
+    property bool quitPrepared: false
+    readonly property bool lifecycleInputBlocked: documentBarrierCallback !== null || awaitingPendingSave || quitPrepared
+    property var documentBarrierCallback: null
+    property int documentBarrierRequest: 0
+    property bool documentBarrierSourceRecovery: false
+    function withCurrentDocument(continuation, sourceRecovery) {
+        if (documentBarrierCallback !== null) return false;
+        var request = backend.requestDocumentBarrier();
+        if (request === 0) return continuation();
+        documentBarrierCallback = continuation;
+        documentBarrierSourceRecovery = sourceRecovery === true;
+        documentBarrierRequest = request;
+        return false;
+    }
+
     property string pendingFileName: ""
     property int pendingHistoryDirection: 0
     property var completionItems: []
@@ -320,9 +340,9 @@ ApplicationWindow {
     // as the edit target until an action restores its focus and dispatches.
     readonly property bool windowsMenuHasFocus: windowsMenuLoader.item !== null && windowsMenuLoader.item.ownsFocus(activeFocusItem)
     readonly property var editingFocusItem: windowsMenuHasFocus ? windowsMenuLoader.item.previousFocusItem : activeFocusItem
-    readonly property bool canFormatLive: workspaceLayout.liveEditEnabled && liveEditorLoader.item !== null
+    readonly property bool canFormatLive: !lifecycleInputBlocked && workspaceLayout.liveEditEnabled && liveEditorLoader.item !== null
         && (liveEditorLoader.item.hasLiveFocus || (windowsMenuHasFocus && isInside(editingFocusItem, liveEditorLoader.item)))
-    readonly property bool canFormatSource: sourceEditorVisible && sourceFormattingOwned
+    readonly property bool canFormatSource: !lifecycleInputBlocked && sourceEditorVisible && sourceFormattingOwned
         && !editor.readOnly && !editor.inputMethodComposing
     function isSourceFormattingChrome(item) {
         var current = item;
@@ -459,11 +479,13 @@ ApplicationWindow {
         id: workspaceLayout
         objectName: "workspaceLayout"
         availableWidth: Math.max(0, win.width - 3)
+        Component.onCompleted: backend.liveEditingActive = liveEditEnabled
         activeSurface: win.lastWritingSurface
     }
     Connections {
         target: workspaceLayout
         function onLiveEditEnabledChanged() {
+            backend.liveEditingActive = workspaceLayout.liveEditEnabled;
             win.sourceFormattingOwned = false;
             Qt.callLater(win.rescueHiddenWorkspaceFocus);
         }
@@ -571,6 +593,7 @@ ApplicationWindow {
     // action; returning to editing restores the last chosen arrangement.
     function setDocumentView(mode) {
         if (mode === 1 && !documentFooter.canSplit) return;
+        ++documentViewChoice;
         if (mode === 2 && searchOpen) closeSearch(false);
         beginDocumentViewportTransition();
         workspaceLayout.layoutMode = mode;
@@ -579,7 +602,15 @@ ApplicationWindow {
             : workspaceLayout.liveEditEnabled ? "live" : "source";
     }
     function setLiveEditing(enabled) {
-        if (!enabled) { workspaceLayout.liveEditEnabled = false; return; }
+        if (!enabled) { setSourceEditing(); return; }
+        // A newer Live choice supersedes only a waiting Source transition.
+        // Persistence and close/quit barriers must keep their own continuations.
+        if (documentBarrierSourceRecovery && documentBarrierCallback !== null) {
+            backend.cancelDocumentBarrier(documentBarrierRequest);
+            documentBarrierCallback = null;
+            documentBarrierRequest = 0;
+            documentBarrierSourceRecovery = false;
+        }
         if (searchOpen) closeSearch(false);
         liveEditorLoader.cursorOnEnter = editor.cursorPosition;
         workspaceLayout.liveEditEnabled = true;
@@ -590,25 +621,30 @@ ApplicationWindow {
         if (liveEditorLoader.item) liveEditorLoader.item.focusLive();
     }
     function setSourceEditing() {
-        if (workspaceLayout.liveEditEnabled) {
-            // Carry the Live caret back to the Source editor, but only when it
-            // moved: an untouched page leaves the Source caret and selection alone.
-            var liveCursor = backend.liveCursor();
-            var moved = backend.editorBridge.caretMovedByUser();
-            workspaceLayout.liveEditEnabled = false;
-            if (moved && liveCursor >= 0) editor.cursorPosition = Math.min(liveCursor, editor.length);
-        }
-        if (workspaceLayout.effectiveLayoutMode !== 2) {
-            focusWritingSurface();
-            return;
-        }
-        beginDocumentViewportTransition();
-        if (workspaceLayout.layoutMode === 2)
-            workspaceLayout.layoutMode = workspaceLayout.lastEditingLayoutMode;
-        lastWritingSurface = "source";
-        lastZoomPane = "source";
-        sourceFormattingOwned = false;
-        documentViewportTransition.focusTarget = "source";
+        var viewChoice = documentViewChoice;
+        return withCurrentDocument(function() {
+            if (workspaceLayout.liveEditEnabled) {
+                // Carry the Live caret back to the Source editor, but only when it
+                // moved: an untouched page leaves the Source caret and selection alone.
+                var liveCursor = backend.liveCursor();
+                var moved = backend.editorBridge.caretMovedByUser();
+                workspaceLayout.liveEditEnabled = false;
+                if (moved && liveCursor >= 0) editor.cursorPosition = Math.min(liveCursor, editor.length);
+            }
+            // Preview Only chooses arrangement, while this request chooses the
+            // future editor. Its newer layout intent survives the acknowledgement.
+            if (workspaceLayout.effectiveLayoutMode !== 2 || viewChoice !== documentViewChoice) {
+                if (workspaceLayout.effectiveLayoutMode !== 2) focusWritingSurface();
+                return;
+            }
+            beginDocumentViewportTransition();
+            if (workspaceLayout.layoutMode === 2)
+                workspaceLayout.layoutMode = workspaceLayout.lastEditingLayoutMode;
+            lastWritingSurface = "source";
+            lastZoomPane = "source";
+            sourceFormattingOwned = false;
+            documentViewportTransition.focusTarget = "source";
+        }, true);
     }
     // Kept for callers that still pass the retired Visual Edit flag.
     function setEditingMode(visual) { setSourceEditing(); }
@@ -1368,9 +1404,13 @@ ApplicationWindow {
     color: pageColor
 
     function prepareQuit() {
-        pendingAction = "quit";
-        if (backend.modified) unsavedChangesDialog.open();
-        else completePendingAction();
+        quitPreparationActive = true;
+        return withCurrentDocument(function() {
+            if (!quitPreparationActive) return;
+            pendingAction = "quit";
+            if (backend.modified) unsavedChangesDialog.open();
+            else completePendingAction();
+        });
     }
     function commitQuit() {
         backend.discardRecovery();
@@ -1378,15 +1418,20 @@ ApplicationWindow {
         close();
     }
     onClosing: function(close) {
-        if (closeConfirmed || !backend.modified) {
+        if (closeConfirmed || (!backend.liveEditingActive && !backend.modified)) {
             backend.notifyWindowClosed();
             return;
         }
-
         close.accepted = false;
-        pendingAction = "close";
-        if (!unsavedChangesDialog.opened)
-            unsavedChangesDialog.open();
+        withCurrentDocument(function() {
+            if (!backend.modified) {
+                closeConfirmed = true;
+                win.close();
+                return;
+            }
+            pendingAction = "close";
+            if (!unsavedChangesDialog.opened) unsavedChangesDialog.open();
+        });
     }
 
     function sourceFormattingAllowed() {
@@ -1402,6 +1447,7 @@ ApplicationWindow {
     }
 
     function liveWebAction(name) {
+        if (lifecycleInputBlocked) return;
         if (workspaceLayout.liveEditEnabled && liveEditorLoader.item) liveEditorLoader.item.triggerWebAction(name);
     }
 
@@ -1523,11 +1569,13 @@ ApplicationWindow {
     }
 
     function requestHistory(direction) {
-        backend.rememberCursor(editor.cursorPosition);
-        pendingHistoryDirection = direction;
-        pendingAction = "history";
-        if (backend.modified) unsavedChangesDialog.open();
-        else completePendingAction();
+        return withCurrentDocument(function() {
+            backend.rememberCursor(editor.cursorPosition);
+            pendingHistoryDirection = direction;
+            pendingAction = "history";
+            if (backend.modified) unsavedChangesDialog.open();
+            else completePendingAction();
+        });
     }
 
     function openSourceLink() {
@@ -1614,37 +1662,43 @@ ApplicationWindow {
     }
 
     function requestOpen(url) {
-        var parts = documentLinkParts(url);
-        if (parts.fragment !== "" && (parts.url === "" || parts.url === String(backend.fileUrl)))
-            return navigateDocumentFragment(parts.fragment);
-        backend.rememberCursor(editor.cursorPosition);
-        if (!backend.modified) {
-            return openDocumentTarget(parts.url, parts.fragment);
-        }
-        pendingOpenUrl = parts.url;
-        pendingOpenFragment = parts.fragment;
-        pendingAction = "open";
-        unsavedChangesDialog.open();
-        return false;
+        return withCurrentDocument(function() {
+            var parts = documentLinkParts(url);
+            if (parts.fragment !== "" && (parts.url === "" || parts.url === String(backend.fileUrl)))
+                return navigateDocumentFragment(parts.fragment);
+            backend.rememberCursor(editor.cursorPosition);
+            if (!backend.modified) {
+                return openDocumentTarget(parts.url, parts.fragment);
+            }
+            pendingOpenUrl = parts.url;
+            pendingOpenFragment = parts.fragment;
+            pendingAction = "open";
+            unsavedChangesDialog.open();
+            return false;
+        });
     }
 
     function requestNewDocument() {
-        pendingAction = "new";
-        if (backend.modified) unsavedChangesDialog.open();
-        else completePendingAction();
+        return withCurrentDocument(function() {
+            pendingAction = "new";
+            if (backend.modified) unsavedChangesDialog.open();
+            else completePendingAction();
+        });
     }
 
     function requestCreateDocument(name, inNewWindow) {
-        workspaceLayout.filesVisible = true;
-        if (inNewWindow) {
-            var file = backend.library.createDocument(name);
-            if (file.toString() !== "") backend.openInNewWindow(file);
-            return;
-        }
-        pendingFileName = name;
-        pendingAction = "create";
-        if (backend.modified) unsavedChangesDialog.open();
-        else completePendingAction();
+        return withCurrentDocument(function() {
+            workspaceLayout.filesVisible = true;
+            if (inNewWindow) {
+                var file = backend.library.createDocument(name);
+                if (file.toString() !== "") backend.openInNewWindow(file);
+                return;
+            }
+            pendingFileName = name;
+            pendingAction = "create";
+            if (backend.modified) unsavedChangesDialog.open();
+            else completePendingAction();
+        });
     }
 
     // In a window too narrow to dock the Library column, the Files drawer shows it instead.
@@ -1674,6 +1728,7 @@ ApplicationWindow {
         var action = pendingAction;
         pendingAction = "";
         if (action === "quit") {
+            quitPrepared = true;
             backend.notifyQuitReady();
         } else if (action === "close") {
             closeConfirmed = true;
@@ -1729,7 +1784,7 @@ ApplicationWindow {
 
     readonly property var editTarget: editingFocusItem && typeof editingFocusItem.cut === "function" ? editingFocusItem : editor
     // Clipboard commands must not borrow an invisible Source selection.
-    readonly property bool sourceClipboardAllowed: sourceEditorVisible || editTarget !== editor
+    readonly property bool sourceClipboardAllowed: !lifecycleInputBlocked && (sourceEditorVisible || editTarget !== editor)
 
     function openSearch(withReplace, useSelection) {
         // In Live, Find/Replace is the editor page's own search panel.
@@ -1938,12 +1993,44 @@ ApplicationWindow {
             saveFileDialog.open();
         }
 
+        function onQuitPreparationCanceled() {
+            win.quitPrepared = false;
+            if (!win.quitPreparationActive) return;
+            win.quitPreparationActive = false;
+            if (win.documentBarrierCallback !== null) {
+                backend.cancelDocumentBarrier(win.documentBarrierRequest);
+                win.documentBarrierCallback = null;
+                win.documentBarrierRequest = 0;
+                win.documentBarrierSourceRecovery = false;
+            }
+            if (win.pendingAction === "quit") win.pendingAction = "";
+            win.awaitingPendingSave = false;
+        }
+
         function onSaveFailed() { win.awaitingPendingSave = false; win.pendingAction = ""; }
 
         function onSaveSucceeded() {
+            var completing = win.awaitingPendingSave;
             win.awaitingPendingSave = false;
-            if (win.pendingAction !== "")
+            if (completing && !backend.modified && win.pendingAction !== "")
                 win.completePendingAction();
+        }
+
+        function onDocumentBarrierFinished(request, success) {
+            if (request !== win.documentBarrierRequest) return;
+            var continuation = win.documentBarrierCallback;
+            var sourceRecovery = win.documentBarrierSourceRecovery;
+            win.documentBarrierCallback = null;
+            win.documentBarrierRequest = 0;
+            win.documentBarrierSourceRecovery = false;
+            if (!success) {
+                win.pendingAction = "";
+                win.awaitingPendingSave = false;
+                backend.cancelQuit();
+            }
+            // Explicit Source recovery keeps the host's known text available
+            // even when the renderer cannot acknowledge a barrier.
+            if ((success || sourceRecovery) && continuation !== null) continuation();
         }
 
         function onExternalChangeDetected(deleted, locallyModified) {
@@ -2600,6 +2687,7 @@ ApplicationWindow {
         Rectangle {
             id: editorPane
             objectName: "editorPane"
+            enabled: !win.lifecycleInputBlocked
             onVisibleChanged: if (!visible && win.searchOpen) win.closeSearch(false)
             color: win.sourceSurfaceColor
             visible: workspaceLayout.effectiveLayoutMode !== 2

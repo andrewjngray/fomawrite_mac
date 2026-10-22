@@ -27,6 +27,7 @@ void FomawriteTest::liveChangesApplyToDocumentByteExactly() {
     editor->setProperty("text", original);
     QCOMPARE(canonical(), original);
     auto *bridge = backend.editorBridge(); QVERIFY(bridge);
+    bridge->ready(); // This browserless fixture emulates a connected page.
     QSignalSpy revision(bridge, SIGNAL(revisionChanged()));
 
     // Three changes in one transaction: replace, insert inside a grapheme-safe
@@ -863,7 +864,8 @@ void FomawriteTest::liveModeInMainWindowLoadsPageAndNavigatesOutline() {
     QVERIFY(layout->property("liveEditEnabled").toBool());
     QTRY_COMPARE_WITH_TIMEOUT(backend.liveCursor(), two, 5000);
     QVERIFY(QMetaObject::invokeMethod(window.data(), "selectWritingMode", Q_ARG(QVariant, QStringLiteral("source"))));
-    QVERIFY(!layout->property("liveEditEnabled").toBool());
+    QTRY_VERIFY(!layout->property("liveEditEnabled").toBool());
+    QTRY_VERIFY(!window->property("lifecycleInputBlocked").toBool());
     QCOMPARE(editor->property("cursorPosition").toInt(), two);
     QVERIFY(!liveToggle->property("checked").toBool());
     backend.discardRecovery();

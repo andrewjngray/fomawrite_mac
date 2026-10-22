@@ -4,6 +4,8 @@ One line per cycle, newest first. Each line links to the cycle's record under `r
 
 ## 0.3.0 development series (Cycles 97–)
 
+- **Windows M2 Live persistence candidate** — Await the active Live editor before saving or closing, reject stale document/page replies, preserve Source recovery and correct Windows output-font fallbacks. Focused red/green tests pass; full CI and packaged VM qualification are pending. [Record](docs/windows/M2-LIVE-PERSISTENCE.md)
+
 - **Windows M2 updater parity candidate** — Enable verified checker updates and atomic rollback without Windows symlinks; port the ten updater tests and add bounded archive/activation regressions. Native CI and final app qualification remain pending. [Record](docs/windows/M2-UPDATER-PARITY.md)
 
 - **Windows M2 checker parity** — Run 28 existing spelling, grammar and Review cases against real bundled Harper, preserve native Mac rows, and fix double-parsed nested-list prose with offset-safe Markdown corrections. Integration and Windows package verification are pending. [Record](docs/windows/M2-CHECKER-PARITY.md)

@@ -117,6 +117,10 @@ void FomawriteTest::liveSpellingUnderlinesMisspelledWordsAndFollowsTheSetting() 
             "`recieve` and https://example.com/recieve\n\n"
             "```\nrecieve\n```\n\n    recieve\n\n- List item recieve\n");
         QVERIFY(QMetaObject::invokeMethod(window.data(), "selectWritingMode", Q_ARG(QVariant, QStringLiteral("source"))));
+        // Live→Source now acknowledges the current page before allowing edits.
+        auto *layout = window->findChild<QObject *>("workspaceLayout"); QVERIFY(layout);
+        QTRY_VERIFY_WITH_TIMEOUT(!layout->property("liveEditEnabled").toBool(), 5000);
+        QVERIFY(!window->property("lifecycleInputBlocked").toBool());
         editor->setProperty("text", prose);
         QVERIFY(QMetaObject::invokeMethod(window.data(), "selectWritingMode", Q_ARG(QVariant, QStringLiteral("live"))));
         bridge->placeCursor(0);

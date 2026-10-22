@@ -1,6 +1,31 @@
 #include <tuple>
 
 namespace {
+// Real page replies establish text and selection before testing a rapid choice.
+QString cycle108PageText(EditorBridge *bridge) {
+    QSignalSpy received(bridge, &EditorBridge::textReceived);
+    const int token = bridge->fetchText();
+    QString text;
+    const bool answered = QTest::qWaitFor([&] {
+        for (const auto &args : received) if (args.at(0).toInt() == token) {
+            text = args.at(1).toString(); return true;
+        }
+        return false;
+    }, 5000);
+    return answered ? text : QStringLiteral("<timeout>");
+}
+QPair<int, int> cycle108PageSelection(EditorBridge *bridge) {
+    QSignalSpy received(bridge, &EditorBridge::selectionReceived);
+    const int token = bridge->fetchSelection();
+    QPair<int, int> result{-1, -1};
+    QTest::qWaitFor([&] {
+        for (const auto &args : received) if (args.at(0).toInt() == token) {
+            result = {args.at(1).toInt(), args.at(2).toInt()}; return true;
+        }
+        return false;
+    }, 5000);
+    return result;
+}
 // Click where the previous frame painted the persistent action, rather than
 // an intermediate SplitView position that the user has never seen.
 bool cycle108PaintedClick(QQuickWindow *window, QQuickItem *item, const QPoint &point) {
@@ -117,6 +142,10 @@ void FomawriteTest::bundledFooterRapidModesPreserveDraftAndViewport() {
             }
             QVERIFY2(overlappingClicks > 0, "Rapid clicks must overlap an unfinished viewport restoration.");
             QTRY_COMPARE(layout->property("effectiveLayoutMode").toInt(), 0);
+            // Source is an acknowledged Live-text transition. Keep the burst
+            // above frame-paced; only its final semantic state must settle.
+            QTRY_VERIFY(!layout->property("liveEditEnabled").toBool());
+            QTRY_VERIFY(!window->property("lifecycleInputBlocked").toBool());
             QTRY_VERIFY(!window->property("changingDocumentView").toBool());
             QTRY_VERIFY(!pane->property("viewportRefreshPending").toBool());
             QVERIFY(!layout->property("liveEditEnabled").toBool());
@@ -144,6 +173,30 @@ void FomawriteTest::bundledFooterRapidModesPreserveDraftAndViewport() {
     QCOMPARE(editor->property("text").toString(), saved);
     QVERIFY(QMetaObject::invokeMethod(editor, "redo"));
     QCOMPARE(editor->property("text").toString(), draft);
+    // A newer Live choice cancels only the older pending Source transition;
+    // its page/history/caret must survive rather than being reloaded later.
+    QVERIFY(cycle102Click(quick, live));
+    auto *bridge = backend.editorBridge();
+    QTRY_VERIFY_WITH_TIMEOUT(bridge->isReady(), 15000);
+    QCOMPARE(cycle108PageText(bridge), draft);
+    const QString marker = QStringLiteral("Newest Live choice stays.\n"), newest = draft + marker;
+    const QJsonArray change{QJsonObject{{"from", draft.size()}, {"to", draft.size()}, {"insert", marker}}};
+    bridge->injectUserChanges(QString::fromUtf8(QJsonDocument(change).toJson(QJsonDocument::Compact)));
+    QTRY_COMPARE(editor->property("text").toString(), newest);
+    const auto caretBefore = cycle108PageSelection(bridge); QVERIFY(caretBefore.first >= 0);
+    QVERIFY(cycle108PaintedClick(quick, source, cycle103SceneBounds(source).center().toPoint()));
+    QVERIFY(window->property("documentBarrierRequest").toInt() > 0);
+    QVERIFY(cycle108PaintedClick(quick, live, cycle103SceneBounds(live).center().toPoint()));
+    QTRY_COMPARE(window->property("documentBarrierRequest").toInt(), 0);
+    QVERIFY2(layout->property("liveEditEnabled").toBool(), "A late Source acknowledgement must not replace the newer Live choice.");
+    QCOMPARE(cycle108PageText(bridge), newest);
+    QCOMPARE(cycle108PageSelection(bridge), caretBefore);
+    QCOMPARE(editor->property("text").toString(), newest);
+    bridge->requestUndo(); QTRY_COMPARE(editor->property("text").toString(), draft);
+    QCOMPARE(cycle108PageText(bridge), draft);
+    bridge->requestRedo(); QTRY_COMPARE(editor->property("text").toString(), newest);
+    QCOMPARE(cycle108PageText(bridge), newest);
+    QCOMPARE(cycle103Read(path), saved.toUtf8());
 }
 
 void FomawriteTest::bundledFooterRoutesFollowResponsivePresentation() {
@@ -180,7 +233,7 @@ void FomawriteTest::bundledFooterRoutesFollowResponsivePresentation() {
         QTRY_COMPARE(layout->property("effectiveLayoutMode").toInt(), 1);
         quick->resize(720, 800);
         QTRY_COMPARE(layout->property("effectiveLayoutMode").toInt(), 0);
-        QCOMPARE(layout->property("liveEditEnabled").toBool(), editing == live);
+        QTRY_COMPARE(layout->property("liveEditEnabled").toBool(), editing == live);
         QTRY_COMPARE(liveVisible(), editing == live);
         QVERIFY(cycle107ViewChecked(footer, layout));
         QVERIFY(cycle108NativeViewChecks(window.data(), 0));
@@ -189,7 +242,7 @@ void FomawriteTest::bundledFooterRoutesFollowResponsivePresentation() {
         QCOMPARE(layout->property("effectiveLayoutMode").toInt(), 0);
         QVERIFY(cycle102Click(quick, split));
         QTRY_COMPARE(layout->property("effectiveLayoutMode").toInt(), 1);
-        QCOMPARE(layout->property("liveEditEnabled").toBool(), editing == live);
+        QTRY_COMPARE(layout->property("liveEditEnabled").toBool(), editing == live);
         QVERIFY(cycle107ViewChecked(footer, layout));
     }
     quick->resize(1440, 800); QVERIFY(cycle102Click(quick, single)); QVERIFY(cycle102Click(quick, source));
@@ -204,7 +257,8 @@ void FomawriteTest::bundledFooterRoutesFollowResponsivePresentation() {
         QVERIFY(cycle102Click(quick, cycle108MenuItem(workspaceMenu, QString::fromLatin1(text))));
         QTRY_VERIFY(!workspaceMenu->property("visible").toBool());
         QTRY_COMPARE(layout->property("effectiveLayoutMode").toInt(), mode);
-        QCOMPARE(layout->property("liveEditEnabled").toBool(), editing);
+        QTRY_COMPARE(layout->property("liveEditEnabled").toBool(), editing);
+        QTRY_VERIFY(!window->property("lifecycleInputBlocked").toBool());
         QVERIFY(cycle107ViewChecked(footer, layout));
         QTRY_VERIFY(cycle108WorkspaceViewChecks(workspaceMenu, mode, editing));
         QVERIFY(cycle108NativeViewChecks(window.data(), mode));
@@ -221,5 +275,17 @@ void FomawriteTest::bundledFooterRoutesFollowResponsivePresentation() {
     QTRY_COMPARE(layout->property("effectiveLayoutMode").toInt(), 0);
     QVERIFY(layout->property("liveEditEnabled").toBool());
     QVERIFY(cycle107ViewChecked(footer, layout));
+    QCOMPARE(editor->property("text").toString(), draft);
+    // Preview Only changes arrangement, preserving the pending Source choice
+    // as the editor used when writing resumes. It must remain Preview Only.
+    QTRY_VERIFY_WITH_TIMEOUT(backend.editorBridge()->isReady(), 15000);
+    QCOMPARE(cycle108PageText(backend.editorBridge()), draft);
+    QVERIFY(QMetaObject::invokeMethod(window.data(), "selectWritingMode", Q_ARG(QVariant, "source")));
+    QVERIFY(window->property("documentBarrierRequest").toInt() > 0);
+    QVERIFY(QMetaObject::invokeMethod(window.data(), "setDocumentView", Q_ARG(QVariant, 2)));
+    QTRY_COMPARE(window->property("documentBarrierRequest").toInt(), 0);
+    QCOMPARE(layout->property("effectiveLayoutMode").toInt(), 2);
+    QVERIFY(!layout->property("liveEditEnabled").toBool());
+    QCOMPARE(cycle108PageText(backend.editorBridge()), draft);
     QCOMPARE(editor->property("text").toString(), draft);
 }

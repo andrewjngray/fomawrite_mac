@@ -24,6 +24,7 @@ public static class NormalLaunchInput {
     [DllImport("user32.dll", SetLastError=true)] static extern bool GetPhysicalCursorPos(out POINT point);
     [DllImport("user32.dll")] static extern bool SetForegroundWindow(IntPtr hwnd);
     [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();
+    [DllImport("user32.dll")] static extern bool IsWindow(IntPtr hwnd);
     [DllImport("user32.dll")] static extern bool ShowWindow(IntPtr hwnd, int command);
     [DllImport("user32.dll", SetLastError=true)] static extern IntPtr SetThreadDpiAwarenessContext(IntPtr context);
     [DllImport("user32.dll")] static extern IntPtr GetThreadDpiAwarenessContext();
@@ -152,11 +153,11 @@ public static class NormalLaunchInput {
             Regex.IsMatch(c.ClassName ?? "", "WebEngine|Chrome_|RenderWidget", RegexOptions.IgnoreCase) ||
             Regex.IsMatch(c.Name ?? "", "^(Live Markdown editor|Publishing preview|Web content)$", RegexOptions.IgnoreCase);
     }
-    static AutomationElement Walk(AutomationElement root, string pattern, List<string> description) {
+    static AutomationElement Walk(AutomationElement root, string pattern, List<string> description, Stopwatch budget = null) {
         if(root==null) return null;
         var pending=new Queue<Entry>(); pending.Enqueue(new Entry(root, 0));
         var runtimeIds=new Dictionary<string, bool>();
-        var elapsed=Stopwatch.StartNew(); int visited=0;
+        var elapsed=budget ?? Stopwatch.StartNew(); int visited=0;
         while(pending.Count>0 && visited<1600 && elapsed.ElapsedMilliseconds<4500) {
             var entry=pending.Dequeue(); visited++;
             try {
@@ -186,8 +187,54 @@ public static class NormalLaunchInput {
         if(description!=null && pending.Count>0) description.Add("bounded observation ended with " + pending.Count + " queued branches");
         return null;
     }
+    static T RetryDisconnected<T>(Func<T> search, Action reacquire, Stopwatch budget, int budgetMs = 4500) {
+        for(int retry=0; ; retry++) {
+            if(budget.ElapsedMilliseconds>=budgetMs) throw new TimeoutException("UIA search retry budget expired");
+            try {
+                T found=search();
+                if(budget.ElapsedMilliseconds>=budgetMs) throw new TimeoutException("UIA search retry budget expired");
+                return found;
+            } catch(COMException error) {
+                // Picker teardown can disconnect a provider during FindAll.
+                // Discard that incomplete traversal; never turn it into absence.
+                if(error.ErrorCode!=unchecked((int)0x80010108) || retry>=2) throw;
+                if(budget.ElapsedMilliseconds+100>=budgetMs) throw new TimeoutException("UIA search retry budget expired", error);
+                Thread.Sleep(100);
+                reacquire(); // Failure or a changed owner/handle remains fatal.
+            }
+        }
+    }
+    static AutomationElement ReacquireOwnedRoot(IntPtr handle, uint owner) {
+        uint actual;
+        if(handle==IntPtr.Zero || owner==0 || owner!=expectedProcessId ||
+            GetWindowThreadProcessId(handle, out actual)==0 || actual!=owner)
+            throw new InvalidOperationException("UIA search root no longer belongs to the owned application");
+        var root=AutomationElement.FromHandle(handle);
+        var current=root.Current;
+        if(current.ProcessId!=owner || new IntPtr(current.NativeWindowHandle)!=handle)
+            throw new InvalidOperationException("UIA reacquired a different root identity");
+        return root;
+    }
     public static AutomationElement Find(AutomationElement root, string pattern) {
-        return Bounded(delegate() { return Walk(root, pattern, null); }, "bounded control search: " + pattern);
+        return Bounded(delegate() {
+            if(root==null) return null;
+            var current=root.Current;
+            var handle=new IntPtr(current.NativeWindowHandle);
+            uint owner=(uint)current.ProcessId;
+            var budget=Stopwatch.StartNew();
+            root=ReacquireOwnedRoot(handle, owner);
+            return RetryDisconnected(delegate() { return Walk(root, pattern, null, budget); },
+                delegate() { root=ReacquireOwnedRoot(handle, owner); }, budget);
+        }, "bounded control search: " + pattern);
+    }
+    public static bool OpenedDocument(AutomationElement main, IntPtr pickerHandle, string title) {
+        return Bounded(delegate() {
+            if(pickerHandle==IntPtr.Zero) throw new InvalidOperationException("Missing native picker identity");
+            if(IsWindow(pickerHandle)) return false;
+            var current=main.Current;
+            var owned=ReacquireOwnedRoot(new IntPtr(current.NativeWindowHandle), (uint)current.ProcessId);
+            return owned.Current.Name==title;
+        }, "opened document identity");
     }
     public static bool Checked(AutomationElement element) {
         return Bounded(delegate() { return CheckedValue(element); }, "checked state readback");

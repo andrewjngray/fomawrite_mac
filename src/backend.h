@@ -112,6 +112,13 @@ public:
     Q_INVOKABLE int nextIssue(int from, bool backwards);
     // Push the current document, theme and appearance to the Live editor page.
     Q_INVOKABLE void syncLiveEditor(int cursor = -1);
+    Q_PROPERTY(bool liveEditingActive READ liveEditingActive WRITE setLiveEditingActive)
+    bool liveEditingActive() const { return m_liveEditingActive; }
+    void setLiveEditingActive(bool active) { m_liveEditingActive = active; }
+    // Source completes synchronously (0); Live completes through the signal.
+    Q_INVOKABLE int requestDocumentBarrier();
+    Q_INVOKABLE void cancelDocumentBarrier(int request);
+    static constexpr int LivePersistenceTimeout = 3000;
     // Re-style the Live editor after a theme change without reloading the document.
     Q_INVOKABLE void pushLiveTheme();
     // The Live editor's last caret position, for carrying it back to Source.
@@ -343,6 +350,8 @@ signals:
     void openDialogRequested();
     void saveDialogRequested(const QUrl &suggestedUrl);
     void saveSucceeded();
+    void documentBarrierFinished(int request, bool success);
+    void quitPreparationCanceled();
     void externalChangeDetected(bool deleted, bool locallyModified);
 
 private:
@@ -391,6 +400,20 @@ private:
     std::deque<LiveSelectionOperation> m_liveSelectionQueue;
     int m_liveSelectionToken = 0;
     int m_liveDocumentGeneration = 0;
+    struct LivePersistenceOperation {
+        int id, generation, page, document;
+        std::function<void(bool)> finish;
+    };
+    int withCurrentLiveDocument(std::function<void(bool)> finish);
+    void pumpLivePersistence();
+    void finishLivePersistence(int token, const QString &text);
+    void failLivePersistence(const QString &reason);
+    std::deque<LivePersistenceOperation> m_livePersistenceQueue;
+    int m_livePersistenceToken = 0;
+    int m_nextPersistenceId = 0;
+    bool m_liveEditingActive = false;
+    int m_documentIdentityGeneration = 0;
+    int m_saveDialogDocument = -1;
     QString m_liveMirror;
     bool m_liveMirrorValid = false;
     std::unique_ptr<EditorBridge> m_editorBridge;
@@ -432,6 +455,7 @@ private:
     QPageLayout m_pageLayout;
     QUrl m_outputCssFile;
     void saveTo(const QUrl &url, bool protectExternalChanges = false);
+    void saveCurrentTextTo(const QUrl &url, bool protectExternalChanges);
     QUrl suggestedSaveUrl() const;
     QString currentDocumentText() const;
     void applyDocumentTypography();

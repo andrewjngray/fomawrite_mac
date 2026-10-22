@@ -38,6 +38,7 @@ Rectangle {
     property bool recoveringPage: false
 
     function showLoadError(message) {
+        if (root.bridge) root.bridge.invalidatePage();
         automaticRetry.stop();
         recoveringPage = false;
         if (loadError === message) return;
@@ -47,6 +48,7 @@ Rectangle {
         noticeRequested(message);
     }
     function reloadPage() {
+        if (root.bridge) root.bridge.invalidatePage();
         // The bridge's last full document can predate incremental Live edits.
         // Refresh its replay from canonical host text before reconnecting.
         backend.syncLiveEditor(backend.liveCursor());
@@ -54,6 +56,7 @@ Rectangle {
         web.reload();
     }
     function rendererStopped() {
+        if (root.bridge) root.bridge.invalidatePage();
         if (automaticRetry.running) return;
         if (automaticRetryUsed) {
             showLoadError("The Live editor stopped unexpectedly. Retry Live, or switch to Source to keep writing.");
@@ -147,6 +150,7 @@ Rectangle {
             console.warn("Live editor page: " + message + " (" + sourceID + ":" + lineNumber + ")");
         }
         onLoadingChanged: function(info) {
+            if (info.status === WebEngineView.LoadStartedStatus && root.bridge) root.bridge.invalidatePage();
             if (info.status === WebEngineView.LoadFailedStatus) {
                 console.warn("Live editor page failed to load: " + info.errorString);
                 if (!automaticRetry.running)

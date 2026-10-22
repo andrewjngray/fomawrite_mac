@@ -30,22 +30,27 @@ void FomawriteTest::liveEditorRendererRecoveryIsBoundedAndPreservesCanonicalEdit
     QTRY_COMPARE_WITH_TIMEOUT(page.canonical(), edited, 10000);
     QTRY_COMPARE_WITH_TIMEOUT(page.pageText(), edited, 10000);
     const int documentRevision = page.backend.documentRevision();
-    QSignalSpy ready(page.bridge(), &EditorBridge::readyChanged);
+    int connections = 0;
+    QObject readinessObservation;
+    QObject::connect(page.bridge(), &EditorBridge::readyChanged, &readinessObservation, [&] {
+        if (page.bridge()->isReady()) ++connections;
+    });
     QSignalSpy notices(pane, SIGNAL(noticeRequested(QString)));
     QVERIFY(signalLiveRendererCrash(view));
+    QVERIFY(!page.bridge()->isReady());
     QTest::qWait(200);
-    QCOMPARE(ready.count(), 0); // Give the UI time to recover before retrying.
+    QCOMPARE(connections, 0); // Give the UI time to recover before retrying.
     auto *automaticRetry = page.root->findChild<QObject *>("liveEditorAutomaticRetry");
     QVERIFY(automaticRetry);
     QVERIFY(automaticRetry->property("running").toBool());
     // Duplicate reports during the delay must not queue a second reload.
     QVERIFY(signalLiveRendererCrash(view));
-    QTRY_COMPARE_WITH_TIMEOUT(ready.count(), 1, 15000);
+    QTRY_COMPARE_WITH_TIMEOUT(connections, 1, 15000);
     QVERIFY(!automaticRetry->property("running").toBool());
     pane->setProperty("visible", false); // Failure of a Source-hidden prewarm.
     QVERIFY(signalLiveRendererCrash(view));
     QTest::qWait(1600); // Beyond the retry delay: a second crash must stay stopped.
-    QCOMPARE(ready.count(), 1);
+    QCOMPARE(connections, 1);
     QVERIFY(!pane->property("loadError").toString().isEmpty());
     QVERIFY(!notices.isEmpty()); // Source receives the nonmodal workspace notice.
     pane->setProperty("visible", true); // Selecting Live exposes its inline error.
@@ -55,14 +60,20 @@ void FomawriteTest::liveEditorRendererRecoveryIsBoundedAndPreservesCanonicalEdit
     QVERIFY(!notices.isEmpty());
     QCOMPARE(page.canonical(), edited);
     QCOMPARE(page.backend.documentRevision(), documentRevision);
-    QCOMPARE(page.pageText(), edited);
+    // A stopped page must not answer persistence queries. The canonical text
+    // remains intact here; the reconnected page is checked exactly after Retry.
+    QVERIFY(!page.bridge()->isReady());
+    QSignalSpy stoppedRequests(page.bridge(), &EditorBridge::requestText);
+    page.bridge()->fetchText();
+    QTest::qWait(20);
+    QVERIFY(stoppedRequests.isEmpty());
     // Repeated crash reports cannot extend a retry timer or queue more reloads.
     QVERIFY(signalLiveRendererCrash(view));
     QTest::qWait(1200);
-    QCOMPARE(ready.count(), 1);
+    QCOMPARE(connections, 1);
     QCOMPARE(page.canonical(), edited);
     QVERIFY(cycle102Click(page.window, retry));
-    QTRY_COMPARE_WITH_TIMEOUT(ready.count(), 2, 15000);
+    QTRY_COMPARE_WITH_TIMEOUT(connections, 2, 15000);
     QTRY_VERIFY(pane->property("loadError").toString().isEmpty());
     QVERIFY(!error->isVisible());
     QCOMPARE(page.pageText(), edited);

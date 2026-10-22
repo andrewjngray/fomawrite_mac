@@ -405,6 +405,11 @@ void FomawriteTest::footerCompactStylesRemainReachableAcrossModes() {
                     QVERIFY(cycle102Click(quick, mode));
                 }
             }
+            // Await the requested editor transition before inspecting or
+            // interacting with its pane-owned style controls.
+            QTRY_VERIFY(!window->property("lifecycleInputBlocked").toBool());
+            if (QString::fromLatin1(name) == "sourceModeButton") QTRY_VERIFY(!layout->property("liveEditEnabled").toBool());
+            if (QString::fromLatin1(name) == "liveEditToggle") QTRY_VERIFY(layout->property("liveEditEnabled").toBool());
             QTRY_VERIFY(cycle117PaneFooterAnchors(window.data()));
             // Compact pane selectors keep a readable Aa label instead of an
             // ellipsis; narrow padding must leave the full text inside its hit area.

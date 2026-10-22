@@ -119,6 +119,8 @@ void FomawriteTest::headerQuickZoomPreservesMarkdownAndUndo() {
     QCOMPARE(zoom->property("previewZoom").toInt(), 110);
     for (const QString &mode : {QStringLiteral("live"), QStringLiteral("preview"), QStringLiteral("source")}) {
         QVERIFY(QMetaObject::invokeMethod(window.data(), "selectWritingMode", Q_ARG(QVariant, mode)));
+        QTRY_COMPARE(window->property("documentBarrierRequest").toInt(), 0);
+        if (mode == QStringLiteral("source")) QTRY_VERIFY(!layout->property("liveEditEnabled").toBool());
         QTRY_VERIFY(!window->property("changingDocumentView").toBool());
         QCOMPARE(zoom->property("sourceZoom").toInt(), 110); QCOMPARE(zoom->property("previewZoom").toInt(), 110);
         QCOMPARE(editor->property("text").toString(), draft);

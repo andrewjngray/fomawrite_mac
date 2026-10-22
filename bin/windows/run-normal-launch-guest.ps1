@@ -217,11 +217,12 @@ try {
     $stage = 'file-menu-and-native-picker'
     Open-Menu 'File' ('^Open File' + [char]0x2026 + '$')
     $dialog = Native-Picker 'Open'
+    $openPickerHandle = [IntPtr]$dialog.Current.NativeWindowHandle
     [NormalLaunchInput]::RequireInputForeground()
     [NormalLaunchInput]::Chord(0x12, 0x4E) # Alt+N: native File name
     [NormalLaunchInput]::Type($sample)
     [NormalLaunchInput]::Press(0x0D)
-    Wait-For { Find-Control '^normal-launch-sample\.md$' } 'opened document title' | Out-Null
+    Wait-For { [NormalLaunchInput]::OpenedDocument($script:main, $openPickerHandle, 'normal-launch-sample.md - Fomawrite') } 'opened document title' | Out-Null
     # Require a readable editor with exact source before altering the fixture.
     Open-Menu 'View' '^Source$'
     $editor = Wait-For { Find-Control '^Markdown editor$' } 'Source editor'

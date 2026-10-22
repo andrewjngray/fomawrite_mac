@@ -128,6 +128,13 @@ private slots:
     void liveImagesSaveBesideTheDocument();
     void liveEditorPastesImagesThroughTheHost();
     void liveEditorPageMirrorsUserEditsByteExactly();
+    void liveUndoSaveWaitsForCurrentPage();
+    void liveSaveAsAndSelectionCommandsPreserveOrdering();
+    void liveCloseWaitsBeforeDirtyDecisionAndSave();
+    void liveCloseBlocksPostSnapshotMutations();
+    void liveQuitPreparationWaitsAndGlobalCancelRestoresWindows();
+    void livePersistenceRejectsStaleDocumentsAndRendererLoss();
+    void livePersistenceMismatchAndTimeoutFailClosed();
     void liveEditorRendererRecoveryIsBoundedAndPreservesCanonicalEdits();
     void liveEditorRoundTripsPersistenceFixturesThroughThePage();
     void liveEditorLoadsLargeDocumentQuickly();
@@ -523,14 +530,15 @@ private slots:
         auto *search = window->findChild<QQuickItem *>("searchField");
         QVERIFY(layout && editor && drawer && prompt && search);
         window->setProperty("width", 720);
-        // Enter the view through its real route; assigning a remembered focus
-        // flag while Source owns focus no longer describes a valid UI state.
+        // Prepare the draft in Source before entering Live, so the real page
+        // and host both contain the writing that navigation must protect.
+        const QString draft = "Keep **unsaved** writing.\n";
+        editor->setProperty("text", draft);
         QVERIFY(QMetaObject::invokeMethod(window.data(), "selectWritingMode", Q_ARG(QVariant, "live")));
+        QTRY_VERIFY_WITH_TIMEOUT(backend.editorBridge()->isReady(), 20000);
         QTRY_COMPARE(layout->property("effectiveLayoutMode").toInt(), 0);
         QVERIFY(layout->property("liveEditEnabled").toBool());
         QTRY_VERIFY(!window->property("changingDocumentView").toBool());
-        const QString draft = "Keep **unsaved** writing.\n";
-        editor->setProperty("text", draft);
         QVERIFY(QMetaObject::invokeMethod(window.data(), "toggleWorkspacePane", Q_ARG(QVariant, "organizer")));
         QTRY_VERIFY(drawer->property("opened").toBool());
         backend.library()->setProperty("rootFolder", QUrl::fromLocalFile(directory.path()));
@@ -1975,7 +1983,14 @@ private slots:
     void templatesSharePreviewAndExportWithoutEditingSource() {
         QTemporaryDir dir;
         Backend backend;
-        const auto reset = qScopeGuard([&] { backend.setOutputStyle(0); backend.discardRecovery(); });
+        const QStringList customKeys{"output/font", "output/size", "output/header", "output/footer", "output/titlePage", "output/pageFurniture", "output/userStyleId"};
+        QMap<QString, QVariant> savedCustom;
+        for (const QString &key : customKeys) if (QSettings().contains(key)) savedCustom.insert(key, QSettings().value(key));
+        const auto reset = qScopeGuard([&] {
+            backend.setOutputStyle(0); backend.discardRecovery();
+            QSettings settings;
+            for (const QString &key : customKeys) { if (savedCustom.contains(key)) settings.setValue(key, savedCustom.value(key)); else settings.remove(key); }
+        });
         QQmlEngine engine; engine.rootContext()->setContextProperty("backend", &backend);
         QQmlComponent component(&engine, QUrl::fromLocalFile(QFINDTESTDATA("../src/Main.qml")));
         QScopedPointer<QObject> window(component.create()); QVERIFY2(window, qPrintable(component.errorString()));
@@ -1995,7 +2010,25 @@ QtObject {
  property string result: ""
  function inspect() {
   result = "";
-  target.runJavaScript("(function(){var s=getComputedStyle(document.body);var h=document.querySelector('#write h1');var p=document.querySelector('#write > p');return {title:h?h.textContent:'',font:s.fontFamily,leading:parseFloat(s.lineHeight)/parseFloat(s.fontSize),indent:p?parseFloat(getComputedStyle(p).textIndent):0,tables:document.querySelectorAll('#write table').length,code:document.querySelector('#write pre code')?document.querySelector('#write pre code').textContent:''};})()", 1, function(value){probe.result=JSON.stringify(value);});
+  target.runJavaScript(`(function(){
+    var s=getComputedStyle(document.body), h=document.querySelector('#write h1'), p=document.querySelector('#write > p');
+    function metrics(family) {
+      var span=document.createElement('span');
+      span.style.cssText='position:absolute;visibility:hidden;display:inline-block;white-space:pre;font:48px '+family+';';
+      document.body.appendChild(span);
+      function width(text) { span.textContent=text; return span.getBoundingClientRect().width; }
+      var result={sample:width('Wim 0123456789 uppercase lowercase'),i:width('iiiiiiii'),w:width('WWWWWWWW')};
+      span.remove(); return result;
+    }
+    // Exercise the real browser fallback even on a Mac where the preferred
+    // family exists. Only the first requested family is made unavailable;
+    // every fallback comes from the application's actual computed CSS stack.
+    var comma=s.fontFamily.indexOf(',');
+    var fallback='"Fomawrite unavailable test family 7f62b308"'+(comma<0?'':s.fontFamily.slice(comma));
+    return {title:h?h.textContent:'',font:s.fontFamily,fallback:metrics(fallback),sans:metrics('Arial,Helvetica,sans-serif'),serif:metrics('Georgia,"Times New Roman",serif'),
+      leading:parseFloat(s.lineHeight)/parseFloat(s.fontSize),indent:p?parseFloat(getComputedStyle(p).textIndent):0,
+      tables:document.querySelectorAll('#write table').length,code:document.querySelector('#write pre code')?document.querySelector('#write pre code').textContent:''};
+  })()`, 1, function(value){probe.result=JSON.stringify(value);});
  }
 })QML", QUrl());
         QScopedPointer<QObject> probe(probeComponent.create()); QVERIFY2(probe, qPrintable(probeComponent.errorString()));
@@ -2005,8 +2038,20 @@ QtObject {
         backend.saveAs(QUrl::fromLocalFile(dir.filePath("Source.md")));
         const QString evidence = qEnvironmentVariable("FOMAWRITE_TEMPLATE_EVIDENCE");
         if (!evidence.isEmpty()) QVERIFY(QDir().mkpath(evidence));
-        for (int style : {0, 1, 2, 4, 5, 6, 7, 0}) {
-            backend.setOutputStyle(style);
+        const struct { int style; const char *customFamily; const char *category; } cases[] = {
+            {0, nullptr, "sans-serif"}, {1, nullptr, "serif"}, {2, nullptr, "monospace"},
+            {4, nullptr, "sans-serif"}, {5, nullptr, "sans-serif"}, {6, nullptr, "serif"}, {7, nullptr, "serif"},
+            {3, "Fomawrite Missing Mono Fixture", "monospace"}, {3, "Fomawrite Missing Sans Fixture", "sans-serif"},
+            {3, "Fomawrite Missing Serif Fixture", "serif"}, {3, "Arial Unicode MS", "sans-serif"}, {0, nullptr, "sans-serif"}
+        };
+        for (const auto &item : cases) {
+            const int style = item.style;
+            if (item.customFamily) {
+                QFile custom(dir.filePath("fallback-custom.json")); QVERIFY(custom.open(QIODevice::WriteOnly));
+                custom.write(QJsonDocument(QJsonObject{{"fontFamily", QString::fromLatin1(item.customFamily)}, {"pointSize", 12}}).toJson()); custom.close();
+                QVERIFY(backend.loadOutputStyle(QUrl::fromLocalFile(custom.fileName())));
+                QCOMPARE(backend.outputFont(), QString::fromLatin1(item.customFamily));
+            } else backend.setOutputStyle(style);
             const auto previousUrl = pane->property("outputUrl").toUrl();
             QVERIFY(QMetaObject::invokeMethod(pane, "reload"));
             QTRY_VERIFY(pane->property("outputUrl").toUrl() != previousUrl);
@@ -2016,6 +2061,21 @@ QtObject {
             const auto dom = QJsonDocument::fromJson(probe->property("result").toString().toUtf8()).object().toVariantMap();
             QCOMPARE(dom["title"].toString(), QString("Template specimen"));
             QVERIFY(dom["font"].toString().contains(backend.outputFont()));
+            const auto fallback = dom.value("fallback").toMap();
+            const double actual = fallback.value("sample").toDouble();
+            const double sans = dom.value("sans").toMap().value("sample").toDouble();
+            const double serif = dom.value("serif").toMap().value("sample").toDouble();
+            QVERIFY2(qAbs(sans - serif) > .5, "The rendered probe must distinguish sans and serif fonts on this machine");
+            const QString category = QString::fromLatin1(item.category);
+            if (category == QLatin1String("sans-serif"))
+                QVERIFY2(qAbs(actual - sans) < .01, qPrintable(QStringLiteral("Style %1 missing-primary glyph width %2 must equal rendered sans fallback %3 (serif %4)").arg(style).arg(actual).arg(sans).arg(serif)));
+            else if (category == QLatin1String("monospace"))
+                QVERIFY2(qAbs(fallback.value("i").toDouble() - fallback.value("w").toDouble()) < .01, "Missing-primary monospace fallback must render equal-width i and W glyphs");
+            else {
+                QVERIFY2(qAbs(actual - sans) > .5, "Missing-primary serif fallback must render differently from sans");
+                QVERIFY(qAbs(fallback.value("i").toDouble() - fallback.value("w").toDouble()) > .5);
+            }
+
             QVERIFY(qAbs(dom["leading"].toDouble() - (style == 2 || style == 7 ? 2.0 : 1.5)) < .01);
             QCOMPARE(dom["tables"].toInt(), 1); QVERIFY(dom["code"].toString().contains("answer = 42"));
             if (style == 7) QVERIFY(dom["indent"].toDouble() > 0);
@@ -2026,6 +2086,15 @@ QtObject {
             QFile html(htmlPath); QVERIFY(html.open(QIODevice::ReadOnly));
             const auto bytes = html.readAll();
             QVERIFY(bytes.contains(backend.outputFont().toUtf8()));
+            const auto fontRule = QRegularExpression(QStringLiteral("body\\s*\\{[^}]*font-family\\s*:\\s*([^;]+);")).match(QString::fromUtf8(bytes));
+            QVERIFY(fontRule.hasMatch());
+            const QString exportedStack = fontRule.captured(1).trimmed();
+            QVERIFY2(exportedStack.endsWith(category), qPrintable(exportedStack));
+            QString previewStack = dom.value("font").toString();
+            previewStack.remove(QRegularExpression(QStringLiteral("[\\s\"']")));
+            QString exportStack = exportedStack; exportStack.remove(QRegularExpression(QStringLiteral("[\\s\"']")));
+            QCOMPARE(exportStack, previewStack);
+
             QVERIFY(bytes.contains("<table"));
             QVERIFY(bytes.contains("answer"));
             if (style == 7) QVERIFY(bytes.contains("text-indent: 3em"));
@@ -5847,3 +5916,5 @@ int main(int argc, char **argv) {
 #include "cycle151-folder-history.inc"
 #include "cycle152-omawrite-source.inc"
 #include "cycle152-omawrite-style.inc"
+
+#include "live-persistence.inc"
