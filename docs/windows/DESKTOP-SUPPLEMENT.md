@@ -2,7 +2,7 @@
 
 This maintained driver covers six physical Windows input workflows: Open by Path cancellation, Command Palette cancellation, Review toggle, Next Issue, Previous Issue, and Window → Center. It composes the current normal-launch driver and helper; it returns to that driver for Source preservation, normal Exit, ordinary relaunch and restored-document checks. It makes no Print claim.
 
-This is a reproducible **future acceptance harness**, not new qualification of the b056 package. No interactive desktop execution, native PowerShell parse or C# compilation has been performed for this maintained composition. The historical failures in [M2-DESKTOP-B056.md](M2-DESKTOP-B056.md) remain unchanged. This covers parts of [TEST-MATRIX.md](TEST-MATRIX.md) W11/W13/W14; the wider matrix remains applicable.
+This is a reproducible **future acceptance harness**, not new qualification of the b056 package. Native Windows PowerShell 5.1 parsing, generated-driver preparation and combined C# helper compilation passed on ARM64 and x64 in commit `385340d` ([CI run](https://github.com/andrewjngray/fomawrite_mac/actions/runs/39824399841)). The ten preparation/identity checks send no input and launch no application. Interactive desktop execution of this maintained composition remains pending. The historical failures in [M2-DESKTOP-B056.md](M2-DESKTOP-B056.md) remain unchanged. This covers parts of [TEST-MATRIX.md](TEST-MATRIX.md) W11/W13/W14; the wider matrix remains applicable.
 
 ## Sources and preparation
 
@@ -46,17 +46,37 @@ Required captures include `desktop-open-path.png`, `desktop-palette.png`, `deskt
 
 Print cancellation remains open: the observed modern printer dialog needs trustworthy lifecycle and ownership observations before a maintained continuation can safely choose Cancel. Clipboard/search follow-through, nested-menu completeness, multiple displays/scales and the remaining distribution and endurance matrix are separate qualifications. This supplement never touches the clipboard and does not resolve the earlier unknown restoration.
 
-## Resume checklist — draft, not an acceptance gate
+## Independent verification
 
-The overnight VM was released on 22 October 2026; this draft was prepared on the host afterwards without sending any more VM input. The 87 existing Python deployment/normal-launch/Live/installer guards were rerun successfully. They do not validate this new composition. No application source, packaged build or CI wiring changed in this draft.
+`bin/windows/check-desktop-supplement.py` checks the exact package and StageOnly receipt, reconstructs both generated files from five maintained sources, validates evidence hashes, six ordered workflows, per-action witness times, focused issue selections, DWM geometry and the ordinary normal-launch Exit/reopen follow-through. It does not run the app or modify raw reports.
 
-Before using this as an acceptance gate:
+```sh
+python3 bin/windows/check-desktop-supplement.py \
+  --package /absolute/path/to/exact/package \
+  --verify-report /absolute/path/to/run/evidence/desktop-supplement-report.json \
+  --expected-executable 'C:\exact\local\package\Fomawrite.exe' \
+  --source-root /absolute/path/to/exact/driver-source-snapshot
+```
 
-1. Parse the wrapper, steps and generated PowerShell with native Windows PowerShell 5.1 and compile the combined C# helper; retain exact source hashes. Use CI for this preparation without taking over the user desktop.
-2. Add an independent Python verifier and negative fixtures. Reconstruct the generated sources from their five recorded inputs, verify every evidence hash and copied staging receipt, and run the existing normal-launch verifier with the additional workflow stage. Never change raw pending flags.
-3. Require six ordered successful workflows, exact fixture bytes, owned and focused next/previous selections, successful DWM geometry, preserved monitor/size, and three stable centered samples spanning at least 300 ms. Use the retained R8 outer-border discrepancy as a geometry fixture.
-4. Require a separate review receipt bound to the exact raw report and opening/closing captures before claiming Review acceptance. It must show the Harper label and all three fixture spelling cards. Missing or two-card evidence remains pending.
-5. Add those rejection fixtures and native parse/compile validation to CI, then request a fresh unattended VM session for actual execution and normal exit/reopen. Do not transfer old package evidence to a newly stamped build.
-6. Complete Print cancellation separately after observing the ownership and lifecycle of the second Windows printer UI. Clipboard/search, nested menus, installer and wider display/endurance checks remain separate open work.
+Omit `--source-root` only when the current maintained sources match the run byte for byte. Windows CI checks out these scripts as CRLF; the verifier preserves those bytes rather than treating an LF checkout as identical. Independent reconstruction from an exact CRLF snapshot matched both native preparation receipts and both generated file hashes.
 
-This draft is intentionally not wired into release acceptance until the above validation is implemented. The source wrappers fail closed on identity/composition mismatches, but independent verifier coverage is still missing.
+A complete workflow without independent visual review exits **2**, with `workflowPassed=true`, `passed=false`, and `qualificationPending=true`. Structural failures exit **1**. A scoped pass exits **0** only when `--visual-review` supplies an independently reviewed JSON receipt containing:
+
+- `schemaVersion: 1`, `gate: "windows-desktop-supplement-visual-review"`, `reviewedBy` and `reviewedUtc` after the run.
+- `reportSha256` of the exact unchanged raw report.
+- `captures` mapping `desktop-review-open.png` and `desktop-review-toggle.png` to their exact SHA-256 values.
+- `engine: "Harper 2.10.0 (built-in)"`, `cards: ["flomptoid", "recieve", "quorbleflat"]`, and `reviewClosed: true`, all established by inspecting those exact captures.
+
+Never create that receipt by copying the expected values without reviewing the images. The verifier cannot itself establish what the screenshots show. Its result always declares `scope: "review-center-supplement"` and `fullM2Acceptance: false`.
+
+Forty-one supplemental fixture tests cover rejected/corrupted evidence and the valid scoped/pending paths, including invisible resize borders and exact CRLF composition. These are verifier tests, not app acceptance. They run alongside the existing deployment guards in Windows CI. The ten native preparation guards run separately and retain their own receipts.
+
+## Remaining acceptance work
+
+The VM was released after the overnight session on 22 October 2026; all work described above after release was host/CI work without VM input. Application source and the tested b056 packages remain unchanged.
+
+1. After another unattended VM session is authorized, run the maintained composition against the exact verified local package with a fresh profile, then verify the full normal Exit/reopen follow-through.
+2. Inspect the exact Review captures and record the separate visual receipt only if the label, three cards and closing behavior are visible. Two-card evidence stays pending.
+3. Complete Print cancellation separately after observing ownership and lifecycle of the second Windows printer UI. Clipboard/search, nested menus, installer and wider display/endurance checks remain separate open work.
+
+Full M2 qualification remains open. Current complete CI status is recorded in [STATUS.md](STATUS.md); a green preparation step does not establish that the entire run passed.

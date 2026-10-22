@@ -1,7 +1,7 @@
 # Windows workstream status
 
 
-**Host-only draft after VM release:** the [Review/Center supplementary harness](DESKTOP-SUPPLEMENT.md) is saved for the next session. Existing Python guards pass 87/87; new native validation, independent verifier and desktop execution are pending. This draft changes no app/build and adds no acceptance claim.
+**Host/CI follow-through after VM release:** the [Review/Center supplementary harness](DESKTOP-SUPPLEMENT.md) passed ten native preparation/parse/compile checks on each Windows architecture at `385340d`. Its independent verifier has 41 passing fixture tests (128 including the existing Python guards). Current full CI is pending; no new ordinary desktop run or app/build change is claimed. Interactive qualification requires another unattended VM session.
 Updated: 22 October 2026 UTC / 23 October Brisbane. Windows only; the root `STATUS.md` records the Mac baseline.
 
 ## Current state — `b056ab5`, not promoted
