@@ -14,6 +14,12 @@ Updated: 22 October 2026. This file tracks Windows only. The root `STATUS.md` re
 - Local affected regressions: **10 passed, 0 failed, 0 skipped** (eight slots plus setup/cleanup), following a reproduced narrow-footer failure. The rebuilt isolated Mac app passed **124 scenarios, 0 failures, 0 QML warnings**.
 - Mac checkout, root status and installed applications remain unchanged. No compiler or Qt SDK was installed in the Windows guest.
 
+## User-reported normal-launch failure
+
+After M1, Andrew reported that menus open but their actions, buttons and folder navigation do not work when double-clicking the ARM64 app. The running executable hash matched `b45cb34`; it was running from the Mac-shared Desktop. Root cause remains unconfirmed, and there is **no newer fixed build**. This report blocks recommending the candidate for ordinary use even though the bounded diagnostic harness passed.
+
+A [versioned testing shelf](TESTING-BUILDS.md) is now available at `dist/windows-testing`, with the existing ARM64/x64 ZIPs, complete extracted app folders and a manual results template. All extracted files were checked against their package manifests. This verifies copying and identity, not normal-launch functionality. Next priority is a normal-launch/native-input reproduction and fix, testing Windows-local storage and shared storage separately.
+
 ## Scope and remaining qualification
 
 M1 covers an executable, reproducible CI and isolated deployed Source/Live/Web/PDF proof. Checker input is synthetic Qt key/pointer events; it does not qualify normal startup/restore or physical input. Windows updater commands remain disabled until W12; only bundled Harper is supported. Legacy native-checker fixture skips do not establish full Windows Review UI parity. The [skip scope](M1-EVIDENCE.md#windows-skip-scope) and [M2 menu omissions](M1-EVIDENCE.md#windows-m2-menu-limits) remain explicit.
