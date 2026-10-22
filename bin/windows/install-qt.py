@@ -14,11 +14,46 @@ import shutil
 import subprocess
 import tempfile
 import urllib.request
+import urllib.error
+import urllib.parse
 
 
 def sha(path, algorithm="sha256"):
     with path.open("rb") as stream:
         return hashlib.file_digest(stream, algorithm).hexdigest()
+
+
+# These HTTPS mirrors are listed by Qt. Fallback preserves the exact locked path
+# and checksum; a newer repository revision is never selected automatically.
+QT_MIRRORS = ("https://qt.mirror.constant.com", "https://www.nic.funet.fi/pub/mirrors/download.qt-project.org")
+
+
+def download_archive(entry, archive):
+    url = entry["url"]
+    parsed = urllib.parse.urlsplit(url)
+    if (parsed.scheme != "https" or parsed.netloc != "download.qt.io"
+            or not parsed.path.startswith("/online/qtsdkrepository/")
+            or parsed.query or parsed.fragment):
+        raise SystemExit(f"Unexpected archive origin: {url}")
+    if not re.fullmatch(r"[0-9a-f]{40}", entry["sha1"]):
+        raise SystemExit("Invalid pinned Qt checksum")
+    candidates = (url, *(mirror + parsed.path for mirror in QT_MIRRORS))
+    for index, candidate in enumerate(candidates):
+        try:
+            with urllib.request.urlopen(candidate) as response, archive.open("wb") as output:
+                acquisition_url = response.geturl()
+                shutil.copyfileobj(response, output)
+        except urllib.error.HTTPError as error:
+            # Only a missing exact archive may use the next fixed mirror.
+            # Authentication, throttling, server errors and TLS failures are fatal.
+            if error.code != 404 or index == len(candidates) - 1:
+                raise
+            print(f"Pinned Qt archive returned HTTP 404; trying fixed mirror: {candidates[index + 1]}", flush=True)
+            continue
+        if sha(archive, "sha1") != entry["sha1"]:
+            raise SystemExit(f"Qt archive checksum mismatch: {candidate}")
+        return acquisition_url
+    raise AssertionError("Qt archive candidates exhausted without a result")
 
 
 def install(lock_path, architecture, output, seven_zip):
@@ -38,10 +73,8 @@ def install(lock_path, architecture, output, seven_zip):
                 raise SystemExit("Invalid pinned Qt checksum")
             archive = Path(temporary) / f"{index}.7z"
             print(f"Downloading {entry['package']} ({entry['packageVersion']})", flush=True)
-            urllib.request.urlretrieve(url, archive)
-            if sha(archive, "sha1") != entry["sha1"]:
-                raise SystemExit(f"Qt archive checksum mismatch: {url}")
-            records.append({**entry, "sha256": sha(archive)})
+            acquisition_url = download_archive(entry, archive)
+            records.append({**entry, "acquisitionUrl": acquisition_url, "sha256": sha(archive)})
             # Official native archives are relative to the kit root (bin/, lib/, ...).
             subprocess.run([seven_zip, "x", "-y", f"-o{output}", str(archive)], check=True,
                            stdout=subprocess.DEVNULL)

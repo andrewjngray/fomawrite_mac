@@ -48,6 +48,18 @@ must be read from each build's manifest. Sources: [ARM runner availability](http
 for both native kits, including their WebEngine/PDF extension repositories.
 The installer verifies those hashes before extraction, records SHA-256 hashes,
 and verifies the relocated qmake version/prefix and required modules.
+
+On 22 October 2026 the official origin replaced its September archive revision;
+[run 39759214639](https://github.com/andrewjngray/fomawrite_mac/actions/runs/39759214639)
+failed with HTTP 404 before either build. The installer preserves the existing
+locked paths and checksums. Only HTTP 404 permits trying Constant Hosting then
+Funet, two HTTPS mirrors on [Qt's official mirror list](https://download.qt.io/static/mirrorlist/).
+Other HTTP errors, TLS/network errors and checksum mismatches remain fatal; no
+newer revision is selected. Installation records the actual acquisition URL
+alongside the locked URL and verified hashes. All 20 locked archive paths returned
+HTTP 200 on Constant; both downloaded base archives matched their original pins.
+This verifies archive availability, not final builds or desktop acceptance.
+
 [Bootstrap run 39670164799](https://github.com/andrewjngray/fomawrite_mac/actions/runs/39670164799)
 installed and verified both native Qt SDKs. It then failed at the same
 Visual Studio environment command quoting defect, before compiling the app.
