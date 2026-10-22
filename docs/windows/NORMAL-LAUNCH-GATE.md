@@ -56,7 +56,8 @@ character pair. It requires all of:
 1. An ordinary application window with acknowledged isolation.
 2. The organizer's **Add library location** button opening a native Windows
    folder picker. Selecting the new writing location must reveal the sample in
-   the Library.
+   the Library. The driver waits for the confirmation button to become enabled
+   after shell navigation, rather than assuming a fixed delay is sufficient.
 3. **File → Open File…** opening a native file picker. The chosen document must
    appear in Source with its exact sample text.
 4. Windows keyboard input (Shift+Enter for each literal Source newline) replacing that sample and **File → Save** persisting
@@ -102,3 +103,8 @@ Run Windows-local NTFS and Mac-shared storage as separate candidates/evidence
 runs when qualifying both locations. This small gate does not establish
 hardware input, arbitrary existing user profiles, broader dialogs, localization,
 DPI, installer or full daily-writing acceptance.
+
+The non-UI `windows/test_normal_launch_wait.ps1` fixture exercises the actual
+driver wait/selection logic for delayed readiness, timeout and process exit.
+It accepts `-DriverPath` to verify red/green against a saved earlier driver.
+Its three checks complement the report verifier and actual desktop runs.

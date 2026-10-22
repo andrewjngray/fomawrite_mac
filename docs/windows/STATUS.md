@@ -4,7 +4,7 @@ Updated: 22 October 2026. Windows only; the root `STATUS.md` records the Mac bas
 
 ## Current repair candidate
 
-Candidate code: **`d573f1666d68efaee0b60f43f04d3fe1e96781c4`**, branch `windows/port`, checkout `/Users/andrewgray/repo/projects/fomawrite_windows`. **M2 qualification remains open.** Both CI runs, final package identities, the standard ARM64 VM normal-launch gate, a shared-document supplement, the packaged ARM64 starter and the separate 124-scenario ARM64 guest document-view diagnostic have passed. Verified packages are promoted under `dist/windows-testing/builds/d573f16-{arm64,x64}/`; the ARM64 entry is `dist/windows-testing/START-WINDOWS-ARM64.cmd`. x64 has CI verification only, with no final VM normal-launch run.
+Candidate code: **`d573f1666d68efaee0b60f43f04d3fe1e96781c4`**, branch `windows/port`, checkout `/Users/andrewgray/repo/projects/fomawrite_windows`. **M2 qualification remains open.** Both CI runs, final package identities, the standard ARM64 VM normal-launch gate, a shared-document supplement, the packaged ARM64 starter and the separate 124-scenario ARM64 guest document-view diagnostic have passed. Verified packages are promoted under `dist/windows-testing/builds/d573f16-{arm64,x64}/`; the ARM64 entry is `dist/windows-testing/START-WINDOWS-ARM64.cmd`. x64 native CI and the ordinary VM workflow under ARM64 emulation also passed; no physical x64-machine test is claimed.
 
 The candidate reserves the Organizer scrollbar gutter so invisible scrollbars cannot intercept action-button centres, bounds automatic Live renderer recovery to one delayed retry with visible failure/retry controls, preserves canonical edits during reconnect, and includes the manifest-verifying Windows-local portable starter. The [repair record](M2-REPAIR-EVIDENCE.md) separates these changes from the earlier diagnostic comparisons.
 
@@ -20,7 +20,7 @@ The candidate reserves the Organizer scrollbar gutter so invisible scrollbars ca
 
 - Port applicable Mac regression fixtures onto the bundled Harper backend and Windows menu objects. Audit the 39 Windows skips individually; do not count skips as passes.
 - Extend actual desktop acceptance beyond the completed ARM64 workflow to the remaining capabilities in the test matrix.
-- Final x64 VM normal-launch acceptance remains untested; x64 CI is green.
+- Both architectures now pass the ordinary VM workflow. Broaden the coverage beyond this six-stage gate; physical x64 hardware remains untested.
 
 The separate ARM64 guest diagnostic passed **124 scenarios, 0 failures, 0 QML warnings**, with exact package/receipt verification. The original ZIPs, extracted applications and copy receipts are in the versioned testing folders; older packages remain preserved.
 

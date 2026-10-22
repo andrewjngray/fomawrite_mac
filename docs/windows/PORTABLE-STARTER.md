@@ -69,7 +69,7 @@ Exact package/report identities and the retained initial environment-blocked
 attempt are in [M2 repair evidence](M2-REPAIR-EVIDENCE.md).
 
 The separate ARM64 guest document-view diagnostic passed all 124 scenarios
-with no failures or QML warnings; the verified packages are promoted to the shelf. Final x64 VM normal-launch acceptance has not run.
+with no failures or QML warnings; the verified packages are promoted to the shelf. The x64 ordinary-launch gate also passed under ARM64 VM emulation.
 Shared-source staging into the local cache and shared-document writing do not
 qualify direct shared-folder WebEngine execution. Wider profiles, displays,
 installer and distribution acceptance remain open.

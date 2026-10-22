@@ -1,6 +1,6 @@
 # Windows M2 repair evidence
 
-Updated: 22 October 2026. Current repair candidate: **`d573f1666d68efaee0b60f43f04d3fe1e96781c4`**. **ARM64 normal-launch and packaged-starter acceptance passed.** The separate ARM64 guest document-view diagnostic also passed; verified packages are promoted to the testing shelf. Final x64 VM normal-launch acceptance is untested. The Mac baseline is unchanged.
+Updated: 22 October 2026. Current repair candidate: **`d573f1666d68efaee0b60f43f04d3fe1e96781c4`**. **ARM64 normal-launch and packaged-starter acceptance passed.** The separate ARM64 guest document-view diagnostic also passed; verified packages are promoted to the testing shelf. The x64 normal-launch gate also passed under ARM64 VM emulation after correcting a driver timing race, as recorded below. The Mac baseline is unchanged.
 
 ## Final candidate checkpoint
 
@@ -92,8 +92,23 @@ The local executable was `C:\Users\andrewgray\AppData\Local\Fomawrite\Portable\a
 
 The same Windows-local ARM64 package passed the separate deployed Source/Live/Web/PDF checker: **124 scenarios, 0 failures, 0 QML warnings**, fresh process exit zero. Report: `dist/windows-testing/results/deployed-d573-arm64-90586882612d4f15bb1005e1cb68d252/report.json`, SHA-256 **`8e0047073fd557a4599faed7f49d3e882da3a1292ec1b33de8a04fc24029e38e`**. `guest-run.json` records the run; `package-verification.json` reports `passed: true`, no failures, and the exact ARM64 commit/executable/manifest above. This synthetic Qt diagnostic supplements the ordinary Windows-input gate; it does not replace it.
 
-Verified originals and extracted packages were copied into new `dist/windows-testing/builds/d573f16-arm64/` and `builds/d573f16-x64/` folders. ZIP and every manifest file hash were rechecked, with no extra extracted application files except the manifest. Per-build and shelf `COPY-VERIFICATION.json`, `BUILD-CATALOG.json` and `START-HERE.txt` record the promotion. `START-WINDOWS-ARM64.cmd` points to the ARM64 packaged starter. Older builds remain unchanged. x64 is identified as CI/package verified, with final ordinary VM input still untested.
+Verified originals and extracted packages were copied into new `dist/windows-testing/builds/d573f16-arm64/` and `builds/d573f16-x64/` folders. ZIP and every manifest file hash were rechecked, with no extra extracted application files except the manifest. Per-build and shelf `COPY-VERIFICATION.json`, `BUILD-CATALOG.json` and `START-HERE.txt` record the promotion. `START-WINDOWS-ARM64.cmd` points to the ARM64 packaged starter. Older builds remain unchanged. x64 also passed the ordinary VM workflow under emulation in the follow-up below.
 
 ## Remaining qualification
 
-Windows test parity continues: 39 Qt skips require individual capability/fixture review; genuine platform exclusions must remain explicit. Final x64 normal-launch testing, wider user profiles, the DPI/display matrix, installer and distribution/licensing qualification remain open. The earlier `d8b8580` unobstructed-edge probe remains separate from the final standard centre-click pass. Direct shared-executable rendering is not claimed repaired by running verified local binaries.
+Windows test parity continues: 39 Qt skips require individual capability/fixture review; genuine platform exclusions must remain explicit. A physical x64 machine, wider user profiles, the DPI/display matrix, installer and distribution/licensing qualification remain open. The earlier `d8b8580` unobstructed-edge probe remains separate from the final standard centre-click pass. Direct shared-executable rendering is not claimed repaired by running verified local binaries.
+
+## Follow-up: picker readiness and x64 ordinary input
+
+The first final x64 run failed at the driver's one-shot Select Folder lookup after a fixed 500 ms navigation delay. The native picker and Select Folder control are visible in its retained screenshot/UIA evidence: `results/final-d573-x64-0aa354819b8347e19bdf6d23956af7e7/`. The driver now polls the real enabled/visible button through its existing bounded wait and aborts if the application exits; no input or result assertion was removed.
+
+`windows/test_normal_launch_wait.ps1` runs the actual parsed driver wait/selection logic with a non-UI delayed-control fixture. It failed against the prior driver at the original missing-button error; the corrected driver passed **3 checks** (delayed readiness, bounded timeout and app exit). CI invokes that fixture in a fresh Windows PowerShell process. This regression proves the driver behavior, not application UI behavior.
+
+Fresh unchanged-package ordinary desktop runs then passed all six stages on both architectures, with strict offline verification and two exit-zero launches each:
+
+| Architecture in Windows ARM64 VM | Report under `dist/windows-testing/results/` | Report SHA-256 |
+| --- | --- | --- |
+| ARM64 native | `final-d573-arm64-1d9f21c479ee49a79a16df1881779957/evidence/normal-launch-report.json` | `4a83afee4eee40d0e103b0bda1652298823bd28179904212e486c644fb939979` |
+| x64 emulated | `final-d573-x64-c5d3d25621a74a2b80b930fa7240e037/evidence/normal-launch-report.json` | `8d63882eef02ffc00bdaa35beee995ffef094cf22315bfa5c64b3504590f9047` |
+
+Each run retains its exact driver/helper and `normal-launch-verification.json`. The updated driver hashes differ from the earlier retained ARM64 run. Product/package identity remains `d573f16`; this follow-up changed the test driver only. No physical x64 machine or broader Windows parity is claimed.

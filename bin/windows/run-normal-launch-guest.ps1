@@ -206,9 +206,9 @@ try {
     [NormalLaunchInput]::Chord(0x12, 0x44) # Alt+D: native address bar
     [NormalLaunchInput]::Type($writing)
     [NormalLaunchInput]::Press(0x0D)
-    Start-Sleep -Milliseconds 500
-    $select = [NormalLaunchInput]::Find($dialog, '^Select Folder$')
-    if (-not $select) { throw 'Native folder picker has no Select Folder button.' }
+    # Shell navigation temporarily disables the confirmation button. Wait for
+    # its actual enabled state; a fixed delay races slower/emulated desktops.
+    $select = Wait-For { [NormalLaunchInput]::Find($dialog, '^Select Folder$') } 'enabled native Select Folder button'
     [NormalLaunchInput]::Click($select)
     Click-Control '^writing-normal-launch$'
     Wait-For { Find-Control '^normal-launch-sample\.md$' } 'sample file visible after Windows folder navigation' | Out-Null

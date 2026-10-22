@@ -2,7 +2,7 @@
 
 ## Current repair build
 
-Current repair code is **`d573f1666d68efaee0b60f43f04d3fe1e96781c4`**. ARM64/x64 CI and strict package identities passed. The final ARM64 standard centre-click VM gate, shared-document supplement and packaged starter passed with offline verification. The separate ARM64 guest document-view diagnostic passed 124 scenarios with no failures or QML warnings. Verified packages are now promoted to the testing shelf. x64 has no final VM normal-launch run. See [Windows status](STATUS.md) and [repair evidence](M2-REPAIR-EVIDENCE.md).
+Current repair code is **`d573f1666d68efaee0b60f43f04d3fe1e96781c4`**. ARM64/x64 CI and strict package identities passed. The final ARM64 standard centre-click VM gate, shared-document supplement and packaged starter passed with offline verification. The separate ARM64 guest document-view diagnostic passed 124 scenarios with no failures or QML warnings. Verified packages are now promoted to the testing shelf. x64 also passed the ordinary workflow under ARM64 VM emulation. See [Windows status](STATUS.md) and [repair evidence](M2-REPAIR-EVIDENCE.md).
 
 The Mac/shared collection folder is:
 
@@ -43,4 +43,4 @@ Different application directories may share ordinary preferences and themes. Pre
 
 ## Remaining qualification
 
-The ARM64 repair checkpoint is available for testing; broader Windows-versus-Mac parity work continues. Final x64 VM normal-launch acceptance, installer and wider desktop qualification remain open. [M2 repair evidence](M2-REPAIR-EVIDENCE.md#remaining-qualification) records the exact completed checks and limits.
+The ARM64 repair checkpoint is available for testing; broader Windows-versus-Mac parity work continues. Physical x64 hardware, installer and wider desktop qualification remain open. [M2 repair evidence](M2-REPAIR-EVIDENCE.md#remaining-qualification) records the exact completed checks and limits.
