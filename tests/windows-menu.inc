@@ -230,7 +230,60 @@ void FomawriteTest::windowsMenuWorkspaceActionsShareState() {
             if (candidate->property("title").toString() == title) return candidate;
         return nullptr;
     };
+    const auto navigateRow = [&](QObject *popup, QQuickItem *target) {
+        int targetIndex = -1;
+        for (int index = 0; index < popup->property("count").toInt(); ++index) {
+            QQuickItem *candidate = nullptr;
+            if (!QMetaObject::invokeMethod(popup, "itemAt", Q_RETURN_ARG(QQuickItem *, candidate), Q_ARG(int, index))) return -1;
+            if (candidate == target) targetIndex = index;
+        }
+        if (targetIndex < 0 || !popup->property("opened").toBool()) return -1;
+        cycle111KeyClick(f.quick, Qt::Key_Home);
+        for (int step = 0; step <= popup->property("count").toInt()
+             && popup->property("currentIndex").toInt() != targetIndex; ++step)
+            cycle111KeyClick(f.quick, Qt::Key_Down);
+        return popup->property("currentIndex").toInt() == targetIndex ? targetIndex : -1;
+    };
+    const auto clickPopupItem = [&](QObject *popup, QQuickItem *target) {
+        auto *viewport = qvariant_cast<QQuickItem *>(popup->property("contentItem"));
+        if (!viewport) return false;
+        const int index = navigateRow(popup, target);
+        // A dormant non-first row reports y=0 until its layout is polished.
+        // Observe its real position before choosing a wheel direction.
+        if (index < 0 || !QTest::qWaitFor([&] { return index == 0 || target->y() > 0; }, 1000)) return false;
+        const auto exposed = [&] {
+            const QPointF centre = target->mapToScene(QPointF(target->width()/2, target->height()/2));
+            if (!target->isVisible() || !target->isEnabled() || target->width() <= 0 || target->height() <= 0
+                || !QRectF(QPointF(0, 0), f.quick->size()).contains(centre)
+                || !viewport->mapRectToScene(viewport->boundingRect()).contains(centre)) return false;
+            for (auto *parent = target->parentItem(); parent; parent = parent->parentItem())
+                if (parent->clip() && !parent->mapRectToScene(parent->boundingRect()).contains(centre)) return false;
+            return true;
+        };
+        QElapsedTimer wheelClock; wheelClock.start();
+        for (int step = 0; step < 32 && !exposed(); ++step) {
+            const QRectF crop = viewport->mapRectToScene(viewport->boundingRect());
+            const QPointF position = crop.center();
+            const QPointF centre = target->mapToScene(QPointF(target->width()/2, target->height()/2));
+            const int delta = centre.y() < crop.top() ? 120 : -120;
+            const qreal previous = viewport->property("contentY").toReal();
+            QTest::mouseMove(f.quick, position.toPoint());
+            QWheelEvent event(position, f.quick->mapToGlobal(position.toPoint()), QPoint(), QPoint(0, delta),
+                              Qt::NoButton, Qt::NoModifier, Qt::NoScrollPhase, false);
+            event.setTimestamp(static_cast<quint64>(wheelClock.msecsSinceReference() + wheelClock.elapsed()));
+            QCoreApplication::sendEvent(f.quick, &event);
+            if (!QTest::qWaitFor([&] { return qAbs(viewport->property("contentY").toReal() - previous) > .01; }, 1000)) return false;
+            if (!QTest::qWaitFor([&] { return !viewport->property("moving").toBool(); }, 1000)) return false;
+        }
+        QSignalSpy frames(f.quick, &QQuickWindow::frameSwapped); f.quick->update();
+        if (!QTest::qWaitFor([&] { return !frames.isEmpty() && exposed(); }, 1000)) return false;
+        QSignalSpy clicked(target, SIGNAL(clicked()));
+        const QPoint point = target->mapToScene(QPointF(target->width()/2, target->height()/2)).toPoint();
+        QTest::mouseClick(f.quick, Qt::LeftButton, Qt::NoModifier, point);
+        return clicked.isValid() && clicked.count() == 1;
+    };
     const auto openMenus = [&]() {
+        QObject *parent = nullptr;
         for (const QString &title : menuPath) {
             auto *menu = menuNamed(title);
             if (!menu) { qWarning() << "Missing desktop submenu" << title; return false; }
@@ -240,8 +293,14 @@ void FomawriteTest::windowsMenuWorkspaceActionsShareState() {
                     && qvariant_cast<QObject *>(candidate->property("menu")) == menu;
                 if (barItem || qvariant_cast<QObject *>(candidate->property("subMenu")) == menu) { entry = candidate; break; }
             }
-            if (!entry || !cycle102Click(f.quick, entry)
-                || !QTest::qWaitFor([&] { return menu->property("opened").toBool(); }, 3000)) return false;
+            if (!entry) return false;
+            if (parent) {
+                // Real keyboard submenu navigation needs no dormant row bounds.
+                if (navigateRow(parent, entry) < 0) return false;
+                cycle111KeyClick(f.quick, Qt::Key_Right);
+            } else if (!cycle102Click(f.quick, entry)) return false;
+            if (!QTest::qWaitFor([&] { return menu->property("opened").toBool(); }, 3000)) return false;
+            parent = menu;
         }
         return true;
     };
@@ -259,7 +318,7 @@ void FomawriteTest::windowsMenuWorkspaceActionsShareState() {
         QVERIFY2(openMenus(), qPrintable(QStringLiteral("Could not open %1").arg(menuPath.join(" > "))));
         QVERIFY(!item->property("checked").toBool());
         QSignalSpy triggered(item, SIGNAL(triggered())); QVERIFY(triggered.isValid());
-        QVERIFY(cycle102Click(f.quick, item));
+        QVERIFY(clickPopupItem(menuNamed(menuPath.last()), item));
         QTRY_COMPARE(triggered.count(), 1);
         QTRY_COMPARE(owner->property(property.constData()), after);
         QTRY_VERIFY(item->property("checked").toBool());

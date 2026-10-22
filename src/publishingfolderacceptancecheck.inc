@@ -189,17 +189,62 @@
                 auto *notice = window->findChild<QObject *>("publishingThemeNotice");
                 auto *hub = window->findChild<QObject *>("exportHub");
                 if (!check(importDialog && settingsDialog && notice && hub, "Theme action dialogs are missing")) return;
+                const auto pickerTrace = [&](QObject *dialog, const char *boundary) {
+                    std::fprintf(stderr, "Publishing theme picker %s: %s (visible=%d)\n",
+                                 qPrintable(dialog->objectName()), boundary, dialog->property("visible").toBool());
+                    std::fflush(stderr);
+                };
+#ifdef Q_OS_WIN
+                // This checker supplies selectedFile/accepted callbacks itself.
+                // Keep that synthetic workflow off the native picker worker;
+                // ordinary Windows native picker input is qualified separately.
+                const QVariant importOptions = importDialog->property("options");
+                const QVariant settingsOptions = settingsDialog->property("options");
+                const auto restorePickerOptions = qScopeGuard([&] {
+                    bool bothClosed = true;
+                    for (QObject *dialog : {importDialog, settingsDialog}) {
+                        QMetaObject::invokeMethod(dialog, "close");
+                        const bool closed = waitUntil([&] { return !dialog->property("visible").toBool(); });
+                        check(closed, "Isolated theme file picker did not close before option restoration");
+                        bothClosed = closed && bothClosed;
+                    }
+                    if (!bothClosed) return;
+                    const bool restoredImport = importDialog->setProperty("options", importOptions);
+                    const bool restoredSettings = settingsDialog->setProperty("options", settingsOptions);
+                    check(restoredImport && restoredSettings
+                        && importDialog->property("options") == importOptions
+                        && settingsDialog->property("options") == settingsOptions,
+                        "Cannot restore isolated theme file picker options");
+                });
+                if (!check(importOptions.isValid() && settingsOptions.isValid()
+                    && !importDialog->property("visible").toBool() && !settingsDialog->property("visible").toBool(),
+                    "Theme file picker options must be configured before opening")) return;
+                const int nonNative = int(QFileDialog::DontUseNativeDialog);
+                for (QObject *dialog : {importDialog, settingsDialog}) {
+                    if (!check(dialog->setProperty("options", dialog->property("options").toInt() | nonNative)
+                        && (dialog->property("options").toInt() & nonNative) != 0,
+                        "Cannot configure isolated non-native theme file picker")) return;
+                    pickerTrace(dialog, "configured non-native synthetic callback picker");
+                }
+#endif
                 const auto acceptFile = [&](QObject *dialog, const QString &path) {
-                    const bool result = dialog->setProperty("selectedFile", QUrl::fromLocalFile(path))
-                        && QMetaObject::invokeMethod(dialog, "accepted");
+                    pickerTrace(dialog, "before selectedFile");
+                    const bool selected = dialog->setProperty("selectedFile", QUrl::fromLocalFile(path));
+                    pickerTrace(dialog, "before accepted callback");
+                    const bool result = selected && QMetaObject::invokeMethod(dialog, "accepted");
+                    pickerTrace(dialog, "after accepted callback; before close");
                     QMetaObject::invokeMethod(dialog, "close");
-                    return check(result && waitUntil([&] { return !dialog->property("visible").toBool(); }), "Cannot complete isolated theme file dialog callback");
+                    const bool closed = waitUntil([&] { return !dialog->property("visible").toBool(); });
+                    pickerTrace(dialog, "after close and visibility wait");
+                    return check(result && closed, "Cannot complete isolated theme file dialog callback");
                 };
                 const QString importedPath = temporary.filePath("cycle125-imported.css");
                 QFile imported(importedPath);
                 if (!check(imported.open(QIODevice::WriteOnly), "Cannot create CSS import fixture")) return;
                 imported.write("#write h1{color:#224466}"); imported.close();
+                pickerTrace(importDialog, "before Import Theme menu open");
                 if (!chooseItem("previewThemeImport")) return;
+                pickerTrace(importDialog, "after Import Theme menu open");
                 check(importDialog->property("visible").toBool(), "Import Theme did not open its file picker");
                 if (!acceptFile(importDialog, importedPath)) return;
                 const QString importedId = backend.publishingThemeId();
@@ -209,7 +254,9 @@
                 QFile json(jsonPath);
                 if (!check(json.open(QIODevice::WriteOnly), "Cannot create basic settings fixture")) return;
                 json.write("{\"fontFamily\":\"Georgia\",\"pointSize\":14}"); json.close();
+                pickerTrace(settingsDialog, "before valid settings menu open");
                 if (!chooseItem("previewTemplateCustomLoad")) return;
+                pickerTrace(settingsDialog, "after valid settings menu open");
                 check(settingsDialog->property("visible").toBool(), "Load Basic Settings did not open its JSON picker");
                 if (!acceptFile(settingsDialog, jsonPath)) return;
                 check(backend.publishingThemeId().isEmpty() && backend.outputStyle() == 3 && backend.outputFont() == "Georgia"
@@ -217,7 +264,10 @@
                     "Loading basic JSON settings did not apply the chosen font/size/selection");
                 if (!check(json.open(QIODevice::WriteOnly | QIODevice::Truncate), "Cannot write invalid settings fixture")) return;
                 json.write("not JSON"); json.close();
-                if (!chooseItem("previewTemplateCustomLoad") || !acceptFile(settingsDialog, jsonPath)) return;
+                pickerTrace(settingsDialog, "before invalid settings menu open");
+                if (!chooseItem("previewTemplateCustomLoad")) return;
+                pickerTrace(settingsDialog, "after invalid settings menu open");
+                if (!acceptFile(settingsDialog, jsonPath)) return;
                 check(notice->property("visible").toBool() && backend.outputFont() == "Georgia" && backend.outputPointSize() == 14
                     && authoritativeSelection(), "Invalid JSON did not report failure while retaining accepted settings");
                 QMetaObject::invokeMethod(notice, "close");

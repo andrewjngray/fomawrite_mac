@@ -30,11 +30,23 @@ $expected = [ordered]@{
     navigationHistoryAndQuickOpenStayIndependent = 'back && forward'
     recentMenuTracksLibraryAndGuardsOpen = 'recent'
 }
+# JUnit/text names include the data tag; source lookup still uses the function.
+# Select exactly the native production row, never all future/component rows.
+$dataRows = [ordered]@{
+    goMenuRoutesSavedQueriesHashtagsAndGuardedRecents = 'production-platform'
+    recentMenuTracksLibraryAndGuardsOpen = 'production-platform'
+}
 $testNames = @($expected.Keys)
+$testSelectors = @(
+    foreach ($name in $testNames) {
+        if ($dataRows.Contains($name)) { "${name}:$($dataRows[$name])" } else { $name }
+    }
+)
 $originalBytes = [IO.File]::ReadAllBytes($menuPath)
 $originalHash = (Get-FileHash -LiteralPath $menuPath -Algorithm SHA256).Hash.ToLowerInvariant()
 $report = [ordered]@{
     startedUtc = [DateTime]::UtcNow.ToString('o'); missingNodeAssertions = $expected
+    dataRows = $dataRows; testSelectors = $testSelectors
     passed = $false; architecture = $Architecture; baselineRevision = $BaselineRevision.ToLowerInvariant()
     executableSha256 = (Get-FileHash -LiteralPath $executable -Algorithm SHA256).Hash.ToLowerInvariant()
     testsSha256 = (Get-FileHash -LiteralPath $testPath -Algorithm SHA256).Hash.ToLowerInvariant()
@@ -73,7 +85,7 @@ function Invoke-MenuProofPhase {
     $xmlPath = Join-Path $proofRoot "$Phase.xml"
     $logPath = Join-Path $proofRoot "$Phase.log"
     Remove-Item -LiteralPath $xmlPath, $logPath -Force -ErrorAction SilentlyContinue
-    & $executable @testNames -o "$xmlPath,junitxml" -o "$logPath,txt"
+    & $executable @testSelectors -o "$xmlPath,junitxml" -o "$logPath,txt"
     $status = $LASTEXITCODE
     if (-not (Test-Path -LiteralPath $xmlPath) -or -not (Test-Path -LiteralPath $logPath)) { throw "$Phase did not produce both Qt logs." }
     [xml]$junit = [IO.File]::ReadAllText($xmlPath)
@@ -84,8 +96,10 @@ function Invoke-MenuProofPhase {
     $report[$Phase] = [ordered]@{ exitCode = $status; cases = $cases.Count; failures = $failures.Count; skips = $skips.Count; errors = $errors.Count }
     if ($cases.Count -ne ($expected.Count + 2) -or $skips.Count -ne 0 -or $errors.Count -ne 0) { throw "$Phase must contain exactly $($expected.Count) cases plus init/cleanup, with no skips/errors." }
     foreach ($name in @('initTestCase', 'cleanupTestCase') + $testNames) {
-        $matching = @($cases | Where-Object { $_.GetAttribute('name') -eq $name })
-        if ($matching.Count -ne 1) { throw "$Phase is missing or duplicates $name." }
+        $caseName = if ($dataRows.Contains($name)) { "$name($($dataRows[$name]))" } else { $name }
+        $textName = if ($dataRows.Contains($name)) { $caseName } else { "$name()" }
+        $matching = @($cases | Where-Object { $_.GetAttribute('name') -eq $caseName })
+        if ($matching.Count -ne 1) { throw "$Phase is missing or duplicates $caseName." }
         $caseFailures = @($matching[0].SelectNodes('failure'))
         $shouldFail = $Phase -eq 'red' -and $expected.Contains($name)
         if ($caseFailures.Count -ne [int]$shouldFail) { throw "$Phase has an unexpected result for $name." }
@@ -103,7 +117,7 @@ function Invoke-MenuProofPhase {
                 if ($source[$index].Trim() -eq "QVERIFY($expression);") { $assertionLine = $index + 1; break }
             }
             if ($null -eq $assertionLine) { throw "Missing-node assertion not found: $name" }
-            $pattern = 'FAIL!\s+: FomawriteTest::' + [regex]::Escape($name) + '\(\)[^\r\n]*' + [regex]::Escape($expression) + '[^\r\n]*\r?\n(?:\s*Loc: \[)?[^\r\n]*[\\/]tests[\\/]tst_fomawrite\.cpp\(' + $assertionLine + '\)(?:\]|\s*: failure location)'
+            $pattern = 'FAIL!\s+: FomawriteTest::' + [regex]::Escape($textName) + '[^\r\n]*' + [regex]::Escape($expression) + '[^\r\n]*\r?\n(?:\s*Loc: \[)?[^\r\n]*[\\/]tests[\\/]tst_fomawrite\.cpp\(' + $assertionLine + '\)(?:\]|\s*: failure location)'
             if ([IO.File]::ReadAllText($logPath) -notmatch $pattern) { throw "Red log does not identify the expected missing-node source location for $name." }
         }
     }

@@ -249,6 +249,70 @@ public static class NormalLaunchInput {
             return "pid="+pid+" | popup="+popup.BoundingRectangle+" | item="+current.Name+" | bounds="+bounds;
         }, "owned File popup before keyboard scrolling");
     }
+    // Retain immutable identity, not a row/COM object that scrolling can hide.
+    // Every crop reacquires only this same popup under the same owned HWND.
+    public sealed class OwnedMenuPopupIdentity {
+        internal readonly int processId;
+        internal readonly IntPtr window;
+        internal readonly string windowRuntime, windowClass, popupRuntime;
+        internal OwnedMenuPopupIdentity(int pid, IntPtr hwnd, string rootId, string rootClass, string popupId) {
+            processId=pid; window=hwnd; windowRuntime=rootId; windowClass=rootClass; popupRuntime=popupId;
+        }
+        public override string ToString() {
+            return "pid="+processId+" | window="+window+" | windowRuntime="+windowRuntime+
+                " | windowClass="+windowClass+" | popupRuntime="+popupRuntime+" | popupClass=QQuickPopupItem";
+        }
+    }
+    static string MenuRuntimeId(AutomationElement element) {
+        var id=element.GetRuntimeId();
+        if(id==null || id.Length==0) throw new InvalidOperationException("Missing File popup/window runtime identity");
+        return String.Join(".", Array.ConvertAll<int,string>(id, delegate(int part) { return part.ToString(); }));
+    }
+    public static OwnedMenuPopupIdentity RetainOwnedMenuPopup(AutomationElement item, int pid) {
+        RequireOwnedMenuPopup(item,pid);
+        return Bounded(delegate() {
+            var popup=TreeWalker.ControlViewWalker.GetParent(item);
+            if(popup==null) throw new InvalidOperationException("Proved File popup disappeared");
+            var parent=TreeWalker.ControlViewWalker.GetParent(popup);
+            if(parent==null) throw new InvalidOperationException("File popup has no owning window parent");
+            var window=parent.Current;
+            if(window.ProcessId!=pid || window.ControlType!=ControlType.Window ||
+                new IntPtr(window.NativeWindowHandle)!=expectedInputWindow)
+                throw new InvalidOperationException("File popup parent is not the owned application window");
+            var proof=new OwnedMenuPopupIdentity(pid,expectedInputWindow,MenuRuntimeId(parent),window.ClassName,MenuRuntimeId(popup));
+            // Revalidate the captured identity before returning; no row is
+            // consulted again after this initial proof or the wheel gesture.
+            OwnedPopupBounds(proof,pid);
+            return proof;
+        }, "retain proved File popup identity");
+    }
+    static System.Windows.Rect OwnedPopupBounds(OwnedMenuPopupIdentity proof, int pid) {
+        if(proof==null || pid!=proof.processId || (uint)pid!=expectedProcessId || proof.window!=expectedInputWindow)
+            throw new InvalidOperationException("Retained File popup owner/window changed");
+        var root=ReacquireOwnedRoot(proof.window,(uint)pid);
+        var window=root.Current;
+        if(window.ControlType!=ControlType.Window || window.ClassName!=proof.windowClass ||
+            MenuRuntimeId(root)!=proof.windowRuntime || window.IsOffscreen || !window.IsEnabled)
+            throw new InvalidOperationException("Retained File popup window identity/state changed");
+        AutomationElement found=null;
+        foreach(AutomationElement child in root.FindAll(TreeScope.Children,Condition.TrueCondition)) {
+            if(MenuRuntimeId(child)!=proof.popupRuntime) continue;
+            if(found!=null) throw new InvalidOperationException("Retained File popup identity is not unique");
+            found=child;
+        }
+        if(found==null) throw new InvalidOperationException("Retained File popup is no longer present");
+        var popup=found.Current;
+        var parent=TreeWalker.ControlViewWalker.GetParent(found);
+        if(popup.ProcessId!=pid || popup.ControlType!=ControlType.Menu || popup.ClassName!="QQuickPopupItem" ||
+            popup.IsOffscreen || !popup.IsEnabled || popup.BoundingRectangle.IsEmpty ||
+            parent==null || MenuRuntimeId(parent)!=proof.windowRuntime ||
+            !window.BoundingRectangle.Contains(popup.BoundingRectangle))
+            throw new InvalidOperationException("Retained File popup parent/class/ownership/bounds changed");
+        return popup.BoundingRectangle;
+    }
+    public static System.Windows.Rect OwnedMenuBounds(OwnedMenuPopupIdentity proof, int pid) {
+        return Bounded(delegate(){return OwnedPopupBounds(proof,pid);},"current retained File popup bounds");
+    }
     public static string ScrollOwnedMenuDown(AutomationElement item, int pid) {
         string proof=RequireOwnedMenuPopup(item,pid);
         var bounds=Bounded(delegate(){return item.Current.BoundingRectangle;},"owned menu wheel position");
@@ -264,6 +328,16 @@ public static class NormalLaunchInput {
         return Bounded(delegate(){return TreeWalker.ControlViewWalker.GetParent(item).Current.BoundingRectangle;},"owned File popup bounds");
     }
     public static void ClickOwnedMenuPoint(AutomationElement anchor, int pid, int x, int y, System.Windows.Rect measuredPopup, long capturedAt) {
+        var popup=OwnedMenuBounds(anchor,pid);
+        if(popup!=measuredPopup || !popup.Contains(x,y))
+            throw new InvalidOperationException("OCR menu target or popup geometry changed");
+        double ageMs=(Stopwatch.GetTimestamp()-capturedAt)*1000.0/Stopwatch.Frequency;
+        if(ageMs<0 || ageMs>750) throw new InvalidOperationException("Final menu crop is no longer current; refusing input");
+        RequireInputForeground();MovePhysical(x,y);RequireInputForeground();
+        INPUT input=new INPUT();input.type=0;input.u.mi.dwFlags=2;Send(input);
+        input.u.mi.dwFlags=4;Send(input);
+    }
+    public static void ClickOwnedMenuPoint(OwnedMenuPopupIdentity anchor, int pid, int x, int y, System.Windows.Rect measuredPopup, long capturedAt) {
         var popup=OwnedMenuBounds(anchor,pid);
         if(popup!=measuredPopup || !popup.Contains(x,y))
             throw new InvalidOperationException("OCR menu target or popup geometry changed");

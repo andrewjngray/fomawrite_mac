@@ -4,7 +4,12 @@
     {
         const auto themeCheck = [&](const QString &name, const std::function<void()> &exercise) {
             const qsizetype before = failures.size();
+            std::fprintf(stderr, "Publishing theme check begin: %s\n", qPrintable(name));
+            std::fflush(stderr);
             exercise();
+            std::fprintf(stderr, "Publishing theme check end: %s (%s)\n", qPrintable(name),
+                         failures.size() == before ? "PASS" : "FAIL");
+            std::fflush(stderr);
             publishingThemeChecks.append(QJsonObject{{"name", name}, {"passed", failures.size() == before},
                 {"newFailures", int(failures.size() - before)}});
         };

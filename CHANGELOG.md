@@ -4,6 +4,10 @@ One line per cycle, newest first. Each line links to the cycle's record under `r
 
 ## 0.3.0 development series (Cycles 97–)
 
+- **161 — Windows Center and shortcut parity candidate** — Add guarded frame centering and five existing command bindings while preserving native Mac actions; six missing-route reds become a focused **15/0/0** green, with required build passed. Windows offscreen CI and physical input/placement qualification remain pending. [Record](research/cycle-161/README.md)
+
+- **160 — Remaining Windows File/Authorship/View menu routes** — Expose eleven existing routes, retaining creation guards, profile/metadata safety and native Mac assertions; thirteen host rows pass in the combined **53/0/0** focused gate after intended missing-node reds. Print Source execution and native Windows qualification remain pending. [Record](research/cycle-160/README.md)
+
 - **158 — Windows immediate Save repair candidate** — Close desktop menus immediately so rapid Bold → Ctrl+S reaches the existing Save path; genuine host red/green and immediate Live/Source controls pass with exact saved bytes. Required build and focused **7/0/0** pass; native packaged zero-gap qualification remains pending. [Record](research/cycle-158/README.md)
 
 - **157 — Windows Edit/Help menu candidate** — Expose existing text transformations, Smart Quotes/Smart Dashes and bundled What's New through real menu routes; native Mac and Windows-component checks pass **12/0/0** after four missing-route reds. Exact native CI and packaged input remain pending. [Record](research/cycle-157/README.md)

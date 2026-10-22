@@ -194,6 +194,8 @@ function Open-Menu([string]$menu, [string]$item) {
         $first = Wait-For { Find-Control '^New Document$' } 'visible owned File menu'
         $proof = [NormalLaunchInput]::RequireOwnedMenuPopup($first, $script:process.Id)
         $proof | Add-Content -LiteralPath (Join-Path $outputRoot 'exit-menu-scroll.txt') -Encoding UTF8
+        $anchor = [NormalLaunchInput]::RetainOwnedMenuPopup($first, $script:process.Id)
+        $anchor.ToString() | Add-Content -LiteralPath (Join-Path $outputRoot 'exit-menu-scroll.txt') -Encoding UTF8
         [NormalLaunchInput]::ScrollOwnedMenuDown($first, $script:process.Id) | Add-Content -LiteralPath (Join-Path $outputRoot 'exit-menu-scroll.txt') -Encoding UTF8
         $exit = Find-Control '^Exit$'
         $script:ExitMenuUiaAbsent=($null -eq $exit)
@@ -202,7 +204,8 @@ function Open-Menu([string]$menu, [string]$item) {
         # Even exposed UIA bounds can describe an intermediate wheel frame.
         # Always measure the settled pixels before clicking the actual Exit.
         [NormalLaunchInput]::Describe($script:main) | Set-Content -LiteralPath (Join-Path $outputRoot ('exit-menu-uia-after-scroll-' + $script:process.Id + '.txt')) -Encoding UTF8
-        $anchor = Wait-For { Find-Control ('^Page Setup' + [char]0x2026 + '$') } 'visible owned File row after wheel scroll'
+        # Revalidate the proved popup itself; scrolled rows need not remain in UIA.
+        [NormalLaunchInput]::OwnedMenuBounds($anchor, $script:process.Id) | Out-Null
         Capture ('exit-menu-visible-' + $script:process.Id)
         $script:ExitMenuOcrAttempt=0
         $script:ExitMenuStableKey=$null; $script:ExitMenuStable=@(); $script:ExitMenuStableClock=[Diagnostics.Stopwatch]::StartNew()

@@ -1,9 +1,11 @@
 import QtQuick
 import QtQuick.Controls
+import QtQuick.Window
 
 // Desktop menu access on Windows. Commands share the workspace registry;
 // editing actions use the same focus-aware handlers as the existing shortcuts.
-// Shortcuts remain in Main.qml, avoiding two registrations for each keystroke.
+// Shared shortcuts remain in Main.qml; native-menu counterparts below are
+// guarded for Windows so Mac registrations remain unique.
 MenuBar {
     id: root
     objectName: "windowsMenuBar"
@@ -59,6 +61,13 @@ MenuBar {
             checked = Qt.binding(function() { return workspaceCommands.isChecked(item.commandId) })
         }
     }
+    // Native Mac menus own these bindings. Even an explicit Mac component
+    // fixture must leave the Windows registrations disabled.
+    Shortcut { objectName: "windowsShortcutOpenPath"; sequence: "Ctrl+Shift+O"; context: Qt.WindowShortcut; enabled: win.isWindows && workspaceCommands.isEnabled("openPath"); onActivated: root.dispatch(function() { workspaceCommands.run("openPath") }) }
+    Shortcut { objectName: "windowsShortcutCommandPalette"; sequence: "Ctrl+Shift+P"; context: Qt.WindowShortcut; enabled: win.isWindows; onActivated: root.dispatch(function() { commandPalette.open() }) }
+    Shortcut { objectName: "windowsShortcutSpelling"; sequence: "Ctrl+:"; context: Qt.WindowShortcut; enabled: win.isWindows && workspaceCommands.isEnabled("spelling"); onActivated: root.dispatch(function() { workspaceCommands.run("spelling") }) }
+    Shortcut { objectName: "windowsShortcutNextIssue"; sequence: "Ctrl+;"; context: Qt.WindowShortcut; enabled: win.isWindows && workspaceCommands.isEnabled("nextIssue"); onActivated: root.dispatch(function() { workspaceCommands.run("nextIssue") }) }
+    Shortcut { objectName: "windowsShortcutPreviousIssue"; sequence: "Ctrl+Alt+;"; context: Qt.WindowShortcut; enabled: win.isWindows && workspaceCommands.isEnabled("previousIssue"); onActivated: root.dispatch(function() { workspaceCommands.run("previousIssue") }) }
     component RecentMenu: WorkspaceMenu {
         id: recents
         Instantiator {
@@ -87,6 +96,9 @@ MenuBar {
         title: "&File"
         Command { commandId: "new" }
         Command { commandId: "newWindow" }
+        MenuItem { objectName: "windows_fileNewLibraryWindow"; text: "New in Library in Window…"; enabled: backend.library.rootFolder.toString() !== ""; onTriggered: root.dispatch(function() { libraryPane.newDocument(true) }) }
+        MenuItem { objectName: "windows_fileNewLibrary"; text: "New in Library…"; enabled: backend.library.rootFolder.toString() !== ""; onTriggered: root.dispatch(function() { libraryPane.newDocument(false) }) }
+        MenuItem { objectName: "windows_fileNewFolder"; text: "New Folder…"; enabled: backend.library.rootFolder.toString() !== ""; onTriggered: root.dispatch(function() { libraryPane.newFolder() }) }
         Command { commandId: "open" }
         Command { commandId: "openPath" }
         RecentMenu { objectName: "windowsOpenRecentMenu"; title: "Open Recent" }
@@ -97,12 +109,24 @@ MenuBar {
         Command { commandId: "rename" }
         Command { commandId: "move" }
         MenuItem { text: "Open Containing Folder"; enabled: backend.fileUrl.toString() !== ""; onTriggered: root.dispatch(function() { backend.showInFinder() }) }
+        Command { commandId: "reveal"; text: "Show in Library" }
         MenuSeparator {}
         Command { commandId: "exportHtml" }
         Command { commandId: "exportPdf" }
         MenuItem { text: "Print…"; onTriggered: root.dispatch(function() { backend.printDocument(false) }) }
+        MenuItem { objectName: "windows_filePrintSource"; text: "Print Markdown Source…"; onTriggered: root.dispatch(function() { backend.printDocument(true) }) }
         Command { commandId: "printPreview" }
         MenuItem { text: "Page Setup…"; onTriggered: root.dispatch(function() { backend.pageSetup() }) }
+        MenuItem {
+            objectName: "windows_fileAutosave"
+            text: "Autosave Saved Files Every Minute"
+            checkable: true
+            checked: workspaceSettings.autosaveEnabled
+            onTriggered: {
+                root.dispatch(function() { workspaceSettings.autosaveEnabled = !workspaceSettings.autosaveEnabled })
+                checked = Qt.binding(function() { return workspaceSettings.autosaveEnabled })
+            }
+        }
         MenuSeparator {}
         MenuItem { text: "&Close Window"; onTriggered: root.dispatch(function() { win.close() }) }
         MenuItem { text: "E&xit"; onTriggered: root.dispatch(function() { backend.requestQuit() }) }
@@ -179,21 +203,88 @@ MenuBar {
             MenuItem { objectName: "windows_editCapitalize"; text: "Capitalize"; enabled: win.canFormatSource && editor.selectedText.length > 0; onTriggered: root.dispatch(function() { win.editMarkdown("capitalize") }) }
             MenuItem { objectName: "windows_editTitleCase"; text: "Make Title Case"; enabled: win.canFormatSource && editor.selectedText.length > 0; onTriggered: root.dispatch(function() { win.editMarkdown("titlecase") }) }
         }
+        MenuSeparator {}
+        Command { commandId: "authorship"; objectName: "windows_editAuthorship"; text: "Authorship Annotations…" }
+        MenuItem { objectName: "windows_editExportAuthorship"; text: "Export Authorship Metadata…"; onTriggered: root.dispatch(function() { authorshipExportDialog.open() }) }
     }
     WorkspaceMenu {
+        objectName: "windowsFormatMenu"
         title: "F&ormat"
-        MenuItem { text: "&Bold"; enabled: win.canFormatSource || win.canFormatLive; onTriggered: root.dispatch(function() { win.tryWrapSelection("**", "**") }) }
-        MenuItem { text: "&Italic"; enabled: win.canFormatSource || win.canFormatLive; onTriggered: root.dispatch(function() { win.tryWrapSelection("*", "*") }) }
+        WorkspaceMenu {
+            objectName: "windowsFormatHeadingsMenu"
+            title: "Headings"
+            MenuItem { objectName: "windows_formatHeading1"; enabled: win.canFormatSource || win.canFormatLive; text: "Heading 1"; onTriggered: root.dispatch(function() { win.editMarkdown("heading1") }) }
+            MenuItem { objectName: "windows_formatHeading2"; enabled: win.canFormatSource || win.canFormatLive; text: "Heading 2"; onTriggered: root.dispatch(function() { win.editMarkdown("heading2") }) }
+            MenuItem { objectName: "windows_formatHeading3"; enabled: win.canFormatSource || win.canFormatLive; text: "Heading 3"; onTriggered: root.dispatch(function() { win.editMarkdown("heading3") }) }
+            MenuItem { objectName: "windows_formatHeading4"; enabled: win.canFormatSource || win.canFormatLive; text: "Heading 4"; onTriggered: root.dispatch(function() { win.editMarkdown("heading4") }) }
+            MenuItem { objectName: "windows_formatHeading5"; enabled: win.canFormatSource || win.canFormatLive; text: "Heading 5"; onTriggered: root.dispatch(function() { win.editMarkdown("heading5") }) }
+            MenuItem { objectName: "windows_formatHeading6"; enabled: win.canFormatSource || win.canFormatLive; text: "Heading 6"; onTriggered: root.dispatch(function() { win.editMarkdown("heading6") }) }
+        }
+        WorkspaceMenu {
+            objectName: "windowsFormatListsMenu"
+            title: "Lists"
+            MenuItem { objectName: "windows_formatList"; enabled: win.canFormatSource || win.canFormatLive; text: "List"; onTriggered: root.dispatch(function() { win.editMarkdown("bullet") }) }
+            MenuItem { objectName: "windows_formatTaskList"; enabled: win.canFormatSource || win.canFormatLive; text: "Task List"; onTriggered: root.dispatch(function() { win.editMarkdown("task") }) }
+            MenuItem { objectName: "windows_formatOrderedList"; enabled: win.canFormatSource || win.canFormatLive; text: "Ordered List"; onTriggered: root.dispatch(function() { win.editMarkdown("ordered") }) }
+            MenuItem { objectName: "windows_formatOrderedTaskList"; enabled: win.canFormatSource || win.canFormatLive; text: "Ordered Task List"; onTriggered: root.dispatch(function() { win.editMarkdown("orderedTask") }) }
+            MenuSeparator {}
+            MenuItem { objectName: "windows_formatToggleTask"; enabled: win.canFormatSource || win.canFormatLive; text: "Mark Task as Completed"; onTriggered: root.dispatch(function() { win.editMarkdown("toggleTask") }) }
+        }
+        MenuItem { objectName: "windows_formatBlockquote"; enabled: win.canFormatSource || win.canFormatLive; text: "Blockquote"; onTriggered: root.dispatch(function() { win.editMarkdown("quote") }) }
+        MenuItem { objectName: "windows_formatBody"; enabled: win.canFormatSource || win.canFormatLive; text: "Body"; onTriggered: root.dispatch(function() { win.editMarkdown("body") }) }
+        WorkspaceMenu {
+            objectName: "windowsFormatStructureMenu"
+            title: "Structure"
+            MenuItem { objectName: "windows_formatIndent"; enabled: win.canFormatSource || win.canFormatLive; text: "Indent"; onTriggered: root.dispatch(function() { win.editMarkdown("indent") }) }
+            MenuItem { objectName: "windows_formatOutdent"; enabled: win.canFormatSource || win.canFormatLive; text: "Outdent"; onTriggered: root.dispatch(function() { win.editMarkdown("outdent") }) }
+            MenuItem { objectName: "windows_formatLineUp"; enabled: win.canFormatSource || win.canFormatLive; text: "Move Line Up"; onTriggered: root.dispatch(function() { win.editMarkdown("lineUp") }) }
+            MenuItem { objectName: "windows_formatLineDown"; enabled: win.canFormatSource || win.canFormatLive; text: "Move Line Down"; onTriggered: root.dispatch(function() { win.editMarkdown("lineDown") }) }
+        }
+        MenuSeparator {}
+        MenuItem { enabled: win.canFormatSource || win.canFormatLive; text: "&Bold"; onTriggered: root.dispatch(function() { win.tryWrapSelection("**", "**") }) }
+        MenuItem { enabled: win.canFormatSource || win.canFormatLive; text: "&Italic"; onTriggered: root.dispatch(function() { win.tryWrapSelection("*", "*") }) }
         Command { commandId: "strike" }
+        MenuItem { objectName: "windows_formatHighlight"; enabled: win.canFormatSource || win.canFormatLive; text: "Highlight"; onTriggered: root.dispatch(function() { win.tryWrapSelection("==", "==") }) }
+        MenuSeparator {}
         Command { commandId: "inlineCode" }
-        MenuItem { text: "&Link…"; enabled: win.canFormatSource || win.canFormatLive; onTriggered: root.dispatch(function() { win.tryInsertLink() }) }
+        MenuItem { objectName: "windows_formatCodeBlock"; enabled: win.canFormatSource || win.canFormatLive; text: "Code Block"; onTriggered: root.dispatch(function() { win.editMarkdown("codeBlock") }) }
+        MenuSeparator {}
+        MenuItem { enabled: win.canFormatSource || win.canFormatLive; text: "&Link…"; onTriggered: root.dispatch(function() { win.tryInsertLink() }) }
+        MenuItem { objectName: "windows_formatWikilink"; enabled: win.canFormatSource || win.canFormatLive; text: "Add Wikilink"; onTriggered: root.dispatch(function() { win.tryWrapSelection("[[", "]]") }) }
+        MenuItem { objectName: "windows_formatFootnote"; enabled: win.canFormatSource || win.canFormatLive; text: "Add Footnote"; onTriggered: root.dispatch(function() { win.tryInsertSourceSnippet("[^note]\n\n[^note]: Note text") }) }
+        MenuItem { objectName: "windows_formatContentBlock"; enabled: win.canFormatSource || win.canFormatLive; text: "Add Content Block"; onTriggered: root.dispatch(function() { win.tryInsertSourceSnippet("\n/chapter.md\n") }) }
+        MenuItem { objectName: "windows_formatHashtag"; enabled: win.canFormatSource || win.canFormatLive; text: "Add Hashtag"; onTriggered: root.dispatch(function() { win.tryInsertSourceSnippet("#tag") }) }
+        MenuSeparator {}
+        MenuItem { objectName: "windows_formatDate"; enabled: win.canFormatSource || win.canFormatLive; text: "Add Date"; onTriggered: root.dispatch(function() { win.editMarkdown("date") }) }
+        MenuItem { objectName: "windows_formatTable"; enabled: win.canFormatSource || win.canFormatLive; text: "Add Table"; onTriggered: root.dispatch(function() { win.editMarkdown("table") }) }
+        MenuItem { objectName: "windows_formatTableOfContents"; enabled: win.canFormatSource || win.canFormatLive; text: "Add Table of Contents"; onTriggered: root.dispatch(function() { win.tryInsertSourceSnippet(backend.tableOfContents(editor.text)) }) }
+        MenuSeparator {}
+        MenuItem { objectName: "windows_formatHorizontalRule"; enabled: win.canFormatSource || win.canFormatLive; text: "Add Horizontal Rule"; onTriggered: root.dispatch(function() { win.editMarkdown("rule") }) }
         Command { commandId: "pageBreak" }
+        MenuSeparator {}
+        MenuItem { objectName: "windows_formatClearStyles"; enabled: win.canFormatSource && editor.selectedText.length > 0; text: "Clear Styles"; onTriggered: root.dispatch(function() { win.editMarkdown("clearStyles") }) }
+    }
+    WorkspaceMenu {
+        objectName: "windows_authorsMenu"
+        title: "Authors"
+        MenuItem { objectName: "windows_authorsSetupAction"; text: "Set Up Authorship…"; onTriggered: root.dispatch(function() { authorshipSetupDialog.open() }) }
     }
     WorkspaceMenu {
         title: "&View"
         Command { commandId: "sourceEditing" }
         Command { commandId: "liveEditing" }
         Command { commandId: "liveThemeExact" }
+        MenuItem {
+            objectName: "windows_synchronizedScroll"
+            text: "Synchronized Scrolling"
+            checkable: true
+            checked: workspaceSettings.synchronizedScroll
+            onTriggered: {
+                root.dispatch(function() { workspaceSettings.synchronizedScroll = !workspaceSettings.synchronizedScroll })
+                checked = Qt.binding(function() { return workspaceSettings.synchronizedScroll })
+            }
+        }
+        MenuItem { objectName: "windows_showCompletions"; text: "Show Completions"; enabled: win.sourceEditorVisible && win.editTarget === editor && editor.selectionStart === editor.selectionEnd; onTriggered: root.dispatch(function() { win.showCompletions() }) }
         MenuSeparator {}
         Command { commandId: "editor" }
         Command { commandId: "split" }
@@ -353,6 +444,11 @@ MenuBar {
         Command { commandId: "smaller" }
         Command { commandId: "resetSize" }
         Command { commandId: "fullscreen" }
+    }
+    WorkspaceMenu {
+        objectName: "windowsWindowMenu"
+        title: "Window"
+        MenuItem { objectName: "windows_windowCenterAction"; text: "Center"; enabled: win.visibility === Window.Windowed; onTriggered: root.dispatch(function() { backend.nativeWindowAction("center") }) }
     }
     WorkspaceMenu {
         title: "F&ocus"

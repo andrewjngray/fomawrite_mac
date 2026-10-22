@@ -4,6 +4,8 @@ import contextlib
 import importlib.util
 import io
 import json
+import re
+import xml.etree.ElementTree as ET
 from pathlib import Path
 import struct
 import sys
@@ -293,6 +295,51 @@ class DeploymentEvidenceTests(unittest.TestCase):
         with patch.object(packaging.subprocess, "check_output", return_value="Unexpected dumpbin output"):
             with self.assertRaises(ValueError):
                 packaging.dumpbin_imports(self.exe)
+
+
+class MenuProofDataRowContractTests(unittest.TestCase):
+    def test_exact_windows_production_rows_match_qt_junit_names(self):
+        # Qt's native JUnit logger uses function(tag), while its CLI selector
+        # uses function:tag. Keep this proof inventory exact, including XML's
+        # numeric hyphen escaping, rather than accepting arbitrary data rows.
+        script = (ROOT / "bin/windows/prove-menu-regressions.ps1").read_text()
+        expected_block = re.search(r"\$expected = \[ordered\]@\{(.*?)\n\}", script, re.S)
+        self.assertIsNotNone(expected_block)
+        expected = dict(re.findall(r"^    (\w+) = '([^']+)'$", expected_block[1], re.M))
+        self.assertEqual(len(expected), 8)
+        row_block = re.search(r"\$dataRows = \[ordered\]@\{(.*?)\n\}", script, re.S)
+        self.assertIsNotNone(row_block, "Data-driven proof cases require explicit production row names")
+        rows = dict(re.findall(r"^    (\w+) = '([^']+)'$", row_block[1], re.M))
+        self.assertEqual(rows, {
+            "goMenuRoutesSavedQueriesHashtagsAndGuardedRecents": "production-platform",
+            "recentMenuTracksLibraryAndGuardsOpen": "production-platform",
+        })
+        expected_names = ["initTestCase", "cleanupTestCase"] + [
+            f"{name}({rows[name]})" if name in rows else name for name in expected]
+        fixture = "<testsuite>" + "".join(
+            '<testcase name="' + name.replace("-", "&#x002D;") + '"/>' for name in expected_names) + "</testsuite>"
+        names = lambda xml: [case.attrib["name"] for case in ET.fromstring(xml).findall("testcase")]
+        self.assertCountEqual(names(fixture), expected_names)
+        # Bare/wrong data tags, duplicates and extras must not satisfy the
+        # exact 8 + init/cleanup inventory used by the native proof script.
+        for function in rows:
+            for replacement in (function, function + "(windows-component)"):
+                self.assertNotEqual(sorted(names(fixture.replace(function + "(production&#x002D;platform)", replacement))), sorted(expected_names))
+        extra = fixture.replace("</testsuite>", '<testcase name="unexpected"/></testsuite>')
+        self.assertNotEqual(sorted(names(extra)), sorted(expected_names))
+        duplicate = fixture.replace("</testsuite>", '<testcase name="initTestCase"/></testsuite>')
+        self.assertNotEqual(sorted(names(duplicate)), sorted(expected_names))
+        self.assertIn('"${name}:$($dataRows[$name])"', script)
+        self.assertIn('& $executable @testSelectors ', script)
+        self.assertIn("$matching = @($cases | Where-Object { $_.GetAttribute('name') -eq $caseName })", script)
+        self.assertIn("[regex]::Escape($textName)", script)
+        # Data-row display names must never replace bare function names in
+        # current source-line/expression checks or relax failure inventories.
+        self.assertIn('[Array]::IndexOf($source, "    void $name() {")', script)
+        self.assertIn('$expression = $expected[$name]', script)
+        self.assertIn('if ($matching.Count -ne 1)', script)
+        self.assertIn('if ($cases.Count -ne ($expected.Count + 2) -or $skips.Count -ne 0 -or $errors.Count -ne 0)', script)
+        self.assertIn('if ($status -ne $expectedFailures -or $failures.Count -ne $expectedFailures)', script)
 
 
 if __name__ == "__main__":

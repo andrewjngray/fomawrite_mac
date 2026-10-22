@@ -64,6 +64,7 @@
 #include <QUuid>
 #include <QVariantMap>
 #include <QWindow>
+#include <QScreen>
 
 #include <algorithm>
 
@@ -4094,6 +4095,14 @@ bool Backend::exportDocument(const QUrl &destination, const QString &format) {
 void Backend::nativeWindowAction(const QString &action) {
 #ifdef Q_OS_MACOS
     performMacWindowAction(m_parentWindow, action, currentDocumentText());
+#elif defined(Q_OS_WIN)
+    if (action != QStringLiteral("center") || !m_parentWindow
+            || m_parentWindow->visibility() != QWindow::Windowed) return;
+    QScreen *screen = m_parentWindow->screen();
+    if (!screen) return;
+    QRect frame = m_parentWindow->frameGeometry();
+    frame.moveCenter(screen->availableGeometry().center());
+    m_parentWindow->setFramePosition(frame.topLeft());
 #else
     Q_UNUSED(action);
 #endif

@@ -35,6 +35,11 @@
 #include <QQuickWindow>
 #include <QPdfDocument>
 #include <QSaveFile>
+#include <QScopeGuard>
+#ifdef Q_OS_WIN
+#include <QFileDialog>
+#endif
+#include <cstdio>
 #include <QSettings>
 #include <QStandardPaths>
 #include <QTemporaryDir>
