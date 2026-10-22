@@ -73,6 +73,20 @@ jobs:
           powershell.exe -NoProfile -File windows/test_menu_click_bounds.ps1 -HelperPath bin/windows/normal-launch-input.cs
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
+      - name: Parse and compile desktop supplement without desktop input
+        run: |
+          powershell.exe -NoProfile -File windows/test_desktop_supplement_prepare.ps1 -Output build/desktop-supplement-preparation.json
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Retain desktop supplement preparation evidence
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-supplement-preparation-${{ matrix.architecture }}-${{ github.sha }}
+          path: build/desktop-supplement-preparation.json
+          if-no-files-found: ignore
+          retention-days: 14
+
       - name: Install pinned Qt SDK and WebEngine/PDF extensions
         run: |
           python bin/windows/install-qt.py --architecture ${{ matrix.architecture }} --output "$env:QT_ROOT_DIR"

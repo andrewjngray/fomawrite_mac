@@ -176,7 +176,8 @@ try {
     $sourceBounds=$source.Current.BoundingRectangle
     Click-Control ('^Live '+[char]0x2014+' edit with Markdown rendered in place$')
     Wait-For {-not(Find-Control '^Markdown editor$')} 'original sample returned to maintained Live hook' | Out-Null
-    Wait-For {$r=Read-LiveRenderedText $sourceBounds;if($r.text-match'(?i)Saved\s+with\s+Windows\s+input\b'){$r}} 'original Live sample renders again' | Out-Null
+    $render=Wait-For {$r=Read-LiveRenderedText $sourceBounds;if($r.text-match'(?i)Saved\s+with\s+Windows\s+input\b'){$r}} 'original Live sample renders again'
+    Capture 'live-mode-rendered'
     Desktop-Unchanged
     if($desktopChecks.Count-ne6){throw 'Require all six independent native workflows'}
     $script:DesktopSupplementObservation.completed=$true
