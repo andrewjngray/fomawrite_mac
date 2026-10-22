@@ -33,6 +33,7 @@ jobs:
           . ./bin/windows/common.ps1
           $qt = Get-QtRoot
           Enter-MsvcEnvironment arm64
+          Invoke-Checked python @("$RepoRoot/bin/windows/fetch-harper.py")
           $env:PATH = (Join-Path $qt 'bin') + ';' + $env:PATH
           $build = Join-Path $RepoRoot 'build-tests/windows-theme-diagnostics'
           New-Item -ItemType Directory -Force $build | Out-Null

@@ -1479,6 +1479,17 @@
           "sha256": "21cd553c5442ee59be0c5db84901b020fcd3843e5f6fac1a70400bebeb210cfc"
         }
       ]
+    },
+    "atomicThemeDiagnosticSetupFailure": {
+      "runId": 39842552695,
+      "commit": "7edb5018b4664d1e812fdd07758cd167a9a04f0a",
+      "runConclusion": "failure",
+      "artifactId": 12454066318,
+      "artifactSha256": "924e9df1e73cb71b4ff8bf94b3764f882b13abebce0f5e23217357eb2b1402fc",
+      "attempts": [],
+      "qualification": "Bounded fresh-process diagnostic only. Does not override the retained ARM64 full-suite failure or establish ordinary desktop qualification.",
+      "nativeFailureBranchExercised": false,
+      "failure": "Standalone test build omitted the normal build Harper resource download; NMAKE U1073 for src/editor/dist/harper/VERSION. No test attempts ran."
     }
   }
 }
