@@ -194,14 +194,16 @@ public static class NormalLaunchInput {
                 T found=search();
                 if(budget.ElapsedMilliseconds>=budgetMs) throw new TimeoutException("UIA search retry budget expired");
                 return found;
-            } catch(COMException error) {
-                // Popup publication or picker teardown can invalidate a provider traversal.
-                // E_FAIL was observed in FindAll after opening File on x64.
-                // Discard the entire read, reacquire the same owned HWND and
-                // retry at most twice; never turn incomplete traversal into absence.
-                if((error.ErrorCode!=unchecked((int)0x80010108) &&
-                    error.ErrorCode!=unchecked((int)0x80004005)) || retry>=2) throw;
-                Console.Error.WriteLine("UIA provider read retry {0}: HRESULT 0x{1:X8}", retry+1, unchecked((uint)error.ErrorCode));
+            } catch(Exception error) {
+                int code=error.HResult;
+                bool disconnected=error is COMException &&
+                    (code==unchecked((int)0x80010108) || code==unchecked((int)0x80004005));
+                bool unavailable=error is System.Windows.Automation.ElementNotAvailableException &&
+                    code==unchecked((int)0x80040201);
+                // Only these observed provider failures restart a complete read.
+                // Same deadline, retry count and owned-HWND reacquisition apply.
+                if((!disconnected && !unavailable) || retry>=2) throw;
+                Console.Error.WriteLine("UIA provider read retry {0}: HRESULT 0x{1:X8}", retry+1, unchecked((uint)code));
                 if(budget.ElapsedMilliseconds+100>=budgetMs) throw new TimeoutException("UIA search retry budget expired", error);
                 Thread.Sleep(100);
                 reacquire(); // Failure or a changed owner/handle remains fatal.
@@ -214,10 +216,55 @@ public static class NormalLaunchInput {
             GetWindowThreadProcessId(handle, out actual)==0 || actual!=owner)
             throw new InvalidOperationException("UIA search root no longer belongs to the owned application");
         var root=AutomationElement.FromHandle(handle);
+        if(root==null) throw new System.Windows.Automation.ElementNotAvailableException("Owned HWND has no UIA provider");
         var current=root.Current;
         if(current.ProcessId!=owner || new IntPtr(current.NativeWindowHandle)!=handle)
             throw new InvalidOperationException("UIA reacquired a different root identity");
         return root;
+    }
+    static T ReadOwnedWindow<T>(int pid, Func<AutomationElement.AutomationElementInformation,T> read) {
+        // Capture the already-proved native identity, never rediscover a window
+        // via the desktop or return provider objects across MTA lifetimes.
+        IntPtr handle=expectedInputWindow;
+        uint owner=expectedProcessId;
+        if(pid<=0 || (uint)pid!=owner || handle==IntPtr.Zero)
+            throw new InvalidOperationException("Owned window primitive identity is missing or changed");
+        return Bounded(delegate() {
+            var budget=Stopwatch.StartNew();
+            return RetryDisconnected(delegate() {
+                if(handle!=expectedInputWindow || owner!=expectedProcessId)
+                    throw new InvalidOperationException("Owned window identity changed before primitive read");
+                var root=ReacquireOwnedRoot(handle,owner);
+                T value=read(root.Current);
+                if(handle!=expectedInputWindow || owner!=expectedProcessId)
+                    throw new InvalidOperationException("Owned window identity changed during primitive read");
+                return value;
+            },delegate() { ReacquireOwnedRoot(handle,owner); },budget);
+        },"owned window primitive observation");
+    }
+    public static System.Windows.Rect OwnedWindowBounds(int pid) {
+        return ReadOwnedWindow(pid,delegate(AutomationElement.AutomationElementInformation current) { return current.BoundingRectangle; });
+    }
+    public static string OwnedWindowTitle(int pid) {
+        return ReadOwnedWindow(pid,delegate(AutomationElement.AutomationElementInformation current) { return current.Name; });
+    }
+    public static AutomationElement FindOwnedWindow(int pid, string pattern) {
+        IntPtr handle=expectedInputWindow;
+        uint owner=expectedProcessId;
+        if(pid<=0 || (uint)pid!=owner || handle==IntPtr.Zero)
+            throw new InvalidOperationException("Owned window search identity is missing or changed");
+        return Bounded(delegate() {
+            var budget=Stopwatch.StartNew();
+            return RetryDisconnected(delegate() {
+                if(handle!=expectedInputWindow || owner!=expectedProcessId)
+                    throw new InvalidOperationException("Owned window identity changed before search");
+                var root=ReacquireOwnedRoot(handle,owner);
+                var found=Walk(root,pattern,null,budget);
+                if(handle!=expectedInputWindow || owner!=expectedProcessId)
+                    throw new InvalidOperationException("Owned window identity changed during search");
+                return found;
+            },delegate() { ReacquireOwnedRoot(handle,owner); },budget);
+        },"bounded owned window search: "+pattern);
     }
     public static AutomationElement Find(AutomationElement root, string pattern) {
         return Bounded(delegate() {

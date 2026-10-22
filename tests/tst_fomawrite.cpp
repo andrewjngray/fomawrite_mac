@@ -247,6 +247,8 @@ private slots:
     void spellCheckPlatformAvailabilityFollowsHarper();
     void windowsAppearanceTracksQtColorScheme();
     void windowsMenuRoutesPortableCommands();
+    void windowsPaginatedPreviewRendersWithoutPrinter_data();
+    void windowsPaginatedPreviewRendersWithoutPrinter();
     void windowsMenuFormattingKeepsImmediateSaveShortcut();
     void windowsShortcutsUseExistingWindowCommands_data();
     void windowsShortcutsUseExistingWindowCommands();
@@ -6279,6 +6281,7 @@ private:
 #include "windows-center-shortcuts.inc"
 #include "cycle159-format-menu.inc"
 #include "cycle160-portable-menus.inc"
+#include "cycle162-paginated-preview.inc"
 
 #include "organizer-scrollbar-hit.inc"
 #include "acceptance-profile.inc"

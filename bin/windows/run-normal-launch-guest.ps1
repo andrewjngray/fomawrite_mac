@@ -65,7 +65,7 @@ function Wait-For([scriptblock]$condition, [string]$reason, [int]$seconds = 20) 
     } while ([DateTime]::UtcNow -lt $deadline)
     throw "Timed out: $reason"
 }
-function Find-Control([string]$pattern) { [NormalLaunchInput]::Find($script:main, $pattern) }
+function Find-Control([string]$pattern) { [NormalLaunchInput]::FindOwnedWindow($script:process.Id, $pattern) }
 function Click-Control([string]$pattern) {
     $element = Wait-For { Find-Control $pattern } "visible control $pattern"
     [NormalLaunchInput]::Click($element)

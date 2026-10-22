@@ -115,9 +115,23 @@ void FomawriteTest::windowsShortcutsUseExistingWindowCommands() {
         QTRY_VERIFY(!shortcut->property("enabled").toBool());
         const int count = activated.count();
         const int cursor = f.editor->property("cursorPosition").toInt();
+        const int selectionStart = f.editor->property("selectionStart").toInt();
+        const int selectionEnd = f.editor->property("selectionEnd").toInt();
         const bool pane = f.layout->property("reviewVisible").toBool();
+        // A disabled Ctrl+Alt accelerator must still allow legitimate AltGr
+        // text input. Test its unavailable guard on a non-editable item in the
+        // same owning window, preserving the Source selection proved above.
+        auto *guardFocus = f.quick->contentItem(); QVERIFY(guardFocus);
+        guardFocus->forceActiveFocus();
+        QTRY_VERIFY(guardFocus->hasActiveFocus());
+        QCOMPARE(f.editor->property("cursorPosition").toInt(), cursor);
+        QCOMPARE(f.editor->property("selectionStart").toInt(), selectionStart);
+        QCOMPARE(f.editor->property("selectionEnd").toInt(), selectionEnd);
         press(); QCOMPARE(activated.count(), count);
         QCOMPARE(f.editor->property("cursorPosition").toInt(), cursor);
+        QCOMPARE(f.editor->property("selectionStart").toInt(), selectionStart);
+        QCOMPARE(f.editor->property("selectionEnd").toInt(), selectionEnd);
+        QCOMPARE(f.editor->property("text").toString(), draft);
         QCOMPARE(f.layout->property("reviewVisible").toBool(), pane);
     }
     QCOMPARE(otherActivated.count(), 0);

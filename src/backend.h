@@ -348,6 +348,7 @@ signals:
     void textScaleChanged();
     void themeColorsChanged();
     void openDialogRequested();
+    void paginatedPreviewRequested();
     void saveDialogRequested(const QUrl &suggestedUrl);
     void saveSucceeded();
     void documentBarrierFinished(int request, bool success);

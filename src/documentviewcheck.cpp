@@ -312,7 +312,7 @@ int runDocumentViewCheck(QApplication &app, const QString &outputDirectory) {
     };
     QJsonObject resources;
     for (const QString &name : {QStringLiteral("Main.qml"), QStringLiteral("DocumentFooter.qml"),
-            QStringLiteral("FooterButton.qml"), QStringLiteral("PublishingPreview.qml"), QStringLiteral("LiveEditorPane.qml"), QStringLiteral("NativeMenuBar.qml"), QStringLiteral("WindowsMenuBar.qml"), QStringLiteral("LibraryPane.qml"),
+            QStringLiteral("FooterButton.qml"), QStringLiteral("PublishingPreview.qml"), QStringLiteral("WindowsPaginatedPreview.qml"), QStringLiteral("LiveEditorPane.qml"), QStringLiteral("NativeMenuBar.qml"), QStringLiteral("WindowsMenuBar.qml"), QStringLiteral("LibraryPane.qml"),
             QStringLiteral("WorkspaceLayout.qml"), QStringLiteral("WorkspaceCommands.qml"), QStringLiteral("AboutDialog.qml"),
             QStringLiteral("DocumentFindBar.qml"), QStringLiteral("DocumentOutline.qml"),
             QStringLiteral("PaneZoomState.qml"), QStringLiteral("PaneZoomControls.qml"), QStringLiteral("WorkspaceHeader.qml"), QStringLiteral("LinkEditor.qml"), QStringLiteral("LinkSyntax.js"), QStringLiteral("ExportHub.qml"), QStringLiteral("SquareDialogButton.qml"),

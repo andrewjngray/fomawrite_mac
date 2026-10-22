@@ -1971,9 +1971,55 @@ ApplicationWindow {
         }
     }
 
+    // Windows uses the same publishing PDF pages without opening a printer.
+    // The separate modal consumer owns its zoom and dies on every close.
+    property var paginatedPreviewPreviousFocus: null
+    function openWindowsPaginatedPreview() {
+        if (!windowsPaginatedPreviewLoader.active) {
+            paginatedPreviewPreviousFocus = win.activeFocusItem;
+            windowsPaginatedPreviewLoader.active = true;
+        } else if (windowsPaginatedPreviewLoader.item) {
+            windowsPaginatedPreviewLoader.item.show();
+            windowsPaginatedPreviewLoader.item.requestActivate();
+        }
+    }
+    Loader {
+        id: windowsPaginatedPreviewLoader
+        objectName: "windowsPaginatedPreviewLoader"
+        active: false
+        sourceComponent: Component {
+            WindowsPaginatedPreview {
+                renderer: win.appBackend
+                markdown: editor.text
+                documentBaseUrl: backend.documentBaseUrl
+                transientParent: win
+                onDismissed: Qt.callLater(function() {
+                    if (!win) return;
+                    windowsPaginatedPreviewLoader.active = false;
+                    if (win.visible) {
+                        win.requestActivate();
+                        var previous = win.paginatedPreviewPreviousFocus;
+                        if (previous && previous.visible && previous.enabled)
+                            previous.forceActiveFocus(Qt.OtherFocusReason);
+                        else win.focusWritingSurface();
+                    }
+                    win.paginatedPreviewPreviousFocus = null;
+                })
+            }
+        }
+        onLoaded: {
+            item.show();
+            item.requestActivate();
+            item.focusPreview();
+        }
+    }
+
     Connections {
         target: backend
 
+        function onPaginatedPreviewRequested() {
+            if (win.isWindows) win.openWindowsPaginatedPreview();
+        }
         function onDocumentLoaded() {
             win.sourceFormattingOwned = false;
             win.cancelDocumentViewportTransition();

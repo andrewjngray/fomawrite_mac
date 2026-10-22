@@ -92,7 +92,7 @@ function Wait-For([scriptblock]$condition, [string]$reason, [int]$seconds = 30) 
     } while ([DateTime]::UtcNow -lt $deadline)
     throw "Timed out: $reason"
 }
-function Find-Control([string]$pattern) { [NormalLaunchInput]::Find($script:main, $pattern) }
+function Find-Control([string]$pattern) { [NormalLaunchInput]::FindOwnedWindow($script:process.Id, $pattern) }
 function Click-Control([string]$pattern) {
     $element = Wait-For { Find-Control $pattern } "control $pattern"
     if ($element.Current.ProcessId -ne $script:process.Id) { throw 'UIA click target belongs to another process.' }

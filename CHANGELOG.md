@@ -4,6 +4,8 @@ One line per cycle, newest first. Each line links to the cycle's record under `r
 
 ## 0.3.0 development series (Cycles 97–)
 
+- **162 — Windows Paginated Preview repair candidate** — Render a separate modal preview through the existing Publisher PDF pages without initializing a printer, with local zoom and safe close/consumer cleanup. Source/Live page-text, actual-pixel and complete state checks pass **4/0/0** after missing-component reds; native qualification remains pending. [Record](research/cycle-162/README.md)
+
 - **161 — Windows Center and shortcut parity candidate** — Add guarded frame centering and five existing command bindings while preserving native Mac actions; six missing-route reds become a focused **15/0/0** green, with required build passed. Windows offscreen CI and physical input/placement qualification remain pending. [Record](research/cycle-161/README.md)
 
 - **160 — Remaining Windows File/Authorship/View menu routes** — Expose eleven existing routes, retaining creation guards, profile/metadata safety and native Mac assertions; thirteen host rows pass in the combined **53/0/0** focused gate after intended missing-node reds. Print Source execution and native Windows qualification remain pending. [Record](research/cycle-160/README.md)

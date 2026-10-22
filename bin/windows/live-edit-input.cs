@@ -25,7 +25,7 @@ public static class LiveEditInput {
         });
     }
     public static string Title(int pid) {
-        return Read(delegate() { var root=NormalLaunchInput.Root(pid); return root.Current.Name; });
+        return NormalLaunchInput.OwnedWindowTitle(pid);
     }
     [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)]
     struct Mouse { public int dx,dy; public uint data,flags,time; public System.UIntPtr extra; }
@@ -37,7 +37,7 @@ public static class LiveEditInput {
     static extern uint SendInput(uint n, Input[] inputs, int size);
     public static void ClickWord(int pid, System.Windows.Rect pane, int x, int y) {
         NormalLaunchInput.RequireInputForeground();
-        var window=Read(delegate() { return NormalLaunchInput.Root(pid).Current.BoundingRectangle; });
+        var window=NormalLaunchInput.OwnedWindowBounds(pid);
         if(pane.IsEmpty || !window.Contains(pane) || !pane.Contains(new System.Windows.Point(x,y)))
             throw new System.InvalidOperationException("OCR target lies outside the owned writing pane");
         NormalLaunchInput.MovePhysical(x,y);

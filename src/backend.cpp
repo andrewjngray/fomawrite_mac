@@ -3608,6 +3608,9 @@ void Backend::prepareOutput(QTextDocument &document, bool plain) const {
 
 void Backend::printPreview() {
     if (!m_document) return;
+#ifdef Q_OS_WIN
+    emit paginatedPreviewRequested();
+#else
     QPrinter printer(QPrinter::HighResolution);
     if (m_pageLayout.isValid()) printer.setPageLayout(m_pageLayout);
     QPrintPreviewDialog dialog(&printer);
@@ -3616,6 +3619,7 @@ void Backend::printPreview() {
         paintPublishingOutput(*output);
     });
     dialog.resize(900,700); dialog.exec();
+#endif
 }
 
 void Backend::pageSetup() {
