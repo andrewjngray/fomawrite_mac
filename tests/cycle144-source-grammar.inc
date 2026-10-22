@@ -40,12 +40,16 @@ double cycle144Contrast(const QColor &a, const QColor &b) {
 
 // (a) A doubled word is blue, a misspelling in the same block stays red, and
 // nothing inside a fence is marked. Where the two overlap, spelling wins.
+void FomawriteTest::sourceGrammarUnderlinesDoubledWordsAndSpellingStaysRed_data() { cycle144ReviewCheckerRows(); }
+
 void FomawriteTest::sourceGrammarUnderlinesDoubledWordsAndSpellingStaysRed() {
+    QFETCH(bool, bundledHarper);
     Cycle103SettingsSnapshot settings;
-    SpellCheck spell;
-    if (!spell.available()) QSKIP("the system spell checker exists only on macOS");
+    Cycle144GrammarService service; QVERIFY2(service.start(bundledHarper), qPrintable(service.error));
+    SpellCheck &spell = *service.checker;
+    if (!bundledHarper && !spell.available()) QSKIP("the system spell checker exists only on macOS");
     spell.setEnabled(true); spell.setGrammarEnabled(true); spell.setLanguage(QStringLiteral("en_US"));
-    CYCLE144_NEEDS_GRAMMAR(spell);
+    if (!bundledHarper) { CYCLE144_NEEDS_GRAMMAR(spell); }
     const QString source = QStringLiteral(
         "We recieve the the mail today.\n\n"
         "```\nfenced the the recieve here\n```\n\n"
@@ -53,9 +57,10 @@ void FomawriteTest::sourceGrammarUnderlinesDoubledWordsAndSpellingStaysRed() {
     QTextDocument document; document.setPlainText(source);
     MarkdownHighlighter highlighter(&document);
     highlighter.setSpellCheck(&spell); QTest::qWait(20); highlighter.rehighlight();
+    QVERIFY(cycle144AwaitGrammar(spell, highlighter, document));
     const int first = source.indexOf(QStringLiteral("the the")), bad = source.indexOf(QStringLiteral("recieve"));
     const auto issue = cycle144DoubledWord(highlighter, document, first);
-    QVERIFY2(issue.start >= 0, "the macOS grammar pass flags a doubled word");
+    QVERIFY2(issue.start >= 0, "the real checker flags a doubled word");
     QVERIFY(!issue.message.isEmpty());
     const int issueStart = document.findBlock(first).position() + issue.start, issueEnd = document.findBlock(first).position() + issue.end;
     qInfo("grammar range [%d, %d) %s message: %s", issue.start, issue.end,
@@ -84,6 +89,7 @@ void FomawriteTest::sourceGrammarUnderlinesDoubledWordsAndSpellingStaysRed() {
     QTextDocument heading; heading.setPlainText(QStringLiteral("# A heading with the the doubled word"));
     MarkdownHighlighter headingHighlighter(&heading);
     headingHighlighter.setSpellCheck(&spell); QTest::qWait(20); headingHighlighter.rehighlight();
+    QVERIFY(cycle144AwaitGrammar(spell, headingHighlighter, heading));
     const int headingWord = heading.toPlainText().indexOf(QStringLiteral("the the"));
     const auto headingFormat = cycle143Format(heading, headingWord + 1);
     QVERIFY(cycle144IsBlueMark(headingFormat) || cycle144IsBlueMark(cycle143Format(heading, headingWord + 5)));
@@ -129,16 +135,21 @@ void FomawriteTest::sourceGrammarUnderlinesDoubledWordsAndSpellingStaysRed() {
 }
 
 // (b) The grammar setting clears blue and keeps red; turning it on brings it back.
+void FomawriteTest::sourceGrammarFollowsItsSettingAndKeepsSpelling_data() { cycle144ReviewCheckerRows(); }
+
 void FomawriteTest::sourceGrammarFollowsItsSettingAndKeepsSpelling() {
+    QFETCH(bool, bundledHarper);
     Cycle103SettingsSnapshot settings;
-    SpellCheck spell;
-    if (!spell.available()) QSKIP("the system spell checker exists only on macOS");
+    Cycle144GrammarService service; QVERIFY2(service.start(bundledHarper), qPrintable(service.error));
+    SpellCheck &spell = *service.checker;
+    if (!bundledHarper && !spell.available()) QSKIP("the system spell checker exists only on macOS");
     spell.setEnabled(true); spell.setGrammarEnabled(true); spell.setLanguage(QStringLiteral("en_US"));
-    CYCLE144_NEEDS_GRAMMAR(spell);
+    if (!bundledHarper) { CYCLE144_NEEDS_GRAMMAR(spell); }
     const QString source = QStringLiteral("We recieve the the mail today.");
     QTextDocument document; document.setPlainText(source);
     MarkdownHighlighter highlighter(&document);
     highlighter.setSpellCheck(&spell); QTest::qWait(20); highlighter.rehighlight();
+    QVERIFY(cycle144AwaitGrammar(spell, highlighter, document));
     const int word = source.indexOf(QStringLiteral("the the")), bad = source.indexOf(QStringLiteral("recieve"));
     const auto blueCount = [&] { int count = 0; for (int p = 0; p < source.size(); ++p) count += cycle144IsBlue(document, p); return count; };
     QVERIFY(blueCount() > 0);
@@ -157,16 +168,21 @@ void FomawriteTest::sourceGrammarFollowsItsSettingAndKeepsSpelling() {
 
 // (c) The caret rule applies to grammar: a range ending at the caret is
 // withheld, and moving the caret never touches the document revision.
+void FomawriteTest::sourceGrammarWithholdsTheRangeAtTheCaretWithoutARevision_data() { cycle144ReviewCheckerRows(); }
+
 void FomawriteTest::sourceGrammarWithholdsTheRangeAtTheCaretWithoutARevision() {
+    QFETCH(bool, bundledHarper);
     Cycle103SettingsSnapshot settings;
-    SpellCheck spell;
-    if (!spell.available()) QSKIP("the system spell checker exists only on macOS");
+    Cycle144GrammarService service; QVERIFY2(service.start(bundledHarper), qPrintable(service.error));
+    SpellCheck &spell = *service.checker;
+    if (!bundledHarper && !spell.available()) QSKIP("the system spell checker exists only on macOS");
     spell.setEnabled(true); spell.setGrammarEnabled(true); spell.setLanguage(QStringLiteral("en_US"));
-    CYCLE144_NEEDS_GRAMMAR(spell);
+    if (!bundledHarper) { CYCLE144_NEEDS_GRAMMAR(spell); }
     const QString source = QStringLiteral("We send the the parcel today.\n\nA second line we send the the letter.");
     QTextDocument document; document.setPlainText(source);
     MarkdownHighlighter highlighter(&document);
     highlighter.setSpellCheck(&spell); QTest::qWait(20); highlighter.rehighlight();
+    QVERIFY(cycle144AwaitGrammar(spell, highlighter, document));
     const auto firstIssue = cycle144DoubledWord(highlighter, document, 0);
     QVERIFY(firstIssue.start >= 0);
     const int end = firstIssue.end, inside = firstIssue.end - 2;
@@ -222,13 +238,18 @@ int cycle144BluePixels(const QImage &frame, const QRectF &box, qreal scale) {
 
 // (d) The rendered window draws it: pixels under "the the", none under clean
 // words, none while the caret sits at the end of the range, none when off.
+void FomawriteTest::sourceGrammarUnderlineIsBlueInTheRenderedWindow_data() { cycle144ReviewCheckerRows(); }
+
 void FomawriteTest::sourceGrammarUnderlineIsBlueInTheRenderedWindow() {
+    QFETCH(bool, bundledHarper);
     Cycle103SettingsSnapshot settings;
     Cycle117Window f; QVERIFY2(f.start(1100), qPrintable(f.error));
+    if (bundledHarper) { QString error; QVERIFY2(cycle144StartBundledReviewChecker(f, &error), qPrintable(error)); }
     auto *spell = f.backend.spellCheck();
-    if (!spell->available()) QSKIP("the system spell checker exists only on macOS");
+    if (!bundledHarper) spell->setEngine(QStringLiteral("macos"));
+    if (!bundledHarper && !spell->available()) QSKIP("the system spell checker exists only on macOS");
     spell->setEnabled(true); spell->setGrammarEnabled(true); spell->setLanguage(QStringLiteral("en_US"));
-    CYCLE144_NEEDS_GRAMMAR((*spell));
+    if (!bundledHarper) { CYCLE144_NEEDS_GRAMMAR((*spell)); }
     QVERIFY(f.mode(0));
     const QString text = QStringLiteral("We send the the parcel today and then ship it onward.");
     f.editor->setProperty("text", text);
@@ -272,13 +293,18 @@ void FomawriteTest::sourceGrammarUnderlineIsBlueInTheRenderedWindow() {
 // (e) Right-click on the grammar range: the message (disabled), corrections,
 // Ignore Grammar Issue. A correction fixes the text and Undo restores it;
 // Ignore clears the mark without a revision bump.
+void FomawriteTest::sourceGrammarContextMenuShowsTheMessageCorrectsAndIgnores_data() { cycle144ReviewCheckerRows(); }
+
 void FomawriteTest::sourceGrammarContextMenuShowsTheMessageCorrectsAndIgnores() {
+    QFETCH(bool, bundledHarper);
     Cycle103SettingsSnapshot settings;
     Cycle117Window f; QVERIFY2(f.start(1100), qPrintable(f.error));
+    if (bundledHarper) { QString error; QVERIFY2(cycle144StartBundledReviewChecker(f, &error), qPrintable(error)); }
     auto *spell = f.backend.spellCheck();
-    if (!spell->available()) QSKIP("the system spell checker exists only on macOS");
+    if (!bundledHarper) spell->setEngine(QStringLiteral("macos"));
+    if (!bundledHarper && !spell->available()) QSKIP("the system spell checker exists only on macOS");
     spell->setEnabled(true); spell->setGrammarEnabled(true); spell->setLanguage(QStringLiteral("en_US"));
-    CYCLE144_NEEDS_GRAMMAR((*spell));
+    if (!bundledHarper) { CYCLE144_NEEDS_GRAMMAR((*spell)); }
     QVERIFY(f.mode(0));
     const QString text = QStringLiteral("We recieve mail today.\n\nThen we send the the parcel onward.");
     f.editor->setProperty("text", text);
@@ -338,7 +364,15 @@ void FomawriteTest::sourceGrammarContextMenuShowsTheMessageCorrectsAndIgnores() 
     QTRY_VERIFY(menu->property("visible").toBool());
     QVERIFY(cycle102Click(f.quick, menu->findChild<QQuickItem *>("grammarIgnore")));
     QTRY_VERIFY(f.backend.grammarIssueAt(doubled + 2).isEmpty());
-    QVERIFY(spell->issues(QStringLiteral("and the the mail")).isEmpty()); // the service holds the ignore, so the pane and Live see it too
+    if (bundledHarper) {
+        // Use a complete sentence: unrelated capitalization findings on the
+        // native fixture's lower-case fragment are Harper rule differences.
+        const QString sharedPhrase = QStringLiteral("We send the the mail.");
+        QTRY_VERIFY_WITH_TIMEOUT(spell->issuesIfKnown(sharedPhrase).has_value(), 20000);
+        QVERIFY(cycle144CheckerGrammar(*spell, sharedPhrase).isEmpty());
+    } else {
+        QVERIFY(spell->issues(QStringLiteral("and the the mail")).isEmpty());
+    } // The service holds the ignore, so the pane and Live see it too.
     QCOMPARE(f.editor->property("text").toString(), text);
     rightClick(pointAt(doubled, 7));
     QVERIFY(!menu->property("visible").toBool());
@@ -354,16 +388,21 @@ void FomawriteTest::sourceGrammarContextMenuShowsTheMessageCorrectsAndIgnores() 
 // The ignore set is the highlighter's own, per document: it hides the finding
 // from the underline and from issuesInBlock, strips the mark in place without a
 // revision bump, and a fresh highlighter (a document attach) starts empty.
+void FomawriteTest::sourceGrammarIgnoreIsPerDocumentAndRestylesInPlace_data() { cycle144ReviewCheckerRows(); }
+
 void FomawriteTest::sourceGrammarIgnoreIsPerDocumentAndRestylesInPlace() {
+    QFETCH(bool, bundledHarper);
     Cycle103SettingsSnapshot settings;
-    SpellCheck spell;
-    if (!spell.available()) QSKIP("the system spell checker exists only on macOS");
+    Cycle144GrammarService service; QVERIFY2(service.start(bundledHarper), qPrintable(service.error));
+    SpellCheck &spell = *service.checker;
+    if (!bundledHarper && !spell.available()) QSKIP("the system spell checker exists only on macOS");
     spell.setEnabled(true); spell.setGrammarEnabled(true); spell.setLanguage(QStringLiteral("en_US"));
-    CYCLE144_NEEDS_GRAMMAR(spell);
+    if (!bundledHarper) { CYCLE144_NEEDS_GRAMMAR(spell); }
     const QString source = QStringLiteral("We hand the the cargo over.\n\nThen we hand the the crate over.");
     QTextDocument document; document.setPlainText(source);
     MarkdownHighlighter highlighter(&document);
     highlighter.setSpellCheck(&spell); QTest::qWait(20); highlighter.rehighlight();
+    QVERIFY(cycle144AwaitGrammar(spell, highlighter, document));
     const auto first = cycle144DoubledWord(highlighter, document, 0);
     const int secondBlock = document.findBlockByNumber(2).position();
     const auto second = cycle144DoubledWord(highlighter, document, secondBlock);
@@ -385,6 +424,7 @@ void FomawriteTest::sourceGrammarIgnoreIsPerDocumentAndRestylesInPlace() {
     QTextDocument copy; copy.setPlainText(source);
     MarkdownHighlighter fresh(&copy);
     fresh.setSpellCheck(&spell); QTest::qWait(20); fresh.rehighlight();
+    QVERIFY(cycle144AwaitGrammar(spell, fresh, copy));
     QVERIFY(!fresh.grammarIssuesInBlock(copy.firstBlock()).isEmpty());
     highlighter.clearIgnoredIssues();
     QVERIFY(!highlighter.grammarIssuesInBlock(document.firstBlock()).isEmpty());

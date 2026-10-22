@@ -9,6 +9,56 @@
 // dictionary, so no test calls learnWord.
 
 namespace {
+// The shared Review contract applies to both engines. Keep the original native
+// checker rows on Mac and exercise the actual pinned, offline Harper page on
+// both Mac and Windows, without claiming synthetic readiness as WASM coverage.
+void cycle144ReviewCheckerRows() {
+    QTest::addColumn<bool>("bundledHarper");
+#ifndef Q_OS_WIN
+    QTest::newRow("native-checker") << false;
+#endif
+#if defined(Q_OS_MACOS) || defined(Q_OS_WIN)
+    QTest::newRow("bundled-harper") << true;
+#endif
+}
+bool cycle144BundledReviewCheckerReady(Backend &backend, QString *error) {
+    auto *spell = backend.spellCheck();
+    if (!QTest::qWaitFor([&] { return backend.editorBridge()->isReady() && spell->harperReady(); }, 60000)) {
+        *error = QStringLiteral("The shipped page did not load the bundled Harper engine");
+        return false;
+    }
+    const QString bundled = HarperSchemeHandler::bundledVersion();
+    if (bundled.isEmpty() || HarperSchemeHandler::servedVersion() != bundled
+            || spell->harperVersion() != bundled || spell->effectiveEngine() != QStringLiteral("harper")) {
+        *error = QStringLiteral("Review fixture must use the pinned bundled Harper version");
+        return false;
+    }
+    return spell->available();
+}
+bool cycle144StartBundledReviewChecker(Cycle117Window &fixture, QString *error) {
+    fixture.backend.spellCheck()->setEngine(QStringLiteral("harper"));
+    if (!QMetaObject::invokeMethod(fixture.window.data(), "selectWritingMode",
+                                  Q_ARG(QVariant, QStringLiteral("live")))) {
+        *error = QStringLiteral("Cannot create the shipped Live page for bundled Harper");
+        return false;
+    }
+    if (!cycle144BundledReviewCheckerReady(fixture.backend, error)) return false;
+    if (!QMetaObject::invokeMethod(fixture.window.data(), "selectWritingMode",
+                                  Q_ARG(QVariant, QStringLiteral("source")))) {
+        *error = QStringLiteral("Cannot return from Harper setup to Source");
+        return false;
+    }
+    return true;
+}
+QObject *cycle144ReviewMenuCommand(QObject *window, const QString &command) {
+    if (!testDesktopMenusMatchPlatform(window)) return nullptr;
+    if (!window->property("isMac").toBool()) return testDesktopCommand(window, command);
+    // These three native items have stable explicit names overriding the
+    // NativeCommand component's usual native_<command> object name.
+    const QMap<QString, QString> names{{"spelling", "editSpelling"},
+        {"nextIssue", "editNextIssue"}, {"previousIssue", "editPreviousIssue"}};
+    return window->findChild<QObject *>(names.value(command));
+}
 QObject *cycle144Commands(QObject *window) { return window->findChild<QObject *>("workspaceCommands"); }
 bool cycle144Run(QObject *window, const char *command) {
     return QMetaObject::invokeMethod(cycle144Commands(window), "run", Q_ARG(QVariant, QString::fromLatin1(command)));
@@ -60,18 +110,32 @@ const QString cycle144Text() {
 }
 }
 
+void FomawriteTest::reviewIssuesListSpellingAndGrammarInOrderWithDocumentOffsets_data() { cycle144ReviewCheckerRows(); }
+
 void FomawriteTest::reviewIssuesListSpellingAndGrammarInOrderWithDocumentOffsets() {
+    QFETCH(bool, bundledHarper);
     Cycle103SettingsSnapshot settings;
     Cycle117Window f; QVERIFY2(f.start(1100), qPrintable(f.error));
+    if (bundledHarper) {
+        QString error;
+        QVERIFY2(cycle144StartBundledReviewChecker(f, &error), qPrintable(error));
+    }
     auto *spell = f.backend.spellCheck();
-    if (!spell->available()) QSKIP("the system spell checker exists only on macOS");
+    if (!bundledHarper && !spell->available()) QSKIP("the system spell checker exists only on macOS");
     spell->setEnabled(true); spell->setGrammarEnabled(true); spell->setLanguage(QStringLiteral("en_US"));
-    CYCLE144_NEEDS_GRAMMAR((*spell));
+    if (!bundledHarper) { CYCLE144_NEEDS_GRAMMAR((*spell)); }
     QVERIFY(f.mode(0));
     const QString text = cycle144Text();
     f.editor->setProperty("text", text);
     QTRY_VERIFY(!f.backend.reviewIssues().isEmpty());
     QTRY_VERIFY(!cycle144Find(f.backend.reviewIssues(), "Spelling", "quorbleflat").isEmpty()); // the last block is checked too
+    if (bundledHarper) {
+        // Answers can arrive out of document order. Require all expected
+        // paragraphs before taking a snapshot for ordering/offset assertions.
+        QTRY_VERIFY(!cycle144Find(f.backend.reviewIssues(), "Spelling", "colage").isEmpty());
+        QTRY_VERIFY(!cycle144Find(f.backend.reviewIssues(), "Spelling", "recieve").isEmpty());
+        QTRY_VERIFY(!cycle144Find(f.backend.reviewIssues(), "Grammar", "the the").isEmpty());
+    }
     const QVariantList issues = f.backend.reviewIssues();
     QVERIFY(!f.backend.reviewIssuesTruncated());
     int previous = -1; bool sawGrammar = false;
@@ -92,7 +156,8 @@ void FomawriteTest::reviewIssuesListSpellingAndGrammarInOrderWithDocumentOffsets
     QVERIFY2(sawGrammar, "the doubled words are a grammar finding");
     const auto colage = cycle144Find(issues, "Spelling", "colage");
     QCOMPARE(colage["start"].toInt(), text.indexOf("colage"));
-    QVERIFY(colage["message"].toString().isEmpty());
+    if (bundledHarper) QVERIFY(!colage["message"].toString().isEmpty());
+    else QVERIFY(colage["message"].toString().isEmpty());
     QVERIFY(!colage["suggestions"].toStringList().isEmpty());
     QCOMPARE(colage["context"].toString(), QStringLiteral("A colage of ideas."));
     const auto recieve = cycle144Find(issues, "Spelling", "recieve");
@@ -121,11 +186,18 @@ void FomawriteTest::reviewIssuesListSpellingAndGrammarInOrderWithDocumentOffsets
     QVERIFY(cycle144Find(f.backend.reviewIssues(), "Spelling", "colage").isEmpty());
 }
 
+void FomawriteTest::reviewIssuesAreCappedAndTheCapIsReported_data() { cycle144ReviewCheckerRows(); }
+
 void FomawriteTest::reviewIssuesAreCappedAndTheCapIsReported() {
+    QFETCH(bool, bundledHarper);
     Cycle103SettingsSnapshot settings;
     Cycle117Window f; QVERIFY2(f.start(1100), qPrintable(f.error));
+    if (bundledHarper) {
+        QString error;
+        QVERIFY2(cycle144StartBundledReviewChecker(f, &error), qPrintable(error));
+    }
     auto *spell = f.backend.spellCheck();
-    if (!spell->available()) QSKIP("the system spell checker exists only on macOS");
+    if (!bundledHarper && !spell->available()) QSKIP("the system spell checker exists only on macOS");
     spell->setEnabled(true); spell->setGrammarEnabled(false); spell->setLanguage(QStringLiteral("en_US"));
     QVERIFY(f.mode(0));
     QString text;
@@ -134,21 +206,32 @@ void FomawriteTest::reviewIssuesAreCappedAndTheCapIsReported() {
     QTRY_VERIFY_WITH_TIMEOUT(f.backend.reviewIssuesTruncated(), 15000);
     QCOMPARE(f.backend.reviewIssues().size(), Backend::ReviewIssueLimit);
     // Still in document order: the first 500, not a sample.
-    QCOMPARE(f.backend.reviewIssues().last().toMap()["blockNumber"].toInt(), (Backend::ReviewIssueLimit - 1) * 2);
+    if (bundledHarper)
+        QTRY_COMPARE_WITH_TIMEOUT(f.backend.reviewIssues().last().toMap()["blockNumber"].toInt(), (Backend::ReviewIssueLimit - 1) * 2, 15000);
+    else
+        QCOMPARE(f.backend.reviewIssues().last().toMap()["blockNumber"].toInt(), (Backend::ReviewIssueLimit - 1) * 2);
     f.editor->setProperty("text", QStringLiteral("Only one zxqvwhatsit here.\n"));
     QTRY_COMPARE(f.backend.reviewIssues().size(), 1);
     QVERIFY(!f.backend.reviewIssuesTruncated());
 }
 
+void FomawriteTest::reviewIssuesAreRebuiltAfterAPauseAndTypingCoalesces_data() { cycle144ReviewCheckerRows(); }
+
 void FomawriteTest::reviewIssuesAreRebuiltAfterAPauseAndTypingCoalesces() {
+    QFETCH(bool, bundledHarper);
     Cycle103SettingsSnapshot settings;
     Cycle117Window f; QVERIFY2(f.start(1100), qPrintable(f.error));
+    if (bundledHarper) {
+        QString error;
+        QVERIFY2(cycle144StartBundledReviewChecker(f, &error), qPrintable(error));
+    }
     auto *spell = f.backend.spellCheck();
-    if (!spell->available()) QSKIP("the system spell checker exists only on macOS");
+    if (!bundledHarper && !spell->available()) QSKIP("the system spell checker exists only on macOS");
     spell->setEnabled(true); spell->setGrammarEnabled(false); spell->setLanguage(QStringLiteral("en_US"));
     QVERIFY(f.mode(0));
     f.editor->setProperty("text", QStringLiteral("Start here.\n"));
     QTRY_VERIFY(f.backend.reviewIssues().isEmpty());
+    if (bundledHarper) QTRY_VERIFY(spell->issuesIfKnown(QStringLiteral("Start here.")).has_value());
     QTest::qWait(400); // let the load's own rebuild finish
     QSignalSpy changed(&f.backend, &Backend::reviewIssuesChanged);
     // Typing "recieve " one letter at a time, faster than the pause: nothing is
@@ -168,21 +251,34 @@ void FomawriteTest::reviewIssuesAreRebuiltAfterAPauseAndTypingCoalesces() {
     QCOMPARE(changed.count(), 1);
 }
 
+void FomawriteTest::reviewPaneTogglesWithTheCommandAndTheMenuTickFollows_data() { cycle144ReviewCheckerRows(); }
+
 void FomawriteTest::reviewPaneTogglesWithTheCommandAndTheMenuTickFollows() {
+    QFETCH(bool, bundledHarper);
     Cycle103SettingsSnapshot settings;
     Cycle117Window f; QVERIFY2(f.start(1100), qPrintable(f.error));
-    if (!f.backend.spellCheck()->available()) QSKIP("the system spell checker exists only on macOS");
+    if (bundledHarper) {
+        QString error;
+        QVERIFY2(cycle144StartBundledReviewChecker(f, &error), qPrintable(error));
+    } else if (!f.backend.spellCheck()->available()) {
+        QSKIP("the system spell checker exists only on macOS");
+    }
     QVERIFY(f.mode(0));
+    const QString originalSource = f.editor->property("text").toString();
+    const int originalRevision = f.backend.documentRevision();
     auto *slot = f.window->findChild<QQuickItem *>("reviewSlot"); QVERIFY(slot);
-    auto *menuItem = f.window->findChild<QObject *>("editSpelling"); QVERIFY(menuItem);
+    auto *menuItem = cycle144ReviewMenuCommand(f.window.data(), QStringLiteral("spelling")); QVERIFY(menuItem);
     QCOMPARE(menuItem->property("text").toString(), QStringLiteral("Spelling and Grammar")); // no ellipsis: it is a pane, not a dialog
     QVERIFY(menuItem->property("checkable").toBool());
     QVERIFY(menuItem->property("enabled").toBool());
     QVERIFY(!menuItem->property("checked").toBool());
     QVERIFY(!f.layout->property("reviewVisible").toBool());
     QVERIFY(!slot->isVisible());
-    QVERIFY(f.window->findChild<QObject *>("editNextIssue")->property("enabled").toBool());
-    QVERIFY(f.window->findChild<QObject *>("editPreviousIssue")->property("enabled").toBool());
+    for (const char *command : {"nextIssue", "previousIssue"}) {
+        auto *item = cycle144ReviewMenuCommand(f.window.data(), QString::fromLatin1(command));
+        QVERIFY2(item, command);
+        QVERIFY(item->property("enabled").toBool());
+    }
     QVERIFY(cycle144Run(f.window.data(), "spelling"));
     QTRY_VERIFY(slot->isVisible());
     QTRY_COMPARE(slot->width(), 320.0); // laid out, not just shown
@@ -220,15 +316,26 @@ void FomawriteTest::reviewPaneTogglesWithTheCommandAndTheMenuTickFollows() {
     auto *turnOn = f.window->findChild<QQuickItem *>("reviewTurnOn"); QVERIFY(turnOn && turnOn->isVisible());
     QVERIFY(cycle102Click(f.quick, turnOn));
     QTRY_VERIFY(f.backend.spellCheck()->enabled());
-    QTRY_COMPARE(empty->property("text").toString(), QStringLiteral("No spelling or grammar issues"));
+    QTRY_COMPARE(empty->property("text").toString(), bundledHarper
+        ? QStringLiteral("No spelling, grammar or style issues")
+        : QStringLiteral("No spelling or grammar issues"));
     QVERIFY(!turnOn->isVisible());
+    QCOMPARE(f.editor->property("text").toString(), originalSource);
+    QCOMPARE(f.backend.documentRevision(), originalRevision);
 }
 
+void FomawriteTest::reviewRowClickMovesTheSourceCaret_data() { cycle144ReviewCheckerRows(); }
+
 void FomawriteTest::reviewRowClickMovesTheSourceCaret() {
+    QFETCH(bool, bundledHarper);
     Cycle103SettingsSnapshot settings;
     Cycle117Window f; QVERIFY2(f.start(1100), qPrintable(f.error));
+    if (bundledHarper) {
+        QString error;
+        QVERIFY2(cycle144StartBundledReviewChecker(f, &error), qPrintable(error));
+    }
     auto *spell = f.backend.spellCheck();
-    if (!spell->available()) QSKIP("the system spell checker exists only on macOS");
+    if (!bundledHarper && !spell->available()) QSKIP("the system spell checker exists only on macOS");
     spell->setEnabled(true); spell->setGrammarEnabled(false); spell->setLanguage(QStringLiteral("en_US"));
     QVERIFY(f.mode(0));
     const QString text = QStringLiteral("A flomptoid of ideas.\n\nWe recieve the mail, and quorbleflat too.\n");
@@ -264,11 +371,18 @@ void FomawriteTest::reviewRowClickMovesTheSourceCaret() {
     QTRY_VERIFY(cycle144Row(f.window.data(), 2));
 }
 
+void FomawriteTest::reviewSuggestionAppliesAsOneUndoableEdit_data() { cycle144ReviewCheckerRows(); }
+
 void FomawriteTest::reviewSuggestionAppliesAsOneUndoableEdit() {
+    QFETCH(bool, bundledHarper);
     Cycle103SettingsSnapshot settings;
     Cycle117Window f; QVERIFY2(f.start(1100), qPrintable(f.error));
+    if (bundledHarper) {
+        QString error;
+        QVERIFY2(cycle144StartBundledReviewChecker(f, &error), qPrintable(error));
+    }
     auto *spell = f.backend.spellCheck();
-    if (!spell->available()) QSKIP("the system spell checker exists only on macOS");
+    if (!bundledHarper && !spell->available()) QSKIP("the system spell checker exists only on macOS");
     spell->setEnabled(true); spell->setGrammarEnabled(false); spell->setLanguage(QStringLiteral("en_US"));
     QVERIFY(f.mode(0));
     const QString text = QStringLiteral("We recieve the mail.\n\nA wrimblesnort here.\n");
@@ -307,11 +421,18 @@ void FomawriteTest::reviewSuggestionAppliesAsOneUndoableEdit() {
     QTRY_VERIFY(!cycle144Row(f.window.data(), 1));
 }
 
+void FomawriteTest::nextAndPreviousIssueWrapRoundTheDocument_data() { cycle144ReviewCheckerRows(); }
+
 void FomawriteTest::nextAndPreviousIssueWrapRoundTheDocument() {
+    QFETCH(bool, bundledHarper);
     Cycle103SettingsSnapshot settings;
     Cycle117Window f; QVERIFY2(f.start(1100), qPrintable(f.error));
+    if (bundledHarper) {
+        QString error;
+        QVERIFY2(cycle144StartBundledReviewChecker(f, &error), qPrintable(error));
+    }
     auto *spell = f.backend.spellCheck();
-    if (!spell->available()) QSKIP("the system spell checker exists only on macOS");
+    if (!bundledHarper && !spell->available()) QSKIP("the system spell checker exists only on macOS");
     spell->setEnabled(true); spell->setGrammarEnabled(false); spell->setLanguage(QStringLiteral("en_US"));
     QVERIFY(f.mode(0));
     const QString text = QStringLiteral("A flomptoid of ideas.\n\nWe recieve the mail.\n\nAnd quorbleflat there.\n");
@@ -328,7 +449,8 @@ void FomawriteTest::nextAndPreviousIssueWrapRoundTheDocument() {
     QCOMPARE(f.backend.nextIssue(first, true), third);            // wraps backwards
     QCOMPARE(f.backend.nextIssue(0, true), third);
     // The commands move and select in Source.
-    QVERIFY(f.window->findChild<QObject *>("editNextIssue")->property("enabled").toBool());
+    auto *nextMenu = cycle144ReviewMenuCommand(f.window.data(), QStringLiteral("nextIssue")); QVERIFY(nextMenu);
+    QVERIFY(nextMenu->property("enabled").toBool());
     f.editor->setProperty("cursorPosition", 0);
     QVERIFY(cycle144Run(f.window.data(), "nextIssue"));
     QTRY_COMPARE(f.editor->property("selectedText").toString(), QStringLiteral("flomptoid"));
@@ -340,17 +462,28 @@ void FomawriteTest::nextAndPreviousIssueWrapRoundTheDocument() {
     QVERIFY(cycle144Run(f.window.data(), "previousIssue")); QTRY_COMPARE(f.editor->property("selectedText").toString(), QStringLiteral("flomptoid"));
     // Nothing to find: no movement, no error.
     spell->setEnabled(false);
-    QVERIFY(!f.window->findChild<QObject *>("editSpelling")->property("checked").toBool());
+    auto *spellingMenu = cycle144ReviewMenuCommand(f.window.data(), QStringLiteral("spelling")); QVERIFY(spellingMenu);
+    QVERIFY(!spellingMenu->property("checked").toBool());
     QCOMPARE(f.backend.nextIssue(0, false), -1);
     // And the commands are unavailable only when there is no checker at all.
-    QVERIFY(f.window->findChild<QObject *>("editNextIssue")->property("enabled").toBool());
+    QVERIFY(nextMenu->property("enabled").toBool());
 }
 
+void FomawriteTest::reviewPaneResizesWithTheSplitViewAndItsWidthPersists_data() { cycle144ReviewCheckerRows(); }
+
 void FomawriteTest::reviewPaneResizesWithTheSplitViewAndItsWidthPersists() {
+    QFETCH(bool, bundledHarper);
     Cycle103SettingsSnapshot settings;
     Cycle117Window f; QVERIFY2(f.start(1280), qPrintable(f.error));
-    if (!f.backend.spellCheck()->available()) QSKIP("the system spell checker exists only on macOS");
+    if (bundledHarper) {
+        QString error;
+        QVERIFY2(cycle144StartBundledReviewChecker(f, &error), qPrintable(error));
+    } else if (!f.backend.spellCheck()->available()) {
+        QSKIP("the system spell checker exists only on macOS");
+    }
     QVERIFY(f.mode(0));
+    const QString originalSource = f.editor->property("text").toString();
+    const int originalRevision = f.backend.documentRevision();
     auto *slot = f.window->findChild<QQuickItem *>("reviewSlot"); QVERIFY(slot);
     auto *editorPane = f.window->findChild<QQuickItem *>("editorPane"); QVERIFY(editorPane);
     QCOMPARE(f.layout->property("reviewWidth").toReal(), 320.0);
@@ -398,14 +531,27 @@ void FomawriteTest::reviewPaneResizesWithTheSplitViewAndItsWidthPersists() {
     QVERIFY(QMetaObject::invokeMethod(f.layout, "restoreState", Q_RETURN_ARG(QVariant, restored), Q_ARG(QVariant, legacy)));
     QCOMPARE(f.layout->property("reviewVisible").toBool(), false);
     QCOMPARE(f.layout->property("reviewWidth").toReal(), 320.0);
+    QCOMPARE(f.editor->property("text").toString(), originalSource);
+    QCOMPARE(f.backend.documentRevision(), originalRevision);
 }
 
 // The footer spans the window; the pane sits above it on the right. Opening and
 // closing the pane must not move a single footer control.
+void FomawriteTest::reviewPaneLeavesTheFooterControlsWhereTheyAre_data() { cycle144ReviewCheckerRows(); }
+
 void FomawriteTest::reviewPaneLeavesTheFooterControlsWhereTheyAre() {
+    QFETCH(bool, bundledHarper);
     Cycle103SettingsSnapshot settings;
     Cycle117Window f; QVERIFY2(f.start(1280), qPrintable(f.error));
-    if (!f.backend.spellCheck()->available()) QSKIP("the system spell checker exists only on macOS");
+    if (bundledHarper) {
+        QString error;
+        QVERIFY2(cycle144StartBundledReviewChecker(f, &error), qPrintable(error));
+    } else if (!f.backend.spellCheck()->available()) {
+        QSKIP("the system spell checker exists only on macOS");
+    }
+    QVERIFY(f.mode(0));
+    const QString originalSource = f.editor->property("text").toString();
+    const int originalRevision = f.backend.documentRevision();
     for (int width : {1280, 960}) {
         f.quick->resize(width, 700); QTRY_COMPARE(f.quick->size(), QSize(width, 700));
         for (int mode : {0, 1}) {
@@ -437,18 +583,23 @@ void FomawriteTest::reviewPaneLeavesTheFooterControlsWhereTheyAre() {
             QTRY_VERIFY(cycle107SameBounds(cycle107ViewBounds(f.footer), closed));
         }
     }
+    QCOMPARE(f.editor->property("text").toString(), originalSource);
+    QCOMPARE(f.backend.documentRevision(), originalRevision);
 }
 
 // Live: the same pane acts on the page. The fix is a host edit that the existing
 // mirror delivers to the page; a row click places the page's caret.
+void FomawriteTest::reviewPaneFixesAndJumpsInTheLivePage_data() { cycle144ReviewCheckerRows(); }
+
 void FomawriteTest::reviewPaneFixesAndJumpsInTheLivePage() {
+    QFETCH(bool, bundledHarper);
 #ifndef Q_OS_MACOS
-    QSKIP("the system spell checker is only available on macOS");
+    if (!bundledHarper) QSKIP("the system spell checker is only available on macOS");
 #endif
     Cycle103SettingsSnapshot settings;
     Backend backend;
     backend.spellCheck()->setEnabled(true); backend.spellCheck()->setGrammarEnabled(false); backend.spellCheck()->setLanguage(QStringLiteral("en_US"));
-    backend.spellCheck()->setEngine(QStringLiteral("macos")); // this test is about the macOS checker (Harper: tests/cycle145-harper-engine.inc)
+    backend.spellCheck()->setEngine(bundledHarper ? QStringLiteral("harper") : QStringLiteral("macos"));
     QQmlEngine engine; engine.rootContext()->setContextProperty("backend", &backend);
     QQmlComponent component(&engine, QUrl(QStringLiteral("qrc:/Main.qml")));
     QScopedPointer<QObject> window(component.create()); QVERIFY2(window, qPrintable(component.errorString()));
@@ -462,6 +613,10 @@ void FomawriteTest::reviewPaneFixesAndJumpsInTheLivePage() {
     QVERIFY(QMetaObject::invokeMethod(window.data(), "selectWritingMode", Q_ARG(QVariant, QStringLiteral("live"))));
     auto *bridge = backend.editorBridge();
     QTRY_VERIFY_WITH_TIMEOUT(bridge->isReady(), 20000);
+    if (bundledHarper) {
+        QString error;
+        QVERIFY2(cycle144BundledReviewCheckerReady(backend, &error), qPrintable(error));
+    }
     auto *view = window->findChild<QObject *>("liveEditorView"); QVERIFY(view);
     QTRY_VERIFY_WITH_TIMEOUT(!view->property("loading").toBool(), 15000);
     QVERIFY(layout->property("liveEditEnabled").toBool());
@@ -502,13 +657,20 @@ void FomawriteTest::reviewPaneFixesAndJumpsInTheLivePage() {
 // Frames of the real window with the pane open, light and dark, for the cycle
 // record (research/cycle-144/captures, local only). The assertion is only that
 // the pane paints something other than one flat colour in each theme.
+void FomawriteTest::reviewPaneRendersInLightAndDarkThemes_data() { cycle144ReviewCheckerRows(); }
+
 void FomawriteTest::reviewPaneRendersInLightAndDarkThemes() {
+    QFETCH(bool, bundledHarper);
     Cycle103SettingsSnapshot settings;
     Cycle117Window f; QVERIFY2(f.start(1280), qPrintable(f.error));
+    if (bundledHarper) {
+        QString error;
+        QVERIFY2(cycle144StartBundledReviewChecker(f, &error), qPrintable(error));
+    }
     auto *spell = f.backend.spellCheck();
-    if (!spell->available()) QSKIP("the system spell checker exists only on macOS");
+    if (!bundledHarper && !spell->available()) QSKIP("the system spell checker exists only on macOS");
     spell->setEnabled(true); spell->setGrammarEnabled(true); spell->setLanguage(QStringLiteral("en_US"));
-    CYCLE144_NEEDS_GRAMMAR((*spell));
+    if (!bundledHarper) { CYCLE144_NEEDS_GRAMMAR((*spell)); }
     QVERIFY(f.mode(1));
     f.editor->setProperty("text", cycle144Text());
     QVERIFY(cycle144Run(f.window.data(), "spelling"));
@@ -519,7 +681,7 @@ void FomawriteTest::reviewPaneRendersInLightAndDarkThemes() {
         f.backend.setThemePreset(QString::fromLatin1(theme));
         QTest::qWait(300);
         QString why;
-        const QString path = QDir(directory).filePath(QStringLiteral("review-pane-%1.png").arg(QString::fromLatin1(theme)));
+        const QString path = QDir(directory).filePath(QStringLiteral("review-pane-%1%2.png").arg(QString::fromLatin1(theme), bundledHarper ? QStringLiteral("-harper") : QString()));
         QVERIFY2(cycle134SaveFrame(f.quick, path, &why), qPrintable(why));
         const QImage frame = f.quick->grabWindow();
         auto *pane = f.window->findChild<QQuickItem *>("reviewPane");
@@ -534,14 +696,17 @@ void FomawriteTest::reviewPaneRendersInLightAndDarkThemes() {
 // In Live the host never sees the Source caret move, so the pane used to list
 // every half-typed word 300 ms after the keystroke (reviewer finding). The
 // hold-back now follows whichever caret moved last.
+void FomawriteTest::reviewPaneWithholdsTheWordBeingTypedInLive_data() { cycle144ReviewCheckerRows(); }
+
 void FomawriteTest::reviewPaneWithholdsTheWordBeingTypedInLive() {
+    QFETCH(bool, bundledHarper);
 #ifndef Q_OS_MACOS
-    QSKIP("the system spell checker is only available on macOS");
+    if (!bundledHarper) QSKIP("the system spell checker is only available on macOS");
 #endif
     Cycle103SettingsSnapshot settings;
     Backend backend;
     backend.spellCheck()->setEnabled(true); backend.spellCheck()->setGrammarEnabled(false); backend.spellCheck()->setLanguage(QStringLiteral("en_US"));
-    backend.spellCheck()->setEngine(QStringLiteral("macos")); // this test is about the macOS checker (Harper: tests/cycle145-harper-engine.inc)
+    backend.spellCheck()->setEngine(bundledHarper ? QStringLiteral("harper") : QStringLiteral("macos"));
     QQmlEngine engine; engine.rootContext()->setContextProperty("backend", &backend);
     QQmlComponent component(&engine, QUrl(QStringLiteral("qrc:/Main.qml")));
     QScopedPointer<QObject> window(component.create()); QVERIFY2(window, qPrintable(component.errorString()));
@@ -555,6 +720,10 @@ void FomawriteTest::reviewPaneWithholdsTheWordBeingTypedInLive() {
     QVERIFY(QMetaObject::invokeMethod(window.data(), "selectWritingMode", Q_ARG(QVariant, QStringLiteral("live"))));
     auto *bridge = backend.editorBridge();
     QTRY_VERIFY_WITH_TIMEOUT(bridge->isReady(), 20000);
+    if (bundledHarper) {
+        QString error;
+        QVERIFY2(cycle144BundledReviewCheckerReady(backend, &error), qPrintable(error));
+    }
     auto *view = window->findChild<QObject *>("liveEditorView"); QVERIFY(view);
     QTRY_VERIFY_WITH_TIMEOUT(!view->property("loading").toBool(), 15000);
     QTRY_COMPARE(cycle144PageText(bridge), text);
@@ -562,18 +731,39 @@ void FomawriteTest::reviewPaneWithholdsTheWordBeingTypedInLive() {
     QTRY_VERIFY(!cycle144Find(backend.reviewIssues(), "Spelling", "recieve").isEmpty());
     // Type a misspelled word at the end of the page, caret left at its end.
     const QString typed = QStringLiteral(" zxqvwha");
+    if (bundledHarper) {
+        // Prime the real post-edit lint before measuring caret hold-back. This
+        // proves the missing row is withheld despite a known finding, rather
+        // than absent because the asynchronous worker has not answered yet.
+        auto *spell = backend.spellCheck();
+        QTRY_VERIFY_WITH_TIMEOUT(spell->issuesIfKnown(text + typed).has_value(), 20000);
+        bool knowsTypedWord = false;
+        for (const auto &issue : spell->issues(text + typed))
+            if (issue.category == QLatin1String("Spelling")
+                    && (text + typed).mid(issue.start, issue.end - issue.start) == QLatin1String("zxqvwha"))
+                knowsTypedWord = true;
+        QVERIFY(knowsTypedWord);
+    }
     const QString script = QStringLiteral(R"JS(
         (function() { const v = window.fomawriteEditor.view; const end = v.state.doc.length;
           v.dispatch({ changes: { from: end, insert: "%1" }, selection: { anchor: end + %2 }, userEvent: "input.type" }); })())JS")
         .arg(typed).arg(typed.size());
     QElapsedTimer sinceTyping; sinceTyping.start();
+    QElapsedTimer sinceMirrored;
+    QObject mirrorObservation;
+    QObject::connect(bridge, &EditorBridge::changesReceived, &mirrorObservation,
+                     [&](const QString &, int) { sinceMirrored.start(); });
     QVERIFY(QMetaObject::invokeMethod(view, "runJavaScript", Q_ARG(QString, script)));
     QTRY_COMPARE_WITH_TIMEOUT(editor->property("text").toString(), text + typed, 5000);
     QTRY_COMPARE_WITH_TIMEOUT(bridge->lastCursor(), text.size() + typed.size(), 5000);
     // Within the typing pause (1.5 s after the edit) the half-typed word is not
     // a row. The pane rebuilds 300 ms after the edit; look just after that.
     QTest::qWait(400);
-    if (sinceTyping.elapsed() > 1200) QSKIP("this machine took too long to mirror the edit for the timing check to mean anything");
+    if (bundledHarper) {
+        QVERIFY(sinceMirrored.isValid());
+        QVERIFY2(sinceMirrored.elapsed() <= 1200, "Observe the known finding during the host's actual caret hold-back interval");
+    }
+    else if (sinceTyping.elapsed() > 1200) QSKIP("this machine took too long to mirror the edit for the timing check to mean anything");
     QVERIFY2(cycle144Find(backend.reviewIssues(), "Spelling", "zxqvwha").isEmpty(), "the word at the Live caret is withheld");
     QVERIFY(!cycle144Find(backend.reviewIssues(), "Spelling", "recieve").isEmpty());
     // The caret leaves the word: it is listed.
@@ -584,13 +774,20 @@ void FomawriteTest::reviewPaneWithholdsTheWordBeingTypedInLive() {
 
 // Ignore Grammar Issue from the Source menu, the pane or the Live page lands in
 // the one list the service keeps, so every surface drops the finding.
+void FomawriteTest::ignoreGrammarFromAnySurfaceReachesEverySurface_data() { cycle144ReviewCheckerRows(); }
+
 void FomawriteTest::ignoreGrammarFromAnySurfaceReachesEverySurface() {
+    QFETCH(bool, bundledHarper);
     Cycle103SettingsSnapshot settings;
     Cycle117Window f; QVERIFY2(f.start(1100), qPrintable(f.error));
+    if (bundledHarper) {
+        QString error;
+        QVERIFY2(cycle144StartBundledReviewChecker(f, &error), qPrintable(error));
+    }
     auto *spell = f.backend.spellCheck();
-    if (!spell->available()) QSKIP("the system spell checker exists only on macOS");
+    if (!bundledHarper && !spell->available()) QSKIP("the system spell checker exists only on macOS");
     spell->setEnabled(true); spell->setGrammarEnabled(true); spell->setLanguage(QStringLiteral("en_US"));
-    CYCLE144_NEEDS_GRAMMAR((*spell));
+    if (!bundledHarper) { CYCLE144_NEEDS_GRAMMAR((*spell)); }
     const QString text = QStringLiteral("This is is a test.\n\nAnd the the end of it.\n");
     f.editor->setProperty("text", text);
     QTRY_VERIFY(!cycle144Find(f.backend.reviewIssues(), "Grammar", "is is").isEmpty());
@@ -601,7 +798,14 @@ void FomawriteTest::ignoreGrammarFromAnySurfaceReachesEverySurface() {
     f.backend.ignoreGrammarIssue(isIs, doubled.value("end").toInt());
     QTRY_VERIFY(cycle144Find(f.backend.reviewIssues(), "Grammar", "is is").isEmpty());
     QVERIFY(f.backend.grammarIssueAt(isIs + 2).isEmpty());
-    QVERIFY(spell->grammarIssues(QStringLiteral("This is is a test.")).isEmpty()); // what the Live host reply is built from
+    if (bundledHarper) {
+        // The real engine has already answered this sentence: an empty result
+        // after ignore must not be a never-requested asynchronous cache entry.
+        QVERIFY(spell->issuesIfKnown(QStringLiteral("This is is a test.")).has_value());
+        QVERIFY(spell->issues(QStringLiteral("This is is a test.")).isEmpty());
+    } else {
+        QVERIFY(spell->grammarIssues(QStringLiteral("This is is a test.")).isEmpty());
+    } // the same service result used to build the Live host reply
     QVERIFY(!cycle144Find(f.backend.reviewIssues(), "Grammar", "the the").isEmpty());
     // Live page path: the bridge slot with the text and the message.
     const QString message = cycle144Find(f.backend.reviewIssues(), "Grammar", "the the").value("message").toString();

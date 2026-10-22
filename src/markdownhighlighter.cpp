@@ -539,9 +539,39 @@ QString MarkdownHighlighter::spellingProse(const QString &blockText) {
     };
     if (prose.contains(QLatin1Char('`')))
         for (const auto &code : inlineCodeSpans(prose)) blank(code.start, code.length);
-    // Link destinations, raw tags, raw URLs and inline math are syntax.
+    // Keep visible-label brackets until Harper's adapter normalizes them, so
+    // it can reject grammar replacements crossing original link punctuation.
+    // Inline links can have an empty destination. Full/collapsed reference
+    // links keep their visible label but not the following reference ID.
+    static const QRegularExpression link(QStringLiteral("\\[([^\\]\\n]+)\\](\\([^\\n]*?\\)|\\[[^\\]\\n]*\\])"));
+    auto links = link.globalMatch(prose);
+    while (links.hasNext()) {
+        const auto match = links.next();
+        const int start = int(match.capturedStart());
+        if (escapedMarker(blockText, start)) continue;
+        const int end = int(match.capturedEnd(1)) + 1; // keep the label's closing ]
+        blank(end, int(match.capturedEnd()) - end);
+        if (start > 0 && blockText.at(start - 1) == QLatin1Char('!')
+            && !escapedMarker(blockText, start - 1)) blank(start - 1, 1);
+    }
+    // Footnote identifiers are syntax; the definition's body remains prose.
+    static const QRegularExpression footnote(QStringLiteral("\\[\\^[^\\]\\s]+\\](:)?"));
+    auto footnotes = footnote.globalMatch(prose);
+    while (footnotes.hasNext()) {
+        const auto match = footnotes.next();
+        if (!escapedMarker(blockText, int(match.capturedStart()))) {
+            const int start = int(match.capturedStart());
+            const int closing = int(match.capturedEnd()) - (match.captured(1).isEmpty() ? 1 : 2);
+            blank(start + 1, closing - start - 1); // keep [] as a grammar boundary
+            if (!match.captured(1).isEmpty()) blank(closing + 1, 1);
+        }
+    }
+    // Reference definitions contain an identifier and destination, no prose.
+    static const QRegularExpression definition(QStringLiteral("^ {0,3}\\[(?!\\^)[^\\]\\n]+\\]:.*$"));
+    if (definition.match(prose).hasMatch()) blank(0, prose.size());
+    // Raw tags, raw URLs and inline math are syntax.
     static const QRegularExpression syntax(QStringLiteral(
-        "\\]\\([^\\n]*?\\)|<[^>\\n]*>|(?:https?|ftp|file)://[^\\s)>\\]]+|www\\.[^\\s)>\\]]+"
+        "<[^>\\n]*>|(?:https?|ftp|file)://[^\\s)>\\]]+|www\\.[^\\s)>\\]]+"
         "|(?<![\\\\$\\w])\\$(?=\\S)[^$\\n]*?\\S\\$(?![\\d\\w])"));
     auto matches = syntax.globalMatch(prose);
     while (matches.hasNext()) {

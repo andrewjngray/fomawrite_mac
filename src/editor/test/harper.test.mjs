@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { existsSync } from "node:fs";
 import { createMockBridge, mockHarperLint } from "../src/bridge.ts";
-import { HarperService, lintWith, mockHarperBackend, realHarperBackend, wireHarperBridge } from "../src/harper.ts";
+import { HarperService, lintWith, lintProseWith, mockHarperBackend, realHarperBackend, wireHarperBridge } from "../src/harper.ts";
 
 // The page as the host's lint service: queue, ready, reply, failure and token rules, against a fake engine (no WebAssembly).
 
@@ -359,6 +359,70 @@ test("real LocalLinter: findings are UTF-16 spans (an emoji before the word shif
   const reply = bridge.calls.find((c) => c.name === "harperReply");
   assert.ok(reply, "answered");
   assert.deepEqual(JSON.parse(reply.args[1]), found);
+});
+
+// The host has already removed code and destinations without moving UTF-16
+// offsets. A Source nested-list line still has four leading spaces: a second
+// Markdown parse would mistake that prose for code.
+test("bundled LocalLinter: masked Source prose uses plaintext and keeps Unicode offsets", async () => {
+  assert.ok(existsSync(WASM), "the shipped Harper WASM must be present");
+  const { LocalLinter, Dialect } = await import("../dist/harper/index.js");
+  const { binary } = await import("../dist/harper/binary.js");
+  const linter = new LocalLinter({ binary, dialect: Dialect.Australian });
+  await linter.setup();
+  const prose = "    - 😀 nested **recieve** and [the recieve]                  ";
+  const found = (await lintProseWith(linter, prose)).filter((f) => f.kind === "Spelling");
+  const expected = [prose.indexOf("recieve"), prose.lastIndexOf("recieve")];
+  assert.deepEqual(found.map((f) => f.start), expected, JSON.stringify(found));
+  for (const finding of found) {
+    assert.equal(prose.slice(finding.start, finding.end), "recieve");
+    assert.equal(finding.end - finding.start, 7);
+    assert.ok(finding.suggestions.includes("receive"));
+  }
+  assert.equal(expected[0], 18, "the emoji occupies two UTF-16 units");
+});
+
+test("bundled LocalLinter: host bracket punctuation keeps spelling, grammar and UTF-16 spans", async () => {
+  assert.ok(existsSync(WASM), "the shipped Harper WASM must be present");
+  const { LocalLinter, Dialect } = await import("../dist/harper/index.js");
+  const { binary } = await import("../dist/harper/binary.js");
+  const linter = new LocalLinter({ binary, dialect: Dialect.Australian });
+  await linter.setup();
+  // Actual host-shaped masks: inline empty destinations and reference IDs
+  // have been blanked by Source, while bare/escaped brackets remain literal.
+  for (const text of ["😀 A [recieve] label.", "😀 A \\[recieve\\] label.",
+                      "😀 Empty [recieve]   link.", "😀 Full [recieve]      link.",
+                      "😀 Collapsed [recieve]    link."]) {
+    const found = await lintProseWith(linter, text);
+    assert.deepEqual(found.map((f) => f.kind), ["Spelling"], "normalization must not create formatting edits: " + text);
+    const spelling = found;
+    assert.deepEqual(spelling.map((f) => [f.start, f.end]), [[text.indexOf("recieve"), text.indexOf("recieve") + 7]], text);
+    assert.ok(spelling[0].suggestions.includes("receive"));
+  }
+  const text = "😀 This [is is] a test.";
+  const found = await lintProseWith(linter, text);
+  assert.deepEqual(found.map((f) => f.kind), ["Repetition"]);
+  const repetition = found[0];
+  assert.ok(repetition);
+  assert.equal(repetition.start, text.indexOf("is is"));
+  assert.equal(text.slice(repetition.start, repetition.end), "is is");
+  assert.ok(repetition.suggestions.includes("is"));
+  for (const text of ["This is [is] a test.", "This is [is]                            a test."])
+    assert.deepEqual(await lintProseWith(linter, text), [],
+      "a grammar replacement must not cross and delete original literal/link brackets");
+});
+
+test("bundled LocalLinter: direct helper still parses raw Markdown and excludes code", async () => {
+  assert.ok(existsSync(WASM), "the shipped Harper WASM must be present");
+  const { LocalLinter, Dialect } = await import("../dist/harper/index.js");
+  const { binary } = await import("../dist/harper/binary.js");
+  const linter = new LocalLinter({ binary, dialect: Dialect.Australian });
+  await linter.setup();
+  const markdown = "    recieve\n\nWe recieve mail. `recieve`\n\n```\nrecieve\n```\n";
+  const start = markdown.indexOf("recieve", markdown.indexOf("We "));
+  const spelling = (await lintWith(linter, markdown)).filter((f) => f.kind === "Spelling");
+  assert.deepEqual(spelling.map((f) => [f.start, f.end]), [[start, start + 7]]);
+  assert.ok(spelling[0].suggestions.includes("receive"));
 });
 
 // ---- Cycle 146: an engine installed after the page loaded one -------------------------------------------------------

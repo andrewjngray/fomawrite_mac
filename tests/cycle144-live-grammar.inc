@@ -4,6 +4,7 @@
 // ones (.fw-misspelled). The grammar setting switches only the blue ones off.
 
 namespace {
+bool cycle144BundledReviewCheckerReady(Backend &backend, QString *error);
 // The text of every element matching `selector` currently in the page.
 QStringList cycle144Texts(QObject *view, const QString &selector) {
     const QVariant answer = cycle143PageResult(view, QStringLiteral(
@@ -14,15 +15,15 @@ QStringList cycle144Texts(QObject *view, const QString &selector) {
 }
 }
 
+void FomawriteTest::liveGrammarUnderlinesFollowTheGrammarSetting_data() { cycle144ReviewCheckerRows(); }
+
 void FomawriteTest::liveGrammarUnderlinesFollowTheGrammarSetting() {
-#ifndef Q_OS_MACOS
-    QSKIP("the system spell checker is only available on macOS");
-#endif
+    QFETCH(bool, bundledHarper);
     Cycle103SettingsSnapshot settings;
     Backend backend;
     backend.spellCheck()->setLanguage(QStringLiteral("en_US"));
-    backend.spellCheck()->setEngine(QStringLiteral("macos")); // this test is about the macOS checker (Harper: tests/cycle145-harper-engine.inc)
-    CYCLE144_NEEDS_GRAMMAR((*backend.spellCheck()));
+    backend.spellCheck()->setEngine(bundledHarper ? QStringLiteral("harper") : QStringLiteral("macos"));
+    if (!bundledHarper) { CYCLE144_NEEDS_GRAMMAR((*backend.spellCheck())); }
     QQmlEngine engine; engine.rootContext()->setContextProperty("backend", &backend);
     QQmlComponent component(&engine, QUrl(QStringLiteral("qrc:/Main.qml")));
     QScopedPointer<QObject> window(component.create()); QVERIFY2(window, qPrintable(component.errorString()));
@@ -31,6 +32,7 @@ void FomawriteTest::liveGrammarUnderlinesFollowTheGrammarSetting() {
     quick->resize(1200, 800); quick->show(); QVERIFY(QTest::qWaitForWindowExposed(quick));
     editor->setProperty("text", QStringLiteral("This is is a test. We recieve the mail.\n"));
     QVERIFY(QMetaObject::invokeMethod(window.data(), "selectWritingMode", Q_ARG(QVariant, QStringLiteral("live"))));
+    if (bundledHarper) { QString error; QVERIFY2(cycle144BundledReviewCheckerReady(backend, &error), qPrintable(error)); }
     auto *bridge = backend.editorBridge();
     QTRY_VERIFY_WITH_TIMEOUT(bridge->isReady(), 20000);
     auto *view = window->findChild<QObject *>("liveEditorView"); QVERIFY(view);

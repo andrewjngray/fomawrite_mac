@@ -32,7 +32,7 @@ interface HarperModule {
 }
 interface HarperLinter {
   setup(): Promise<void>;
-  lint(text: string): Promise<HarperLint[]>;
+  lint(text: string, options?: { language: "markdown" | "plaintext" }): Promise<HarperLint[]>;
   importWords(words: string[]): Promise<void>;
   clearWords(): Promise<void>;
   getLintConfig(): Promise<Record<string, boolean | undefined>>;
@@ -113,12 +113,27 @@ export function harperReady(dialect: HarperDialect = currentDialect): Promise<vo
   return ensureLinter(dialect).then(() => undefined);
 }
 
-export async function lintWith(linter: HarperLinter, text: string): Promise<HarperFinding[]> {
-  const lints = await linter.lint(text);
+export async function lintWith(linter: HarperLinter, text: string, language: "markdown" | "plaintext" = "markdown"): Promise<HarperFinding[]> {
+  const lints = await linter.lint(text, { language });
   return lints.map((lint) => {
     const span = lint.span();
     return { start: span.start, end: span.end, kind: lint.lint_kind(), message: lint.message(), suggestions: lint.suggestions().map((s) => s.get_replacement_text()) };
   });
+}
+
+/** Lint the host editors' already-masked prose without parsing Markdown twice.
+ * Brackets are punctuation in this input, including escaped/literal brackets.
+ * Harper's plaintext tokenizer otherwise treats a bracketed word as a token
+ * it cannot spell-check. Spaces preserve the host's exact UTF-16 offsets.
+ */
+export async function lintProseWith(linter: HarperLinter, text: string): Promise<HarperFinding[]> {
+  const prose = text.replace(/[\[\]]/g, " ");
+  const findings = await lintWith(linter, prose, "plaintext");
+  // Normalization can introduce extra whitespace findings, or join words on
+  // opposite sides of a bracket into a grammar range. Neither is an edit the
+  // writer should be offered: a replacement must not remove their brackets.
+  return findings.filter((finding) => prose.slice(finding.start, finding.end).trim() !== ""
+    && !/[\[\]]/.test(text.slice(finding.start, finding.end)));
 }
 
 /** Lint `text` with the engine (loading it first if needed). */
@@ -350,7 +365,10 @@ export function realHarperBackend(): HarperBackend {
   return {
     async load(dialect) {
       const { linter, version } = await ensureLinter(dialect);
-      return { lint: (text) => lintWith(linter, text), importWords: async (words) => { await linter.clearWords(); await linter.importWords(words); }, version };
+      // Both host editors already mask code and Markdown syntax while keeping
+      // UTF-16 offsets. A second Markdown parse mistakes nested-list prose
+      // for indented code. The public harperLint helper still accepts Markdown.
+      return { lint: (text) => lintProseWith(linter, text), importWords: async (words) => { await linter.clearWords(); await linter.importWords(words); }, version };
     },
     version: readServedVersion,
     reset: resetHarperEngine,

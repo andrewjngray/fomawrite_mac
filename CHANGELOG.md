@@ -4,6 +4,8 @@ One line per cycle, newest first. Each line links to the cycle's record under `r
 
 ## 0.3.0 development series (Cycles 97–)
 
+- **Windows M2 checker parity** — Run 28 existing spelling, grammar and Review cases against real bundled Harper, preserve native Mac rows, and fix double-parsed nested-list prose with offset-safe Markdown corrections. Integration and Windows package verification are pending. [Record](docs/windows/M2-CHECKER-PARITY.md)
+
 - **Windows M2 repair candidate** — Reserve the Organizer scrollbar gutter, bound Live recovery and stage verified packages onto Windows-local storage. ARM64/x64 CI, final ARM64 standard native-input workflow, shared-document supplement and packaged starter passed; the separate ARM64 guest document-view check passed 124 scenarios and verified packages are on the testing shelf. Windows/Mac parity qualification continues. [Record](docs/windows/M2-REPAIR-EVIDENCE.md)
 
 - **Windows M1 complete** — Code `b45cb34` passes native ARM64/x64 compile, Qt, appearance and deployed checks, shared Mac/editor CI, and both Parallels package checkers. Desktop parity, normal startup/restore, installer and distribution qualification remain later milestones. [Record](docs/windows/M1-EVIDENCE.md)

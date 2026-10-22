@@ -191,6 +191,7 @@ private slots:
     void sourceSpellingRefreshDoesNotAdvanceDocumentRevision();
     void spellCheckServiceFindsWordsAndHonoursIgnoreAndSetting();
     void checkSpellingWhileTypingCommandTogglesTheSetting();
+    void spellCheckServiceReportsGrammarIssuesWithCategory_data();
     void spellCheckServiceReportsGrammarIssuesWithCategory();
     void harperLintsInsideTheEditorPage();
     void liveMarksALongListOfMisspellingsLineByLine();
@@ -246,33 +247,60 @@ private slots:
     void helpMenuOffersWritingCheckerUpdatesWithBannerAndPaneStatus();
     void harperUpdateLoadsInTheRealPageUnderItsOwnVersionedUrlAndRollsBack();
     void livePageWarmUpDoesNotDelayFirstPaintAndIsMeasured();
+    void grammarChecksLongParagraphsInCachedChunks_data();
     void grammarChecksLongParagraphsInCachedChunks();
+    void reviewPaneWithholdsTheWordBeingTypedInLive_data();
     void reviewPaneWithholdsTheWordBeingTypedInLive();
+    void ignoreGrammarFromAnySurfaceReachesEverySurface_data();
     void ignoreGrammarFromAnySurfaceReachesEverySurface();
+    void sourceSpellingUnderlinesProseOnly_data();
     void sourceSpellingUnderlinesProseOnly();
+    void sourceSpellingFollowsTheSettingAndLearnedWords_data();
     void sourceSpellingFollowsTheSettingAndLearnedWords();
     void sourceSpellingChecksOnlyChangedBlocks();
+    void sourceSpellingUnderlineIsRedInTheRenderedWindow_data();
     void sourceSpellingUnderlineIsRedInTheRenderedWindow();
+    void sourceSpellingContextMenuOffersSuggestionsAndCorrects_data();
     void sourceSpellingContextMenuOffersSuggestionsAndCorrects();
+    void sourceSpellingWithholdsTheCaretWordAndDimmedText_data();
     void sourceSpellingWithholdsTheCaretWordAndDimmedText();
+    void sourceGrammarUnderlinesDoubledWordsAndSpellingStaysRed_data();
     void sourceGrammarUnderlinesDoubledWordsAndSpellingStaysRed();
+    void sourceGrammarFollowsItsSettingAndKeepsSpelling_data();
     void sourceGrammarFollowsItsSettingAndKeepsSpelling();
+    void sourceGrammarWithholdsTheRangeAtTheCaretWithoutARevision_data();
     void sourceGrammarWithholdsTheRangeAtTheCaretWithoutARevision();
+    void sourceGrammarUnderlineIsBlueInTheRenderedWindow_data();
     void sourceGrammarUnderlineIsBlueInTheRenderedWindow();
+    void sourceGrammarContextMenuShowsTheMessageCorrectsAndIgnores_data();
     void sourceGrammarContextMenuShowsTheMessageCorrectsAndIgnores();
+    void sourceGrammarIgnoreIsPerDocumentAndRestylesInPlace_data();
     void sourceGrammarIgnoreIsPerDocumentAndRestylesInPlace();
+    void liveSpellingUnderlinesMisspelledWordsAndFollowsTheSetting_data();
     void liveSpellingUnderlinesMisspelledWordsAndFollowsTheSetting();
+    void liveGrammarUnderlinesFollowTheGrammarSetting_data();
     void liveGrammarUnderlinesFollowTheGrammarSetting();
+    void reviewIssuesListSpellingAndGrammarInOrderWithDocumentOffsets_data();
     void reviewIssuesListSpellingAndGrammarInOrderWithDocumentOffsets();
+    void reviewIssuesAreCappedAndTheCapIsReported_data();
     void reviewIssuesAreCappedAndTheCapIsReported();
+    void reviewIssuesAreRebuiltAfterAPauseAndTypingCoalesces_data();
     void reviewIssuesAreRebuiltAfterAPauseAndTypingCoalesces();
+    void reviewPaneTogglesWithTheCommandAndTheMenuTickFollows_data();
     void reviewPaneTogglesWithTheCommandAndTheMenuTickFollows();
+    void reviewRowClickMovesTheSourceCaret_data();
     void reviewRowClickMovesTheSourceCaret();
+    void reviewSuggestionAppliesAsOneUndoableEdit_data();
     void reviewSuggestionAppliesAsOneUndoableEdit();
+    void nextAndPreviousIssueWrapRoundTheDocument_data();
     void nextAndPreviousIssueWrapRoundTheDocument();
+    void reviewPaneResizesWithTheSplitViewAndItsWidthPersists_data();
     void reviewPaneResizesWithTheSplitViewAndItsWidthPersists();
+    void reviewPaneLeavesTheFooterControlsWhereTheyAre_data();
     void reviewPaneLeavesTheFooterControlsWhereTheyAre();
+    void reviewPaneFixesAndJumpsInTheLivePage_data();
     void reviewPaneFixesAndJumpsInTheLivePage();
+    void reviewPaneRendersInLightAndDarkThemes_data();
     void reviewPaneRendersInLightAndDarkThemes();
     void footerLayoutCapsuleNamesPreviewOnly();
     void footerViewCyclesPreserveDraftSelectionAndWidths();
@@ -1694,7 +1722,12 @@ private slots:
         FileLibrary library;
         library.setRootFolder(QUrl::fromLocalFile(directory.path()));
         library.refreshTags();
-        QTRY_VERIFY_WITH_TIMEOUT(!library.tagStatus().startsWith("Scanning"), 10000);
+        // A queued filesystem event may move directly from a completed scan
+        // to the debounce state. Wait for actual watch readiness, not merely
+        // a status that is temporarily different from "Scanning".
+        QTRY_VERIFY2_WITH_TIMEOUT(library.tagStatus().contains("watching for changes")
+                                 || library.tagStatus().contains("automatic refresh unavailable"),
+                                 qPrintable(library.tagStatus()), 10000);
         QCOMPARE(library.tagIndex().size(), 1);
         QCOMPARE(library.tagIndex().first().toMap().value("tag").toString(), QString("first"));
         if (library.tagStatus().contains("automatic refresh unavailable"))
@@ -1712,7 +1745,10 @@ private slots:
         QVERIFY(file.open(QIODevice::WriteOnly | QIODevice::Truncate));
         QCOMPARE(file.write("#third\n"), qint64(7));
         file.close();
-        QTRY_VERIFY_WITH_TIMEOUT(library.tagStatus().contains("watching for changes"), 10000);
+        QTRY_VERIFY2_WITH_TIMEOUT(library.tagStatus().contains("watching for changes")
+                                 && library.tagIndex().size() == 1
+                                 && library.tagIndex().first().toMap().value("tag").toString() == QString("third"),
+                                 qPrintable(library.tagStatus()), 10000);
         QVERIFY(library.tagStatus().contains("watching for changes"));
         QCOMPARE(library.tagIndex().size(), 1);
         QCOMPARE(library.tagIndex().first().toMap().value("tag").toString(), QString("third"));

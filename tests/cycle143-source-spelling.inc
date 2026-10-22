@@ -7,6 +7,45 @@
 // test run, so a word one test ignores must not be asserted underlined by another.
 
 namespace {
+// Defined by the Review fixture later in this translation unit. This launches
+// the shipped Live page and waits for its real bundled-WASM/version handshake.
+bool cycle144StartBundledReviewChecker(Cycle117Window &fixture, QString *error);
+void cycle143SpellingCheckerRows() {
+    QTest::addColumn<bool>("bundledHarper");
+#ifndef Q_OS_WIN
+    QTest::newRow("native-checker") << false;
+#endif
+#if defined(Q_OS_MACOS) || defined(Q_OS_WIN)
+    QTest::newRow("bundled-harper") << true;
+#endif
+}
+bool cycle143ConfigureChecker(Cycle117Window &fixture, bool bundledHarper, QString *error) {
+    auto *spell = fixture.backend.spellCheck();
+    if (!bundledHarper) { spell->setEngine(QStringLiteral("macos")); return true; }
+    if (!cycle144StartBundledReviewChecker(fixture, error)) return false;
+    spell->setGrammarEnabled(false);
+    spell->setStyleEnabled(false);
+    return true;
+}
+struct Cycle143SpellingService {
+    SpellCheck native;
+    std::unique_ptr<Cycle117Window> page;
+    SpellCheck *checker = nullptr;
+    QString error;
+    bool start(bool bundledHarper) {
+        if (!bundledHarper) { native.setEngine(QStringLiteral("macos")); checker = &native; return true; }
+        // Exercise the app's own persisted dictionary import without calling
+        // learnWord(), which would also write the macOS user's dictionary.
+        QStringList learned = QSettings().value(QStringLiteral("writing/learnedWords")).toStringList();
+        learned.append(QStringLiteral("zxqvknownsource"));
+        QSettings().setValue(QStringLiteral("writing/learnedWords"), learned);
+        page = std::make_unique<Cycle117Window>();
+        if (!page->start(1100)) { error = page->error; return false; }
+        if (!cycle143ConfigureChecker(*page, true, &error)) return false;
+        checker = page->backend.spellCheck();
+        return true;
+    }
+};
 bool cycle143Underlined(QTextDocument &document, int position) {
     const auto block = document.findBlock(position);
     const int offset = position - block.position();
@@ -30,11 +69,18 @@ int cycle143Word(const QString &text, const QString &context, const QString &wor
 }
 }
 
+void FomawriteTest::sourceSpellingUnderlinesProseOnly_data() { cycle143SpellingCheckerRows(); }
+
 void FomawriteTest::sourceSpellingUnderlinesProseOnly() {
+    QFETCH(bool, bundledHarper);
     Cycle103SettingsSnapshot settings;
-    SpellCheck spell;
+    Cycle143SpellingService service;
+    QVERIFY2(service.start(bundledHarper), qPrintable(service.error));
+    SpellCheck &spell = *service.checker;
     if (!spell.available()) QSKIP("the system spell checker exists only on macOS");
     spell.setEnabled(true); spell.setLanguage(QStringLiteral("en_US"));
+    std::unique_ptr<QSignalSpy> requests;
+    if (bundledHarper) requests = std::make_unique<QSignalSpy>(service.page->backend.editorBridge(), &EditorBridge::harperLint);
     const QString source = QString::fromUtf8(
         "# Please recieve the plan\n\n"
         "We recieve mail and receive more; `recieve` in code, ``recieve`` too.\n\n"
@@ -42,9 +88,16 @@ void FomawriteTest::sourceSpellingUnderlinesProseOnly() {
         "```\nfenced recieve here\n```\n\n"
         "After the fence we recieve again.\n\n"
         "    indented recieve code\n\n"
-        "- list item recieve\n    - nested recieve\n\n"
+        "- list item recieve\n    - nested recieve\n    - 😀 **recieve** and [recieve](https://example.com/recieve)\n\n"
+        "> Quoted recieve prose.\n\n"
         "snake_recieve_case and foo/recieve/bar.\n\n"
         "Read [the recieve](https://example.com/x/y) note and <a href=\"https://x.com/p\">recieve</a> it.\n\n"
+        "![recieve](https://example.com/recieve) image.\n\n"
+        "Empty [recieve]() and reference [recieve][ref] prose.\n\n"
+        "Bare [recieve] and collapsed [recieve][] labels.\n\n"
+        "Escaped \\[recieve\\] and **recieve** emphasis.\n\n"
+        "A footnote [^zxqvfootref] with recieve prose.\n\n"
+        "[^zxqvfootlabel]: A recieve note.\n\n"
         "[ref]: https://example.com/recieve\n");
     QTextDocument document; document.setPlainText(source);
     MarkdownHighlighter highlighter(&document);
@@ -53,6 +106,11 @@ void FomawriteTest::sourceSpellingUnderlinesProseOnly() {
     const struct { const char *context; bool underlined; } cases[] = {
         {"Please recieve the plan", true}, {"We recieve mail", true},
         {"we recieve again", true}, {"list item recieve", true}, {"nested recieve", true},
+        {"Quoted recieve prose.", true}, {"😀 **recieve**", true}, {"and [recieve](https://example.com/recieve)", true},
+        {"![recieve](https://example.com/recieve)", true}, {"with recieve prose", true}, {"A recieve note", true},
+        {"Empty [recieve]()", true}, {"reference [recieve][ref]", true},
+        {"Bare [recieve]", true}, {"collapsed [recieve][]", true},
+        {"Escaped \\[recieve\\]", true}, {"**recieve** emphasis", true},
         {"`recieve` in code", false}, {"``recieve`` too", false},
         {"https://example.com/recieve and", false}, {"[a link](https://example.com/recieve)", false},
         {"class=\"recieve\"", false}, {"fenced recieve here", false}, {"indented recieve code", false},
@@ -61,13 +119,51 @@ void FomawriteTest::sourceSpellingUnderlinesProseOnly() {
         {"and receive more", false},
     };
     for (const auto &item : cases) {
-        const QString context = QString::fromLatin1(item.context);
+        const QString context = QString::fromUtf8(item.context);
         const bool correctSpelling = context.contains(QStringLiteral("receive"));
         const int position = cycle143Word(source, context, correctSpelling ? QStringLiteral("receive") : QStringLiteral("recieve"));
         QVERIFY2(position >= 0, item.context);
+        if (bundledHarper) {
+            const QString prose = MarkdownHighlighter::spellingProse(document.findBlock(position).text());
+            const bool literal = context.contains(QStringLiteral("fenced recieve"))
+                || context.contains(QStringLiteral("indented recieve"));
+            bool requested = false;
+            for (const auto &request : *requests) if (request.at(1).toString() == prose) requested = true;
+            // During initial attachment a block can be requested before its
+            // fence state is established. Require the actual answer before
+            // asserting it stays unmarked; pending is never an empty result.
+            if ((!literal || requested) && !prose.trimmed().isEmpty())
+                QTRY_VERIFY_WITH_TIMEOUT(spell.issuesIfKnown(prose).has_value(), 15000);
+        }
+        if (bundledHarper && item.underlined) {
+            const bool marked = QTest::qWaitFor([&] { return cycle143Underlined(document, position); }, 15000);
+            if (!marked) {
+                const auto block = document.findBlock(position);
+                const QString prose = MarkdownHighlighter::spellingProse(block.text());
+                const auto known = spell.issuesIfKnown(prose);
+                qWarning() << "bundled Harper prose case:" << context << "prose:" << prose
+                           << "answer known:" << bool(known) << "issues:" << spell.issueList(prose);
+            }
+            QVERIFY2(marked, item.context);
+        }
         QVERIFY2(cycle143Underlined(document, position) == item.underlined, item.context);
         QVERIFY2(cycle143Underlined(document, position + 3) == item.underlined, item.context);
     }
+    QVERIFY(!cycle143Underlined(document, source.indexOf(QStringLiteral("zxqvfootref"))));
+    QVERIFY(!cycle143Underlined(document, source.indexOf(QStringLiteral("zxqvfootlabel"))));
+    if (bundledHarper) {
+        for (const auto &request : *requests) {
+            const QString sent = request.at(1).toString();
+            QVERIFY2(!sent.contains(QStringLiteral("zxqvfootref")), qPrintable(sent));
+            QVERIFY2(!sent.contains(QStringLiteral("zxqvfootlabel")), qPrintable(sent));
+        }
+    }
+    QCOMPARE(MarkdownHighlighter::spellingProse(QStringLiteral("An escaped \\[ordinary\\] bracket.")),
+             QStringLiteral("An escaped \\[ordinary\\] bracket."));
+    const QString unicodeLine = QString::fromUtf8("    - 😀 **recieve** and [recieve](https://example.com/recieve)");
+    const QString maskedLine = MarkdownHighlighter::spellingProse(unicodeLine);
+    QCOMPARE(maskedLine.size(), unicodeLine.size());
+    QCOMPARE(maskedLine.indexOf(QStringLiteral("recieve")), unicodeLine.indexOf(QStringLiteral("recieve")));
     // The red underline is composed onto the syntax format, not instead of it.
     const auto heading = cycle143Format(document, cycle143Word(source, "Please recieve the plan"));
     QVERIFY(heading.fontUnderline());
@@ -79,12 +175,24 @@ void FomawriteTest::sourceSpellingUnderlinesProseOnly() {
     frontHighlighter.setSpellCheck(&spell); frontHighlighter.rehighlight();
     const QString frontText = front.toPlainText();
     QVERIFY(!cycle143Underlined(front, cycle143Word(frontText, "title: recieve")));
+    if (bundledHarper)
+        QTRY_VERIFY_WITH_TIMEOUT(cycle143Underlined(front, cycle143Word(frontText, "Body recieve text")), 15000);
     QVERIFY(cycle143Underlined(front, cycle143Word(frontText, "Body recieve text")));
+    QVERIFY(!cycle143Underlined(front, cycle143Word(frontText, "title: recieve")));
+    if (bundledHarper)
+        for (const auto &request : *requests)
+            QVERIFY2(!request.at(1).toString().contains(QStringLiteral("title: recieve")), qPrintable(request.at(1).toString()));
+    QCOMPARE(document.toPlainText(), source);
 }
 
+void FomawriteTest::sourceSpellingFollowsTheSettingAndLearnedWords_data() { cycle143SpellingCheckerRows(); }
+
 void FomawriteTest::sourceSpellingFollowsTheSettingAndLearnedWords() {
+    QFETCH(bool, bundledHarper);
     Cycle103SettingsSnapshot settings;
-    SpellCheck spell;
+    Cycle143SpellingService service;
+    QVERIFY2(service.start(bundledHarper), qPrintable(service.error));
+    SpellCheck &spell = *service.checker;
     if (!spell.available()) QSKIP("the system spell checker exists only on macOS");
     spell.setEnabled(true); spell.setLanguage(QStringLiteral("en_US"));
     const QString source = QStringLiteral("We definately the pieces.\n\nA second definately line.");
@@ -92,6 +200,8 @@ void FomawriteTest::sourceSpellingFollowsTheSettingAndLearnedWords() {
     MarkdownHighlighter highlighter(&document);
     highlighter.setSpellCheck(&spell); QTest::qWait(20); highlighter.rehighlight();
     const int first = cycle143Word(source, "We definately the", "definately"), second = cycle143Word(source, "second definately", "definately");
+    if (bundledHarper)
+        QTRY_VERIFY_WITH_TIMEOUT(cycle143Underlined(document, first) && cycle143Underlined(document, second), 15000);
     QVERIFY(cycle143Underlined(document, first) && cycle143Underlined(document, second));
     // (b) The setting clears every underline and brings them back.
     spell.setEnabled(false);
@@ -100,10 +210,22 @@ void FomawriteTest::sourceSpellingFollowsTheSettingAndLearnedWords() {
         for (const auto &range : block.layout()->formats())
             QCOMPARE(range.format.underlineStyle(), QTextCharFormat::NoUnderline);
     spell.setEnabled(true);
+    if (bundledHarper)
+        QTRY_VERIFY_WITH_TIMEOUT(cycle143Underlined(document, first) && cycle143Underlined(document, second), 15000);
     QVERIFY(cycle143Underlined(document, first) && cycle143Underlined(document, second));
     // (c) Ignoring the word clears it everywhere without touching other text.
     spell.ignoreWord(QStringLiteral("definately"));
     QVERIFY(!cycle143Underlined(document, first) && !cycle143Underlined(document, second));
+    if (bundledHarper) {
+        QVERIFY(spell.hasLearnedWord(QStringLiteral("zxqvknownsource")));
+        const QString words = QStringLiteral("A zxqvknownsource and zxqvnewsource.");
+        QTextDocument dictionary; dictionary.setPlainText(words);
+        MarkdownHighlighter dictionaryHighlighter(&dictionary);
+        dictionaryHighlighter.setSpellCheck(&spell); dictionaryHighlighter.rehighlight();
+        QTRY_VERIFY_WITH_TIMEOUT(cycle143Underlined(dictionary, words.indexOf("zxqvnewsource")), 15000);
+        QVERIFY(!cycle143Underlined(dictionary, words.indexOf("zxqvknownsource")));
+        QCOMPARE(dictionary.toPlainText(), words);
+    }
     // A long document with the real checker restyles in a bounded time.
     spell.setEnabled(true);
     QStringList lines;
@@ -120,6 +242,8 @@ void FomawriteTest::sourceSpellingFollowsTheSettingAndLearnedWords() {
     largeHighlighter.rehighlightBlock(large.findBlockByNumber(1500));
     const QTextBlock farBlock = large.findBlockByNumber(1500);
     const int farWord = farBlock.position() + farBlock.text().indexOf("recieve");
+    if (bundledHarper)
+        QTRY_VERIFY_WITH_TIMEOUT(cycle143Underlined(large, farWord), 30000);
     if (!cycle143Underlined(large, farWord)) {
         // Say what this machine's checker and the layer think, for the CI log.
         int underlinedBlocks = 0;
@@ -204,10 +328,15 @@ int cycle143RedPixels(const QImage &frame, const QRectF &box, qreal scale, bool 
 }
 }
 
+void FomawriteTest::sourceSpellingUnderlineIsRedInTheRenderedWindow_data() { cycle143SpellingCheckerRows(); }
+
 void FomawriteTest::sourceSpellingUnderlineIsRedInTheRenderedWindow() {
+    QFETCH(bool, bundledHarper);
     Cycle103SettingsSnapshot settings;
     Cycle117Window f; QVERIFY2(f.start(1100), qPrintable(f.error));
     auto *spell = f.backend.spellCheck();
+    QString checkerError;
+    QVERIFY2(cycle143ConfigureChecker(f, bundledHarper, &checkerError), qPrintable(checkerError));
     if (!spell->available()) QSKIP("the system spell checker exists only on macOS");
     spell->setEnabled(true); spell->setLanguage(QStringLiteral("en_US"));
     QVERIFY(f.mode(0));
@@ -243,10 +372,15 @@ void FomawriteTest::sourceSpellingUnderlineIsRedInTheRenderedWindow() {
     QCOMPARE(cycle143RedPixels(f.quick->grabWindow(), badBox, scale), 0);
 }
 
+void FomawriteTest::sourceSpellingContextMenuOffersSuggestionsAndCorrects_data() { cycle143SpellingCheckerRows(); }
+
 void FomawriteTest::sourceSpellingContextMenuOffersSuggestionsAndCorrects() {
+    QFETCH(bool, bundledHarper);
     Cycle103SettingsSnapshot settings;
     Cycle117Window f; QVERIFY2(f.start(1100), qPrintable(f.error));
     auto *spell = f.backend.spellCheck();
+    QString checkerError;
+    QVERIFY2(cycle143ConfigureChecker(f, bundledHarper, &checkerError), qPrintable(checkerError));
     if (!spell->available()) QSKIP("the system spell checker exists only on macOS");
     spell->setEnabled(true); spell->setLanguage(QStringLiteral("en_US"));
     QVERIFY(f.mode(0));
@@ -304,9 +438,14 @@ void FomawriteTest::sourceSpellingContextMenuOffersSuggestionsAndCorrects() {
 
 // The word being typed is not marked until the caret leaves it, and focus mode
 // leaves the dimmed text outside the focus alone (reviewer findings F1, F10).
+void FomawriteTest::sourceSpellingWithholdsTheCaretWordAndDimmedText_data() { cycle143SpellingCheckerRows(); }
+
 void FomawriteTest::sourceSpellingWithholdsTheCaretWordAndDimmedText() {
+    QFETCH(bool, bundledHarper);
     Cycle103SettingsSnapshot settings;
-    SpellCheck spell;
+    Cycle143SpellingService service;
+    QVERIFY2(service.start(bundledHarper), qPrintable(service.error));
+    SpellCheck &spell = *service.checker;
     if (!spell.available()) QSKIP("the system spell checker exists only on macOS");
     spell.setEnabled(true); spell.setLanguage(QStringLiteral("en_US"));
     const QString source = QStringLiteral("We recieve mail here.\n\nA second recieve line.");
@@ -314,6 +453,8 @@ void FomawriteTest::sourceSpellingWithholdsTheCaretWordAndDimmedText() {
     MarkdownHighlighter highlighter(&document);
     highlighter.setSpellCheck(&spell); QTest::qWait(20); highlighter.rehighlight();
     const int first = cycle143Word(source, "We recieve mail"), second = cycle143Word(source, "second recieve line");
+    if (bundledHarper)
+        QTRY_VERIFY_WITH_TIMEOUT(cycle143Underlined(document, first) && cycle143Underlined(document, second), 15000);
     QVERIFY(cycle143Underlined(document, first) && cycle143Underlined(document, second));
     // Caret at the end of the first word: that word is withheld, the other stays,
     // and the document revision does not move (a caret move is not an edit).
@@ -337,7 +478,23 @@ void FomawriteTest::sourceSpellingWithholdsTheCaretWordAndDimmedText() {
     QCOMPARE(document.revision(), revision);
     // Typing a word: each step keeps the caret at its end, so nothing flashes.
     QTextCursor cursor(&document); cursor.setPosition(document.characterCount() - 1);
-    const QString typed = QStringLiteral(" tomor");
+    // Harper's actual dictionary accepts "tomor". Keep the native fixture's
+    // word and use a genuine, verified Harper finding for its data row.
+    const QString typed = bundledHarper ? QStringLiteral(" zxqvcaretprobe") : QStringLiteral(" tomor");
+    if (bundledHarper) {
+        for (const QString &ending : {typed, typed + QLatin1Char(' ')}) {
+            const QString prose = MarkdownHighlighter::spellingProse(document.lastBlock().text() + ending);
+            QTRY_VERIFY_WITH_TIMEOUT(spell.issuesIfKnown(prose).has_value(), 15000);
+            const auto actual = spell.issuesIfKnown(prose);
+            QVERIFY(actual.has_value());
+            bool actualFinding = false;
+            for (const auto &issue : *actual)
+                if (issue.category == QLatin1String("Spelling")
+                        && prose.mid(issue.start, issue.end - issue.start) == QStringLiteral("zxqvcaretprobe")) actualFinding = true;
+            if (!actualFinding) qWarning() << "known caret findings for" << prose << spell.issueList(prose);
+            QVERIFY2(actualFinding, "Caret withholding must start with a known real bundled-Harper misspelling");
+        }
+    }
     for (int i = 0; i < typed.size(); ++i) {
         cursor.insertText(typed.mid(i, 1));
         highlighter.setCaret(cursor.position());
@@ -346,7 +503,16 @@ void FomawriteTest::sourceSpellingWithholdsTheCaretWordAndDimmedText() {
     }
     cursor.insertText(QStringLiteral(" "));
     highlighter.setCaret(cursor.position()); document.adjustSize();
-    QVERIFY(cycle143Underlined(document, cursor.position() - 3)); // "tomor" is a word now
+    if (bundledHarper) {
+        const bool marked = QTest::qWaitFor([&] { return cycle143Underlined(document, cursor.position() - 3); }, 15000);
+        if (!marked) {
+            const QString prose = MarkdownHighlighter::spellingProse(cursor.block().text());
+            qWarning() << "bundled Harper completed caret word:" << cursor.block().text()
+                       << "answer known:" << bool(spell.issuesIfKnown(prose)) << "issues:" << spell.issueList(prose);
+        }
+        QVERIFY2(marked, "The completed typed word must be marked by the actual bundled dictionary");
+    }
+    QVERIFY(cycle143Underlined(document, cursor.position() - 3)); // completed word is marked after the separating space
     // Focus mode: a misspelling outside the focused range carries no wash.
     highlighter.setCaret(-1);
     highlighter.setFocusRange(document.findBlock(second).position(), document.findBlock(second).position() + document.findBlock(second).length());

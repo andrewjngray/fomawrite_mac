@@ -16,6 +16,10 @@ The candidate reserves the Organizer scrollbar gutter so invisible scrollbars ca
 - [Shared CI 39741241651](https://github.com/andrewjngray/fomawrite_mac/actions/runs/39741241651): **success**; **300 Mac Qt tests** (0 failures, 13 skips), **321 editor tests** (0 failures/skips), typecheck, asset build and committed-asset verification passed.
 - Final ARM64 VM: the **unmodified standard centre-click normal-launch gate passed**, including native folder/file pickers, exact save, actual Live pixels/OCR, Source return, clean exits and normal restore. Strict offline verification passed. A separate run changing only the disposable writing path to shared storage also passed. Package/report hashes and the retained initial environment-blocked attempt are in the [repair record](M2-REPAIR-EVIDENCE.md).
 
+## Checker parity cycle in verification
+
+Twenty-eight existing Source/Live spelling, grammar and Review cases now run against real bundled Harper in addition to native Mac rows. They exposed and now cover a nested-list prose bug caused by parsing already-masked prose as Markdown again. Local focused checks and 324 editor tests pass; full integration, Windows CI and new package qualification are pending. [Evidence and remaining gaps](M2-CHECKER-PARITY.md). The shelf candidate above remains the last qualified package.
+
 ## Next stability cycle
 
 - Port applicable Mac regression fixtures onto the bundled Harper backend and Windows menu objects. Audit the 39 Windows skips individually; do not count skips as passes.

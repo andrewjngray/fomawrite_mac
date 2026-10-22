@@ -96,17 +96,63 @@ static bool cycle144GrammarAvailable(SpellCheck &check) {
 }
 #define CYCLE144_NEEDS_GRAMMAR(check) if (!cycle144GrammarAvailable(check)) QSKIP("this macOS has no grammar pass for the test language")
 
+namespace {
+// Implemented by the Review fixture later in this translation unit. These rows
+// load the shipped JS/WASM page; no synthetic ready or lint answers are used.
+void cycle144ReviewCheckerRows();
+bool cycle144StartBundledReviewChecker(Cycle117Window &fixture, QString *error);
+struct Cycle144GrammarService {
+    SpellCheck native;
+    std::unique_ptr<Cycle117Window> page;
+    SpellCheck *checker = nullptr;
+    QString error;
+    bool start(bool bundledHarper) {
+        if (!bundledHarper) { native.setEngine(QStringLiteral("macos")); checker = &native; return true; }
+        page = std::make_unique<Cycle117Window>();
+        if (!page->start(1100)) { error = page->error; return false; }
+        if (!cycle144StartBundledReviewChecker(*page, &error)) return false;
+        checker = page->backend.spellCheck();
+        checker->setStyleEnabled(false);
+        return true;
+    }
+};
+QList<SpellCheck::Issue> cycle144CheckerGrammar(SpellCheck &checker, const QString &text) {
+    // grammarIssues() is the native grammar pass; Harper's asynchronous shared
+    // API is issuesIfKnown()/issues(), with the same public category contract.
+    if (!checker.usesHarper()) return checker.grammarIssues(text);
+    QList<SpellCheck::Issue> grammar;
+    for (const auto &issue : checker.issues(text))
+        if (issue.category == QStringLiteral("Grammar")) grammar.append(issue);
+    return grammar;
+}
+bool cycle144AwaitGrammar(SpellCheck &checker, MarkdownHighlighter &highlighter, QTextDocument &document) {
+    if (!checker.usesHarper()) return true;
+    // Ask through the actual highlighter so its markup-masked prose, rather
+    // than the raw document, is what the real engine answers and caches.
+    return QTest::qWaitFor([&] {
+        for (QTextBlock block = document.firstBlock(); block.isValid(); block = block.next())
+            highlighter.issuesInBlock(block);
+        return checker.harper()->inFlightCount() == 0 && checker.harper()->queuedCount() == 0;
+    }, 20000);
+}
+}
+
 // Grammar findings come from the same service with a message and a category,
 // follow their own setting, and issuesInBlock lists spelling and grammar in order.
+void FomawriteTest::spellCheckServiceReportsGrammarIssuesWithCategory_data() { cycle144ReviewCheckerRows(); }
+
 void FomawriteTest::spellCheckServiceReportsGrammarIssuesWithCategory() {
+    QFETCH(bool, bundledHarper);
     Cycle103SettingsSnapshot settings;
-    SpellCheck check;
-    if (!check.available()) QSKIP("the system checker exists only on macOS");
+    Cycle144GrammarService service; QVERIFY2(service.start(bundledHarper), qPrintable(service.error));
+    SpellCheck &check = *service.checker;
+    if (!bundledHarper && !check.available()) QSKIP("the system checker exists only on macOS");
     check.setEnabled(true); check.setGrammarEnabled(true); check.setLanguage(QStringLiteral("en_US"));
-    CYCLE144_NEEDS_GRAMMAR(check);
+    if (!bundledHarper) { CYCLE144_NEEDS_GRAMMAR(check); }
     const QString text = QStringLiteral("This is is a test. We recieve the the mail here.");
-    const auto grammar = check.grammarIssues(text);
-    QVERIFY2(!grammar.isEmpty(), "the macOS grammar pass flags a doubled word");
+    if (bundledHarper) { QTRY_VERIFY_WITH_TIMEOUT(check.issuesIfKnown(text).has_value(), 20000); }
+    const auto grammar = cycle144CheckerGrammar(check, text);
+    QVERIFY2(!grammar.isEmpty(), "the real checker flags a doubled word");
     for (const auto &issue : grammar) {
         QCOMPARE(issue.category, QStringLiteral("Grammar"));
         QVERIFY(issue.start >= 0 && issue.end <= text.size() && issue.end > issue.start);
@@ -120,7 +166,7 @@ void FomawriteTest::spellCheckServiceReportsGrammarIssuesWithCategory() {
     QSignalSpy changed(&check, &SpellCheck::grammarEnabledChanged);
     check.setGrammarEnabled(false);
     QCOMPARE(changed.count(), 1);
-    QVERIFY(check.grammarIssues(text).isEmpty());
+    QVERIFY(cycle144CheckerGrammar(check, text).isEmpty());
     QVERIFY(check.issues(text).size() < all.size());
     QCOMPARE(QSettings().value("writing/checkGrammarWhileTyping").toBool(), false);
     check.setGrammarEnabled(true);
@@ -128,6 +174,7 @@ void FomawriteTest::spellCheckServiceReportsGrammarIssuesWithCategory() {
     QTextDocument document; document.setPlainText(text + QStringLiteral("\n\n```\nthe the recieve\n```\n"));
     MarkdownHighlighter highlighter(&document);
     highlighter.setSpellCheck(&check); QTest::qWait(20); highlighter.rehighlight();
+    QVERIFY(cycle144AwaitGrammar(check, highlighter, document));
     const auto first = highlighter.issuesInBlock(document.firstBlock());
     QCOMPARE(first.size(), all.size());
     QVERIFY(highlighter.issuesInBlock(document.findBlockByNumber(3)).isEmpty());
@@ -138,7 +185,10 @@ void FomawriteTest::spellCheckServiceReportsGrammarIssuesWithCategory() {
 // Grammar runs in sentence-aligned chunks with a per-chunk cache: a long
 // paragraph costs about one chunk per keystroke instead of a super-linear
 // whole-paragraph pass (0.9 s at 8,700 characters before, reviewer finding).
+void FomawriteTest::grammarChecksLongParagraphsInCachedChunks_data() { cycle144ReviewCheckerRows(); }
+
 void FomawriteTest::grammarChecksLongParagraphsInCachedChunks() {
+    QFETCH(bool, bundledHarper);
     Cycle103SettingsSnapshot settings;
     // Chunking is pure: sentence ends win, then line ends, then spaces, never longer than the limit.
     QString text;
@@ -157,9 +207,39 @@ void FomawriteTest::grammarChecksLongParagraphsInCachedChunks() {
     const auto noSentences = SpellCheck::grammarChunks(QString(2500, QLatin1Char('x')), 1000);
     QCOMPARE(noSentences.size(), 3);
     QCOMPARE(SpellCheck::grammarChunks(QString(), 1000).size(), 0);
-    SpellCheck check;
-    CYCLE144_NEEDS_GRAMMAR(check);
+    Cycle144GrammarService service; QVERIFY2(service.start(bundledHarper), qPrintable(service.error));
+    SpellCheck &check = *service.checker;
+    if (!bundledHarper) { CYCLE144_NEEDS_GRAMMAR(check); }
     check.setEnabled(true); check.setGrammarEnabled(true); check.setLanguage(QStringLiteral("en_US"));
+    if (bundledHarper) {
+        // Harper caches whole prose requests, rather than the native grammar
+        // pass's chunks. Preserve long-text offsets and prove real cache reuse
+        // by counting bridge requests, without imposing a native timing model.
+        auto *bridge = service.page->backend.editorBridge();
+        QSignalSpy requests(bridge, &EditorBridge::harperLint);
+        const auto countFor = [&](const QString &prose) {
+            int count = 0; for (const auto &request : requests) if (request.at(1).toString() == prose) ++count;
+            return count;
+        };
+        QTRY_VERIFY_WITH_TIMEOUT(check.issuesIfKnown(text).has_value(), 20000);
+        const auto cold = cycle144CheckerGrammar(check, text);
+        bool found = false;
+        for (const auto &issue : cold)
+            if (text.mid(issue.start, issue.end - issue.start) == QStringLiteral("the the")) found = true;
+        QVERIFY2(found, "the last grammar finding keeps its full long-paragraph offset");
+        QCOMPARE(countFor(text), 1);
+        const auto cached = cycle144CheckerGrammar(check, text);
+        QCOMPARE(cached, cold);
+        QTest::qWait(50);
+        QCOMPARE(countFor(text), 1);
+        const QString edited = text + QStringLiteral(" More.");
+        QTRY_VERIFY_WITH_TIMEOUT(check.issuesIfKnown(edited).has_value(), 20000);
+        const auto warm = cycle144CheckerGrammar(check, edited);
+        QCOMPARE(warm, cold);
+        QCOMPARE(countFor(edited), 1);
+        QCOMPARE(countFor(text), 1);
+        return;
+    }
     QElapsedTimer timer; timer.start();
     const auto cold = check.grammarIssues(text);
     const qint64 coldMs = timer.elapsed();
