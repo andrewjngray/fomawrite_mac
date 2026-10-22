@@ -1,9 +1,9 @@
 # Non-UI fixture: synthetic executable bytes are staged, never launched.
 [CmdletBinding()]
-param()
+param([string]$DriverPath = '')
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
-$driverPath = Join-Path $PSScriptRoot '..\bin\windows\launch-local.ps1'
+if ([string]::IsNullOrWhiteSpace($DriverPath)) { $driverPath = Join-Path $PSScriptRoot '..\bin\windows\launch-local.ps1' }
 $driver = [ScriptBlock]::Create([IO.File]::ReadAllText($driverPath))
 $root = Join-Path $env:TEMP ('Fomawrite-launcher-fixture-' + [Guid]::NewGuid().ToString('N'))
 $package = Join-Path $root 'package with spaces'
@@ -20,6 +20,13 @@ function Reject([scriptblock]$Action, [string]$Message, [string]$ExpectedReason)
     try { & $Action | Out-Null } catch { $rejected = $true; $reason = $_.Exception.Message }
     Assert $rejected $Message
     Assert ($reason -match $ExpectedReason) ("Wrong rejection reason: " + $reason)
+}
+function Get-JobDiagnostic($Job) {
+    $children = @($Job.ChildJobs | ForEach-Object {
+        [ordered]@{ state = [string]$_.State; reason = [string]$_.JobStateInfo.Reason;
+            errors = @($_.Error | ForEach-Object { $_.ToString() }); output = @($_.Output | ForEach-Object { $_.ToString() }) }
+    })
+    [ordered]@{ state = [string]$Job.State; reason = [string]$Job.JobStateInfo.Reason; children = $children } | ConvertTo-Json -Depth 7 -Compress
 }
 function Write-Manifest($Files) {
     $manifest = [ordered]@{ architecture = 'arm64'; commit = ('a' * 40); executableSha256 = Hash (Join-Path $package 'Fomawrite.exe'); files = $Files }
@@ -49,19 +56,20 @@ try {
     $lockPath = Join-Path $cacheHome 'Fomawrite\Portable\.stage-lock'
     $marker = Join-Path $root 'waiting-starter-ready.txt'
     $heldLock = [IO.File]::Open($lockPath, [IO.FileMode]::OpenOrCreate, [IO.FileAccess]::ReadWrite, [IO.FileShare]::None)
-    $blockingJob = Start-Job -ArgumentList $driverPath, $package, $marker -ScriptBlock {
-        param($DriverPath, $Package, $Marker)
+    $blockingJob = Start-Job -ArgumentList $driverPath, $package, $marker, $cacheHome -ScriptBlock {
+        param($DriverPath, $Package, $Marker, $CacheHome)
+        $env:LOCALAPPDATA = $CacheHome
         [IO.File]::WriteAllText($Marker, 'ready')
         & ([ScriptBlock]::Create([IO.File]::ReadAllText($DriverPath))) -Package $Package -StageOnly
     }
     $readyDeadline = [DateTime]::UtcNow.AddSeconds(15)
     while (-not (Test-Path -LiteralPath $marker) -and [DateTime]::UtcNow -lt $readyDeadline) { Start-Sleep -Milliseconds 100 }
-    Assert (Test-Path -LiteralPath $marker) 'Concurrent starter fixture never reached its launch point.'
+    if (-not (Test-Path -LiteralPath $marker)) { throw ('Concurrent starter never reached its launch point. ' + (Get-JobDiagnostic $blockingJob)) }
     Start-Sleep -Milliseconds 750
-    Assert ($blockingJob.State -eq 'Running') 'Concurrent starter did not wait for the cache lock.'
+    if ($blockingJob.State -ne 'Running') { throw ('Concurrent starter did not wait for the cache lock. ' + (Get-JobDiagnostic $blockingJob)) }
     $heldLock.Dispose(); $heldLock = $null
-    $finishedJob = Wait-Job $blockingJob -Timeout 20
-    Assert ($null -ne $finishedJob -and $blockingJob.State -eq 'Completed') 'Concurrent starter did not complete after lock release.'
+    if ($blockingJob.State -eq 'Running') { Wait-Job $blockingJob -Timeout 60 | Out-Null }
+    if ($blockingJob.State -ne 'Completed') { throw ('Concurrent starter did not complete after lock release. ' + (Get-JobDiagnostic $blockingJob)) }
     $serialized = (Receive-Job $blockingJob) | ConvertFrom-Json
     Remove-Job $blockingJob; $blockingJob = $null
     Assert ($serialized.reusedCache -eq $true -and $serialized.localPackage -eq $first.localPackage) 'Concurrent starter did not reverify/reuse the published cache.'

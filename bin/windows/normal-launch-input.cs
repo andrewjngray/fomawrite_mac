@@ -4,6 +4,8 @@ using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using System.Windows.Automation;
 using System.Threading;
+using System.Diagnostics;
+using System.Text.RegularExpressions;
 public static class NormalLaunchInput {
     [StructLayout(LayoutKind.Sequential)] struct INPUT { public uint type; public INPUTUNION u; }
     [StructLayout(LayoutKind.Explicit)] struct INPUTUNION {
@@ -17,68 +19,180 @@ public static class NormalLaunchInput {
         public ushort vk, scan; public uint flags, time; public UIntPtr extra;
     }
     [DllImport("user32.dll", SetLastError=true)] static extern uint SendInput(uint n, INPUT[] inputs, int size);
-    [DllImport("user32.dll")] static extern bool SetCursorPos(int x, int y);
+    [StructLayout(LayoutKind.Sequential)] struct POINT { public int x, y; }
+    [DllImport("user32.dll", SetLastError=true)] static extern bool SetPhysicalCursorPos(int x, int y);
+    [DllImport("user32.dll", SetLastError=true)] static extern bool GetPhysicalCursorPos(out POINT point);
     [DllImport("user32.dll")] static extern bool SetForegroundWindow(IntPtr hwnd);
     [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();
     [DllImport("user32.dll")] static extern bool ShowWindow(IntPtr hwnd, int command);
-    [DllImport("user32.dll")] static extern bool SetProcessDPIAware();
+    [DllImport("user32.dll", SetLastError=true)] static extern IntPtr SetThreadDpiAwarenessContext(IntPtr context);
+    [DllImport("user32.dll")] static extern IntPtr GetThreadDpiAwarenessContext();
+    [DllImport("user32.dll")] static extern bool AreDpiAwarenessContextsEqual(IntPtr first, IntPtr second);
     static void Send(INPUT input) {
         if (SendInput(1, new INPUT[] {input}, Marshal.SizeOf(typeof(INPUT))) != 1)
             throw new InvalidOperationException("Windows rejected SendInput: " + Marshal.GetLastWin32Error());
     }
-    public static void Initialize() { SetProcessDPIAware(); }
+    public static void Initialize() {
+        var physicalContext=new IntPtr(-4); // DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2
+        if(SetThreadDpiAwarenessContext(physicalContext)==IntPtr.Zero ||
+            !AreDpiAwarenessContextsEqual(GetThreadDpiAwarenessContext(), physicalContext))
+            throw new InvalidOperationException("Cannot establish physical per-monitor-v2 DPI context: " + Marshal.GetLastWin32Error());
+    }
+    public static void MovePhysical(int x, int y) {
+        if(!SetPhysicalCursorPos(x, y))
+            throw new InvalidOperationException("Cannot position physical Windows pointer: " + Marshal.GetLastWin32Error());
+        POINT observed;
+        if(!GetPhysicalCursorPos(out observed) || observed.x!=x || observed.y!=y)
+            throw new InvalidOperationException("Physical pointer position did not match the requested UIA coordinates");
+    }
+    static IntPtr expectedInputWindow;
+    [DllImport("user32.dll")] static extern uint GetWindowThreadProcessId(IntPtr hwnd, out uint pid);
+    static uint expectedProcessId;
+    [DllImport("kernel32.dll")] static extern uint GetCurrentThreadId();
+    [DllImport("user32.dll")] static extern bool AttachThreadInput(uint source, uint target, bool attach);
     public static void Foreground(IntPtr hwnd) {
-        ShowWindow(hwnd, 9); SetForegroundWindow(hwnd); Thread.Sleep(250);
-        if (GetForegroundWindow() != hwnd) throw new InvalidOperationException("Could not foreground acceptance window");
+        ShowWindow(hwnd, 9); SetForegroundWindow(hwnd); Thread.Sleep(100);
+        if(GetForegroundWindow()!=hwnd) {
+            uint ignored;
+            uint foregroundThread=GetWindowThreadProcessId(GetForegroundWindow(), out ignored);
+            uint callerThread=GetCurrentThreadId();
+            bool attached=false;
+            try {
+                if(foregroundThread!=0 && foregroundThread!=callerThread)
+                    attached=AttachThreadInput(callerThread, foregroundThread, true);
+                SetForegroundWindow(hwnd);
+            } finally {
+                if(attached) AttachThreadInput(callerThread, foregroundThread, false);
+            }
+            Thread.Sleep(150);
+        }
+        for(int attempt=0; attempt<2 && GetForegroundWindow()!=hwnd; attempt++) {
+            Press(0x12); SetForegroundWindow(hwnd); Thread.Sleep(150);
+        }
+        if(GetForegroundWindow()!=hwnd) throw new InvalidOperationException("Could not foreground acceptance window");
+        expectedInputWindow=hwnd;
+        GetWindowThreadProcessId(hwnd, out expectedProcessId);
+    }
+    public static void RequireInputForeground() {
+        uint actual;
+        GetWindowThreadProcessId(GetForegroundWindow(), out actual);
+        if(expectedInputWindow==IntPtr.Zero || actual!=expectedProcessId)
+            throw new InvalidOperationException("Acceptance application lost foreground; refusing input");
     }
     public static void Key(ushort vk, bool up) {
         INPUT input = new INPUT(); input.type=1; input.u.ki.vk=vk; input.u.ki.flags=up ? 2u : 0u; Send(input);
     }
-    public static void Press(ushort vk) { Key(vk, false); Key(vk, true); }
+    public static void Press(ushort vk) {
+        if(vk!=0x12) RequireInputForeground();
+        Key(vk, false); Key(vk, true);
+    }
     public static void Chord(ushort modifier, ushort vk) {
+        RequireInputForeground();
         Key(modifier, false); try { Press(vk); } finally { Key(modifier, true); }
     }
-    public static void Type(string text) {
+    public static void Type(string text) { TypeText(text, false); }
+    public static void TypeSource(string text) { TypeText(text, true); }
+    static void TypeText(string text, bool literalNewlines) {
+        RequireInputForeground();
         foreach (char ch in text) {
-            if (ch == '\n') { Press(0x0D); continue; }
+            // Source's ordinary Return creates a paragraph; Shift+Return is
+            // its production soft-break path for one literal Markdown newline.
+            if (ch == '\n') {
+                if(literalNewlines) Chord(0x10, 0x0D); else Press(0x0D);
+                continue;
+            }
             if (ch == '\r') continue;
+            RequireInputForeground();
             INPUT input = new INPUT(); input.type=1; input.u.ki.scan=ch; input.u.ki.flags=4; Send(input);
             input.u.ki.flags=6; Send(input);
         }
     }
     public static void Click(AutomationElement element) {
-        var current=element.Current;
+        RequireInputForeground();
+        var current=Bounded(delegate() { return element.Current; }, "click target bounds");
         if (!current.IsEnabled || current.IsOffscreen || current.BoundingRectangle.IsEmpty)
             throw new InvalidOperationException("Cannot click inaccessible control: " + current.Name);
         var rect=current.BoundingRectangle;
-        if (!SetCursorPos((int)(rect.Left+rect.Width/2), (int)(rect.Top+rect.Height/2)))
-            throw new InvalidOperationException("Cannot position Windows pointer");
+        MovePhysical((int)(rect.Left+rect.Width/2), (int)(rect.Top+rect.Height/2));
+        RequireInputForeground();
         INPUT input=new INPUT(); input.type=0; input.u.mi.dwFlags=2; Send(input);
         input.u.mi.dwFlags=4; Send(input); Thread.Sleep(200);
     }
+    // A provider may block a single UIA call. Keep that call on a background
+    // MTA thread so a broken accessibility branch cannot hang the whole gate.
+    static T Bounded<T>(Func<T> action, string operation) {
+        T result=default(T); Exception failure=null;
+        var worker=new Thread(delegate() {
+            try { result=action(); } catch(Exception error) { failure=error; }
+        });
+        worker.IsBackground=true; worker.SetApartmentState(ApartmentState.MTA); worker.Start();
+        if(!worker.Join(6000)) throw new TimeoutException("UIA provider timed out during " + operation);
+        if(failure!=null) throw new InvalidOperationException("UIA " + operation + " failed", failure);
+        return result;
+    }
     public static AutomationElement Root(int pid) {
-        return AutomationElement.RootElement.FindFirst(TreeScope.Children,
-            new PropertyCondition(AutomationElement.ProcessIdProperty, pid));
+        return Bounded(delegate() {
+            return AutomationElement.RootElement.FindFirst(TreeScope.Children,
+                new PropertyCondition(AutomationElement.ProcessIdProperty, pid));
+        }, "application root discovery");
     }
     public static AutomationElement ForegroundRoot(int pid) {
-        var element=AutomationElement.FromHandle(GetForegroundWindow());
-        return element.Current.ProcessId == pid ? element : null;
+        return Bounded(delegate() {
+            var element=AutomationElement.FromHandle(GetForegroundWindow());
+            return element.Current.ProcessId == pid ? element : null;
+        }, "foreground dialog discovery");
     }
-    public static AutomationElement Find(AutomationElement root, string pattern) {
-        if(root == null) return null;
-        AutomationElementCollection elements;
-        try { elements=root.FindAll(TreeScope.Descendants, Condition.TrueCondition); }
-        catch(ElementNotAvailableException) { return null; } // Wait-For re-queries; never count disappearance as success.
-        foreach(AutomationElement element in elements) {
+    struct Entry {
+        public AutomationElement element; public int depth;
+        public Entry(AutomationElement e, int d) { element=e; depth=d; }
+    }
+    static bool BrowserBranch(AutomationElement.AutomationElementInformation c) {
+        // Menu/toolbar/Source searches need no Chromium accessibility subtree.
+        return c.ControlType == ControlType.Document ||
+            Regex.IsMatch(c.ClassName ?? "", "WebEngine|Chrome_|RenderWidget", RegexOptions.IgnoreCase) ||
+            Regex.IsMatch(c.Name ?? "", "^(Live Markdown editor|Publishing preview|Web content)$", RegexOptions.IgnoreCase);
+    }
+    static AutomationElement Walk(AutomationElement root, string pattern, List<string> description) {
+        if(root==null) return null;
+        var pending=new Queue<Entry>(); pending.Enqueue(new Entry(root, 0));
+        var runtimeIds=new Dictionary<string, bool>();
+        var elapsed=Stopwatch.StartNew(); int visited=0;
+        while(pending.Count>0 && visited<1600 && elapsed.ElapsedMilliseconds<4500) {
+            var entry=pending.Dequeue(); visited++;
             try {
-                var item=element.Current;
-                if (!item.IsOffscreen && item.IsEnabled && !item.BoundingRectangle.IsEmpty &&
-                    System.Text.RegularExpressions.Regex.IsMatch(item.Name.Replace("&", ""), pattern)) return element;
-            } catch(ElementNotAvailableException) {}
+                var runtime=entry.element.GetRuntimeId();
+                string runtimeId=String.Join(".", Array.ConvertAll<int, string>(runtime, delegate(int part) { return part.ToString(); }));
+                if(runtimeIds.ContainsKey(runtimeId)) continue;
+                runtimeIds.Add(runtimeId, true);
+                var c=entry.element.Current;
+                if(description!=null) description.Add("depth=" + entry.depth + " | " + c.ControlType.ProgrammaticName +
+                    " | " + c.Name + " | " + c.AutomationId + " | " + c.ClassName + " | " +
+                    c.BoundingRectangle + " | offscreen=" + c.IsOffscreen + " | enabled=" + c.IsEnabled);
+                if(pattern!=null && !c.IsOffscreen && c.IsEnabled && !c.BoundingRectangle.IsEmpty &&
+                    Regex.IsMatch(c.Name.Replace("&", ""), pattern)) return entry.element;
+                if(entry.depth>=18 || BrowserBranch(c)) {
+                    if(description!=null) description.Add("branch omitted: depth limit or embedded browser content");
+                    continue;
+                }
+                // Crucially, never ask a provider for all descendants at once.
+                var children=entry.element.FindAll(TreeScope.Children, Condition.TrueCondition);
+                foreach(AutomationElement child in children) pending.Enqueue(new Entry(child, entry.depth+1));
+            } catch(ElementNotAvailableException) {
+                if(description!=null) description.Add("depth=" + entry.depth + " | unavailable branch");
+            }
         }
+        if(pattern!=null && pending.Count>0)
+            throw new InvalidOperationException("UIA search incomplete; cannot establish target absence: " + pattern);
+        if(description!=null && pending.Count>0) description.Add("bounded observation ended with " + pending.Count + " queued branches");
         return null;
     }
+    public static AutomationElement Find(AutomationElement root, string pattern) {
+        return Bounded(delegate() { return Walk(root, pattern, null); }, "bounded control search: " + pattern);
+    }
     public static bool Checked(AutomationElement element) {
+        return Bounded(delegate() { return CheckedValue(element); }, "checked state readback");
+    }
+    static bool CheckedValue(AutomationElement element) {
         object pattern;
         if(element.TryGetCurrentPattern(TogglePattern.Pattern, out pattern))
             return ((TogglePattern)pattern).Current.ToggleState == ToggleState.On;
@@ -87,19 +201,22 @@ public static class NormalLaunchInput {
         throw new InvalidOperationException("Control exposes no checked/selected state: " + element.Current.Name);
     }
     public static string Text(AutomationElement element) {
+        return Bounded(delegate() { return TextValue(element); }, "Source text readback");
+    }
+    static string TextValue(AutomationElement element) {
         object pattern;
         if(element.TryGetCurrentPattern(ValuePattern.Pattern, out pattern)) return ((ValuePattern)pattern).Current.Value;
         if(element.TryGetCurrentPattern(TextPattern.Pattern, out pattern)) return ((TextPattern)pattern).DocumentRange.GetText(-1);
         throw new InvalidOperationException("Editor exposes no readable text pattern");
     }
     public static string[] Describe(AutomationElement root) {
-        var result=new List<string>(); if(root == null) return result.ToArray();
-        var elements=root.FindAll(TreeScope.Descendants, Condition.TrueCondition);
-        foreach(AutomationElement element in elements) try {
-            var c=element.Current;
-            result.Add(c.ControlType.ProgrammaticName + " | " + c.Name + " | " + c.AutomationId + " | " +
-                c.BoundingRectangle + " | offscreen=" + c.IsOffscreen + " | enabled=" + c.IsEnabled);
-        } catch(ElementNotAvailableException) {}
-        return result.ToArray();
+        var result=new List<string>();
+        try {
+            return Bounded(delegate() { Walk(root, null, result); return result.ToArray(); }, "bounded diagnostic observation");
+        } catch(Exception error) {
+            // Diagnostics never change a required workflow assertion's result.
+            // Preserve whatever the worker observed, even if a provider stalled.
+            return new string[] { "UIA diagnostic incomplete: " + error.Message };
+        }
     }
 }

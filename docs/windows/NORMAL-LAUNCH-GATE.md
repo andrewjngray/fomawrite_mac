@@ -10,9 +10,14 @@ desktop. Do not use the mouse or keyboard during the run. The runner needs no Qt
 SDK, Python or PowerShell 7. Use a new output directory on each run:
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\bin\windows\run-normal-launch-guest.ps1 `
+powershell.exe -NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File .\bin\windows\run-normal-launch-guest.ps1 `
     -Package C:\FomawriteQA\candidate\Fomawrite -Output C:\FomawriteQA\normal-launch-001
 ```
+
+`-WindowStyle Hidden` is required when invoking PowerShell through Parallels
+`prlctl exec --current-user`: a visible PowerShell console can steal foreground
+from the application or native picker. Keep that PowerShell process alive for
+the complete driver run; a bare detached `Start-Process` is insufficient.
 
 The runner validates every deployed manifest file, strips inherited Qt/QML/app
 overrides and developer PATH entries, then launches `Fomawrite.exe` twice with
@@ -23,7 +28,9 @@ startup/session/restoration code active. The same profile is reused on reopen.
 A candidate that lacks this isolation contract fails before UI input.
 
 The gate uses read-only Windows UI Automation to discover visible controls and
-read their bounds, checked states and editor text. Pointer clicks and keyboard
+read their bounds, editor visibility and Source text. Discovery uses bounded
+breadth-first child queries with runtime-ID deduplication and avoids browser
+subtrees for menu/toolbar/Source searches. Pointer clicks and keyboard
 input enter through Windows `SendInput`; there are no QML calls, Qt test events,
 UIA Invoke/Value setters or command-dispatch shortcuts. It requires all of:
 
@@ -33,10 +40,15 @@ UIA Invoke/Value setters or command-dispatch shortcuts. It requires all of:
    the Library.
 3. **File → Open File…** opening a native file picker. The chosen document must
    appear in Source with its exact sample text.
-4. Windows keyboard input replacing that sample and **File → Save** persisting
+4. Windows keyboard input (Shift+Enter for each literal Source newline) replacing that sample and **File → Save** persisting
    the exact expected Markdown to disk.
-5. The **Live** and **Source** footer buttons changing their exposed checked
-   states and preserving the exact document source.
+5. The **Live** footer button hiding the Source editor and changing the actual
+   editor-mode appearance label. Built-in English Windows OCR must recognize
+   the sample heading and saved sentence in a screenshot cropped to the prior
+   Source writing rectangle, excluding Library excerpts and publishing output.
+   The **Source** footer button must then reveal Source with exact text.
+   Qt's mode buttons expose no Toggle/Selection UIA pattern, so checked-state
+   labels cannot stand in for this visible editor and rendered-content proof.
 6. **File → Exit** ending the process successfully, then a second argument-free
    ordinary launch restoring the saved document. The second process must also
    exit successfully through the menu.
@@ -60,7 +72,8 @@ python3 bin/windows/check-normal-launch.py \
 The verifier requires every ordered stage, two clean argument-free launches,
 timestamps inside the run, exact package/executable/driver identities,
 app-written isolation receipt, screenshots, UIA/native-picker observations,
-launch logs and byte-exact expected saved sample (allowing Windows line
+Live writing-region screenshot/OCR proof, clean renderer/page-load logs and
+byte-exact expected saved sample (allowing Windows line
 endings). All artifacts are hash-bound to the report. Its focused report
 rejection tests run with `python3 -m unittest windows.test_normal_launch`.
 Those tests protect the verifier; only a real guest run establishes UI behavior.

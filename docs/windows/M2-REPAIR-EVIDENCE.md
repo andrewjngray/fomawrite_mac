@@ -31,7 +31,7 @@ The working QML change replaces an unconditional immediate reload after renderer
 
 Before reload, the page replay is refreshed from the canonical document so incremental unsaved Live edits survive reconnect. The handshake resynchronizes the canonical document again if Source changed during reload. Recovery must preserve the document revision and must not manufacture edits.
 
-The focused local Qt run passed **6 tests, 0 failures**, including the renderer recovery regression, with red/green evidence against the previous behavior. The local app build passed. The recovery fixture delivers the real WebEngine termination signal to the QML handler; it does not inject an actual operating-system renderer crash. These results establish the bounded recovery behavior under the fixture, not resolution of the shared-folder failure or acceptance of a packaged Windows repair.
+The focused local Qt run passed **6 tests, 0 failures**, including the renderer recovery regression, with red/green evidence against the previous behavior. The local app build passed. The complete local shared Qt suite then passed **310 tests, 0 failures, 1 skipped** (`./bin/test`; 344.7 seconds). The recovery fixture delivers the real WebEngine termination signal to the QML handler; it does not inject an actual operating-system renderer crash. These results establish the bounded recovery behavior under the fixture, not resolution of the shared-folder failure or acceptance of a packaged Windows repair.
 
 ## Windows-local portable starter
 
