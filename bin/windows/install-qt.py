@@ -25,7 +25,12 @@ def sha(path, algorithm="sha256"):
 
 # These HTTPS mirrors are listed by Qt. Fallback preserves the exact locked path
 # and checksum; a newer repository revision is never selected automatically.
-QT_MIRRORS = ("https://qt.mirror.constant.com", "https://www.nic.funet.fi/pub/mirrors/download.qt-project.org")
+QT_MIRRORS = (
+    "https://qt.mirror.constant.com",
+    "https://www.nic.funet.fi/pub/mirrors/download.qt-project.org",
+    "https://ftp.jaist.ac.jp/pub/qtproject",
+    "https://ftp.nluug.nl/languages/qt",
+)
 
 
 def download_archive(entry, archive):

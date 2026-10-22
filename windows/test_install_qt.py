@@ -61,14 +61,38 @@ class QtDownloadTrustTests(unittest.TestCase):
 
     def test_second_fixed_mirror_only_after_first_mirror_404(self):
         url, calls = self.download([http(404), http(404), Response(url=self.mirrors[1])])
-        self.assertEqual(calls, [ORIGIN, *self.mirrors])
+        self.assertEqual(calls, [ORIGIN, *self.mirrors[:2]])
         self.assertEqual(url, self.mirrors[1])
 
-    def test_all_404_exhausts_exactly_two_mirrors(self):
-        with patch.object(INSTALLER.urllib.request, 'urlopen', side_effect=[http(404)] * 3) as request:
+    def test_all_404_exhausts_all_fixed_mirrors(self):
+        candidates = [ORIGIN, *self.mirrors]
+        with patch.object(INSTALLER.urllib.request, 'urlopen', side_effect=[http(404)] * len(candidates)) as request:
             with self.assertRaises(urllib.error.HTTPError):
                 INSTALLER.download_archive(self.entry, self.archive)
-        self.assertEqual(request.call_count, 3)
+        self.assertEqual([c.args[0] for c in request.call_args_list], candidates)
+
+    def test_verified_additional_mirrors_preserve_exact_path_and_pin(self):
+        roots = ('https://ftp.jaist.ac.jp/pub/qtproject', 'https://ftp.nluug.nl/languages/qt')
+        for index, root in enumerate(roots, start=3):
+            target = root + ORIGIN.removeprefix('https://download.qt.io')
+            before = dict(self.entry)
+            with self.subTest(root=root):
+                url, calls = self.download([http(404)] * index + [Response(url=target)])
+                self.assertEqual(calls, [ORIGIN, *self.mirrors[:index]])
+                self.assertEqual(calls[-1], target)
+                self.assertEqual(url, target)
+                self.assertEqual(self.entry, before)
+                self.assertEqual(hashlib.sha1(self.archive.read_bytes()).hexdigest(), before['sha1'])
+
+    def test_additional_mirror_errors_stop_without_further_fallback(self):
+        for index in (3, 4):
+            for error in (http(403), http(429), http(503), ssl.SSLCertVerificationError('fixture'), urllib.error.URLError('fixture')):
+                with self.subTest(candidate=index, error=type(error).__name__), patch.object(
+                        INSTALLER.urllib.request, 'urlopen', side_effect=[http(404)] * index + [error]) as request:
+                    with self.assertRaises(type(error)) as raised:
+                        INSTALLER.download_archive(self.entry, self.archive)
+                    self.assertIs(raised.exception, error)
+                    self.assertEqual(request.call_count, index + 1)
 
     def test_other_origin_http_errors_do_not_fallback(self):
         for code in (401, 403, 429, 500, 503):
@@ -92,8 +116,9 @@ class QtDownloadTrustTests(unittest.TestCase):
                 self.assertEqual(request.call_count, 2)
 
     def test_checksum_mismatch_never_falls_back(self):
-        for prefix in ([], [http(404)]):
-            with self.subTest(after404=bool(prefix)), patch.object(INSTALLER.urllib.request, 'urlopen', side_effect=prefix + [Response(b'wrong revision')]) as request:
+        for index in range(len(INSTALLER.QT_MIRRORS) + 1):
+            prefix = [http(404)] * index
+            with self.subTest(candidate=index), patch.object(INSTALLER.urllib.request, 'urlopen', side_effect=prefix + [Response(b'wrong revision')]) as request:
                 with self.assertRaisesRegex(SystemExit, 'checksum mismatch'):
                     INSTALLER.download_archive(self.entry, self.archive)
                 self.assertEqual(request.call_count, len(prefix) + 1)

@@ -643,6 +643,39 @@
     },
     "hostedRepairVerification": "pending",
     "applicationChanged": false,
-    "desktopQualification": false
+    "desktopQualification": false,
+    "sdkAcquisitionFollowthrough": {
+      "commit": "b1e49a434a19dd33d630a5f4694b208d04c20080",
+      "runId": 39830560241,
+      "records": [
+        {
+          "architecture": "arm64",
+          "jobId": 120005255916,
+          "conclusion": "failure",
+          "stage": "Install pinned Qt SDK and WebEngine/PDF extensions",
+          "applicationBuilt": false,
+          "logSha256": "c8c02e8815a7199078f1be8b1733b319e15c9363e874cf843f0ae34aceb48721"
+        },
+        {
+          "architecture": "x64",
+          "jobId": 120005256488,
+          "conclusion": "failure",
+          "stage": "Install pinned Qt SDK and WebEngine/PDF extensions",
+          "applicationBuilt": false,
+          "logSha256": "6ad2a28ea400a494a2ba4e6a62a4f400e59a4983e2ae8f229d4c2a065e27e5b6"
+        }
+      ],
+      "cause": "Pinned September Qt SDK archives now return404 at every configured origin; upstream same-version October rebuild has different checksum. Application tests not reached.",
+      "repair": {
+        "fixedFallbacks": [
+          "https://ftp.jaist.ac.jp/pub/qtproject",
+          "https://ftp.nluug.nl/languages/qt"
+        ],
+        "pinsChanged": false,
+        "installerGuardsPassed": 14,
+        "durableArchive": false,
+        "evidenceDirectory": "research/cycle-162/evidence/b1e49a4-sdk-acquisition"
+      }
+    }
   }
 }
