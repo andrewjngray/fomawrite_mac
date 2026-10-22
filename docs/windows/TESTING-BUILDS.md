@@ -2,6 +2,12 @@
 
 ## Choose a build from the current status
 
+For this checkpoint, the explicit internal-review entry is **`TEST-B056-ARM64.cmd`**, in the collection folder below. On Windows use:
+
+`C:\Mac\Home\repo\projects\fomawrite_windows\dist\windows-testing\TEST-B056-ARM64.cmd`
+
+This launches the exact ordinary-tested b056 ARM64 package through its manifest-verifying local starter. It is an internal test candidate, with [bounded passes and remaining qualification](M2-DESKTOP-B056.md), not a release. `TEST-B056-X64.cmd` selects the separately tested x64-emulated package. Neither entry overwrites a historical package or changes ordinary user preferences.
+
 Read [Windows status](STATUS.md) before choosing a package. It records the exact candidate, CI results, ordinary VM acceptance and any promotion. The top-level starter and catalog can still point to an older shelf build; they are not a reliable indication of the newest tested code.
 
 The historical `d573f16` shelf passed its original checks, but a later selected-Live-formatting test exposed a rapid Save defect. **Do not treat that shelf as the current qualified build.** New repair packages stay in `diagnostic-candidates/` until their exact identities and required acceptance checks are reviewed. A successful build alone does not promote one.

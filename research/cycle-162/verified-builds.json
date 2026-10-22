@@ -1,0 +1,285 @@
+{
+  "recordedUtc": "2026-10-22T17:22:00.908538+00:00",
+  "sourceCommit": "b056ab5e6a73078b69c99916a4c5bce52772dfa6",
+  "testMaintenanceCommit": "ad538881a0abdf3babd20fd899f01138d45b75b6",
+  "version": "0.3.0-dev49",
+  "fullM2Acceptance": false,
+  "releaseQualified": false,
+  "internalTestEntry": "dist/windows-testing/TEST-B056-ARM64.cmd",
+  "workflows": {
+    "arm64Normal": {
+      "report": "dist/windows-testing/results/final-b056-arm64-r15-normal-e8ae200dc2c54c0285c56c3fc6208236/normal-launch-report.json",
+      "sha256": "b6b561b2affd94a5cf4cec0157703fcb727b149dbe152ac95e619e1e968a8267",
+      "scope": "accepted bounded6/6",
+      "rawPassed": true,
+      "rawWorkflowPassed": null
+    },
+    "arm64SelectedImmediateSave": {
+      "report": "dist/windows-testing/results/final-b056-arm64-r16-selection-save-0814cab57ab84e0aa35755c861dd5766/evidence/selection-save-report.json",
+      "sha256": "e60fbd236c4e732f57c01f26210cb60049443e8c561f273c622dd834c0017bfa",
+      "scope": "accepted by separate root selection review; rawmanualpending unchanged",
+      "rawPassed": false,
+      "rawWorkflowPassed": true
+    },
+    "x64EmulatedNormal": {
+      "report": "dist/windows-testing/results/final-b056-x64-r18-normal-d6b156eb288c46e592347d24ff7037c1/normal-launch-report.json",
+      "sha256": "5ba62dec78ad09544bafa868d50854b2dae870e94c7629914b41f9cc4482c1a6",
+      "scope": "accepted bounded6/6 underARM64emulation",
+      "rawPassed": true,
+      "rawWorkflowPassed": null
+    },
+    "arm64Publishing": {
+      "report": "dist/windows-testing/results/final-b056-arm64-r22-publishing-dfd8a7c47f7f40f38cbaead65f2d141b/publishing-supplement-report.json",
+      "sha256": "fc519ded82bb4136ebf6b22158ad1470e020d1935bff43fe06dc8f3245b9bf33",
+      "scope": "accepted bounded9/9 after root8capture review; rawmanualpending unchanged; Parallels255 retained",
+      "rawPassed": false,
+      "rawWorkflowPassed": true
+    },
+    "arm64FiveLive": {
+      "report": "dist/windows-testing/results/final-b056-arm64-r22-live-a089ca0635df48f687ecfb599f6fbcd7/live-edit-series.json",
+      "sha256": "2132cb8b4ac0d694cd3dd0632dff59f714de173448804f86c210322e3b989997",
+      "scope": "accepted5/5 after independent1171hash/15snapshot/45clean/10launch verification",
+      "rawPassed": true,
+      "rawWorkflowPassed": null
+    },
+    "arm64PreviewFeature": {
+      "report": "dist/windows-testing/results/final-b056-arm64-preview-r6-d9f821ee08934130af0ffba99fc3d159/evidence/cycle162-preview-report.json",
+      "sha256": "46a8a369a840b64c0550c5cdaa8e044ca1e92a302694fc65010ca22b007c7bb6",
+      "scope": "previewfeature accepted by separate review; overallworkflowfailedExitcleanup",
+      "rawPassed": false,
+      "rawWorkflowPassed": false
+    },
+    "arm64EarlierLiveFailure": {
+      "report": "dist/windows-testing/results/final-b056-arm64-r15-live-bbbb0d95023e4caaa6b49fdeab98d380/live-edit-series.json",
+      "sha256": "a5005027801df25c43177859372fc6ed101c28458deef0b7a6e98695d7915ab2",
+      "scope": "retained failed4/5; later fullseries separate",
+      "rawPassed": false,
+      "rawWorkflowPassed": null
+    },
+    "arm64Cycle161Partial": {
+      "report": "dist/windows-testing/results/final-b056-arm64-cycle161-r4-f1342b64d2e442db9a55ef891c75ff9c/evidence/cycle161-smoke-report.json",
+      "sha256": "b08594e1d2ad3e1af1f90ac27ee01779e4056a791603a9ab5d12991fcd20f749",
+      "scope": "retainedpartial OpenPath+Palette; nativefilename128/162; remainingunrun",
+      "rawPassed": false,
+      "rawWorkflowPassed": false
+    },
+    "arm64Cycle161ShortPathFailure": {
+      "report": "dist/windows-testing/results/final-b056-arm64-cycle161-r5-eba245926987498a9b7f91b1273d732f/evidence/cycle161-smoke-report.json",
+      "sha256": "f5d52a780bb53cf7f179e1713140ab8db3235ea1de86b81fbb370c2724e02484",
+      "scope": "Retained failure: incomplete filename observed; Enter not sent.",
+      "rawPassed": false,
+      "rawWorkflowPassed": false
+    },
+    "arm64Cycle161BannerFailure": {
+      "report": "dist/windows-testing/results/final-b056-arm64-cycle161-r6-d845f970ef7341d193a6d68bfa79f04b/evidence/cycle161-smoke-report.json",
+      "sha256": "45750612f6ea24d75ae4386c38b06085286375b2c2aa9cd3f52dad7e89168743",
+      "scope": "Retained failure: visible Review/Harper/three cards, UIA banner unavailable; later checks unrun.",
+      "rawPassed": false,
+      "rawWorkflowPassed": false
+    },
+    "arm64Cycle161FinalPartial": {
+      "report": "dist/windows-testing/results/final-b056-arm64-cycle161-r7-manual-97407157c14d430baf8b47b67fb2a821/evidence/cycle161-smoke-report.json",
+      "sha256": "9f118f9b617fa3f5734d4badea77a9a11ec7c059a766c179a1686cc7407269e0",
+      "scope": "OpenPath/Palette/exact next+previous selections passed. Visible Review toggle, only two opening cards: three-card criterion unmet. Center geometry failed; Print unrun.",
+      "rawPassed": false,
+      "rawWorkflowPassed": false
+    },
+    "arm64CenterObservation": {
+      "report": "dist/windows-testing/results/final-b056-arm64-cycle161-r8-center-observe-ff5d71ff9b4049d9ac59d34aee129193/evidence/cycle161-smoke-report.json",
+      "sha256": "b97b17388256396f251095daa294504ab6f0e316a609077e7bdebac4e4163732",
+      "rawPassed": false,
+      "rawWorkflowPassed": false,
+      "scope": "Raw outer-rectangle3px assertion remains failed. Independent120samples prove DWM visibleframe exactlycentered, same size/monitor; invisible resizeborder accounts for+5.5px difference. Printunrun."
+    },
+    "arm64PrintOnly": {
+      "report": "dist/windows-testing/results/final-b056-arm64-print-cancel-r1-b05af3dce5d346b1825ba02c4719dfde/evidence/cycle161-smoke-report.json",
+      "sha256": "e9c82d62e22806aa0255dbfa1f47dcf88ee4597147f0829b95db8145065b10bc",
+      "rawPassed": false,
+      "rawWorkflowPassed": false,
+      "scope": "Connection prompt Cancel observed; subsequent printer UI blocked main-window restoration guard. Actual Print cancellation/normal close unqualified. No print submitted/settings changed; public Markdown unchanged."
+    }
+  },
+  "packages": {
+    "arm64": {
+      "expectedCommit": "b056ab5e6a73078b69c99916a4c5bce52772dfa6",
+      "architecture": "arm64",
+      "packageArchiveSha256": "fd3cfff5865dfae01910da2695a796a5bf7d9e03fa59d5fb175d8371a015473f",
+      "manifestSha256": "da4ae383dbba8c2634b39d669abc93a3ecdc41e9cc7016b6de0fbb4643b01033",
+      "executableSha256": "1e113b3fb7c15cf72307dd1d9f6ac19842e4225b38c89056a73a59c97032345a"
+    },
+    "x64": {
+      "expectedCommit": "b056ab5e6a73078b69c99916a4c5bce52772dfa6",
+      "architecture": "x64",
+      "packageArchiveSha256": "53e6bfd36f436ee46209b66ffd4bd90f548012620901d6150aca29c7e468d6c3",
+      "manifestSha256": "821125e99bc8dd122769176163f384757ddad06c0b19c4f292333d84704bccf8",
+      "executableSha256": "b1b2adf645f6dbe210632bcb1f839041f10830901057c0b7cad77b1d1f2223bc"
+    }
+  },
+  "sourceComparison": "evidence/final-b056-ci/fomawrite-ad53888-production-source-comparison.json",
+  "nativeCiRun": 39806145688,
+  "nativeQtEach": {
+    "passed": 389,
+    "failed": 0,
+    "skipped": 0
+  },
+  "nativeAppearanceEach": 3,
+  "deployedScenariosEach": 124,
+  "sharedOriginalMac": {
+    "passed": 411,
+    "failed": 2,
+    "skipped": 13
+  },
+  "newSharedCiRun": 39815611959,
+  "newWindowsCiRun": 39815612017,
+  "followthroughCiStatus": "both workflows completed successfully",
+  "originalUserClipboardRestoration": "unknown; later publicbaseline checks do not establish restoration",
+  "finalSharedMac": {
+    "passed": 413,
+    "failed": 0,
+    "skipped": 13,
+    "seconds": 1068.102
+  },
+  "finalEditor": {
+    "tests": 324,
+    "pass": 324,
+    "fail": 0,
+    "skipped": 0,
+    "log": "/private/tmp/fomawrite-ad53888-editor.log"
+  },
+  "vmReleased": true,
+  "remainingQualification": [
+    "Clipboard/search ordinary follow-through",
+    "Complete nested-menu observations",
+    "Review three-card readiness in final toggle workflow",
+    "Correct desktop Center test to visible-frame contract; full follow-through and other monitors",
+    "Native Print cancellation",
+    "Immediate in-flight Live entry to separate Paginated Preview",
+    "Installer install/upgrade/uninstall",
+    "Physical x64 hardware",
+    "Wider DPI/monitors/storage and endurance"
+  ],
+  "finalNativeEvidence": {
+    "arm64": {
+      "commit": "ad538881a0abdf3babd20fd899f01138d45b75b6",
+      "architecture": "arm64",
+      "runId": 39815612017,
+      "jobId": 119953299891,
+      "jobConclusion": "success",
+      "evidenceArtifactId": 12443921681,
+      "evidenceArtifactSha256": "40e0cb0e8a0cd39b721a0aa9ab72866b6d90718edae0f95874b3cad707945636",
+      "qt": {
+        "name": "FomawriteTest",
+        "timestamp": "2026-10-22T09:48:00",
+        "hostname": "runnervmso2ns",
+        "tests": "389",
+        "failures": "0",
+        "errors": "0",
+        "skipped": "0",
+        "time": "881.772"
+      },
+      "failures": [],
+      "appearance": {
+        "name": "FomawriteTest",
+        "timestamp": "2026-10-22T09:48:00",
+        "hostname": "runnervmso2ns",
+        "tests": "3",
+        "failures": "0",
+        "errors": "0",
+        "skipped": "0",
+        "time": "0.031"
+      },
+      "guards": {
+        "pythonCI": 37,
+        "pythonNormal": 25,
+        "pythonLive": 13,
+        "pythonQtInstaller": 12,
+        "nativeStarter": 9,
+        "nativeNormalWait": 20,
+        "nativeUiaRetry": 35,
+        "nativeMenuClickBounds": 6
+      },
+      "guardsTotal": 157,
+      "deployed": {
+        "passed": true,
+        "scenarios": 124,
+        "failures": [],
+        "qmlWarnings": []
+      },
+      "menuProof": {
+        "stepConclusion": "skipped",
+        "scope": "Automatic push did not request optional baseline; exact prior b056 red/green proof retained separately."
+      },
+      "newHeadEvidenceManifestIdentity": {
+        "manifestSha256": "7b0f7e33a172805e85121d13b00d0b74068fcb92b159a39de00a8b162d28b48a",
+        "executableSha256": "07697d06a46d569e9c60badbca025a8bb29676f7ba1a7bb820984ac80385ae1f",
+        "nativeBuildFullSourceTreeSha256": "bc4fd1dd38f2d3c07f37d326b5271c2d935f7ff88e2eb2a94c423d148689e72c",
+        "applicationSourceHashesMatchB056": true,
+        "applicationSourcePaths": 191
+      },
+      "qualification": "Newhead CI/evidence only; packageZIP/PEinventory not independently downloaded/verified and ordinary b056 acceptance is not transferred.",
+      "traceFiles": []
+    },
+    "x64": {
+      "commit": "ad538881a0abdf3babd20fd899f01138d45b75b6",
+      "architecture": "x64",
+      "runId": 39815612017,
+      "jobId": 119953300160,
+      "jobConclusion": "success",
+      "evidenceArtifactId": 12442858999,
+      "evidenceArtifactSha256": "78e7090aed29a25dd56ef10acaaf9856b1123df4539c1e3be28c74b0c09545bc",
+      "qt": {
+        "name": "FomawriteTest",
+        "timestamp": "2026-10-22T16:47:25",
+        "hostname": "runnervmgnbhw",
+        "tests": "389",
+        "failures": "0",
+        "errors": "0",
+        "skipped": "0",
+        "time": "895.262"
+      },
+      "failures": [],
+      "appearance": {
+        "name": "FomawriteTest",
+        "timestamp": "2026-10-22T16:47:24",
+        "hostname": "runnervmgnbhw",
+        "tests": "3",
+        "failures": "0",
+        "errors": "0",
+        "skipped": "0",
+        "time": "0.030"
+      },
+      "guards": {
+        "pythonCI": 37,
+        "pythonNormal": 25,
+        "pythonLive": 13,
+        "pythonQtInstaller": 12,
+        "nativeStarter": 9,
+        "nativeNormalWait": 20,
+        "nativeUiaRetry": 35,
+        "nativeMenuClickBounds": 6
+      },
+      "guardsTotal": 157,
+      "deployed": {
+        "passed": true,
+        "scenarios": 124,
+        "failures": [],
+        "qmlWarnings": []
+      },
+      "menuProof": {
+        "stepConclusion": "skipped",
+        "scope": "Automatic push did not request optional baseline; exact prior b056 red/green proof retained separately."
+      },
+      "newHeadEvidenceManifestIdentity": {
+        "manifestSha256": "1a35b36aa3fbfdf555432f21bbeb8bf58308e14a7dd15386cabb14c6f8ea6da6",
+        "executableSha256": "14a1a97bf62ce7b20a8cb95a2bfee5e7e971f9d23cebb3919863d6cf279bea53",
+        "nativeBuildFullSourceTreeSha256": "bc4fd1dd38f2d3c07f37d326b5271c2d935f7ff88e2eb2a94c423d148689e72c",
+        "applicationSourceHashesMatchB056": true,
+        "applicationSourcePaths": 191
+      },
+      "qualification": "Newhead CI/evidence only; packageZIP/PEinventory not independently downloaded/verified and ordinary b056 acceptance is not transferred.",
+      "traceFiles": []
+    }
+  },
+  "finalCiSummarySha256": "219fe032400cacb28102b7dbf143d45c3b1633a3f4dc15cc8bcf492356968662",
+  "finalVmCleanupUtc": "2026-10-22T17:20:38Z"
+}
