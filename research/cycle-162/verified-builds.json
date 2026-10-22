@@ -848,6 +848,164 @@
         "installerGuardsPassed": 14,
         "durableArchive": false,
         "evidenceDirectory": "research/cycle-162/evidence/b1e49a4-sdk-acquisition"
+      },
+      "verifiedNativeFollowthrough": {
+        "arm64": {
+          "commit": "45807e120cef3510c959d9abad68a130480380ca",
+          "architecture": "arm64",
+          "runId": 39832046802,
+          "jobId": 120010415816,
+          "jobConclusion": "success",
+          "evidenceArtifactId": 12451555213,
+          "evidenceArtifactSha256": "022b50e0961c7ab9062ad2877a55b2d080b850b706feb06d6df35cec312d530f",
+          "qt": {
+            "name": "FomawriteTest",
+            "timestamp": "2026-10-22T11:42:14",
+            "hostname": "runnervmso2ns",
+            "tests": "389",
+            "failures": "0",
+            "errors": "0",
+            "skipped": "0",
+            "time": "888.228"
+          },
+          "failures": [],
+          "appearance": {
+            "name": "FomawriteTest",
+            "timestamp": "2026-10-22T11:42:14",
+            "hostname": "runnervmso2ns",
+            "tests": "3",
+            "failures": "0",
+            "errors": "0",
+            "skipped": "0",
+            "time": "0.039"
+          },
+          "guards": {
+            "pythonCI": 37,
+            "pythonNormal": 25,
+            "pythonLive": 13,
+            "pythonDesktopSupplement": 41,
+            "pythonQtInstaller": 14,
+            "nativeStarter": 9,
+            "nativeNormalWait": 20,
+            "nativeUiaRetry": 35,
+            "nativeMenuClickBounds": 6,
+            "nativeDesktopPreparation": 10
+          },
+          "guardsTotal": 210,
+          "deployed": {
+            "passed": true,
+            "scenarios": 124,
+            "failures": [],
+            "qmlWarnings": []
+          },
+          "menuProof": {
+            "stepConclusion": "skipped",
+            "scope": "Automatic push did not request optional baseline; exact prior b056 red/green proof retained separately."
+          },
+          "newHeadEvidenceManifestIdentity": {
+            "manifestSha256": "3b8626bc0220678261f6ee4ea5c9fece7494176d3c39a1f79cab59f421856db3",
+            "executableSha256": "a6ee805e8a69b2c7608fdbbc25733b2c45ff71262139f6ff1e5b7018adaae129",
+            "nativeBuildFullSourceTreeSha256": "5449f420f9b9784c1a7a0a39a756e60499efb2625ee372b0fb3c00f389ca718f",
+            "applicationSourceHashesMatchB056": true,
+            "applicationSourcePaths": 191
+          },
+          "qtSdk": {
+            "lockSha256": "6c981f5d710a9b05127e899304c63764ddfe0596335c971618fcbc381a2b19e6",
+            "archivesMatchPreviousSuccessfulRun": 9,
+            "acquisitionUrls": [
+              "https://ftp.jaist.ac.jp/pub/qtproject/online/qtsdkrepository/windows_arm64/desktop/qt6_6113/qt6_6113/qt.qt6.6113.win64_msvc2022_arm64/6.11.3-0-202609240253qtbase-Windows-Windows_11_23H2-MSVC2022-Windows-Windows_11_23H2-AARCH64.7z",
+              "https://ftp.jaist.ac.jp/pub/qtproject/online/qtsdkrepository/windows_arm64/desktop/qt6_6113/qt6_6113/qt.qt6.6113.win64_msvc2022_arm64/6.11.3-0-202609240253qtsvg-Windows-Windows_11_23H2-MSVC2022-Windows-Windows_11_23H2-AARCH64.7z",
+              "https://ftp.jaist.ac.jp/pub/qtproject/online/qtsdkrepository/windows_arm64/desktop/qt6_6113/qt6_6113/qt.qt6.6113.win64_msvc2022_arm64/6.11.3-0-202609240253qtdeclarative-Windows-Windows_11_23H2-MSVC2022-Windows-Windows_11_23H2-AARCH64.7z",
+              "https://ftp.jaist.ac.jp/pub/qtproject/online/qtsdkrepository/windows_arm64/desktop/qt6_6113/qt6_6113/qt.qt6.6113.win64_msvc2022_arm64/6.11.3-0-202609240253qttools-Windows-Windows_11_23H2-MSVC2022-Windows-Windows_11_23H2-AARCH64.7z",
+              "https://ftp.jaist.ac.jp/pub/qtproject/online/qtsdkrepository/windows_arm64/desktop/qt6_6113/qt6_6113/qt.qt6.6113.win64_msvc2022_arm64/6.11.3-0-202609240253qttranslations-Windows-Windows_11_23H2-MSVC2022-Windows-Windows_11_23H2-AARCH64.7z",
+              "https://ftp.jaist.ac.jp/pub/qtproject/online/qtsdkrepository/windows_arm64/desktop/qt6_6113/qt6_6113/qt.qt6.6113.addons.qtpositioning.win64_msvc2022_arm64/6.11.3-0-202609240253qtpositioning-Windows-Windows_11_23H2-MSVC2022-Windows-Windows_11_23H2-AARCH64.7z",
+              "https://ftp.jaist.ac.jp/pub/qtproject/online/qtsdkrepository/windows_arm64/desktop/qt6_6113/qt6_6113/qt.qt6.6113.addons.qtwebchannel.win64_msvc2022_arm64/6.11.3-0-202609240253qtwebchannel-Windows-Windows_11_23H2-MSVC2022-Windows-Windows_11_23H2-AARCH64.7z",
+              "https://ftp.jaist.ac.jp/pub/qtproject/online/qtsdkrepository/windows_arm64/extensions/qtwebengine/6113/msvc2022_arm64/extensions.qtwebengine.6113.win64_msvc2022_arm64/6.11.3-0-202609240437qtwebengine-Windows-Windows_11_24H2-MSVC2022-Windows-Windows_11_24H2-ARM64.7z",
+              "https://ftp.jaist.ac.jp/pub/qtproject/online/qtsdkrepository/windows_arm64/extensions/qtpdf/6113/msvc2022_arm64/extensions.qtpdf.6113.win64_msvc2022_arm64/6.11.3-0-202609240404qtpdf-Windows-Windows_11_23H2-MSVC2022-Windows-Windows_11_23H2-AARCH64.7z"
+            ]
+          },
+          "qualification": "Newhead CI/evidence only; packageZIP/PEinventory not independently downloaded/verified and ordinary b056 acceptance is not transferred.",
+          "traceFiles": []
+        },
+        "x64": {
+          "commit": "45807e120cef3510c959d9abad68a130480380ca",
+          "architecture": "x64",
+          "runId": 39832046802,
+          "jobId": 120010415506,
+          "jobConclusion": "success",
+          "evidenceArtifactId": 12449664495,
+          "evidenceArtifactSha256": "1bf2604b9fd009f4c445b8df65e444a11ba9381569b99fd137520a8bac715ccd",
+          "qt": {
+            "name": "FomawriteTest",
+            "timestamp": "2026-10-22T18:40:48",
+            "hostname": "runnervmgnbhw",
+            "tests": "389",
+            "failures": "0",
+            "errors": "0",
+            "skipped": "0",
+            "time": "835.432"
+          },
+          "failures": [],
+          "appearance": {
+            "name": "FomawriteTest",
+            "timestamp": "2026-10-22T18:40:48",
+            "hostname": "runnervmgnbhw",
+            "tests": "3",
+            "failures": "0",
+            "errors": "0",
+            "skipped": "0",
+            "time": "0.032"
+          },
+          "guards": {
+            "pythonCI": 37,
+            "pythonNormal": 25,
+            "pythonLive": 13,
+            "pythonDesktopSupplement": 41,
+            "pythonQtInstaller": 14,
+            "nativeStarter": 9,
+            "nativeNormalWait": 20,
+            "nativeUiaRetry": 35,
+            "nativeMenuClickBounds": 6,
+            "nativeDesktopPreparation": 10
+          },
+          "guardsTotal": 210,
+          "deployed": {
+            "passed": true,
+            "scenarios": 124,
+            "failures": [],
+            "qmlWarnings": []
+          },
+          "menuProof": {
+            "stepConclusion": "skipped",
+            "scope": "Automatic push did not request optional baseline; exact prior b056 red/green proof retained separately."
+          },
+          "newHeadEvidenceManifestIdentity": {
+            "manifestSha256": "4c765409b0846898fce1b0a4035b618d1930b65ac5ef1d55cac045654a93cf6e",
+            "executableSha256": "b6ea6ad91fa82887e48acd0360226189842cdfb9117da7614ae90fe6a9856607",
+            "nativeBuildFullSourceTreeSha256": "5449f420f9b9784c1a7a0a39a756e60499efb2625ee372b0fb3c00f389ca718f",
+            "applicationSourceHashesMatchB056": true,
+            "applicationSourcePaths": 191
+          },
+          "qtSdk": {
+            "lockSha256": "6c981f5d710a9b05127e899304c63764ddfe0596335c971618fcbc381a2b19e6",
+            "archivesMatchPreviousSuccessfulRun": 11,
+            "acquisitionUrls": [
+              "https://ftp.jaist.ac.jp/pub/qtproject/online/qtsdkrepository/windows_x86/desktop/qt6_6113/qt6_6113_msvc2022_64/qt.qt6.6113.win64_msvc2022_64/6.11.3-0-202609240253qtbase-Windows-Windows_11_24H2-MSVC2022-Windows-Windows_11_24H2-X86_64.7z",
+              "https://ftp.jaist.ac.jp/pub/qtproject/online/qtsdkrepository/windows_x86/desktop/qt6_6113/qt6_6113_msvc2022_64/qt.qt6.6113.win64_msvc2022_64/6.11.3-0-202609240253qtsvg-Windows-Windows_11_24H2-MSVC2022-Windows-Windows_11_24H2-X86_64.7z",
+              "https://ftp.jaist.ac.jp/pub/qtproject/online/qtsdkrepository/windows_x86/desktop/qt6_6113/qt6_6113_msvc2022_64/qt.qt6.6113.win64_msvc2022_64/6.11.3-0-202609240253qtdeclarative-Windows-Windows_11_24H2-MSVC2022-Windows-Windows_11_24H2-X86_64.7z",
+              "https://ftp.jaist.ac.jp/pub/qtproject/online/qtsdkrepository/windows_x86/desktop/qt6_6113/qt6_6113_msvc2022_64/qt.qt6.6113.win64_msvc2022_64/6.11.3-0-202609240253qttools-Windows-Windows_11_24H2-MSVC2022-Windows-Windows_11_24H2-X86_64.7z",
+              "https://ftp.jaist.ac.jp/pub/qtproject/online/qtsdkrepository/windows_x86/desktop/qt6_6113/qt6_6113_msvc2022_64/qt.qt6.6113.win64_msvc2022_64/6.11.3-0-202609240253qttranslations-Windows-Windows_11_24H2-MSVC2022-Windows-Windows_11_24H2-X86_64.7z",
+              "https://ftp.jaist.ac.jp/pub/qtproject/online/qtsdkrepository/windows_x86/desktop/qt6_6113/qt6_6113_msvc2022_64/qt.qt6.6113.win64_msvc2022_64/6.11.3-0-202609240253d3dcompiler_47-x64.7z",
+              "https://ftp.jaist.ac.jp/pub/qtproject/online/qtsdkrepository/windows_x86/desktop/qt6_6113/qt6_6113_msvc2022_64/qt.qt6.6113.win64_msvc2022_64/6.11.3-0-202609240253opengl32sw-64-mesa_11_2_2-signed_sha256.7z",
+              "https://ftp.jaist.ac.jp/pub/qtproject/online/qtsdkrepository/windows_x86/desktop/qt6_6113/qt6_6113_msvc2022_64/qt.qt6.6113.addons.qtpositioning.win64_msvc2022_64/6.11.3-0-202609240253qtpositioning-Windows-Windows_11_24H2-MSVC2022-Windows-Windows_11_24H2-X86_64.7z",
+              "https://ftp.jaist.ac.jp/pub/qtproject/online/qtsdkrepository/windows_x86/desktop/qt6_6113/qt6_6113_msvc2022_64/qt.qt6.6113.addons.qtwebchannel.win64_msvc2022_64/6.11.3-0-202609240253qtwebchannel-Windows-Windows_11_24H2-MSVC2022-Windows-Windows_11_24H2-X86_64.7z",
+              "https://ftp.jaist.ac.jp/pub/qtproject/online/qtsdkrepository/windows_x86/extensions/qtwebengine/6113/msvc2022_64/extensions.qtwebengine.6113.win64_msvc2022_64/6.11.3-0-202609240437qtwebengine-Windows-Windows_11_24H2-MSVC2022-Windows-Windows_11_24H2-X86_64.7z",
+              "https://ftp.jaist.ac.jp/pub/qtproject/online/qtsdkrepository/windows_x86/extensions/qtpdf/6113/msvc2022_64/extensions.qtpdf.6113.win64_msvc2022_64/6.11.3-0-202609240404qtpdf-Windows-Windows_11_24H2-MSVC2022-Windows-Windows_11_24H2-X86_64.7z"
+            ]
+          },
+          "qualification": "Newhead CI/evidence only; packageZIP/PEinventory not independently downloaded/verified and ordinary b056 acceptance is not transferred.",
+          "traceFiles": []
+        }
       }
     },
     "visibleStalePageFixture": {
@@ -978,6 +1136,349 @@
         }
       ]
     },
-    "visibleStalePageHostedVerification": "pending"
+    "visibleStalePageHostedVerification": {
+      "shared": {
+        "repository": "andrewjngray/fomawrite_mac",
+        "runId": 39835545936,
+        "commit": "6c1256909f4af5a9c422808ee1e3e270ddcaf786",
+        "url": "https://github.com/andrewjngray/fomawrite_mac/actions/runs/39835545936",
+        "status": "completed",
+        "conclusion": "success",
+        "recordedUtc": "2026-10-22T19:18:56.909595+00:00",
+        "mac": {
+          "jobId": 120022789434,
+          "url": "https://github.com/andrewjngray/fomawrite_mac/actions/runs/39835545936/job/120022789434",
+          "conclusion": "success",
+          "completedAt": "2026-10-22T19:16:53Z",
+          "qtVersion": "6.11.3",
+          "counts": {
+            "passed": 414,
+            "failed": 0,
+            "skipped": 13,
+            "blacklisted": 0,
+            "elapsedMs": 1096618
+          },
+          "independentlyCountedResultRows": {
+            "passed": 414,
+            "failed": 0,
+            "skipped": 13
+          },
+          "focusedCases": {
+            "livePersistenceMismatchAndTimeoutFailClosed": {
+              "passed": true,
+              "failed": false
+            },
+            "liveInvalidatedPageRejectsRealChannelChanges": {
+              "passed": true,
+              "failed": false
+            },
+            "liveEditorRendererRecoveryIsBoundedAndPreservesCanonicalEdits": {
+              "passed": true,
+              "failed": false
+            }
+          },
+          "stalePageDiagnostic": "QINFO  : FomawriteTest::liveInvalidatedPageRejectsRealChannelChanges() Invalidated visible-page mutation callback completed true result \"{\\\"text\\\":\\\"late old renderer Known host text.\\\\n\\\"}\" generation 3 expected generation 3 ready false",
+          "skipReasonCounts": {
+            "this macOS has no grammar pass for the test language": 12,
+            "Windows Qt appearance implementation; native Windows execution required": 1
+          },
+          "skips": [
+            {
+              "case": "spellCheckServiceReportsGrammarIssuesWithCategory(native-checker)",
+              "reason": "this macOS has no grammar pass for the test language"
+            },
+            {
+              "case": "windowsAppearanceTracksQtColorScheme()",
+              "reason": "Windows Qt appearance implementation; native Windows execution required"
+            },
+            {
+              "case": "grammarChecksLongParagraphsInCachedChunks(native-checker)",
+              "reason": "this macOS has no grammar pass for the test language"
+            },
+            {
+              "case": "ignoreGrammarFromAnySurfaceReachesEverySurface(native-checker)",
+              "reason": "this macOS has no grammar pass for the test language"
+            },
+            {
+              "case": "sourceGrammarUnderlinesDoubledWordsAndSpellingStaysRed(native-checker)",
+              "reason": "this macOS has no grammar pass for the test language"
+            },
+            {
+              "case": "sourceGrammarFollowsItsSettingAndKeepsSpelling(native-checker)",
+              "reason": "this macOS has no grammar pass for the test language"
+            },
+            {
+              "case": "sourceGrammarWithholdsTheRangeAtTheCaretWithoutARevision(native-checker)",
+              "reason": "this macOS has no grammar pass for the test language"
+            },
+            {
+              "case": "sourceGrammarUnderlineIsBlueInTheRenderedWindow(native-checker)",
+              "reason": "this macOS has no grammar pass for the test language"
+            },
+            {
+              "case": "sourceGrammarContextMenuShowsTheMessageCorrectsAndIgnores(native-checker)",
+              "reason": "this macOS has no grammar pass for the test language"
+            },
+            {
+              "case": "sourceGrammarIgnoreIsPerDocumentAndRestylesInPlace(native-checker)",
+              "reason": "this macOS has no grammar pass for the test language"
+            },
+            {
+              "case": "liveGrammarUnderlinesFollowTheGrammarSetting(native-checker)",
+              "reason": "this macOS has no grammar pass for the test language"
+            },
+            {
+              "case": "reviewIssuesListSpellingAndGrammarInOrderWithDocumentOffsets(native-checker)",
+              "reason": "this macOS has no grammar pass for the test language"
+            },
+            {
+              "case": "reviewPaneRendersInLightAndDarkThemes(native-checker)",
+              "reason": "this macOS has no grammar pass for the test language"
+            }
+          ],
+          "failures": [],
+          "steps": {
+            "Set up job": "success",
+            "Check out": "success",
+            "Install Qt 6.11.3": "success",
+            "Show toolchain": "success",
+            "Fetch the pinned Harper engine": "success",
+            "Build app": "success",
+            "Build and run tests (offscreen)": "success",
+            "Upload test log": "skipped",
+            "Post Install Qt 6.11.3": "success",
+            "Post Check out": "success",
+            "Complete job": "success"
+          },
+          "testLogArtifact": "Failure-only upload step skipped on this successful job; exact finished job log is preserved."
+        },
+        "editor": {
+          "jobId": 120022789095,
+          "url": "https://github.com/andrewjngray/fomawrite_mac/actions/runs/39835545936/job/120022789095",
+          "conclusion": "success",
+          "counts": {
+            "tests": 324,
+            "pass": 324,
+            "fail": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          },
+          "independentlyCountedTapOkRows": 324,
+          "typecheck": "success",
+          "assetBuild": "success",
+          "committedAssetVerification": "success"
+        },
+        "limits": [
+          "This success applies to the exact shared run and commit only; prior failed runs remain failed.",
+          "No ordinary Windows desktop acceptance is established by this shared CI evidence.",
+          "No repository, application or VM changes were performed by this audit.",
+          "No rerun was requested or performed."
+        ],
+        "evidence": [
+          {
+            "path": "/private/tmp/fomawrite-6c12569-shared/editor-job.log",
+            "bytes": 152123,
+            "sha256": "44947ef5bef3e384c91c5c4ee6a04d9d64607c67279ed3adb98f487f5ceab411"
+          },
+          {
+            "path": "/private/tmp/fomawrite-6c12569-shared/mac-job.log",
+            "bytes": 380163,
+            "sha256": "1e507714ab330e1892f494dcaa0312f532ab5cf341705ba39aea94c9bbc4e209"
+          },
+          {
+            "path": "/private/tmp/fomawrite-6c12569-shared/run-status.json",
+            "bytes": 4440,
+            "sha256": "25e574536e095eb8d1a1ee606533e00830c07e9eb06516ec2cd1eab284ed6b73"
+          },
+          {
+            "path": "/private/tmp/fomawrite-6c12569-shared/run-watch.log",
+            "bytes": 16911,
+            "sha256": "0cb4da67313ad7fbe607203bc7e87070b82d07be8d3b448e2dc899dc19fbbc8d"
+          }
+        ]
+      },
+      "windows": {
+        "arm64": {
+          "commit": "6c1256909f4af5a9c422808ee1e3e270ddcaf786",
+          "runId": 39836302810,
+          "jobId": 120025457112,
+          "architecture": "arm64",
+          "jobConclusion": "failure",
+          "qt": {
+            "name": "FomawriteTest",
+            "timestamp": "2026-10-22T12:13:11",
+            "hostname": "runnervmso2ns",
+            "tests": "390",
+            "failures": "1",
+            "errors": "0",
+            "skipped": "0",
+            "time": "863.999"
+          },
+          "failures": [
+            {
+              "case": "publishingFolderThemesReloadAndAtomicResourcesSettle",
+              "detail": {
+                "type": "fail",
+                "message": "'Cycle125WatchedThemeFixture::write(fixture.imported, \"#write{color:#abcdef}\", &writeError)' returned FALSE. (Atomic theme fixture commit failed for C:/Users/runneradmin/AppData/Roaming/qttest/FomawriteTests/FomawriteTests-5144/publishing-themes/cycle125-watcher-616005da-71e9-440f-a41b-45b3d04e8d34-assets/styles/base.css: Access is denied. (QFileDevice::FileError=10); GetLastError immediately after failure=5)"
+              }
+            }
+          ],
+          "focusedCases": {
+            "livePersistenceMismatchAndTimeoutFailClosed": true,
+            "liveInvalidatedPageRejectsRealChannelChanges": true,
+            "liveEditorRendererRecoveryIsBoundedAndPreservesCanonicalEdits": true
+          },
+          "appearance": {
+            "name": "FomawriteTest",
+            "timestamp": "2026-10-22T12:13:11",
+            "hostname": "runnervmso2ns",
+            "tests": "3",
+            "failures": "0",
+            "errors": "0",
+            "skipped": "0",
+            "time": "0.029"
+          },
+          "deployed": {
+            "passed": true,
+            "scenarios": 124,
+            "failures": [],
+            "qmlWarnings": []
+          },
+          "evidenceArtifactId": 12452123938,
+          "evidenceArtifactSha256": "cb7080b37a85b58b8f7d8b3914b43ee8f7dd223352a53b6bd3f8335bd6e7f295",
+          "jobLogSha256": "849fd2f491443d00076f12c57b3a1d29512eef9d0d32248fb46ddd94e15fcc0c",
+          "qualification": "Failed full Qt suite; deployed scenario success does not override it. No ordinary desktop qualification."
+        },
+        "x64": {
+          "commit": "6c1256909f4af5a9c422808ee1e3e270ddcaf786",
+          "architecture": "x64",
+          "runId": 39836302810,
+          "jobId": 120025457754,
+          "jobConclusion": "success",
+          "evidenceArtifactId": 12452257893,
+          "evidenceArtifactSha256": "8edeca68b75e6c18ef68d37ce74a842e2e7f4e4277958469a167868e12399b12",
+          "qt": {
+            "name": "FomawriteTest",
+            "timestamp": "2026-10-22T19:11:41",
+            "hostname": "runnervmgnbhw",
+            "tests": "390",
+            "failures": "0",
+            "errors": "0",
+            "skipped": "0",
+            "time": "865.179"
+          },
+          "failures": [],
+          "appearance": {
+            "name": "FomawriteTest",
+            "timestamp": "2026-10-22T19:11:41",
+            "hostname": "runnervmgnbhw",
+            "tests": "3",
+            "failures": "0",
+            "errors": "0",
+            "skipped": "0",
+            "time": "0.038"
+          },
+          "guards": {
+            "pythonCI": 37,
+            "pythonNormal": 25,
+            "pythonLive": 13,
+            "pythonDesktopSupplement": 41,
+            "pythonQtInstaller": 14,
+            "nativeStarter": 9,
+            "nativeNormalWait": 20,
+            "nativeUiaRetry": 35,
+            "nativeMenuClickBounds": 6,
+            "nativeDesktopPreparation": 10
+          },
+          "guardsTotal": 210,
+          "deployed": {
+            "passed": true,
+            "scenarios": 124,
+            "failures": [],
+            "qmlWarnings": []
+          },
+          "menuProof": {
+            "stepConclusion": "skipped",
+            "scope": "Automatic push did not request optional baseline; exact prior b056 red/green proof retained separately."
+          },
+          "newHeadEvidenceManifestIdentity": {
+            "manifestSha256": "aa45a45b4dc009c67e127a7e0b50f9de32d2235f19e4cab6ce3b4f5c85444fe4",
+            "executableSha256": "7df7cafb3f48a52c30c1057386df931c9552b1a211a367ad51ed70b50559437d",
+            "nativeBuildFullSourceTreeSha256": "5449f420f9b9784c1a7a0a39a756e60499efb2625ee372b0fb3c00f389ca718f",
+            "applicationSourceHashesMatchB056": true,
+            "applicationSourcePaths": 191
+          },
+          "qtSdk": {
+            "lockSha256": "6c981f5d710a9b05127e899304c63764ddfe0596335c971618fcbc381a2b19e6",
+            "archivesMatchPreviousSuccessfulRun": 11,
+            "acquisitionUrls": [
+              "https://ftp.jaist.ac.jp/pub/qtproject/online/qtsdkrepository/windows_x86/desktop/qt6_6113/qt6_6113_msvc2022_64/qt.qt6.6113.win64_msvc2022_64/6.11.3-0-202609240253qtbase-Windows-Windows_11_24H2-MSVC2022-Windows-Windows_11_24H2-X86_64.7z",
+              "https://ftp.jaist.ac.jp/pub/qtproject/online/qtsdkrepository/windows_x86/desktop/qt6_6113/qt6_6113_msvc2022_64/qt.qt6.6113.win64_msvc2022_64/6.11.3-0-202609240253qtsvg-Windows-Windows_11_24H2-MSVC2022-Windows-Windows_11_24H2-X86_64.7z",
+              "https://ftp.jaist.ac.jp/pub/qtproject/online/qtsdkrepository/windows_x86/desktop/qt6_6113/qt6_6113_msvc2022_64/qt.qt6.6113.win64_msvc2022_64/6.11.3-0-202609240253qtdeclarative-Windows-Windows_11_24H2-MSVC2022-Windows-Windows_11_24H2-X86_64.7z",
+              "https://ftp.jaist.ac.jp/pub/qtproject/online/qtsdkrepository/windows_x86/desktop/qt6_6113/qt6_6113_msvc2022_64/qt.qt6.6113.win64_msvc2022_64/6.11.3-0-202609240253qttools-Windows-Windows_11_24H2-MSVC2022-Windows-Windows_11_24H2-X86_64.7z",
+              "https://ftp.jaist.ac.jp/pub/qtproject/online/qtsdkrepository/windows_x86/desktop/qt6_6113/qt6_6113_msvc2022_64/qt.qt6.6113.win64_msvc2022_64/6.11.3-0-202609240253qttranslations-Windows-Windows_11_24H2-MSVC2022-Windows-Windows_11_24H2-X86_64.7z",
+              "https://ftp.jaist.ac.jp/pub/qtproject/online/qtsdkrepository/windows_x86/desktop/qt6_6113/qt6_6113_msvc2022_64/qt.qt6.6113.win64_msvc2022_64/6.11.3-0-202609240253d3dcompiler_47-x64.7z",
+              "https://ftp.jaist.ac.jp/pub/qtproject/online/qtsdkrepository/windows_x86/desktop/qt6_6113/qt6_6113_msvc2022_64/qt.qt6.6113.win64_msvc2022_64/6.11.3-0-202609240253opengl32sw-64-mesa_11_2_2-signed_sha256.7z",
+              "https://ftp.jaist.ac.jp/pub/qtproject/online/qtsdkrepository/windows_x86/desktop/qt6_6113/qt6_6113_msvc2022_64/qt.qt6.6113.addons.qtpositioning.win64_msvc2022_64/6.11.3-0-202609240253qtpositioning-Windows-Windows_11_24H2-MSVC2022-Windows-Windows_11_24H2-X86_64.7z",
+              "https://ftp.jaist.ac.jp/pub/qtproject/online/qtsdkrepository/windows_x86/desktop/qt6_6113/qt6_6113_msvc2022_64/qt.qt6.6113.addons.qtwebchannel.win64_msvc2022_64/6.11.3-0-202609240253qtwebchannel-Windows-Windows_11_24H2-MSVC2022-Windows-Windows_11_24H2-X86_64.7z",
+              "https://ftp.jaist.ac.jp/pub/qtproject/online/qtsdkrepository/windows_x86/extensions/qtwebengine/6113/msvc2022_64/extensions.qtwebengine.6113.win64_msvc2022_64/6.11.3-0-202609240437qtwebengine-Windows-Windows_11_24H2-MSVC2022-Windows-Windows_11_24H2-X86_64.7z",
+              "https://ftp.jaist.ac.jp/pub/qtproject/online/qtsdkrepository/windows_x86/extensions/qtpdf/6113/msvc2022_64/extensions.qtpdf.6113.win64_msvc2022_64/6.11.3-0-202609240404qtpdf-Windows-Windows_11_24H2-MSVC2022-Windows-Windows_11_24H2-X86_64.7z"
+            ]
+          },
+          "qualification": "Newhead CI/evidence only; packageZIP/PEinventory not independently downloaded/verified and ordinary b056 acceptance is not transferred.",
+          "traceFiles": []
+        }
+      },
+      "overall": "Not green: ARM64 atomic theme replacement denied; all stale-channel cases passed on Mac, ARM64 and x64. Diagnostic investigation pending; no package promotion."
+    },
+    "atomicThemeDiagnosticPreparation": {
+      "scope": "test-only diagnostics; not an atomic-replacement fix",
+      "changes": [
+        "synthetic fixture preserves single open/write/commit and original false return",
+        "Windows precommit target/stage metadata retained, output only on failure",
+        "Restart Manager target owner snapshot is dynamic, fixed-capacity, query-only"
+      ],
+      "hostVerification": {
+        "qt": "6.11.2",
+        "platform": "macOS arm64 offscreen",
+        "passed": 6,
+        "failed": 0,
+        "skipped": 0,
+        "elapsedMs": 9811,
+        "note": "A subsequent Windows-only structured JSON field addition does not change the compiled non-Windows path."
+      },
+      "limits": [
+        "Windows branch requires native compilation and failure-path execution; no native Windows run is claimed.",
+        "Native error is captured immediately after the Qt operation, which may already have cleaned up.",
+        "Staged handle is borrowed; native size may omit buffered Qt writes; no diagnostic flush.",
+        "Target read/hash is bounded to1MiB, fully shareable and closed before commit; snapshot is not atomic.",
+        "Restart Manager users after failure are not proven blockers; transient owners and staged-file owners can be missed.",
+        "Restart Manager calls/buffers are bounded, but OS API wait duration is not forcibly canceled; API and cleanup errors are reported.",
+        "No product source changes, VM access, commit or push."
+      ],
+      "files": [
+        {
+          "path": "/Users/andrewgray/repo/projects/fomawrite_windows/tests/cycle125-theme-folder.inc",
+          "bytes": 13905,
+          "sha256": "216611c8cc4898997f73c28ca3c49b4cbdc96ce5cc0a55fc40e992e6be34e743"
+        },
+        {
+          "path": "/Users/andrewgray/repo/projects/fomawrite_windows/tests/windows-theme-atomic-diagnostics.inc",
+          "bytes": 8291,
+          "sha256": "0eaead889dd1693e044936074159413024c3deb8c95cbe43a4a9b0a02578b367"
+        },
+        {
+          "path": "/private/tmp/fomawrite-theme-atomic-diagnostics-host-test.log",
+          "bytes": 712,
+          "sha256": "798bdb1b40497a8947cb5777cbedeb451e9c8fb3d3a3edc2c2c45147a86d5801"
+        },
+        {
+          "path": "/private/tmp/fomawrite-theme-atomic-diagnostics-host-build.log",
+          "bytes": 9299,
+          "sha256": "21cd553c5442ee59be0c5db84901b020fcd3843e5f6fac1a70400bebeb210cfc"
+        }
+      ]
+    }
   }
 }

@@ -1,4 +1,5 @@
 #include "publishingthemes.h"
+#include "windows-theme-atomic-diagnostics.inc"
 
 void FomawriteTest::publishingFolderThemesResolveNamesImportsAndAssets() {
     const QString folder = PublishingThemes::directory();
@@ -110,14 +111,31 @@ struct Cycle125WatchedThemeFixture {
     }
     static bool write(const QString &path, const QByteArray &bytes, QString *error = nullptr) {
         QSaveFile file(path);
+#ifdef Q_OS_WIN
+        QJsonObject targetBefore{{"available", false}, {"reason", "commit not reached"}};
+        QJsonObject stagedBefore{{"available", false}, {"reason", "commit not reached"}};
+#endif
         const auto failed = [&](const char *phase) {
 #ifdef Q_OS_WIN
-            const DWORD nativeError = GetLastError();
+            const DWORD nativeError = GetLastError(); // Before any further Qt/native diagnostic call.
 #endif
+            const auto qtError = file.error();
+            const auto qtMessage = file.errorString();
             QString message = QStringLiteral("Atomic theme fixture %1 failed for %2: %3 (QFileDevice::FileError=%4)")
-                .arg(QString::fromLatin1(phase), path, file.errorString()).arg(int(file.error()));
+                .arg(QString::fromLatin1(phase), path, qtMessage).arg(int(qtError));
 #ifdef Q_OS_WIN
-            message += QStringLiteral("; GetLastError immediately after failure=%1").arg(nativeError);
+            if (file.isOpen()) stagedBefore = cycle125StagedSnapshot(file);
+            QJsonObject diagnostic{{"schemaVersion", 1}, {"phase", QString::fromLatin1(phase)},
+                {"target", path}, {"qtFileError", int(qtError)}, {"qtErrorString", qtMessage},
+                {"nativeErrorImmediatelyAfterQtOperation", double(nativeError)},
+                {"nativeErrorLimitation", "Qt may perform cleanup before returning; this is not an intercepted failing Win32 call."},
+                {"expectedSizeBytes", QString::number(bytes.size())},
+                {"expectedSha256", QString::fromLatin1(QCryptographicHash::hash(bytes, QCryptographicHash::Sha256).toHex())},
+                {"targetBeforeCommit", targetBefore}, {"stagedBeforeCommit", stagedBefore},
+                {"targetAfterFailure", cycle125TargetSnapshot(path)},
+                {"resourceOwnersAfterFailure", cycle125ResourceOwners(path)}};
+            message += QStringLiteral("; GetLastError immediately after failure=%1; diagnostics=%2")
+                .arg(nativeError).arg(QString::fromUtf8(QJsonDocument(diagnostic).toJson(QJsonDocument::Compact)));
 #endif
             if (error) *error = message;
             qWarning().noquote() << message;
@@ -127,6 +145,12 @@ struct Cycle125WatchedThemeFixture {
         // or delayed acceptance can hide the Windows atomic-replacement error.
         if (!file.open(QIODevice::WriteOnly)) return failed("open");
         if (file.write(bytes) != bytes.size()) return failed("write");
+#ifdef Q_OS_WIN
+        // No handles survive this metadata read except Qt's own borrowed staged
+        // handle. No diagnostic flush or retry changes the atomic write.
+        targetBefore = cycle125TargetSnapshot(path);
+        stagedBefore = cycle125StagedSnapshot(file);
+#endif
         if (!file.commit()) return failed("commit");
         return true;
     }

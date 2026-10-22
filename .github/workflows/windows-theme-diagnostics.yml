@@ -1,0 +1,77 @@
+name: Windows theme atomic-write diagnostics
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-theme-diagnostics-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  diagnose:
+    runs-on: windows-11-vs2026-arm
+    timeout-minutes: 60
+    defaults:
+      run:
+        shell: pwsh
+    env:
+      QT_ROOT_DIR: C:/Qt/6.11.3-arm64
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install the existing checksum-pinned ARM64 SDK
+        run: |
+          python bin/windows/install-qt.py --architecture arm64 --output "$env:QT_ROOT_DIR"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Build regression executable and retain source identity
+        run: |
+          . ./bin/windows/common.ps1
+          $qt = Get-QtRoot
+          Enter-MsvcEnvironment arm64
+          $env:PATH = (Join-Path $qt 'bin') + ';' + $env:PATH
+          $build = Join-Path $RepoRoot 'build-tests/windows-theme-diagnostics'
+          New-Item -ItemType Directory -Force $build | Out-Null
+          git rev-parse HEAD | Set-Content "$build/commit.txt"
+          if ($LASTEXITCODE -ne 0) { throw 'Cannot identify source.' }
+          Copy-Item "$qt/fomawrite-qt-install.json" "$build/qt-install.json"
+          Push-Location $build
+          try {
+            Invoke-Checked "$qt/bin/qmake.exe" @("$RepoRoot/tests/tests.pro", 'CONFIG+=release', 'CONFIG-=debug_and_release', 'CONFIG-=debug')
+            Invoke-Checked nmake @('/NOLOGO')
+          } finally { Pop-Location }
+      - name: Bounded diagnostic series — stop at first failure
+        run: |
+          . ./bin/windows/common.ps1
+          $qt = Get-QtRoot
+          $env:PATH = (Join-Path $qt 'bin') + ';' + $env:PATH
+          $env:QT_QPA_PLATFORM = 'offscreen'
+          $build = Join-Path $RepoRoot 'build-tests/windows-theme-diagnostics'
+          Push-Location $build
+          try {
+            # Fresh processes isolate the fixture. This is diagnostic sampling,
+            # never a retry-to-green or a substitute for the failing full suite.
+            foreach ($attempt in 1..10) {
+              & ./tst_fomawrite.exe publishingFolderThemesReloadAndAtomicResourcesSettle -o "attempt-$attempt.xml,junitxml" -o "attempt-$attempt.log,txt"
+              $status = $LASTEXITCODE
+              "attempt=$attempt exit=$status" | Add-Content attempts.txt
+              if ($status -ne 0) { throw "First failure retained at attempt $attempt (exit $status)." }
+            }
+          } finally { Pop-Location; Remove-Item Env:QT_QPA_PLATFORM -ErrorAction SilentlyContinue }
+      - name: Retain all completed attempts, including first failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-theme-diagnostics-arm64-${{ github.sha }}
+          path: |
+            build-tests/windows-theme-diagnostics/*.xml
+            build-tests/windows-theme-diagnostics/*.log
+            build-tests/windows-theme-diagnostics/attempts.txt
+            build-tests/windows-theme-diagnostics/commit.txt
+            build-tests/windows-theme-diagnostics/qt-install.json
+          if-no-files-found: warn
+          retention-days: 14
