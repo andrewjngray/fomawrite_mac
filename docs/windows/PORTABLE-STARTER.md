@@ -1,8 +1,14 @@
 # Windows-local portable starter
 
-New portable packages contain **START-FOMAWRITE.cmd** beside `Fomawrite.exe`.
-Double-click that starter when the extracted package is on a Mac shared folder.
-It verifies the package and runs a local copy from:
+The current repair candidate packages **START-FOMAWRITE.cmd** beside
+`Fomawrite.exe`. Final ARM64 package identity and actual command-file launch
+passed. The promoted shelf entry is
+`dist/windows-testing/START-WINDOWS-ARM64.cmd`, pointing to the verified ARM64 package.
+See [current status](STATUS.md) and [testing builds](TESTING-BUILDS.md).
+
+Once the package is verified and promoted, the starter is the user entry when
+the extracted package is on a Mac shared folder. It verifies the package and
+runs a local copy from:
 
 ```text
 %LOCALAPPDATA%\Fomawrite\Portable\<architecture>-<commit-prefix>-<manifest-hash-prefix>\Fomawrite.exe
@@ -40,11 +46,30 @@ the adjacent package automatically.
 `windows/test_launch_local.ps1` exercises synthetic packages with no UI launch:
 new staging, exact file selection, unchanged cache reuse, concurrent lock
 waiting, source/cache corruption rejection, unexpected cache files, unsafe
-manifest paths, separate manifest versions and temporary cleanup. Run it in a
-hidden Windows PowerShell process while desktop acceptance is being conducted.
+manifest paths, separate manifest versions and temporary cleanup. All **9
+checks passed** without starting an application. **2 real UNC shared-folder
+staging/reuse checks** also passed; provider-qualified UNC paths resolve through
+the filesystem provider. The concurrent fixture explicitly passes its cache
+root into the child process, records job state/reason/errors on failure and
+allows up to 60 seconds for a running job to complete after lock release.
 
-The starter's staging tests do not establish that the app's menu, dialogs,
-editing, rendering or restore behavior works. Final qualification requires the
-[ordinary launch gate](NORMAL-LAUNCH-GATE.md) against the verified local copy,
-plus the separate document-view diagnostic. Until those finish, the final
-normal-launch outcome remains unverified.
+Run staging fixtures in a hidden Windows PowerShell process while desktop
+acceptance is being conducted. The fixture results are separate from the actual
+packaged ARM64 command-file launch described below.
+
+The final ARM64 `START-FOMAWRITE.cmd` was invoked from the shared package and
+**passed** actual ordinary startup with an isolated native profile, verified local
+executable identity, cache reuse and File → Exit with exit status zero.
+`dist/windows-testing/results/starter-d573-arm64-d85250e2e3d0455e82711a25da1e705e/starter-check.json`
+records `passed: true`, `normalStartup: true` and `stageOnly: false`, with the
+final commit, executable hash and manifest hash. The unmodified centre-click
+[ordinary-launch gate](NORMAL-LAUNCH-GATE.md) also passed with strict offline
+verification; a shared-document writing-path-only supplement passed separately.
+Exact package/report identities and the retained initial environment-blocked
+attempt are in [M2 repair evidence](M2-REPAIR-EVIDENCE.md).
+
+The separate ARM64 guest document-view diagnostic passed all 124 scenarios
+with no failures or QML warnings; the verified packages are promoted to the shelf. Final x64 VM normal-launch acceptance has not run.
+Shared-source staging into the local cache and shared-document writing do not
+qualify direct shared-folder WebEngine execution. Wider profiles, displays,
+installer and distribution acceptance remain open.
