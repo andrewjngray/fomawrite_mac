@@ -121,9 +121,9 @@ void FomawriteTest::windowsShortcutsUseExistingWindowCommands() {
         // A disabled Ctrl+Alt accelerator must still allow legitimate AltGr
         // text input. Test its unavailable guard on a non-editable item in the
         // same owning window, preserving the Source selection proved above.
-        auto *guardFocus = f.quick->contentItem(); QVERIFY(guardFocus);
-        guardFocus->forceActiveFocus();
-        QTRY_VERIFY(guardFocus->hasActiveFocus());
+        QQuickItem guardFocus(f.quick->contentItem());
+        guardFocus.forceActiveFocus();
+        QTRY_COMPARE(f.quick->activeFocusItem(), &guardFocus);
         QCOMPARE(f.editor->property("cursorPosition").toInt(), cursor);
         QCOMPARE(f.editor->property("selectionStart").toInt(), selectionStart);
         QCOMPARE(f.editor->property("selectionEnd").toInt(), selectionEnd);

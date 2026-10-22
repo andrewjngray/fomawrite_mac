@@ -1,25 +1,27 @@
 # Windows testing builds
 
-## Current repair build
+## Choose a build from the current status
 
-Current repair code is **`d573f1666d68efaee0b60f43f04d3fe1e96781c4`**. ARM64/x64 CI and strict package identities passed. The final ARM64 standard centre-click VM gate, shared-document supplement and packaged starter passed with offline verification. The separate ARM64 guest document-view diagnostic passed 124 scenarios with no failures or QML warnings. Verified packages are now promoted to the testing shelf. x64 also passed the ordinary workflow under ARM64 VM emulation. See [Windows status](STATUS.md) and [repair evidence](M2-REPAIR-EVIDENCE.md).
+Read [Windows status](STATUS.md) before choosing a package. It records the exact candidate, CI results, ordinary VM acceptance and any promotion. The top-level starter and catalog can still point to an older shelf build; they are not a reliable indication of the newest tested code.
+
+The historical `d573f16` shelf passed its original checks, but a later selected-Live-formatting test exposed a rapid Save defect. **Do not treat that shelf as the current qualified build.** New repair packages stay in `diagnostic-candidates/` until their exact identities and required acceptance checks are reviewed. A successful build alone does not promote one.
 
 The Mac/shared collection folder is:
 
 `/Users/andrewgray/repo/projects/fomawrite_windows/dist/windows-testing`
 
-The current packages are already unpacked in `builds/d573f16-arm64/Fomawrite/` and `builds/d573f16-x64/Fomawrite/`, each with its original portable ZIP and copy verification. The older `b45cb34` shelf packages and `diagnostic-candidates/` are retained for comparison; use the current starter below.
+The historical shelf packages are already unpacked in `builds/d573f16-arm64/Fomawrite/` and `builds/d573f16-x64/Fomawrite/`, each with its original portable ZIP and copy verification. The older `b45cb34` shelf packages and `diagnostic-candidates/` are retained for comparison. Use the exact package identified in current Windows status; do not assume the top-level starter points to it.
 
 ## Run on the Parallels ARM64 VM
 
-Double-click **`START-WINDOWS-ARM64.cmd`** in the shared testing folder. In Windows its path is:
+After a candidate is explicitly promoted, the shared-folder ARM64 entry is **`START-WINDOWS-ARM64.cmd`**. Until then it points to the historical shelf described above. Its Windows path is:
 
 `C:\Mac\Home\repo\projects\fomawrite_windows\dist\windows-testing\START-WINDOWS-ARM64.cmd`
 
-No ZIP extraction or manual DLL copying is needed.
+For an explicitly identified unpacked candidate, use its own **`Fomawrite\START-FOMAWRITE.cmd`**. It verifies and stages that exact package locally. No ZIP extraction or manual DLL copying is needed.
 
 1. Close other Windows Fomawrite instances normally, saving work first.
-2. Open the shared `dist/windows-testing` folder in Windows File Explorer and use the promoted ARM64 starter.
+2. Open the exact ARM64 candidate folder given in current Windows status and use its packaged starter; use the top-level starter only after explicit promotion.
 3. Allow the first preparation to finish. The manifest-verifying starter copies the selected package into a versioned Windows-local cache, checks it and launches ordinary Fomawrite. First staging from a share can take several minutes; later launches verify and reuse that cache.
 4. Use sample writing and record the exact build, launch path, architecture and any failed action in a fresh copy of `TEST-RESULTS-TEMPLATE.md` under `results`.
 
@@ -43,4 +45,4 @@ Different application directories may share ordinary preferences and themes. Pre
 
 ## Remaining qualification
 
-The ARM64 repair checkpoint is available for testing; broader Windows-versus-Mac parity work continues. Physical x64 hardware, installer and wider desktop qualification remain open. [M2 repair evidence](M2-REPAIR-EVIDENCE.md#remaining-qualification) records the exact completed checks and limits.
+The current candidate’s completed and pending checks are recorded in Windows status; broader Windows-versus-Mac parity work continues. Physical x64 hardware, installer and wider desktop qualification remain open. [M2 repair evidence](M2-REPAIR-EVIDENCE.md#remaining-qualification) records the exact completed checks and limits.
