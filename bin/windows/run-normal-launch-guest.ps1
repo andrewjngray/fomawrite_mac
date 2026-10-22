@@ -276,6 +276,19 @@ try {
     Quit
 } catch {
     $failure = $_.Exception.Message
+    $caught = $_
+    try {
+        $caught.Exception.ToString() | Set-Content -LiteralPath (Join-Path $outputRoot 'failure-exception.txt') -Encoding UTF8
+        $chain = New-Object 'System.Collections.Generic.List[object]'
+        $exception = $caught.Exception
+        while ($null -ne $exception) {
+            $chain.Add([ordered]@{ type = $exception.GetType().FullName;
+                hresult = ('0x{0:X8}' -f [int]$exception.HResult); message = $exception.Message })
+            $exception = $exception.InnerException
+        }
+        [ordered]@{ scriptStackTrace = $caught.ScriptStackTrace; exceptions = @($chain.ToArray()) } |
+            ConvertTo-Json -Depth 6 | Set-Content -LiteralPath (Join-Path $outputRoot 'failure-context.json') -Encoding UTF8
+    } catch { Write-Warning "Could not retain failure exception diagnostics: $_" }
     $checks.Add([ordered]@{ name = $stage; passed = $false; detail = $failure; observedUtc = [DateTime]::UtcNow.ToString('o') })
     try { Capture 'failure' } catch { Write-Warning "Could not capture failure: $_" }
 } finally {

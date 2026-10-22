@@ -16,27 +16,31 @@ The candidate reserves the Organizer scrollbar gutter so invisible scrollbars ca
 - [Shared CI 39741241651](https://github.com/andrewjngray/fomawrite_mac/actions/runs/39741241651): **success**; **300 Mac Qt tests** (0 failures, 13 skips), **321 editor tests** (0 failures/skips), typecheck, asset build and committed-asset verification passed.
 - Final ARM64 VM: the **unmodified standard centre-click normal-launch gate passed**, including native folder/file pickers, exact save, actual Live pixels/OCR, Source return, clean exits and normal restore. Strict offline verification passed. A separate run changing only the disposable writing path to shared storage also passed. Package/report hashes and the retained initial environment-blocked attempt are in the [repair record](M2-REPAIR-EVIDENCE.md).
 
-## Checker parity cycle in verification
+## Current verification checkpoint — not promoted
 
-Twenty-eight existing Source/Live spelling, grammar and Review cases now run against real bundled Harper in addition to native Mac rows. They exposed and now cover a nested-list prose bug caused by parsing already-masked prose as Markdown again. Candidate code `d145a0f` passes the full local build and Qt suite (340 passed, 0 failed, one Windows-only skip), focused checks and 324 editor tests. Shared CI passed 328 Mac Qt and 324 editor tests. Windows x64 passed 302 Qt tests; ARM64 passed 301 and failed one imported-theme CSS fixture write, with 11 skips on each architecture. Both deployed diagnostics passed 124 scenarios. The theme-write failure is under investigation; new package qualification is pending. [Evidence and remaining gaps](M2-CHECKER-PARITY.md). The shelf candidate above remains the last qualified package.
+Code `6558d3505b8cff0284f3dc3cc0e1c6b92a1336fc` contains the Live persistence barrier, portable output-font fallbacks and pinned Qt mirror recovery. **CI is red; do not promote this package.** [Complete checkpoint, hashes and retained failures](M2-DESKTOP-6558.md).
 
-## Live persistence and typography candidate
+| Check | Exact result |
+| --- | --- |
+| Local parent build/test | `bb62989`: build passed; 351 Qt passes, zero failures, one Windows-only skip. |
+| Native Windows CI `39760440078` | ARM64: 323 passed / 0 failed / 1 skipped. x64: 321 / 2 / 1. Both: 3 appearance passes and 124 deployed scenarios without failures. Overall failed. |
+| Shared CI `39760440072` | Mac Qt: 338 passed / 1 failed / 13 skipped. Editor tests and committed-bundle verification passed. Overall failed. |
+| Ordinary ARM64 VM | Six-stage normal launch and independent verifier passed. All five maintained Live timing cases passed, including immediate Undo→Save. |
+| Ordinary ARM64 publishing | Nine stages passed; all eight captures independently reviewed. Correct document identity, Web/PDF, native exports and sans/serif distinction. |
+| Ordinary x64 VM, emulated | Initial second-launch Exit accessibility lookup failed. One repeat with exception diagnostics passed; the first failure remains unexplained and retained. |
+| Updater desktop | Final ordinary ARM64 update/install/rollback/relaunch passed; 36 evidence hashes and four engine captures independently verified. Earlier observation failures are retained. Native failure/rollback regressions also passed at the earlier `2d84cc4` checkpoint. |
 
-The pending repair waits for acknowledged Live text before Save, Save As, close or navigation; it rejects stale document/page replies and preserves newer editor/layout choices. Modern Sans and other built-in styles now have portable font fallbacks without changing stored font settings. Focused integration passed **19 tests, zero failures/skips**, plus typography regressions. The required complete build/test repeat for `bb62989ac053616b870499422b586447e2e9cb27` passed **351 tests, zero failures, one Windows-only skip** in 451.122 seconds. The initial nine failures and their corrections remain recorded. [Repair evidence](M2-LIVE-PERSISTENCE.md).
+The shared Mac/x64 footer clean-state assertion and x64 stale-page delivery witness are under investigation. The initial ARM64 imported-theme fixture-write failure at `d145a0f` has not recurred; its root cause is still unproven. Original Qt checksum pins are unchanged; official mirror fallback passed 12 new checks plus 74 existing deployment/input guards.
 
-The maintained actual-input driver reproduces rapid Undo→Save failure on d573 and passes its settled baseline. Final repaired packages require all five timing cases, publishing/export repetitions and independent receipts. Its **74 Python guards, 11 native UIA/readiness checks and three folder-readiness checks** passed. No new package has been promoted. Windows CI `39759214639` stopped before compilation because the primary Qt repository removed the pinned archive revision (HTTP404); its deployment guards passed. The reviewed mirror fallback retains the original checksums; its 12 focused tests plus the existing 74 guards passed. Native builds are being repeated.
+## Current work and next gates
 
-Updater checkpoint `2d84cc4` passed all updater tests on both native architectures, including actual engine install/rollback, plus three appearance cases and 124 packaged diagnostic scenarios each. Each complete Windows run was 315 passed/one failure/one skip; Mac was 331/one/13. Their only failure was an obsolete assertion that updater Help commands must be absent; its corrected form passed the focused integration run. The earlier theme-write failure did not recur, and its cause remains unexplained. Final full CI remains required.
+- Diagnose the two CI assertions and retain meaningful regression coverage. Repeat affected checks, then require both complete CI workflows green at the actual candidate commit.
+- The pending View-menu slice exposes existing sorting, date, excerpts and navigation controls plus Paginated Preview. The former portable menu-state skip is replaced with actual Windows menu tests. Its local required build and complete suite passed **366 tests, zero failures, one Windows-only skip**; final Windows CI and ordinary desktop menu testing remain pending.
+- The ordinary updater workflow is complete on `6558d35`; repeat affected desktop acceptance on the final package. Preserve exact UTF-8 bytes, undo/recovery, correct preview identity and the rapid Live-save regression. [Live repair](M2-LIVE-PERSISTENCE.md), [maintained Live driver](LIVE-EDIT-ACCEPTANCE.md), [publishing driver](PUBLISHING-ACCEPTANCE.md), [updater evidence](M2-UPDATER-PARITY.md).
+- Resolve or explicitly document portable UI gaps from the [parity ledger](PARITY-LEDGER.md). Mac-only Cocoa/NSSpellChecker exclusions must not hide portable behavior. Passing Backend tests do not establish an absent menu route.
+- Promote and sync only the final verified packages; update this status with exact architecture, commit and manifest identities. The d573 shelf above remains available but has the subsequently discovered rapid Live-save defect. It is not a beta/release.
 
-## Next stability cycle
-
-- Resolve the ARM64 theme-fixture write failure. Twenty-eight checker skips have been replaced with actual Harper cases; the ten updater cases now have a Windows implementation and focused host coverage, pending native CI. [Updater evidence](M2-UPDATER-PARITY.md). The remaining native Mac menu exclusion is platform-specific.
-- Extend actual desktop acceptance beyond the completed ARM64 workflow. The [ordinary publishing supplement](PUBLISHING-ACCEPTANCE.md) passed document identity, Web/PDF and native exports on d573; visual review exposed a Modern Sans fallback defect, now under repair. Repeat on the final candidate. Settled Live typing/save/undo/redo and reopening passed on d573. Rapid Undo→Save reproducibly saved the earlier text while the editor remained dirty; the reviewed persistence barrier passes 14 focused checks and is now in full integration testing. [Live repair evidence](M2-LIVE-PERSISTENCE.md).
-- Both architectures now pass the ordinary VM workflow. Broaden the coverage beyond this six-stage gate; physical x64 hardware remains untested.
-
-The separate ARM64 guest diagnostic passed **124 scenarios, 0 failures, 0 QML warnings**, with exact package/receipt verification. The original ZIPs, extracted applications and copy receipts are in the versioned testing folders; older packages remain preserved.
-
-The first standard ARM64 attempt stopped before workflow input because an older instance's dialog blocked foreground activation. That attempt is retained. After Andrew authorized cancel/normal close and the old process was confirmed absent, a fresh run of the unchanged gate passed. [Exact evidence](M2-REPAIR-EVIDENCE.md#final-arm64-vm-normal-launch-evidence).
+The primary Mac checkout, root status and installed apps remain untouched. Generated captures are restored after local test runs; no reference image has been changed to obtain a pass. Historical [checker evidence](M2-CHECKER-PARITY.md), [repair evidence](M2-REPAIR-EVIDENCE.md) and failed attempts remain available.
 
 ## What the diagnosis established
 
@@ -56,6 +60,6 @@ Toolchain baseline: Qt 6.11.3, MSVC 2022 v143 `14.44.35207`, Windows SDK `10.0.2
 
 ## Remaining scope
 
-M1's synthetic Qt input does not qualify ordinary startup/restore or hardware input. Wider profiles, storage paths, DPI, desktop parity, installer execution/upgrade/uninstall and distribution/licensing acceptance remain open. The shelf package still uses bundled Harper; the new updater candidate is awaiting Windows qualification. [Skip scope](M1-EVIDENCE.md#windows-skip-scope), [M2 menu limits](M1-EVIDENCE.md#windows-m2-menu-limits), [plan](PLAN.md) and [test matrix](TEST-MATRIX.md).
+M1's synthetic Qt input does not qualify ordinary startup/restore or hardware input. Wider profiles, storage paths, DPI, desktop parity, installer execution/upgrade/uninstall and distribution/licensing acceptance remain open. The shelf package still uses bundled Harper; ordinary ARM64 updater qualification passed on `6558d35`; final complete CI is still required. [Skip scope](M1-EVIDENCE.md#windows-skip-scope), [M2 menu limits](M1-EVIDENCE.md#windows-m2-menu-limits), [plan](PLAN.md) and [test matrix](TEST-MATRIX.md).
 
 This is an internal repair candidate, not a qualified beta or release. Its inherited `0.3.0-dev49` label is insufficient identity; use architecture, commit and manifest hashes. See [testing builds](TESTING-BUILDS.md) and [portable starter](PORTABLE-STARTER.md).

@@ -244,6 +244,9 @@ private slots:
     void spellCheckPlatformAvailabilityFollowsHarper();
     void windowsAppearanceTracksQtColorScheme();
     void windowsMenuRoutesPortableCommands();
+    void windowsClipboardSearchMenusPreserveFocusAndUndo();
+    void windowsMenuWorkspaceActionsShareState_data();
+    void windowsMenuWorkspaceActionsShareState();
     void organizerHeaderButtonsStayClickable_data();
     void organizerHeaderButtonsStayClickable();
     void acceptanceProfileRejectsInvalidRoots();
@@ -3393,38 +3396,14 @@ QtObject {
         QCOMPARE(matches.first().toInt(), source.indexOf(QStringLiteral("café")));
         QVERIFY(backend.searchPositions("").isEmpty());
         QVERIFY(backend.searchPositions("absent").isEmpty());
-        const bool nativeMenus = window->findChild<QObject *>("editReplace") != nullptr;
-        QCOMPARE(nativeMenus, window->property("isMac").toBool());
-        if (!nativeMenus) {
-            QVERIFY(window->property("isWindows").toBool());
-            auto *desktopLoader = window->findChild<QObject *>("windowsMenuLoader"); QVERIFY(desktopLoader);
-            QVERIFY(desktopLoader->property("active").toBool());
-            QVERIFY(window->findChild<QObject *>("windowsMenuBar"));
-        }
+        QVERIFY(testDesktopMenusMatchPlatform(window.data()));
+        const auto action = [&](const char *name) {
+            return window->findChild<QObject *>((window->property("isMac").toBool()
+                ? QString() : QStringLiteral("windows_")) + QString::fromLatin1(name));
+        };
         auto trigger = [&](const char *name) {
-            if (nativeMenus) {
-                QObject *action = window->findChild<QObject *>(name);
-                return action && QMetaObject::invokeMethod(action, "triggered");
-            }
-            // Windows M1 exposes Replace in the desktop menu. Find next/previous,
-            // selection Find and field deletion use their existing common routes;
-            // their extra desktop menu affordances are an explicit M2 gap.
-            const QLatin1String id(name);
-            if (id == QLatin1String("editReplace")) {
-                auto *desktop = window->findChild<QObject *>("windowsMenuBar");
-                if (!desktop) return false;
-                for (QObject *action : desktop->findChildren<QObject *>())
-                    if (action->property("text").toString() == QStringLiteral("&Replace…"))
-                        return QMetaObject::invokeMethod(action, "triggered");
-                return false;
-            }
-            if (id == QLatin1String("editFindPrevious") || id == QLatin1String("editFindNext"))
-                return QMetaObject::invokeMethod(window.data(), "moveSearch", Q_ARG(QVariant, id == QLatin1String("editFindPrevious") ? -1 : 1));
-            if (id == QLatin1String("editDelete"))
-                return QMetaObject::invokeMethod(query, "remove", Q_ARG(int, query->property("selectionStart").toInt()), Q_ARG(int, query->property("selectionEnd").toInt()));
-            if (id == QLatin1String("editFindSelection"))
-                return QMetaObject::invokeMethod(window.data(), "openSearch", Q_ARG(QVariant, false), Q_ARG(QVariant, true));
-            return false;
+            QObject *item = action(name);
+            return item && item->property("enabled").toBool() && QMetaObject::invokeMethod(item, "triggered");
         };
         QVERIFY(trigger("editReplace"));
         QVERIFY(window->property("searchOpen").toBool());
@@ -3446,8 +3425,10 @@ QtObject {
         QVERIFY(QMetaObject::invokeMethod(editor, "undo"));
         QCOMPARE(editor->property("text").toString(), source);
         query->setProperty("text", "absent");
-        if (nativeMenus) QVERIFY(!window->findChild<QObject *>("editFindNext")->property("enabled").toBool());
-        else QVERIFY(window->property("searchMatches").toList().isEmpty());
+        QVERIFY(action("editFindNext"));
+        QVERIFY(!action("editFindNext")->property("enabled").toBool());
+        QVERIFY(action("editFindPrevious"));
+        QVERIFY(!action("editFindPrevious")->property("enabled").toBool());
         QVERIFY(QMetaObject::invokeMethod(query, "forceActiveFocus"));
         QVERIFY(QMetaObject::invokeMethod(query, "selectAll"));
         QVERIFY(trigger("editDelete"));
@@ -3879,20 +3860,23 @@ QtObject {
         auto *layout = window->findChild<QObject *>("workspaceLayout");
         auto *pane = window->findChild<QObject *>("libraryPane");
         QVERIFY(settings && pane);
-        // Failed assertions must not leak display preferences into later fixtures.
+        // Restore exact owner state, including preferences persisted by the library.
+        QVariantMap paneState, libraryState, layoutState;
+        for (const char *key : {"dateMode", "showExcerpts", "showSortBar", "showFilterBar"}) paneState.insert(key, pane->property(key));
+        for (const char *key : {"navigationMode", "ascending", "sortMode", "foldersFirst"}) libraryState.insert(key, backend.library()->property(key));
+        for (const char *key : {"filesVisible", "organizerVisible", "layoutMode"}) layoutState.insert(key, layout->property(key));
         const auto cleanup = qScopeGuard([&] {
-            pane->setProperty("dateMode", 0);
-            pane->setProperty("showExcerpts", false);
-            backend.library()->setProperty("navigationMode", 0);
-            backend.library()->setProperty("ascending", true);
+            for (auto it = paneState.cbegin(); it != paneState.cend(); ++it) pane->setProperty(it.key().toLatin1().constData(), it.value());
+            for (auto it = libraryState.cbegin(); it != libraryState.cend(); ++it) backend.library()->setProperty(it.key().toLatin1().constData(), it.value());
+            for (auto it = layoutState.cbegin(); it != layoutState.cend(); ++it) layout->setProperty(it.key().toLatin1().constData(), it.value());
         });
-        auto native = [&](const char *id) { return window->findChild<QObject *>(QStringLiteral("native_") + id); };
-        auto *libraryAction = native("library");
-#ifdef Q_OS_MACOS
-        QVERIFY(libraryAction);
-#else
-        QSKIP("Native menus are macOS-specific");
+#if !defined(Q_OS_MACOS) && !defined(Q_OS_WIN)
+        QSKIP("Desktop menu implementations are provided for macOS and Windows");
 #endif
+        QVERIFY(testDesktopMenusMatchPlatform(window.data()));
+        auto native = [&](const char *id) { return testDesktopCommand(window.data(), QString::fromLatin1(id)); };
+        auto *libraryAction = native("library");
+        QVERIFY(libraryAction);
         layout->setProperty("filesVisible", true);
         layout->setProperty("organizerVisible", true);
         QVERIFY(QMetaObject::invokeMethod(libraryAction, "triggered"));
@@ -3950,7 +3934,8 @@ QtObject {
         QCOMPARE(layout->property("layoutMode").toInt(), 2);
         QVERIFY(QMetaObject::invokeMethod(native("split"), "triggered"));
         QCOMPARE(layout->property("layoutMode").toInt(), 1);
-        auto *pdfPreview = window->findChild<QObject *>("native_pdfPreview");
+        auto *pdfPreview = window->property("isMac").toBool()
+            ? window->findChild<QObject *>("native_pdfPreview") : native("printPreview");
         QVERIFY(pdfPreview);
         QCOMPARE(pdfPreview->property("text").toString(), QStringLiteral("Paginated Preview…"));
         QVERIFY(QMetaObject::invokeMethod(native("descending"), "triggered"));
@@ -3973,8 +3958,8 @@ QtObject {
         QVERIFY(testDesktopMenusMatchPlatform(window.data()));
         if (window->property("isWindows").toBool()) {
             // Windows exposes these portable file/clipboard actions. Native
-            // versions, Share, Speech and extra Copy formats are M2 omissions.
-            for (const char *id : {"fileCreateVersion", "fileRestoreVersion", "fileShareMarkdown", "editSpeakSelection", "editCopyFormatted", "editCopyHtml", "editCopyMarkdown"})
+            // versions, Share and Speech are native capability exclusions.
+            for (const char *id : {"fileCreateVersion", "fileRestoreVersion", "fileShareMarkdown", "editSpeakSelection"})
                 QVERIFY(!action(id));
             auto *duplicate = testDesktopCommand(window.data(), QStringLiteral("duplicate"));
             auto *rename = testDesktopCommand(window.data(), QStringLiteral("rename"));
@@ -4004,11 +3989,16 @@ QtObject {
             const int revision = backend.documentRevision();
             QVERIFY(QMetaObject::invokeMethod(copy, "triggered"));
             QCOMPARE(QGuiApplication::clipboard()->mimeData()->data("text/markdown"), QByteArray("**café**"));
-            // Preserve the common extra-format behavior despite its absent
-            // desktop affordance; none of these calls may edit the source.
-            QVERIFY(backend.copySelection(0, 8, QStringLiteral("html")));
+            auto *copyMarkdown = action("windows_editCopyMarkdown");
+            auto *copyHtml = action("windows_editCopyHtml");
+            auto *copyFormatted = action("windows_editCopyFormatted");
+            QVERIFY(copyMarkdown && copyHtml && copyFormatted);
+            for (auto *item : {copyMarkdown, copyHtml, copyFormatted}) QVERIFY(item->property("enabled").toBool());
+            QVERIFY(QMetaObject::invokeMethod(copyMarkdown, "triggered"));
+            QCOMPARE(QGuiApplication::clipboard()->mimeData()->data("text/markdown"), QByteArray("**café**"));
+            QVERIFY(QMetaObject::invokeMethod(copyHtml, "triggered"));
             QVERIFY(QGuiApplication::clipboard()->text().contains("<html"));
-            QVERIFY(backend.copySelection(0, 8, QStringLiteral("formatted")));
+            QVERIFY(QMetaObject::invokeMethod(copyFormatted, "triggered"));
             QVERIFY(QGuiApplication::clipboard()->mimeData()->hasHtml());
             QCOMPARE(editor->property("text").toString(), source);
             QCOMPARE(backend.documentRevision(), revision);
@@ -4018,6 +4008,7 @@ QtObject {
             QVERIFY(QMetaObject::invokeMethod(query, "forceActiveFocus"));
             QVERIFY(QMetaObject::invokeMethod(query, "selectAll"));
             QTRY_VERIFY(!window->property("canFormatSource").toBool());
+            for (auto *item : {copyMarkdown, copyHtml, copyFormatted}) QTRY_VERIFY(!item->property("enabled").toBool());
             // Editing Find rehighlights Source and advances QTextDocument's
             // formatting revision. Measure Copy after that separate operation.
             QCOMPARE(editor->property("text").toString(), source);
@@ -5900,6 +5891,7 @@ private:
 #include "cycle146-harper-updates.inc"
 #include "windows-platform.inc"
 #include "windows-menu.inc"
+
 #include "organizer-scrollbar-hit.inc"
 #include "acceptance-profile.inc"
 

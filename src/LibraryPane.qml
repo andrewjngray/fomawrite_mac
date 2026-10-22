@@ -305,7 +305,7 @@ Rectangle {
                 wrapMode: Text.Wrap
                 horizontalAlignment: Text.AlignHCenter
                 visible: fileList.count === 0
-                text: root.library.rootFolder.toString() === "" ? "Choose a folder to begin.\nYour files stay on your Mac."
+                text: root.library.rootFolder.toString() === "" ? "Choose a folder to begin.\nYour files stay on this computer."
                     : root.library.navigationMode === 0 ? "No Markdown or text files here.\nExpand a folder or create a document."
                     : "No Markdown or text files here.\nOpen another folder or create a document."
                 color: backend.palette.muted

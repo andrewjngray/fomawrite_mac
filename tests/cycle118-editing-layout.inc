@@ -41,23 +41,20 @@ void FomawriteTest::editingAndLayoutChoicesAreIndependent() {
     // retaining an invisible Source selection as a native clipboard target.
     auto *find = f.item("documentSearchButton"), *findBar = f.item("documentFindBar");
     auto *appearance = f.item("workspaceAppearanceButton");
-    auto *nativeDelete = f.window->findChild<QObject *>("editDelete");
-    auto *nativePaste = f.window->findChild<QObject *>("editPastePlain");
+    const QString editPrefix = f.window->property("isMac").toBool() ? QString() : QStringLiteral("windows_");
+    auto *nativeDelete = f.window->findChild<QObject *>(editPrefix + "editDelete");
+    auto *nativePaste = f.window->findChild<QObject *>(editPrefix + "editPastePlain");
     QVERIFY(testDesktopMenusMatchPlatform(f.window.data()));
-    const bool mac = f.window->property("isMac").toBool();
-    auto *desktopPaste = mac ? nullptr : testWindowsMenuItem(f.window.data(), QStringLiteral("&Paste"));
-    QVERIFY(find && findBar && appearance);
-    if (mac) QVERIFY(nativeDelete && nativePaste);
-    else { QVERIFY(!nativeDelete && !nativePaste); QVERIFY(desktopPaste); }
+    QVERIFY(find && findBar && appearance && nativeDelete && nativePaste);
     QVERIFY(cycle102Click(f.quick, find)); QTRY_VERIFY(findBar->isVisible());
     QVERIFY(cycle102Click(f.quick, liveChoice)); QTRY_VERIFY(!findBar->isVisible());
     QVERIFY(cycle102Click(f.quick, appearance));
     QTRY_VERIFY(!f.window->property("sourceClipboardAllowed").toBool());
-    if (mac) {
-        QVERIFY(!nativeDelete->property("enabled").toBool()); QVERIFY(!nativePaste->property("enabled").toBool());
-    } else {
-        // Delete / Paste As Plain Text desktop affordances remain M2 omissions.
-        QVERIFY(!desktopPaste->property("enabled").toBool());
+    QVERIFY(!nativeDelete->property("enabled").toBool());
+    QVERIFY(!nativePaste->property("enabled").toBool());
+    if (f.window->property("isWindows").toBool()) {
+        auto *paste = testWindowsMenuItem(f.window.data(), QStringLiteral("&Paste")); QVERIFY(paste);
+        QVERIFY(!paste->property("enabled").toBool());
     }
     auto *appearanceMenu = f.window->findChild<QObject *>("writingOptions");
     QVERIFY(appearanceMenu); QVERIFY(QMetaObject::invokeMethod(appearanceMenu, "close"));
@@ -73,6 +70,12 @@ void FomawriteTest::editingAndLayoutChoicesAreIndependent() {
     QVERIFY(liveVisible() && f.preview->isVisible());
     QVERIFY(cycle118ReadPreview(f.window.data())); QTRY_COMPARE(f.layout->property("effectiveLayoutMode").toInt(), 2);
     QVERIFY(!sourceChoice->property("checked").toBool() && !liveChoice->property("checked").toBool());
+    // Preview-only must not expose a hidden editor selection to clipboard edits.
+    for (const char *id : {"editDelete", "editPastePlain", "editPasteMarkdown", "editCopyMarkdown", "editCopyHtml", "editCopyFormatted"}) {
+        auto *item = f.window->findChild<QObject *>(editPrefix + QString::fromLatin1(id)); QVERIFY(item);
+        QTRY_VERIFY(!item->property("enabled").toBool());
+    }
+    QCOMPARE(f.editor->property("text").toString(), draft);
     QVERIFY(QMetaObject::invokeMethod(f.window.data(), "selectWritingMode", Q_ARG(QVariant, "live"))); QTRY_COMPARE(f.layout->property("effectiveLayoutMode").toInt(), 1);
     QVERIFY(f.layout->property("liveEditEnabled").toBool());
     QVERIFY(QMetaObject::invokeMethod(f.window.data(), "selectWritingMode", Q_ARG(QVariant, "source")));

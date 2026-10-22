@@ -30,6 +30,10 @@ MenuBar {
     Component.onCompleted: rememberEditingFocus(win.activeFocusItem)
     component WorkspaceMenu: Menu {
         id: popup
+        // Long menus must scroll inside short windows instead of placing
+        // enabled commands below the area that can receive a pointer click.
+        height: Math.min(implicitHeight, Math.max(0, win.contentItem.height - 16))
+        margins: 8
         // Include nested popup content in the same focus ownership boundary.
         Component.onCompleted: root.focusMenus = root.focusMenus.concat([popup])
         onAboutToShow: root.rememberEditingFocus(win.activeFocusItem)
@@ -69,6 +73,7 @@ MenuBar {
         Command { commandId: "exportHtml" }
         Command { commandId: "exportPdf" }
         MenuItem { text: "Print…"; onTriggered: root.dispatch(function() { backend.printDocument(false) }) }
+        Command { commandId: "printPreview" }
         MenuItem { text: "Page Setup…"; onTriggered: root.dispatch(function() { backend.pageSetup() }) }
         MenuSeparator {}
         MenuItem { text: "&Close Window"; onTriggered: root.dispatch(function() { win.close() }) }
@@ -81,11 +86,23 @@ MenuBar {
         MenuSeparator {}
         MenuItem { text: "Cu&t"; enabled: win.canFormatLive || (win.sourceClipboardAllowed && !win.editTarget.readOnly && win.editTarget.selectedText.length > 0); onTriggered: root.dispatch(function() { if (win.canFormatLive) win.liveWebAction("Cut"); else if (win.editTarget === editor) { if (backend.copySelection(editor.selectionStart, editor.selectionEnd, "markdown")) win.performDocumentEdit(function() { editor.remove(editor.selectionStart, editor.selectionEnd); }); } else win.editTarget.cut() }) }
         MenuItem { text: "&Copy"; enabled: win.canFormatLive || (win.sourceClipboardAllowed && win.editTarget.selectedText.length > 0); onTriggered: root.dispatch(function() { if (win.canFormatLive) win.liveWebAction("Copy"); else if (win.editTarget === editor) backend.copySelection(editor.selectionStart, editor.selectionEnd, "markdown"); else win.editTarget.copy() }) }
+        MenuItem { objectName: "windows_editCopyFormatted"; text: "Copy Formatted"; enabled: win.canFormatLive || (win.sourceClipboardAllowed && win.editTarget === editor && editor.selectedText.length > 0); onTriggered: root.dispatch(function() { if (win.canFormatLive) backend.liveCopySelection("formatted"); else backend.copySelection(editor.selectionStart, editor.selectionEnd, "formatted"); }) }
+        MenuItem { objectName: "windows_editCopyHtml"; text: "Copy HTML"; enabled: win.canFormatLive || (win.sourceClipboardAllowed && win.editTarget === editor && editor.selectedText.length > 0); onTriggered: root.dispatch(function() { if (win.canFormatLive) backend.liveCopySelection("html"); else backend.copySelection(editor.selectionStart, editor.selectionEnd, "html"); }) }
+        MenuItem { objectName: "windows_editCopyMarkdown"; text: "Copy Markdown"; enabled: win.canFormatLive || (win.sourceClipboardAllowed && win.editTarget === editor && editor.selectedText.length > 0); onTriggered: root.dispatch(function() { if (win.canFormatLive) backend.liveCopySelection("markdown"); else backend.copySelection(editor.selectionStart, editor.selectionEnd, "markdown"); }) }
         MenuItem { text: "&Paste"; enabled: win.canFormatLive || (win.sourceClipboardAllowed && !win.editTarget.readOnly && win.editTarget.canPaste); onTriggered: root.dispatch(function() { if (win.canFormatLive) win.liveWebAction("Paste"); else if (win.editTarget === editor) editor.pasteClipboardAsPlainText(); else win.editTarget.paste() }) }
+        WorkspaceMenu {
+            title: "Paste As"
+            MenuItem { objectName: "windows_editPastePlain"; text: "Plain Text"; enabled: win.canFormatLive || (win.sourceClipboardAllowed && win.editTarget === editor && editor.canPaste); onTriggered: root.dispatch(function() { if (win.canFormatLive) { backend.liveReplaceSelection(backend.clipboardText()); return; } editor.forceActiveFocus(); editor.replaceAtomic(editor.selectionStart, editor.selectionEnd, backend.clipboardText()); }) }
+            MenuItem { objectName: "windows_editPasteMarkdown"; text: "Markdown from HTML"; enabled: win.canFormatLive || (win.sourceClipboardAllowed && win.editTarget === editor && editor.canPaste); onTriggered: root.dispatch(function() { if (win.canFormatLive) { backend.liveReplaceSelection(backend.clipboardMarkdown()); return; } editor.forceActiveFocus(); editor.replaceAtomic(editor.selectionStart, editor.selectionEnd, backend.clipboardMarkdown()); }) }
+        }
+        MenuItem { objectName: "windows_editDelete"; text: "Delete"; enabled: win.sourceClipboardAllowed && !win.editTarget.readOnly && win.editTarget.selectedText.length > 0; onTriggered: root.dispatch(function() { win.performDocumentEdit(function() { win.editTarget.remove(win.editTarget.selectionStart, win.editTarget.selectionEnd); }); }) }
         MenuItem { text: "Select &All"; onTriggered: root.dispatch(function() { if (win.canFormatLive) win.liveWebAction("SelectAll"); else if (win.sourceClipboardAllowed) win.editTarget.selectAll() }) }
         MenuSeparator {}
-        MenuItem { text: "&Find…"; onTriggered: root.dispatch(function() { win.openSearch(false, false) }) }
-        MenuItem { text: "&Replace…"; onTriggered: root.dispatch(function() { win.openSearch(true, false) }) }
+        MenuItem { objectName: "windows_editFind"; text: "&Find…"; onTriggered: root.dispatch(function() { win.openSearch(false, false) }) }
+        MenuItem { objectName: "windows_editReplace"; text: "&Replace…"; onTriggered: root.dispatch(function() { win.openSearch(true, false) }) }
+        MenuItem { objectName: "windows_editFindNext"; text: "Find Next"; enabled: win.searchOpen && win.searchMatches.length > 0; onTriggered: root.dispatch(function() { win.moveSearch(1); }) }
+        MenuItem { objectName: "windows_editFindPrevious"; text: "Find Previous"; enabled: win.searchOpen && win.searchMatches.length > 0; onTriggered: root.dispatch(function() { win.moveSearch(-1); }) }
+        MenuItem { objectName: "windows_editFindSelection"; text: "Use Selection for Find"; enabled: editor.selectedText.length > 0; onTriggered: root.dispatch(function() { win.openSearch(false, true); }) }
         MenuSeparator {}
         Command { commandId: "spelling" }
         Command { commandId: "nextIssue" }
@@ -127,6 +144,35 @@ MenuBar {
         MenuSeparator {}
         Command { commandId: "library" }
         Command { commandId: "organizer" }
+        Command { commandId: "sortBar" }
+        Command { commandId: "filterBar" }
+        WorkspaceMenu {
+            title: "Sort Files By"
+            Command { commandId: "sortName" }
+            Command { commandId: "sortModified" }
+            Command { commandId: "sortCreated" }
+            Command { commandId: "sortExtension" }
+            MenuSeparator {}
+            Command { commandId: "ascending" }
+            Command { commandId: "descending" }
+            MenuSeparator {}
+            Command { commandId: "foldersFirst" }
+        }
+        WorkspaceMenu {
+            title: "View Options"
+            WorkspaceMenu {
+                title: "Show Date"
+                Command { commandId: "dateModified" }
+                Command { commandId: "dateCreated" }
+                Command { commandId: "dateNone" }
+            }
+            Command { commandId: "excerpts" }
+            WorkspaceMenu {
+                title: "Navigation"
+                Command { commandId: "navigationTree" }
+                Command { commandId: "navigationList" }
+            }
+        }
         Command { commandId: "outline" }
         Command { commandId: "statistics" }
         WorkspaceMenu {

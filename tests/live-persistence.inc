@@ -197,13 +197,16 @@ void FomawriteTest::livePersistenceMismatchAndTimeoutFailClosed() {
     QCOMPARE(saved.count(), 1); QVERIFY(!f.backend.modified());
     // The invalidated old page can still send queued channel calls, but its
     // real delta must not overwrite Source before a fresh ready handshake.
-    QSignalSpy oldPageCursor(f.backend.editorBridge(), &EditorBridge::cursorMoved);
-    QCOMPARE(cycle143PageResult(view, "(()=>{window.fomawriteEditor.simulateUserChanges('[{\"from\":0,\"to\":0,\"insert\":\"late old renderer \"}]');window.fomawriteEditor.view.dispatch({selection:{anchor:'late old renderer '.length}});return window.fomawriteEditor.getText();})()", 0).toString(), QStringLiteral("late old renderer ") + original);
-    // The cursor report is sent after the real delta on the same channel;
-    // witness delivery before asserting that the invalidated delta was ignored.
-    QTRY_VERIFY(std::any_of(oldPageCursor.cbegin(), oldPageCursor.cend(), [](const auto &args) {
-        return args.at(1).toInt() == QStringLiteral("late old renderer ").size();
+    QSignalSpy oldPageDispatch(f.backend.editorBridge(), &EditorBridge::metricRecorded);
+    QSignalSpy oldPageChanges(f.backend.editorBridge(), &EditorBridge::changesReceived);
+    QCOMPARE(cycle143PageResult(view, "(()=>{window.fomawriteEditor.view.dom.dispatchEvent(new Event('beforeinput'));window.fomawriteEditor.simulateUserChanges('[{\"from\":0,\"to\":0,\"insert\":\"late old renderer \"}]');return window.fomawriteEditor.getText();})()", 0).toString(), QStringLiteral("late old renderer ") + original);
+    // onDocChanged sends the keystroke metric immediately after the real
+    // documentChanged call on the same channel. Hidden Chromium pages throttle
+    // the debounced cursor timer, which can lose to automatic renderer retry.
+    QTRY_VERIFY(std::any_of(oldPageDispatch.cbegin(), oldPageDispatch.cend(), [](const auto &args) {
+        return args.at(0).toString() == QStringLiteral("keystroke-to-dispatch");
     }));
+    QCOMPARE(oldPageChanges.count(), 0);
     QCOMPARE(f.editor->property("text").toString(), source);
     QVERIFY(!f.backend.modified());
 }

@@ -285,6 +285,7 @@ void FomawriteTest::footerControlsAndMenusRemainReachableWhenResized() {
     QTRY_COMPARE(libraryModel->filter(), QString());
     QTRY_COMPARE(cycle103VisualItems(library, "libraryEntry").size(), 2);
     const auto cleanup = qScopeGuard([&] { backend.discardRecovery(); });
+    QSignalSpy failedSaves(&backend, &Backend::saveFailed);
     backend.setOutputStyle(1);
     for (bool dark : {false, true}) {
         backend.setThemePreset(dark ? "dark" : "studio");
@@ -325,6 +326,15 @@ void FomawriteTest::footerControlsAndMenusRemainReachableWhenResized() {
         QTest::qWait(50);
         layout->setProperty("layoutMode", 1);
         layout->setProperty("liveEditEnabled", true);
+        // Geometry can settle before the lazily created qrc page connects.
+        // Source's persistence barrier must see the real loaded document.
+        QTRY_VERIFY_WITH_TIMEOUT(backend.editorBridge()->isReady(), 15000);
+        QSignalSpy pageText(backend.editorBridge(), &EditorBridge::textReceived);
+        const int textRequest = backend.editorBridge()->fetchText();
+        QVERIFY(textRequest > 0);
+        QTRY_VERIFY(!pageText.isEmpty() && pageText.last().at(0).toInt() == textRequest);
+        QCOMPARE(pageText.last().at(1).toString(),
+                 QStringLiteral("# Notes\n\nA calm place to write.\n"));
         QTRY_VERIFY(cycle106FootersAlign(window.data()));
         QTRY_VERIFY(cycle106FooterControlsFit(window.data()));
         QVERIFY(cycle102Click(quick, footer->findChild<QQuickItem *>("singleModeButton")));
@@ -357,5 +367,6 @@ void FomawriteTest::footerControlsAndMenusRemainReachableWhenResized() {
     QVERIFY(dismiss && cycle102Click(quick, dismiss));
     QTRY_VERIFY(!notice->isVisible());
     QCOMPARE(cycle103Read(directory.filePath("Notes.md")), QByteArray("# Notes\n\nA calm place to write.\n"));
+    QCOMPARE(failedSaves.count(), 0);
     QVERIFY(!backend.modified());
 }
