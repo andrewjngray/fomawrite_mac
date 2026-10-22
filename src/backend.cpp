@@ -3757,6 +3757,9 @@ void Backend::cancelDocumentBarrier(int request) {
             m_livePersistenceToken = 0;
         }
         m_livePersistenceQueue.erase(it);
+        // The selection timer may already have deferred to this barrier.
+        // Canceling the last barrier restores its original standalone deadline.
+        if (m_livePersistenceQueue.empty()) scheduleLiveSelectionFallback();
         QTimer::singleShot(0, this, &Backend::pumpLivePersistence);
         return;
     }
@@ -3808,6 +3811,11 @@ void Backend::failLivePersistence(const QString &reason) {
     if (m_livePersistenceQueue.empty()) return;
     m_editorBridge->cancelTextRequest(m_livePersistenceToken);
     m_livePersistenceToken = 0;
+    // Fail the preceding commands with the barrier, before callbacks can retry
+    // or replace the document. A late selection must never replay those edits.
+    m_editorBridge->cancelSelectionRequest(m_liveSelectionToken);
+    m_liveSelectionToken = 0;
+    m_liveSelectionQueue.clear();
     auto operations = std::move(m_livePersistenceQueue);
     m_livePersistenceQueue.clear();
     // A late request for an old document must not dirty its replacement.
@@ -3842,27 +3850,32 @@ void Backend::pushLiveTheme() { m_editorBridge->applyTheme(liveThemeCss()); }
 // Run `operation` on the page's current selection. With a ready page the
 // selection is fetched first (see backend.h) and the operation runs in the
 // reply; a page that does not answer within a second falls back to the last
-// reported selection so a command is never silently lost. Operations queue
+// reported selection. A pending Save or lifecycle barrier instead owns the
+// bounded persistence deadline and requires a real reply. Operations queue
 // and run one at a time, so a second command asks only after the first one's
 // edit and caret were sent (the channel keeps that order).
 void Backend::runAtLiveSelection(std::function<void(int, int)> operation) {
-    m_liveSelectionQueue.push_back({m_liveDocumentGeneration, std::move(operation)});
+    m_liveSelectionQueue.push_back({m_liveDocumentGeneration, m_editorBridge->pageGeneration(), std::move(operation)});
     pumpLiveSelection();
 }
 
 void Backend::pumpLiveSelection() {
     if (m_liveSelectionToken != 0 || m_liveSelectionQueue.empty()) return;
-    const int token = m_editorBridge->fetchSelection();
-    m_liveSelectionToken = token;
-    QTimer::singleShot(1000, this, [this, token] {
+    m_liveSelectionClock.start();
+    m_liveSelectionToken = m_editorBridge->fetchSelection();
+    scheduleLiveSelectionFallback();
+}
+
+void Backend::scheduleLiveSelectionFallback() {
+    if (!m_liveSelectionToken || m_liveSelectionQueue.empty()) return;
+    const int token = m_liveSelectionToken;
+    const int remaining = int(qMax<qint64>(0, 1000 - m_liveSelectionClock.elapsed()));
+    QTimer::singleShot(remaining, this, [this, token] {
         if (m_liveSelectionToken != token) return;
+        // Save's existing three-second deadline includes earlier commands.
+        // Never substitute a stale selection while persistence is waiting.
+        if (!m_livePersistenceQueue.empty()) return;
         m_editorBridge->cancelSelectionRequest(token);
-        if (!m_livePersistenceQueue.empty()) {
-            m_liveSelectionToken = 0;
-            m_liveSelectionQueue.clear();
-            failLivePersistence(QStringLiteral("Save paused: an earlier Live command did not respond. Retry when Live is ready."));
-            return;
-        }
         finishLiveSelection(m_editorBridge->lastSelectionStart(), m_editorBridge->lastSelectionEnd());
     });
 }
@@ -3872,7 +3885,7 @@ void Backend::finishLiveSelection(int start, int end) {
     if (m_liveSelectionQueue.empty()) return;
     auto operation = std::move(m_liveSelectionQueue.front());
     m_liveSelectionQueue.pop_front();
-    if (operation.generation == m_liveDocumentGeneration) operation.run(start, end);
+    if (operation.generation == m_liveDocumentGeneration && operation.page == m_editorBridge->pageGeneration()) operation.run(start, end);
     pumpLiveSelection();
     pumpLivePersistence();
 }

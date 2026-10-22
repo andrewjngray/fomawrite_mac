@@ -130,6 +130,9 @@ private slots:
     void liveEditorPageMirrorsUserEditsByteExactly();
     void liveUndoSaveWaitsForCurrentPage();
     void liveSaveAsAndSelectionCommandsPreserveOrdering();
+    void liveSaveWaitsForDelayedSelectionReply_data();
+    void liveSaveWaitsForDelayedSelectionReply();
+    void liveCanceledBarrierRestoresSelectionFallback();
     void liveCloseWaitsBeforeDirtyDecisionAndSave();
     void liveCloseBlocksPostSnapshotMutations();
     void liveQuitPreparationWaitsAndGlobalCancelRestoresWindows();

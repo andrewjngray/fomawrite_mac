@@ -53,6 +53,12 @@ void FomawriteTest::liveSaveAsAndSelectionCommandsPreserveOrdering() {
     const QString path = directory.filePath("original.md"), copy = directory.filePath("copy.md");
     Cycle117Window f; QVERIFY2(livePersistenceStart(f, path, original), qPrintable(f.error));
     auto *bridge = f.backend.editorBridge();
+    QSignalSpy selectionRequests(bridge, &EditorBridge::requestSelection), selectionReplies(bridge, &EditorBridge::selectionReceived);
+    const auto failedDiagnostic = QObject::connect(&f.backend, &Backend::saveFailed, f.window.data(), [&] {
+        qWarning() << "SaveAs/selection ordering failure" << f.backend.status() << "ready" << bridge->isReady()
+                   << "page generation" << bridge->pageGeneration() << "selection requests/replies" << selectionRequests.count() << selectionReplies.count();
+    });
+    const auto diagnosticCleanup = qScopeGuard([&] { QObject::disconnect(failedDiagnostic); });
     bridge->injectUserChanges(QStringLiteral("[{\"from\":0,\"to\":1,\"insert\":\"Another\"}]"));
     const QString changed = QStringLiteral("Another paragraph.\n");
     QTRY_COMPARE(f.editor->property("text").toString(), changed);
@@ -69,6 +75,134 @@ void FomawriteTest::liveSaveAsAndSelectionCommandsPreserveOrdering() {
     const QString formatted = QStringLiteral("A **paragraph**.\n");
     QTRY_COMPARE(cycle103Read(copy), formatted.toUtf8());
     QCOMPARE(cycle144PageText(bridge), formatted);
+    QVERIFY(!f.backend.modified());
+}
+
+// A busy but responsive real page must not lose a preceding Format command
+// merely because selection takes longer than the standalone fallback budget.
+void FomawriteTest::liveSaveWaitsForDelayedSelectionReply_data() {
+    QTest::addColumn<int>("stallMs");
+    QTest::addColumn<bool>("shouldSave");
+    QTest::newRow("responsive-after-standalone-deadline") << 1800 << true;
+    QTest::newRow("beyond-persistence-deadline") << 4200 << false;
+}
+
+void FomawriteTest::liveSaveWaitsForDelayedSelectionReply() {
+    QFETCH(int, stallMs); QFETCH(bool, shouldSave);
+    Cycle103SettingsSnapshot settings;
+    QTemporaryDir directory;
+    const QString original = QStringLiteral("A paragraph.\n");
+    const QString path = directory.filePath("original.md"), copy = directory.filePath("copy.md");
+    Cycle117Window f; QVERIFY2(livePersistenceStart(f, path, original), qPrintable(f.error));
+    auto *bridge = f.backend.editorBridge();
+    auto *view = f.window->findChild<QObject *>("liveEditorView"); QVERIFY(view);
+    QSignalSpy saved(&f.backend, &Backend::saveSucceeded), failed(&f.backend, &Backend::saveFailed);
+    QSignalSpy requested(bridge, &EditorBridge::requestSelection), replied(bridge, &EditorBridge::selectionReceived);
+    f.backend.saveAs(QUrl::fromLocalFile(copy)); QTRY_COMPARE(saved.count(), 1);
+    QCOMPARE(cycle103Read(copy), original.toUtf8());
+    QCOMPARE(f.backend.fileUrl(), QUrl::fromLocalFile(copy));
+    QCOMPARE(cycle144PageText(bridge), original);
+    const int generation = bridge->pageGeneration();
+    auto *engine = qmlEngine(view); QVERIFY(engine);
+    engine->globalObject().setProperty("liveDelayedSelectionDone", QJSValue(QJSValue::UndefinedValue));
+    const QJSValue callback = engine->evaluate("(function(value) { liveDelayedSelectionDone = value; })");
+    // The genuine CM delta reaches the host before this task blocks Chromium.
+    // It provides a start witness without fabricating a selection/text reply.
+    QElapsedTimer queued; queued.start();
+    QVERIFY(QMetaObject::invokeMethod(view, "runJavaScript", Q_ARG(QString, QStringLiteral(R"JS(
+        (()=>{
+            const v=window.fomawriteEditor.view;
+            v.dispatch({changes:{from:0,to:1,insert:'B'},selection:{anchor:2,head:11},userEvent:'input'});
+            const until=performance.now()+%1;
+            while(performance.now()<until){}
+            return true;
+        })()
+    )JS").arg(stallMs)), Q_ARG(uint, 0), Q_ARG(QJSValue, callback)));
+    const QString marked = QStringLiteral("B paragraph.\n");
+    QTRY_COMPARE_WITH_TIMEOUT(f.editor->property("text").toString(), marked, 5000);
+    const qint64 startAcknowledgedMs = queued.elapsed();
+    QVERIFY2(engine->globalObject().property("liveDelayedSelectionDone").isUndefined(), "Timing precondition: genuine page stall must still be running after its delta acknowledgment");
+    QElapsedTimer selectionDelay; selectionDelay.start();
+    qint64 selectionReplyMs = -1;
+    const auto timing = QObject::connect(bridge, &EditorBridge::selectionReceived, f.window.data(), [&](int, int, int) { selectionReplyMs = selectionDelay.elapsed(); });
+    const auto timingCleanup = qScopeGuard([&] { QObject::disconnect(timing); });
+    QVERIFY(f.backend.liveWrapSelection("**", "**"));
+    f.backend.save(); // Same host turn; no wait for the selection response.
+    QCOMPARE(requested.count(), 1);
+    QCOMPARE(replied.count(), 0);
+    QTRY_VERIFY_WITH_TIMEOUT(saved.count() == 2 || failed.count() != 0, Backend::LivePersistenceTimeout + 1000);
+    const bool taskFinished = !engine->globalObject().property("liveDelayedSelectionDone").isUndefined();
+    qInfo() << "Delayed real selection/save" << "saved" << saved.count() << "failed" << failed.count()
+            << "requests" << requested.count() << "replies" << replied.count() << "status" << f.backend.status()
+            << "page generation" << generation << bridge->pageGeneration() << "start acknowledged ms" << startAcknowledgedMs
+            << "selection reply ms" << selectionReplyMs << "page task finished" << taskFinished;
+    if (!shouldSave) {
+        QCOMPARE(failed.count(), 1); QCOMPARE(saved.count(), 1);
+        QVERIFY2(!taskFinished, "Timing precondition: the genuine page stall must outlast the bounded Save failure");
+        QCOMPARE(cycle103Read(copy), original.toUtf8());
+        QCOMPARE(f.editor->property("text").toString(), marked); QVERIFY(f.backend.modified());
+        QTRY_VERIFY_WITH_TIMEOUT(!engine->globalObject().property("liveDelayedSelectionDone").isUndefined(), stallMs + 1000);
+        QCOMPARE(cycle144PageText(bridge), marked); // Same-channel fence after the canceled late selection reply.
+        QCOMPARE(replied.count(), 0);
+        QCOMPARE(cycle103Read(copy), original.toUtf8()); QCOMPARE(saved.count(), 1);
+        QCOMPARE(f.editor->property("text").toString(), marked); QVERIFY(f.backend.modified());
+        f.backend.save(); QTRY_COMPARE(saved.count(), 2); // A canceled selection cannot strand future saves.
+        QCOMPARE(failed.count(), 1); QCOMPARE(cycle103Read(copy), marked.toUtf8());
+        QVERIFY(!f.backend.modified());
+        return;
+    }
+    if (failed.count()) QVERIFY2(!taskFinished, "Timing witness: failed Save must have occurred while the actual page was still stalled");
+    QCOMPARE(failed.count(), 0);
+    QCOMPARE(saved.count(), 2);
+    QTRY_COMPARE(replied.count(), 1);
+    QVERIFY2(selectionReplyMs > 1000, "Timing precondition: the actual selection reply must cross the standalone one-second deadline");
+    QCOMPARE(replied.first().at(1).toInt(), 2); QCOMPARE(replied.first().at(2).toInt(), 11);
+    const QString formatted = QStringLiteral("B **paragraph**.\n");
+    QCOMPARE(cycle103Read(copy), formatted.toUtf8());
+    QCOMPARE(f.editor->property("text").toString(), formatted);
+    QCOMPARE(cycle144PageText(bridge), formatted);
+    QCOMPARE(cycle103Read(path), original.toUtf8());
+    QCOMPARE(bridge->pageGeneration(), generation);
+    QVERIFY(!f.backend.modified());
+}
+
+void FomawriteTest::liveCanceledBarrierRestoresSelectionFallback() {
+    Cycle103SettingsSnapshot settings;
+    QTemporaryDir directory;
+    const QString path = directory.filePath("cancel.md"), original = QStringLiteral("A paragraph.\n");
+    Cycle117Window f; QVERIFY2(livePersistenceStart(f, path, original), qPrintable(f.error));
+    auto *bridge = f.backend.editorBridge();
+    auto *view = f.window->findChild<QObject *>("liveEditorView"); QVERIFY(view);
+    // Establish the ordinary fallback cache through the real debounced report.
+    QCOMPARE(cycle143PageResult(view, "(()=>{let v=window.fomawriteEditor.view;v.dispatch({selection:{anchor:2,head:11}});return v.state.selection.main.to;})()", 0).toInt(), 11);
+    QTRY_COMPARE(bridge->lastSelectionStart(), 2); QTRY_COMPARE(bridge->lastSelectionEnd(), 11);
+    auto *engine = qmlEngine(view); QVERIFY(engine);
+    engine->globalObject().setProperty("liveCanceledSelectionDone", QJSValue(QJSValue::UndefinedValue));
+    const QJSValue callback = engine->evaluate("(function(value) { liveCanceledSelectionDone = value; })");
+    QVERIFY(QMetaObject::invokeMethod(view, "runJavaScript", Q_ARG(QString, QStringLiteral(R"JS(
+        (()=>{const v=window.fomawriteEditor.view;
+            v.dispatch({changes:{from:0,to:1,insert:'B'},userEvent:'input'});
+            const until=performance.now()+2600;while(performance.now()<until){};return true;})()
+    )JS")), Q_ARG(uint, 0), Q_ARG(QJSValue, callback)));
+    QTRY_COMPARE(f.editor->property("text").toString(), QStringLiteral("B paragraph.\n"));
+    QVERIFY(engine->globalObject().property("liveCanceledSelectionDone").isUndefined());
+    QSignalSpy failed(&f.backend, &Backend::saveFailed), saved(&f.backend, &Backend::saveSucceeded);
+    QSignalSpy finished(&f.backend, &Backend::documentBarrierFinished);
+    QVERIFY(f.backend.liveWrapSelection("**", "**"));
+    const int request = f.backend.requestDocumentBarrier(); QVERIFY(request > 0);
+    QTest::qWait(1200); // Cross the documented standalone fallback deadline.
+    QVERIFY2(engine->globalObject().property("liveCanceledSelectionDone").isUndefined(), "Timing precondition: page must still be stalled at barrier cancellation");
+    QCOMPARE(finished.count(), 0);
+    f.backend.cancelDocumentBarrier(request);
+    const QString formatted = QStringLiteral("B **paragraph**.\n");
+    QTRY_COMPARE_WITH_TIMEOUT(f.editor->property("text").toString(), formatted, 1000);
+    QCOMPARE(cycle103Read(path), original.toUtf8()); QCOMPARE(saved.count(), 0); QCOMPARE(failed.count(), 0);
+    QVERIFY(f.backend.modified());
+    QTRY_VERIFY_WITH_TIMEOUT(!engine->globalObject().property("liveCanceledSelectionDone").isUndefined(), 5000);
+    QCOMPARE(cycle144PageText(bridge), formatted);
+    QCOMPARE(finished.count(), 0);
+    f.backend.save(); QTRY_COMPARE(saved.count(), 1);
+    QCOMPARE(cycle103Read(path), formatted.toUtf8()); QCOMPARE(failed.count(), 0);
     QVERIFY(!f.backend.modified());
 }
 
@@ -113,6 +247,7 @@ void FomawriteTest::livePersistenceRejectsStaleDocumentsAndRendererLoss() {
     page.backend.setLiveEditingActive(true);
     QSignalSpy failed(&page.backend, &Backend::saveFailed), saved(&page.backend, &Backend::saveSucceeded);
     // The real page may reply later, but this operation belongs to the old doc.
+    QVERIFY(page.backend.liveWrapSelection("**", "**"));
     page.backend.save(); QVERIFY(page.backend.open(QUrl::fromLocalFile(second)));
     QTRY_COMPARE(failed.count(), 1);
     page.backend.syncLiveEditor(); QCOMPARE(page.pageText(), secondText);
@@ -130,6 +265,7 @@ void FomawriteTest::livePersistenceRejectsStaleDocumentsAndRendererLoss() {
     // Exercise the actual pane's renderer-termination handler. The renderer
     // itself is not killed: readiness invalidation, recovery notice and retry
     // are the same lifecycle used when Chromium reports a terminated process.
+    QVERIFY(page.backend.liveWrapSelection("**", "**"));
     page.backend.save();
     auto *pane = page.root->findChild<QObject *>("liveEditorPane"); QVERIFY(pane);
     QVERIFY(QMetaObject::invokeMethod(pane, "rendererStopped"));

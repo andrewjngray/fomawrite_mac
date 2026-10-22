@@ -393,12 +393,13 @@ private:
     // Live commands waiting for the page's selection (FIFO, one request in flight).
     void runAtLiveSelection(std::function<void(int start, int end)> operation);
     void pumpLiveSelection();
+    void scheduleLiveSelectionFallback();
     void finishLiveSelection(int start, int end);
-    // Each queued operation remembers the document generation it was issued
-    // for; a reply that arrives after the document was swapped drops it.
-    struct LiveSelectionOperation { int generation; std::function<void(int, int)> run; };
+    // Drop commands whose document or page was replaced before the reply.
+    struct LiveSelectionOperation { int generation, page; std::function<void(int, int)> run; };
     std::deque<LiveSelectionOperation> m_liveSelectionQueue;
     int m_liveSelectionToken = 0;
+    QElapsedTimer m_liveSelectionClock;
     int m_liveDocumentGeneration = 0;
     struct LivePersistenceOperation {
         int id, generation, page, document;

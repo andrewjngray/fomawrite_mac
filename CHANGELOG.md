@@ -4,6 +4,8 @@ One line per cycle, newest first. Each line links to the cycle's record under `r
 
 ## 0.3.0 development series (Cycles 97–)
 
+- **Windows M2 delayed Live selection repair candidate** — Let Save await earlier selection commands within its existing three-second deadline, retain standalone fallback and cancel late commands safely. Real-page red/green regressions pass; final integration, native CI and packaged qualification remain pending. [Record](docs/windows/M2-LIVE-PERSISTENCE.md#delayed-selection-and-save-deadline)
+
 - **Windows M2 menu parity candidate** — Restore existing View, clipboard/search and Paginated Preview routes with actual-menu regressions; replace two CI timing assumptions with real page readiness and delivery evidence. Final native CI and packaged qualification are pending. [Record](docs/windows/M2-MENU-PARITY.md)
 
 - **Windows M2 Live persistence candidate** — Await the active Live editor before saving or closing, reject stale document/page replies, preserve Source recovery and correct Windows output-font fallbacks. Focused red/green tests pass; full CI and packaged VM qualification are pending. [Record](docs/windows/M2-LIVE-PERSISTENCE.md)

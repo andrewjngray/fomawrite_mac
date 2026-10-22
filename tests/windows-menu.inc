@@ -106,9 +106,15 @@ void FomawriteTest::windowsMenuRoutesPortableCommands() {
     QVERIFY(QMetaObject::invokeMethod(live, "triggered"));
     QTRY_VERIFY(f.layout->property("liveEditEnabled").toBool());
     QTRY_VERIFY(live->property("checked").toBool());
-    // Live Undo must reach its page history while the popup owns actual focus.
-    f.backend.editorBridge()->ready();
+    // The lazy qrc page must finish its own handshake and document replay.
+    // Fabricated readiness can be invalidated by the real load starting later,
+    // making requestUndo correctly refuse an unconnected page during the click.
+    QTRY_VERIFY_WITH_TIMEOUT(f.backend.editorBridge()->isReady(), 15000);
     auto *liveView = f.window->findChild<QQuickItem *>("liveEditorView"); QVERIFY(liveView);
+    const auto liveText = [&] { return cycle143PageResult(liveView, QStringLiteral("window.fomawriteEditor.getText()"), 0).toString(); };
+    QTRY_COMPARE_WITH_TIMEOUT(liveText(), original, 10000);
+    const bool modifiedBeforeLiveUndo = f.backend.modified();
+    // Live Undo must reach its real page history while the popup owns focus.
     liveView->forceActiveFocus();
     QTRY_VERIFY(f.window->property("canFormatLive").toBool());
     QSignalSpy liveUndo(f.backend.editorBridge(), &EditorBridge::undo);
@@ -120,9 +126,13 @@ void FomawriteTest::windowsMenuRoutesPortableCommands() {
     QTRY_VERIFY(!editMenu->property("visible").toBool());
     QCOMPARE(liveUndo.count(), 1);
     QCOMPARE(f.editor->property("text").toString(), original);
+    QTRY_COMPARE_WITH_TIMEOUT(liveText(), original, 5000);
+    QCOMPARE(f.backend.modified(), modifiedBeforeLiveUndo);
     QVERIFY(QMetaObject::invokeMethod(source, "triggered"));
     QTRY_VERIFY(!f.layout->property("liveEditEnabled").toBool());
     QTRY_VERIFY(source->property("checked").toBool());
+    QTRY_VERIFY(!f.window->property("lifecycleInputBlocked").toBool());
+    QCOMPARE(f.editor->property("text").toString(), original);
     QVERIFY(QMetaObject::invokeMethod(pdf, "triggered"));
     auto *settings = f.window->findChild<QObject *>("workspaceSettings");
     QVERIFY(settings);

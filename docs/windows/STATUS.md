@@ -2,7 +2,7 @@
 
 Updated: 22 October 2026. Windows only; the root `STATUS.md` records the Mac baseline.
 
-## Current repair candidate
+## Last promoted repair candidate
 
 Candidate code: **`d573f1666d68efaee0b60f43f04d3fe1e96781c4`**, branch `windows/port`, checkout `/Users/andrewgray/repo/projects/fomawrite_windows`. **M2 qualification remains open.** Both CI runs, final package identities, the standard ARM64 VM normal-launch gate, a shared-document supplement, the packaged ARM64 starter and the separate 124-scenario ARM64 guest document-view diagnostic have passed. Verified packages are promoted under `dist/windows-testing/builds/d573f16-{arm64,x64}/`; the ARM64 entry is `dist/windows-testing/START-WINDOWS-ARM64.cmd`. x64 native CI and the ordinary VM workflow under ARM64 emulation also passed; no physical x64-machine test is claimed.
 
@@ -16,7 +16,13 @@ The candidate reserves the Organizer scrollbar gutter so invisible scrollbars ca
 - [Shared CI 39741241651](https://github.com/andrewjngray/fomawrite_mac/actions/runs/39741241651): **success**; **300 Mac Qt tests** (0 failures, 13 skips), **321 editor tests** (0 failures/skips), typecheck, asset build and committed-asset verification passed.
 - Final ARM64 VM: the **unmodified standard centre-click normal-launch gate passed**, including native folder/file pickers, exact save, actual Live pixels/OCR, Source return, clean exits and normal restore. Strict offline verification passed. A separate run changing only the disposable writing path to shared storage also passed. Package/report hashes and the retained initial environment-blocked attempt are in the [repair record](M2-REPAIR-EVIDENCE.md).
 
-## Current verification checkpoint — not promoted
+## Current candidate — `7c37078`, not promoted
+
+`7c37078b0d135f78b68f412444083ae7f919b339` implements the View and clipboard/search menu routes. Its local required build/full suite passed **367/0/1**. Exact Windows CI `39766241460` passed ARM64 **340/0/0** but failed x64 **339/1/0**: immediate formatting after Save As was absent from the saved copy. This exposed a confirmed selection/Save deadline defect: a one-second selection fallback failed formatting despite the existing three-second persistence budget. The fix passes 14 focused checks after a real-page red reproduction; complete local/native reruns remain required. [Repair evidence](M2-LIVE-PERSISTENCE.md#delayed-selection-and-save-deadline). Both architectures passed appearance and deployed diagnostics. Shared CI `39766241338` passed editor checks but failed Mac Qt **352/3/13**. Three test-readiness corrections subsequently passed **29/0/0** locally; native reruns remain required. [Detailed evidence](M2-MENU-PARITY.md).
+
+The exact ARM64 package is verified and staged only for ordinary VM diagnostics. Neither this candidate nor the earlier red-CI `6558d35` package is the recommended shelf build.
+
+## Previous verification checkpoint — not promoted
 
 Code `6558d3505b8cff0284f3dc3cc0e1c6b92a1336fc` contains the Live persistence barrier, portable output-font fallbacks and pinned Qt mirror recovery. **CI is red; do not promote this package.** [Complete checkpoint, hashes and retained failures](M2-DESKTOP-6558.md).
 
@@ -30,12 +36,12 @@ Code `6558d3505b8cff0284f3dc3cc0e1c6b92a1336fc` contains the Live persistence ba
 | Ordinary x64 VM, emulated | Initial second-launch Exit accessibility lookup failed. One repeat with exception diagnostics passed; the first failure remains unexplained and retained. |
 | Updater desktop | Final ordinary ARM64 update/install/rollback/relaunch passed; 36 evidence hashes and four engine captures independently verified. Earlier observation failures are retained. Native failure/rollback regressions also passed at the earlier `2d84cc4` checkpoint. |
 
-The shared Mac/x64 footer clean-state assertion and x64 stale-page delivery witness are under investigation. The initial ARM64 imported-theme fixture-write failure at `d145a0f` has not recurred; its root cause is still unproven. Original Qt checksum pins are unchanged; official mirror fallback passed 12 new checks plus 74 existing deployment/input guards.
+The shared Mac/x64 footer clean-state assertion and x64 stale-page delivery witness were corrected in the subsequent `7c37078` checkpoint; its separate failures are recorded above. The initial ARM64 imported-theme fixture-write failure at `d145a0f` has not recurred; its root cause is still unproven. Original Qt checksum pins are unchanged; official mirror fallback passed 12 new checks plus 74 existing deployment/input guards.
 
 ## Current work and next gates
 
-- Diagnose the two CI assertions and retain meaningful regression coverage. Repeat affected checks, then require both complete CI workflows green at the actual candidate commit.
-- The pending View-menu slice exposes existing sorting, date, excerpts and navigation controls plus Paginated Preview. The former portable menu-state skip is replaced with actual Windows menu tests. Its local required build and complete suite passed **366 tests, zero failures, one Windows-only skip**; final Windows CI and ordinary desktop menu testing remain pending.
+- Complete the selection/Save deadline repair and three fixture-readiness corrections, then require the full local suite and both complete CI workflows green at the actual candidate commit.
+- The pending View-menu slice exposes existing sorting, date, excerpts and navigation controls plus Paginated Preview. The former portable menu-state skip is replaced with actual Windows menu tests. The combined View/clipboard/search candidate `7c37078b0d135f78b68f412444083ae7f919b339` passed the required local build and complete suite: **367 tests, zero failures, one Windows-only skip**, 540.931 seconds. The exact native/shared CI failures are recorded above; final ordinary desktop menu testing remains incomplete. [Menu evidence](M2-MENU-PARITY.md).
 - The ordinary updater workflow is complete on `6558d35`; repeat affected desktop acceptance on the final package. Preserve exact UTF-8 bytes, undo/recovery, correct preview identity and the rapid Live-save regression. [Live repair](M2-LIVE-PERSISTENCE.md), [maintained Live driver](LIVE-EDIT-ACCEPTANCE.md), [publishing driver](PUBLISHING-ACCEPTANCE.md), [updater evidence](M2-UPDATER-PARITY.md).
 - Resolve or explicitly document portable UI gaps from the [parity ledger](PARITY-LEDGER.md). Mac-only Cocoa/NSSpellChecker exclusions must not hide portable behavior. Passing Backend tests do not establish an absent menu route.
 - Promote and sync only the final verified packages; update this status with exact architecture, commit and manifest identities. The d573 shelf above remains available but has the subsequently discovered rapid Live-save defect. It is not a beta/release.

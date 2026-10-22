@@ -48,7 +48,26 @@ bool cycle144StartBundledReviewChecker(Cycle117Window &fixture, QString *error) 
         *error = QStringLiteral("Cannot return from Harper setup to Source");
         return false;
     }
+    // The ordinary Source transition acknowledges the real page asynchronously.
+    // Do not let callers mutate the hidden mirror while that request is pending.
+    if (!QTest::qWaitFor([&] {
+        return !fixture.backend.liveEditingActive()
+            && !fixture.window->property("lifecycleInputBlocked").toBool()
+            && fixture.window->property("documentBarrierRequest").toInt() == 0;
+    }, 5000)) {
+        *error = QStringLiteral("Harper setup did not complete its Source transition: ") + fixture.backend.status();
+        return false;
+    }
     return true;
+}
+bool cycle144ReviewTextKnown(SpellCheck *spell, const QString &text) {
+    bool known = true;
+    for (const QString &paragraph : text.split(QLatin1Char('\n'))) {
+        const QString prose = MarkdownHighlighter::spellingProse(paragraph);
+        if (!prose.trimmed().isEmpty())
+            known = spell->issuesIfKnown(prose).has_value() && known;
+    }
+    return known;
 }
 QObject *cycle144ReviewMenuCommand(QObject *window, const QString &command) {
     if (!testDesktopMenusMatchPlatform(window)) return nullptr;
@@ -340,6 +359,12 @@ void FomawriteTest::reviewRowClickMovesTheSourceCaret() {
     QVERIFY(f.mode(0));
     const QString text = QStringLiteral("A flomptoid of ideas.\n\nWe recieve the mail, and quorbleflat too.\n");
     f.editor->setProperty("text", text);
+    // Engine readiness precedes the first real findings for these paragraphs.
+    // Use the existing Source-Harper finding budget; keep UI assertions below
+    // on their normal deadline once every actual reply is in the cache.
+    if (bundledHarper)
+        QTRY_VERIFY2_WITH_TIMEOUT(cycle144ReviewTextKnown(spell, text),
+                                 "Bundled Harper did not answer the actual Source paragraphs", 15000);
     QVERIFY(cycle144Run(f.window.data(), "spelling"));
     QTRY_VERIFY(cycle144Row(f.window.data(), 2));
     auto *counts = f.window->findChild<QQuickItem *>("reviewCounts");
@@ -437,6 +462,12 @@ void FomawriteTest::nextAndPreviousIssueWrapRoundTheDocument() {
     QVERIFY(f.mode(0));
     const QString text = QStringLiteral("A flomptoid of ideas.\n\nWe recieve the mail.\n\nAnd quorbleflat there.\n");
     f.editor->setProperty("text", text);
+    // Engine readiness precedes the first real findings for these paragraphs.
+    // Use the existing Source-Harper finding budget; keep UI assertions below
+    // on their normal deadline once every actual reply is in the cache.
+    if (bundledHarper)
+        QTRY_VERIFY2_WITH_TIMEOUT(cycle144ReviewTextKnown(spell, text),
+                                 "Bundled Harper did not answer the actual Source paragraphs", 15000);
     QTRY_COMPARE(f.backend.reviewIssues().size(), 3);
     const int first = text.indexOf("flomptoid"), second = text.indexOf("recieve"), third = text.indexOf("quorbleflat");
     // The model: strictly after / before, wrapping, -1 with nothing to find.
