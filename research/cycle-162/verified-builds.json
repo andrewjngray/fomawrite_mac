@@ -1490,6 +1490,239 @@
       "qualification": "Bounded fresh-process diagnostic only. Does not override the retained ARM64 full-suite failure or establish ordinary desktop qualification.",
       "nativeFailureBranchExercised": false,
       "failure": "Standalone test build omitted the normal build Harper resource download; NMAKE U1073 for src/editor/dist/harper/VERSION. No test attempts ran."
+    },
+    "atomicThemeDiagnosticVerification": {
+      "runId": 39843298436,
+      "commit": "be99f89c253faf20db21fd2b88eccdc03f6ff2a3",
+      "runConclusion": "success",
+      "artifactId": 12454681858,
+      "artifactSha256": "6ed6646825762e18fba8f6c15f807eaae89c9ee523b293e7714a393fb46344bd",
+      "attempts": [
+        {
+          "attempt": 1,
+          "xml": {
+            "name": "FomawriteTest",
+            "timestamp": "2026-10-22T12:54:45",
+            "hostname": "runnervm31itj",
+            "tests": "3",
+            "failures": "0",
+            "errors": "0",
+            "skipped": "0",
+            "time": "7.031"
+          },
+          "failures": [],
+          "sha256": "a212763c1f129110fb11d52f970ee3b3c423dec3546becbc4c1b287fe5ed0ab0"
+        },
+        {
+          "attempt": 2,
+          "xml": {
+            "name": "FomawriteTest",
+            "timestamp": "2026-10-22T12:54:53",
+            "hostname": "runnervm31itj",
+            "tests": "3",
+            "failures": "0",
+            "errors": "0",
+            "skipped": "0",
+            "time": "6.980"
+          },
+          "failures": [],
+          "sha256": "14d99f4632f7bdba81759788b2e7dc000031b46087905f57e2af99ac8826be27"
+        },
+        {
+          "attempt": 3,
+          "xml": {
+            "name": "FomawriteTest",
+            "timestamp": "2026-10-22T12:55:00",
+            "hostname": "runnervm31itj",
+            "tests": "3",
+            "failures": "0",
+            "errors": "0",
+            "skipped": "0",
+            "time": "7.208"
+          },
+          "failures": [],
+          "sha256": "960e37fe35d772cdc61abfa784e719ee8c14f11fd3ff0d6ae253106b08cb4fc3"
+        },
+        {
+          "attempt": 4,
+          "xml": {
+            "name": "FomawriteTest",
+            "timestamp": "2026-10-22T12:55:07",
+            "hostname": "runnervm31itj",
+            "tests": "3",
+            "failures": "0",
+            "errors": "0",
+            "skipped": "0",
+            "time": "7.047"
+          },
+          "failures": [],
+          "sha256": "ecebc2f2813f6df63832aeda9bd77c758263860dac71d7f63532b4cd9cb8685b"
+        },
+        {
+          "attempt": 5,
+          "xml": {
+            "name": "FomawriteTest",
+            "timestamp": "2026-10-22T12:55:14",
+            "hostname": "runnervm31itj",
+            "tests": "3",
+            "failures": "0",
+            "errors": "0",
+            "skipped": "0",
+            "time": "7.030"
+          },
+          "failures": [],
+          "sha256": "ca1d6c5ef6c4de224386c643eafc3466590e962b860eba1267b4d4ffafd8e87e"
+        },
+        {
+          "attempt": 6,
+          "xml": {
+            "name": "FomawriteTest",
+            "timestamp": "2026-10-22T12:55:21",
+            "hostname": "runnervm31itj",
+            "tests": "3",
+            "failures": "0",
+            "errors": "0",
+            "skipped": "0",
+            "time": "7.007"
+          },
+          "failures": [],
+          "sha256": "a9bb1b113009c7adcb410d18ae2a949c5337f7d0122624a2fe84a1cd5bdcd048"
+        },
+        {
+          "attempt": 7,
+          "xml": {
+            "name": "FomawriteTest",
+            "timestamp": "2026-10-22T12:55:28",
+            "hostname": "runnervm31itj",
+            "tests": "3",
+            "failures": "0",
+            "errors": "0",
+            "skipped": "0",
+            "time": "7.022"
+          },
+          "failures": [],
+          "sha256": "e08e03ee5e791263ea2c35663ffe6e7d7a7457468dbd752ee6269685b24cbe51"
+        },
+        {
+          "attempt": 8,
+          "xml": {
+            "name": "FomawriteTest",
+            "timestamp": "2026-10-22T12:55:35",
+            "hostname": "runnervm31itj",
+            "tests": "3",
+            "failures": "0",
+            "errors": "0",
+            "skipped": "0",
+            "time": "7.104"
+          },
+          "failures": [],
+          "sha256": "29bfcfb95f03447865fd6f5f3ce30bc85cd46a5cad82e5fd9d071e9aebf59821"
+        },
+        {
+          "attempt": 9,
+          "xml": {
+            "name": "FomawriteTest",
+            "timestamp": "2026-10-22T12:55:42",
+            "hostname": "runnervm31itj",
+            "tests": "3",
+            "failures": "0",
+            "errors": "0",
+            "skipped": "0",
+            "time": "7.040"
+          },
+          "failures": [],
+          "sha256": "f246c44d85d7528a17cebcff5f28a340365aa0d9a9ff42f474c1ab7de02be956"
+        },
+        {
+          "attempt": 10,
+          "xml": {
+            "name": "FomawriteTest",
+            "timestamp": "2026-10-22T12:55:50",
+            "hostname": "runnervm31itj",
+            "tests": "3",
+            "failures": "0",
+            "errors": "0",
+            "skipped": "0",
+            "time": "7.007"
+          },
+          "failures": [],
+          "sha256": "6cb051ba61cf2065142eb0c5eb3d24dd2f88327ff8a3b29971eda4841a7b8ce7"
+        }
+      ],
+      "qualification": "Bounded fresh-process diagnostic only. Does not override the retained ARM64 full-suite failure or establish ordinary desktop qualification.",
+      "nativeFailureBranchExercised": false,
+      "recordedUtc": "2026-10-22T19:57:23.921293+00:00",
+      "nativeBuild": "success",
+      "targetCase": "publishingFolderThemesReloadAndAtomicResourcesSettle",
+      "targetExecutions": {
+        "passed": 10,
+        "failed": 0,
+        "skipped": 0
+      },
+      "qtRowsIncludingInitAndCleanup": {
+        "passed": 30,
+        "failed": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "independentXmlAndTextVerification": true,
+      "allAttemptExitStatusesZero": true,
+      "sdk": {
+        "archivePinsMatched": 9,
+        "lockSha256": "6c981f5d710a9b05127e899304c63764ddfe0596335c971618fcbc381a2b19e6",
+        "lockHashNote": "Matches Windows CRLF checkout bytes; archive URLs/package versions/SHA-1 pins independently match host lock."
+      },
+      "outcome": "Unreproduced in ten fresh-process samples; retained prior ARM64 full-suite atomic replacement failure remains unresolved.",
+      "limits": [
+        "Only one test case was sampled, in ten fresh processes; this is not the complete regression suite.",
+        "Failure diagnostic branch and Restart Manager owner evidence were not exercised.",
+        "No ordinary desktop qualification, package promotion, or VM interaction is established."
+      ],
+      "evidenceSummary": "research/cycle-162/evidence/theme-atomic-diagnostics/final-be99f89/summary.json",
+      "evidenceSummarySha256": "6ceaa8885589aefd354c41137f6635b098c3453057f860cfb4a72428387d8870"
     }
+  },
+  "manualTestHandoff": {
+    "scope": "User requested a manual-test-ready checkpoint and independent review; full Windows qualification remains open.",
+    "rootLauncher": "TEST-FOMAWRITE.cmd",
+    "handoff": "WINDOWS-REVIEW-HANDOFF.md",
+    "manualChecklist": "MANUAL-TEST-CHECKLIST.md",
+    "rootLauncherSmoke": {
+      "schemaVersion": 1,
+      "gate": "root-launcher-smoke",
+      "passed": true,
+      "failure": null,
+      "launcher": "C:\\Mac\\Home\\repo\\projects\\fomawrite_windows\\TEST-FOMAWRITE.cmd",
+      "launcherSha256": "f879686eb3fb7b36973db80a43f8d81aef1a5c5c98b70d605ad180e16371b8a9",
+      "receipt": {
+        "localExecutable": "C:\\Users\\andrewgray\\AppData\\Local\\Fomawrite\\Portable\\arm64-b056ab5e6a73-da4ae383dbba8c26\\Fomawrite.exe",
+        "sourcePackage": "C:\\Mac\\Home\\repo\\projects\\fomawrite_windows\\dist\\windows-testing\\diagnostic-candidates\\b056ab5-arm64\\Fomawrite",
+        "localPackage": "C:\\Users\\andrewgray\\AppData\\Local\\Fomawrite\\Portable\\arm64-b056ab5e6a73-da4ae383dbba8c26",
+        "architecture": "arm64",
+        "commit": "b056ab5e6a73078b69c99916a4c5bce52772dfa6",
+        "manifestSha256": "da4ae383dbba8c2634b39d669abc93a3ecdc41e9cc7016b6de0fbb4643b01033",
+        "executableSha256": "1e113b3fb7c15cf72307dd1d9f6ac19842e4225b38c89056a73a59c97032345a",
+        "reusedCache": true,
+        "stageOnly": false,
+        "processId": 15232
+      },
+      "appExitCode": 0,
+      "appStillRunning": false,
+      "profile": "C:\\Users\\andrewgray\\AppData\\Local\\FomawritePortQA\\root-launcher-5cbfd53ea1584a788985deda590e9461\\profile",
+      "clipboardTouched": false,
+      "scope": "Root launcher, exact Windows-local ARM64 identity, isolated ordinary startup and Alt+F4 close only",
+      "evidenceHashes": {
+        "launcher-stdout.log": "d54f0bd977f6135f0c64acdfc977d4fcdefde00d64793ae62530fcbbb04249e4",
+        "launcher-stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "window-uia.txt": "4743a6cffc02f7ed9ab5d4be505c7d4c50570c15d66d64bd58d3fef336354db0",
+        "window.png": "867dfa2d37600e1739759654bd0c30ab427abc5dfb2770969191698207783961",
+        "profile\\profile.json": "ac245e2c3dea6991708d1d7ed6c38aa769aaeb023db196bda972f86a086d98fd"
+      },
+      "observedUtc": "2026-10-22T19:57:43.2087224Z"
+    },
+    "reportPath": "dist/windows-testing/results/root-launcher-5cbfd53ea1584a788985deda590e9461/smoke.json",
+    "reportSha256": "7c1ab6faa61bac665f493176409ae0be47233b9a4d2e43c90d134fd38a9afabb",
+    "independentVerification": "Root checked all five evidence hashes, exact launcher bytes, candidate manifest/executable identity, isolated ordinary profile, visible Fomawrite capture and exit zero.",
+    "remaining": "ARM64 full-suite atomic-theme failure unresolved; broader menu/print/clipboard/installer/storage/display/endurance scope remains in handoff."
   }
 }
