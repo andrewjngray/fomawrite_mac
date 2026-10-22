@@ -138,6 +138,7 @@ private slots:
     void liveQuitPreparationWaitsAndGlobalCancelRestoresWindows();
     void livePersistenceRejectsStaleDocumentsAndRendererLoss();
     void livePersistenceMismatchAndTimeoutFailClosed();
+    void liveInvalidatedPageRejectsRealChannelChanges();
     void liveEditorRendererRecoveryIsBoundedAndPreservesCanonicalEdits();
     void liveEditorRoundTripsPersistenceFixturesThroughThePage();
     void liveEditorLoadsLargeDocumentQuickly();

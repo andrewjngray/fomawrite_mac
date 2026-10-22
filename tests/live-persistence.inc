@@ -320,9 +320,8 @@ void FomawriteTest::livePersistenceMismatchAndTimeoutFailClosed() {
     // The delayed genuine reply is ignored after the request was canceled.
     QCOMPARE(cycle144PageText(f.backend.editorBridge(), 5000), original);
     QCOMPARE(saved.count(), 0); QCOMPARE(cycle103Read(path), original.toUtf8());
-    // Exhaust the genuine one-retry lifecycle before testing queued calls from
-    // a stopped page. Otherwise its one-second reload can replace that page
-    // during this test's Source transition or asynchronous JavaScript probe.
+    // Exhaust the genuine one-retry lifecycle before checking Source recovery.
+    // An exhausted renderer must not reload again behind the Source editor.
     auto *pane = f.window->findChild<QObject *>("liveEditorPane"); QVERIFY(pane);
     auto *automaticRetry = pane->findChild<QObject *>("liveEditorAutomaticRetry"); QVERIFY(automaticRetry);
     auto *bridge = f.backend.editorBridge();
@@ -346,13 +345,50 @@ void FomawriteTest::livePersistenceMismatchAndTimeoutFailClosed() {
     f.backend.save(); // Source save remains synchronous, even without Live.
     QCOMPARE(cycle103Read(path), source.toUtf8());
     QCOMPARE(saved.count(), 1); QVERIFY(!f.backend.modified());
-    // The invalidated old page can still send queued channel calls, but its
-    // real delta must not overwrite Source before a fresh ready handshake.
+    // Check that Source remains saved beyond the real automatic retry delay.
     QTest::qWait(1200); // Beyond the real retry delay: this page must stay stopped.
     QVERIFY(!bridge->isReady());
     QVERIFY(!automaticRetry->property("running").toBool());
     QVERIFY(pane->property("automaticRetryUsed").toBool());
     QCOMPARE(bridge->pageGeneration(), stoppedGeneration);
+    QCOMPARE(f.editor->property("text").toString(), source);
+    QCOMPARE(cycle103Read(path), source.toUtf8());
+    QCOMPARE(saved.count(), 1); QVERIFY(!f.backend.modified());
+    QVERIFY(!pane->property("loadError").toString().isEmpty());
+}
+
+void FomawriteTest::liveInvalidatedPageRejectsRealChannelChanges() {
+    Cycle103SettingsSnapshot settings;
+    QTemporaryDir directory;
+    const QString path = directory.filePath("invalidated-page.md");
+    const QString original = QStringLiteral("Known host text.\n");
+    const QString source = QStringLiteral("Source recovery remains writable.\n");
+    QVERIFY(cycle103Write(path, original.toUtf8()));
+    // Keep the real renderer visible independently of Main's Source/error UI.
+    // Invalidating its production bridge must reject stale page traffic; it
+    // must not require new JavaScript work in a hidden/stopped Chromium view.
+    Cycle134Page page; QVERIFY2(page.create(), qPrintable(page.error));
+    auto *bridge = page.bridge();
+    QTRY_VERIFY_WITH_TIMEOUT(bridge->isReady(), 15000);
+    QVERIFY(page.backend.open(QUrl::fromLocalFile(path)));
+    page.backend.syncLiveEditor();
+    QCOMPARE(page.pageText(), original);
+    auto *view = page.root->findChild<QQuickItem *>("liveEditorView"); QVERIFY(view);
+    auto *pane = page.root->findChild<QQuickItem *>("liveEditorPane"); QVERIFY(pane);
+    QVERIFY(page.window->isVisible()); QVERIFY(pane->isVisible()); QVERIFY(view->isVisible());
+    QVERIFY(pane->property("loadError").toString().isEmpty());
+    QVERIFY(!page.backend.liveEditingActive());
+    bridge->invalidatePage();
+    QVERIFY(!bridge->isReady());
+    const int invalidatedGeneration = bridge->pageGeneration();
+    QSignalSpy saved(&page.backend, &Backend::saveSucceeded);
+    QVERIFY(page.editor->setProperty("text", source));
+    QCOMPARE(page.canonical(), source);
+    page.backend.save();
+    QCOMPARE(saved.count(), 1); QCOMPARE(cycle103Read(path), source.toUtf8());
+    QVERIFY(!page.backend.modified());
+    QVERIFY(view->isVisible());
+    auto *engine = &page.engine;
     QSignalSpy oldPageDispatch(bridge, &EditorBridge::metricRecorded);
     QSignalSpy oldPageChanges(bridge, &EditorBridge::changesReceived);
     // Submit the mutation once in the main world. Record callback completion
@@ -374,29 +410,28 @@ void FomawriteTest::livePersistenceMismatchAndTimeoutFailClosed() {
     )JS")), Q_ARG(uint, 0), Q_ARG(QJSValue, probeCallback)));
     const bool completed = QTest::qWaitFor([&] { return probe.property("completed").toBool(); }, 5000);
     const QJSValue result = probe.property("value");
-    qInfo() << "Stopped-page mutation callback completed" << completed
+    qInfo() << "Invalidated visible-page mutation callback completed" << completed
             << "result" << result.toString() << "generation" << bridge->pageGeneration()
-            << "expected generation" << stoppedGeneration << "ready" << bridge->isReady();
-    QVERIFY2(completed, "Stopped-page JavaScript callback did not complete within five seconds");
-    QVERIFY2(result.isString(), "Stopped-page callback completed without the expected JSON string");
+            << "expected generation" << invalidatedGeneration << "ready" << bridge->isReady();
+    QVERIFY2(completed, "Invalidated visible-page JavaScript callback did not complete within five seconds");
+    QVERIFY2(result.isString(), "Invalidated visible-page callback completed without the expected JSON string");
     QJsonParseError parseError;
     const auto resultDocument = QJsonDocument::fromJson(result.toString().toUtf8(), &parseError);
     QVERIFY2(parseError.error == QJsonParseError::NoError && resultDocument.isObject(), qPrintable(result.toString()));
     const auto resultObject = resultDocument.object();
     QVERIFY2(!resultObject.contains("error"), qPrintable(resultObject.value("error").toString()));
     QCOMPARE(resultObject.value("text").toString(), QStringLiteral("late old renderer ") + original);
-    // onDocChanged sends the keystroke metric immediately after the real
-    // documentChanged call on the same channel; do not rely on the hidden
-    // page's throttled cursor timer as a delivery witness.
+    // onDocChanged sends this metric immediately after documentChanged on
+    // the same channel, proving delivery before the zero-accepted-change check.
     QTRY_VERIFY(std::any_of(oldPageDispatch.cbegin(), oldPageDispatch.cend(), [](const auto &args) {
         return args.at(0).toString() == QStringLiteral("keystroke-to-dispatch");
     }));
     QCOMPARE(oldPageChanges.count(), 0);
-    QCOMPARE(f.editor->property("text").toString(), source);
+    QCOMPARE(page.canonical(), source);
     QCOMPARE(cycle103Read(path), source.toUtf8());
-    QVERIFY(!f.backend.modified());
+    QVERIFY(!page.backend.modified());
     QVERIFY(!bridge->isReady());
-    QCOMPARE(bridge->pageGeneration(), stoppedGeneration);
+    QCOMPARE(bridge->pageGeneration(), invalidatedGeneration);
 }
 
 void FomawriteTest::liveCloseBlocksPostSnapshotMutations() {

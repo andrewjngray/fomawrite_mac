@@ -641,7 +641,180 @@
         }
       ]
     },
-    "hostedRepairVerification": "pending",
+    "hostedRepairVerification": {
+      "repository": "andrewjngray/fomawrite_mac",
+      "runId": 39830560340,
+      "commit": "b1e49a434a19dd33d630a5f4694b208d04c20080",
+      "url": "https://github.com/andrewjngray/fomawrite_mac/actions/runs/39830560340",
+      "status": "completed",
+      "conclusion": "failure",
+      "recordedUtc": "2026-10-22T18:45:04.814946+00:00",
+      "mac": {
+        "jobId": 120005256574,
+        "url": "https://github.com/andrewjngray/fomawrite_mac/actions/runs/39830560340/job/120005256574",
+        "conclusion": "failure",
+        "completedAt": "2026-10-22T18:41:43Z",
+        "qtVersion": "6.11.3",
+        "counts": {
+          "passed": 412,
+          "failed": 1,
+          "skipped": 13,
+          "blacklisted": 0,
+          "elapsedMs": 1040691
+        },
+        "independentlyCountedResultRows": {
+          "passed": 412,
+          "failed": 1,
+          "skipped": 13
+        },
+        "focusedCases": {
+          "livePersistenceMismatchAndTimeoutFailClosed": {
+            "passed": false,
+            "failed": true
+          },
+          "liveEditorRendererRecoveryIsBoundedAndPreservesCanonicalEdits": {
+            "passed": true,
+            "failed": false
+          }
+        },
+        "skipReasonCounts": {
+          "this macOS has no grammar pass for the test language": 12,
+          "Windows Qt appearance implementation; native Windows execution required": 1
+        },
+        "skips": [
+          {
+            "case": "spellCheckServiceReportsGrammarIssuesWithCategory(native-checker)",
+            "reason": "this macOS has no grammar pass for the test language"
+          },
+          {
+            "case": "windowsAppearanceTracksQtColorScheme()",
+            "reason": "Windows Qt appearance implementation; native Windows execution required"
+          },
+          {
+            "case": "grammarChecksLongParagraphsInCachedChunks(native-checker)",
+            "reason": "this macOS has no grammar pass for the test language"
+          },
+          {
+            "case": "ignoreGrammarFromAnySurfaceReachesEverySurface(native-checker)",
+            "reason": "this macOS has no grammar pass for the test language"
+          },
+          {
+            "case": "sourceGrammarUnderlinesDoubledWordsAndSpellingStaysRed(native-checker)",
+            "reason": "this macOS has no grammar pass for the test language"
+          },
+          {
+            "case": "sourceGrammarFollowsItsSettingAndKeepsSpelling(native-checker)",
+            "reason": "this macOS has no grammar pass for the test language"
+          },
+          {
+            "case": "sourceGrammarWithholdsTheRangeAtTheCaretWithoutARevision(native-checker)",
+            "reason": "this macOS has no grammar pass for the test language"
+          },
+          {
+            "case": "sourceGrammarUnderlineIsBlueInTheRenderedWindow(native-checker)",
+            "reason": "this macOS has no grammar pass for the test language"
+          },
+          {
+            "case": "sourceGrammarContextMenuShowsTheMessageCorrectsAndIgnores(native-checker)",
+            "reason": "this macOS has no grammar pass for the test language"
+          },
+          {
+            "case": "sourceGrammarIgnoreIsPerDocumentAndRestylesInPlace(native-checker)",
+            "reason": "this macOS has no grammar pass for the test language"
+          },
+          {
+            "case": "liveGrammarUnderlinesFollowTheGrammarSetting(native-checker)",
+            "reason": "this macOS has no grammar pass for the test language"
+          },
+          {
+            "case": "reviewIssuesListSpellingAndGrammarInOrderWithDocumentOffsets(native-checker)",
+            "reason": "this macOS has no grammar pass for the test language"
+          },
+          {
+            "case": "reviewPaneRendersInLightAndDarkThemes(native-checker)",
+            "reason": "this macOS has no grammar pass for the test language"
+          }
+        ],
+        "failures": [
+          {
+            "case": "livePersistenceMismatchAndTimeoutFailClosed()",
+            "rawLines": [
+              "QINFO  : FomawriteTest::livePersistenceMismatchAndTimeoutFailClosed() Stopped-page mutation callback completed false result \"undefined\" generation 8 expected generation 8 ready false",
+              "FAIL!  : FomawriteTest::livePersistenceMismatchAndTimeoutFailClosed() 'completed' returned FALSE. (Stopped-page JavaScript callback did not complete within five seconds)",
+              "   Loc: [../tests/live-persistence.inc(380)]"
+            ],
+            "diagnosis": "The explicitly observed main-world JavaScript callback did not complete within five seconds; bridge generation stayed8 and readiness remained false. This does not establish a product document mutation or explain why the callback did not run."
+          }
+        ],
+        "steps": {
+          "Set up job": "success",
+          "Check out": "success",
+          "Install Qt 6.11.3": "success",
+          "Show toolchain": "success",
+          "Fetch the pinned Harper engine": "success",
+          "Build app": "success",
+          "Build and run tests (offscreen)": "failure",
+          "Upload test log": "success",
+          "Post Install Qt 6.11.3": "success",
+          "Post Check out": "success",
+          "Complete job": "success"
+        }
+      },
+      "editor": {
+        "jobId": 120005258032,
+        "url": "https://github.com/andrewjngray/fomawrite_mac/actions/runs/39830560340/job/120005258032",
+        "conclusion": "success",
+        "counts": {
+          "tests": 324,
+          "pass": 324,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0
+        },
+        "typecheck": "success",
+        "assetBuild": "success",
+        "committedAssetVerification": "success"
+      },
+      "limits": [
+        "This exact shared run failed; earlier green or focused host runs are not substituted.",
+        "The repaired stale-page case did not pass this hosted Qt6.11.3 run.",
+        "No ordinary Windows desktop acceptance is established by this shared CI evidence.",
+        "No repository, application or VM changes were performed by this audit."
+      ],
+      "evidence": [
+        {
+          "path": "/private/tmp/fomawrite-b1e49a4-shared/editor-evidence.json",
+          "bytes": 546,
+          "sha256": "90e7a08322f3d2cf5164b1eefdc75779f160693d2c96d5a2ce7e3597b5e7deaf"
+        },
+        {
+          "path": "/private/tmp/fomawrite-b1e49a4-shared/editor-job.log",
+          "bytes": 152279,
+          "sha256": "6def70b4bec7dbd58d3bc7f1816494eb63bdda917512220ed1c1aa2d41bd30e8"
+        },
+        {
+          "path": "/private/tmp/fomawrite-b1e49a4-shared/mac-job.log",
+          "bytes": 380990,
+          "sha256": "32c79a8f03a7f8aedc899b5a49abdc3b7cf1a224b38452b47ae76c4993970528"
+        },
+        {
+          "path": "/private/tmp/fomawrite-b1e49a4-shared/mac-test-artifact/test.log",
+          "bytes": 198870,
+          "sha256": "662ecc5f43b4ec4b6c081fb3857c0642c64450ae30e2c5bdf36b57037383424f"
+        },
+        {
+          "path": "/private/tmp/fomawrite-b1e49a4-shared/run-status.json",
+          "bytes": 4440,
+          "sha256": "311ad2e13f23ccb8f8d4b1e82cbbf09aec8d137fe13e82c193aed0efe2b78b0f"
+        },
+        {
+          "path": "/private/tmp/fomawrite-b1e49a4-shared/run-watch.log",
+          "bytes": 13587,
+          "sha256": "6eaa1ec4ff9a693a8fb0fe6b5c6d79ffd3521f0d8d8b2dfb273bcf0e36872ba5"
+        }
+      ]
+    },
     "applicationChanged": false,
     "desktopQualification": false,
     "sdkAcquisitionFollowthrough": {
@@ -676,6 +849,135 @@
         "durableArchive": false,
         "evidenceDirectory": "research/cycle-162/evidence/b1e49a4-sdk-acquisition"
       }
-    }
+    },
+    "visibleStalePageFixture": {
+      "scope": "test-only separation of Source recovery UI from real visible-WebChannel invalid-page guard",
+      "recordedUtc": "2026-10-22T18:54:08.309832+00:00",
+      "sourceCommitBeforeChanges": "45807e120cef3510c959d9abad68a130480380ca",
+      "platform": "macOS arm64; Qt6.11.2; offscreen via bin/test",
+      "scenarios": [
+        {
+          "name": "initial-focused",
+          "command": "./bin/test livePersistenceMismatchAndTimeoutFailClosed liveInvalidatedPageRejectsRealChannelChanges liveEditorRendererRecoveryIsBoundedAndPreservesCanonicalEdits -o /private/tmp/fomawrite-visible-stale-page/initial-focused-test.log,txt > /private/tmp/fomawrite-visible-stale-page/initial-focused-build.log 2>&1",
+          "cwd": "/Users/andrewgray/repo/projects/fomawrite_windows",
+          "counts": {
+            "passed": 5,
+            "failed": 0,
+            "skipped": 0,
+            "blacklisted": 0,
+            "elapsedMs": 12978
+          },
+          "guardRemoved": false,
+          "testLogSha256": "314d0e211315c5f4c07ff8b8c023798b56ae0fbbc93023a85a0ac8930155be1b",
+          "buildLogSha256": "21cd553c5442ee59be0c5db84901b020fcd3843e5f6fac1a70400bebeb210cfc"
+        },
+        {
+          "name": "guard-removed",
+          "command": "./bin/test liveInvalidatedPageRejectsRealChannelChanges -o /private/tmp/fomawrite-visible-stale-page/guard-removed-test.log,txt > /private/tmp/fomawrite-visible-stale-page/guard-removed-build.log 2>&1",
+          "cwd": "/Users/andrewgray/repo/projects/fomawrite_windows",
+          "counts": {
+            "passed": 2,
+            "failed": 1,
+            "skipped": 0,
+            "blacklisted": 0,
+            "elapsedMs": 436
+          },
+          "guardRemoved": true,
+          "testLogSha256": "44a5d258a08c13794fb499ac395cdaa7bf0e2e0b3f033a436948877aaf41dc74",
+          "buildLogSha256": "6117b6187baa07d338932f1aa6b4afb8f1f9dd71bc72118df1f80c80f6560bf3"
+        },
+        {
+          "name": "restored-focused",
+          "command": "./bin/test livePersistenceMismatchAndTimeoutFailClosed liveInvalidatedPageRejectsRealChannelChanges liveEditorRendererRecoveryIsBoundedAndPreservesCanonicalEdits -o /private/tmp/fomawrite-visible-stale-page/restored-focused-test.log,txt > /private/tmp/fomawrite-visible-stale-page/restored-focused-build.log 2>&1",
+          "cwd": "/Users/andrewgray/repo/projects/fomawrite_windows",
+          "counts": {
+            "passed": 5,
+            "failed": 0,
+            "skipped": 0,
+            "blacklisted": 0,
+            "elapsedMs": 12793
+          },
+          "guardRemoved": false,
+          "testLogSha256": "2750db1d4210f6b23b68a919685a31d30864b8d667b3785401734dd21aa5f3bb",
+          "buildLogSha256": "ae548af1992d32ffb0be04dcd4307c5d563f77156251925da544d9a391afe0a7"
+        }
+      ],
+      "guardSensitivity": {
+        "removedOnly": "if (!m_ready) return; in EditorBridge::documentChanged",
+        "failure": "oldPageChanges.count() actual1,expected0; real main-world callback returned expected old renderer text and bridge generation stayed3",
+        "originalBridgeSha256": "01d1871ec731dd73f1cf6f01579d098571753a8f14b440a889acb29563837740",
+        "guardRemovedBridgeSha256": "33d6aa787c355120a6ef3cac7e980bc366ca984f9f477e6f73be93f9fe2dc298",
+        "restoredBridgeSha256": "01d1871ec731dd73f1cf6f01579d098571753a8f14b440a889acb29563837740",
+        "byteExactRestoration": true
+      },
+      "changedSources": {
+        "tests/live-persistence.inc": "518d5f7836daca238f8ab7e7fac10640b312fd5efda2bed3992c4a2f30a5a2c9",
+        "tests/tst_fomawrite.cpp": "d0a972b594cebd402672c2229d99ca5c24f005065d3d91e399132715e5902444"
+      },
+      "limits": [
+        "No product change; the temporary readiness-guard mutation was restored byte-for-byte.",
+        "Guard sensitivity is not a product bug/red-green claim.",
+        "No Windows VM input, commit or push.",
+        "Focused host runs only; full hosted Mac/Windows Qt6.11.3 gates remain required."
+      ],
+      "files": [
+        {
+          "path": "/private/tmp/fomawrite-visible-stale-page/before-editorbridge.cpp",
+          "bytes": 6131,
+          "sha256": "01d1871ec731dd73f1cf6f01579d098571753a8f14b440a889acb29563837740"
+        },
+        {
+          "path": "/private/tmp/fomawrite-visible-stale-page/before-live-persistence.inc",
+          "bytes": 30619,
+          "sha256": "9cdf051e2b98d6e15a52a9754e9a09634ad8e219123a7afc4f62e433f5aa8a76"
+        },
+        {
+          "path": "/private/tmp/fomawrite-visible-stale-page/before-tst_fomawrite.cpp",
+          "bytes": 376548,
+          "sha256": "cdce4a5f46bc318544c0445191d41ea0562f9288dc7fc886f0cec6a69cde3296"
+        },
+        {
+          "path": "/private/tmp/fomawrite-visible-stale-page/guard-removed-build.log",
+          "bytes": 11339,
+          "sha256": "6117b6187baa07d338932f1aa6b4afb8f1f9dd71bc72118df1f80c80f6560bf3"
+        },
+        {
+          "path": "/private/tmp/fomawrite-visible-stale-page/guard-removed-editorbridge.cpp",
+          "bytes": 6105,
+          "sha256": "33d6aa787c355120a6ef3cac7e980bc366ca984f9f477e6f73be93f9fe2dc298"
+        },
+        {
+          "path": "/private/tmp/fomawrite-visible-stale-page/guard-removed-test.log",
+          "bytes": 1206,
+          "sha256": "44a5d258a08c13794fb499ac395cdaa7bf0e2e0b3f033a436948877aaf41dc74"
+        },
+        {
+          "path": "/private/tmp/fomawrite-visible-stale-page/initial-focused-build.log",
+          "bytes": 9299,
+          "sha256": "21cd553c5442ee59be0c5db84901b020fcd3843e5f6fac1a70400bebeb210cfc"
+        },
+        {
+          "path": "/private/tmp/fomawrite-visible-stale-page/initial-focused-test.log",
+          "bytes": 1274,
+          "sha256": "314d0e211315c5f4c07ff8b8c023798b56ae0fbbc93023a85a0ac8930155be1b"
+        },
+        {
+          "path": "/private/tmp/fomawrite-visible-stale-page/restored-focused-build.log",
+          "bytes": 3549,
+          "sha256": "ae548af1992d32ffb0be04dcd4307c5d563f77156251925da544d9a391afe0a7"
+        },
+        {
+          "path": "/private/tmp/fomawrite-visible-stale-page/restored-focused-test.log",
+          "bytes": 1471,
+          "sha256": "2750db1d4210f6b23b68a919685a31d30864b8d667b3785401734dd21aa5f3bb"
+        },
+        {
+          "path": "/private/tmp/fomawrite-visible-stale-page/tests.patch",
+          "bytes": 7630,
+          "sha256": "ff9815074f42c30c0d6585b6513a7964f7af022f9d581e6ee6ea1fac505045f6"
+        }
+      ]
+    },
+    "visibleStalePageHostedVerification": "pending"
   }
 }
