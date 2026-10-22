@@ -4,6 +4,8 @@ One line per cycle, newest first. Each line links to the cycle's record under `r
 
 ## 0.3.0 development series (Cycles 97–)
 
+- **154 — Windows M2 Focus/chrome parity candidate** — Expose existing Focus, style-check, Title Bar and Toolbar/Stats Only commands through actual desktop menus; tighten five existing platform-menu tests and add optional native red/green proof. Required local build and all 370 tests pass; native red/green and packaged qualification remain pending. [Record](research/cycle-154/README.md)
+
 - **Windows M2 delayed Live selection repair candidate** — Let Save await earlier selection commands within its existing three-second deadline, retain standalone fallback and cancel late commands safely. Real-page red/green regressions pass; final integration, native CI and packaged qualification remain pending. [Record](docs/windows/M2-LIVE-PERSISTENCE.md#delayed-selection-and-save-deadline)
 
 - **Windows M2 menu parity candidate** — Restore existing View, clipboard/search and Paginated Preview routes with actual-menu regressions; replace two CI timing assumptions with real page readiness and delivery evidence. Final native CI and packaged qualification are pending. [Record](docs/windows/M2-MENU-PARITY.md)

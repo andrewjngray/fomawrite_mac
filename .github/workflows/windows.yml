@@ -5,6 +5,12 @@ on:
     branches: [windows/port]
   pull_request:
   workflow_dispatch:
+    inputs:
+      menu_baseline_revision:
+        description: 'Optional full commit SHA for native Focus/chrome menu red/green proof'
+        required: false
+        type: string
+        default: ''
 
 permissions:
   contents: read
@@ -33,6 +39,16 @@ jobs:
       QT_ROOT_DIR: C:/Qt/6.11.3-${{ matrix.architecture }}
     steps:
       - uses: actions/checkout@v4
+
+      - name: Fetch optional same-origin menu baseline
+        id: menu-baseline
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.menu_baseline_revision != '' }}
+        env:
+          MENU_BASELINE_REVISION: ${{ inputs.menu_baseline_revision }}
+        run: |
+          if ($env:MENU_BASELINE_REVISION -notmatch '^[0-9a-fA-F]{40}$') { throw 'menu_baseline_revision must be a full 40-character commit SHA.' }
+          git fetch --no-tags --depth=1 origin $env:MENU_BASELINE_REVISION
+          if ($LASTEXITCODE -ne 0) { throw 'Could not fetch the exact menu baseline from origin.' }
 
       - uses: actions/setup-python@v5
         with:
@@ -82,8 +98,15 @@ jobs:
           retention-days: 14
 
       - name: Build and run complete Qt regression suite
+        id: qt-tests
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         run: ./bin/windows/test.ps1 -Architecture ${{ matrix.architecture }}
+
+      - name: Prove native Focus and chrome menu regressions
+        if: ${{ !cancelled() && steps.qt-tests.outcome == 'success' && steps.menu-baseline.outcome == 'success' }}
+        env:
+          MENU_BASELINE_REVISION: ${{ inputs.menu_baseline_revision }}
+        run: ./bin/windows/prove-menu-regressions.ps1 -Architecture ${{ matrix.architecture }} -BaselineRevision $env:MENU_BASELINE_REVISION
 
       - name: Exercise deployed executable on native Windows desktop
         if: ${{ !cancelled() && steps.package.outcome == 'success' }}
@@ -99,6 +122,7 @@ jobs:
             build-tests/windows-${{ matrix.architecture }}/test.xml
             build-tests/windows-${{ matrix.architecture }}/native-appearance.log
             build-tests/windows-${{ matrix.architecture }}/native-appearance.xml
+            build-tests/windows-${{ matrix.architecture }}/menu-regression-proof/
             build-tests/windows-${{ matrix.architecture }}/deployed-acceptance/
             dist/windows-${{ matrix.architecture }}/Fomawrite/manifest.json
             build/windows-${{ matrix.architecture }}/qt-install.json

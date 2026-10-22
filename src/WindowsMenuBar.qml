@@ -176,6 +176,47 @@ MenuBar {
         Command { commandId: "outline" }
         Command { commandId: "statistics" }
         WorkspaceMenu {
+            objectName: "windowsTitleBarMenu"
+            title: "Title Bar"
+            Command { commandId: "titleBarFade" }
+            Command { commandId: "titleBarAlways" }
+        }
+        WorkspaceMenu {
+            objectName: "windowsToolbarMenu"
+            title: "Toolbar"
+            // Menu creates its submenu entry through this delegate. Keep the
+            // Stats Only heading checked while its persisted mode is active.
+            delegate: MenuItem {
+                id: toolbarSubmenuItem
+                objectName: subMenu === toolbarStatsOnlyMenu ? "windows_toolbarStatsOnly" : ""
+                checkable: subMenu === toolbarStatsOnlyMenu
+                checked: subMenu === toolbarStatsOnlyMenu && workspaceCommands.isChecked("toolbarStatsOnly")
+                onTriggered: checked = Qt.binding(function() {
+                    return toolbarSubmenuItem.subMenu === toolbarStatsOnlyMenu && workspaceCommands.isChecked("toolbarStatsOnly")
+                })
+            }
+            Command { commandId: "toolbarFade" }
+            Command { commandId: "toolbarAlways" }
+            Command { commandId: "toolbarHide" }
+            MenuSeparator {}
+            Command { commandId: "toolbarDefault" }
+            WorkspaceMenu {
+                id: toolbarStatsOnlyMenu
+                objectName: "windowsToolbarStatsOnlyMenu"
+                title: "Stats Only"
+                Command { commandId: "toolbarCharacters" }
+                Command { commandId: "toolbarCharactersNoSpaces" }
+                Command { commandId: "toolbarWords" }
+                Command { commandId: "toolbarSentences" }
+                Command { commandId: "toolbarReadingTime" }
+                Command { commandId: "toolbarSpeakingTime" }
+                Command { commandId: "toolbarTasks" }
+                Command { commandId: "toolbarHuman" }
+                Command { commandId: "toolbarAI" }
+                Command { commandId: "toolbarReference" }
+            }
+        }
+        WorkspaceMenu {
             title: "Writing Appearance"
             Command { commandId: "writingManuscript" }
             Command { commandId: "writingEditorial" }
@@ -194,6 +235,24 @@ MenuBar {
         Command { commandId: "smaller" }
         Command { commandId: "resetSize" }
         Command { commandId: "fullscreen" }
+    }
+    WorkspaceMenu {
+        title: "F&ocus"
+        WorkspaceMenu {
+            objectName: "windowsFocusModeMenu"
+            title: "Enable Focus Mode"
+            Command { commandId: "sentence"; text: "Sentence" }
+            Command { commandId: "paragraph"; text: "Paragraph" }
+            Command { commandId: "typewriter"; text: "Typewriter (Source)" }
+        }
+        WorkspaceMenu {
+            objectName: "windowsFocusStyleCheckMenu"
+            title: "Enable Style Check"
+            Command { commandId: "fillersStyleCheck" }
+            Command { commandId: "customStyleCheck" }
+        }
+        MenuSeparator {}
+        Command { commandId: "writingReview" }
     }
     WorkspaceMenu {
         title: "&Help"

@@ -28,6 +28,10 @@ The same candidate implements nine clipboard/search actions: Copy Markdown/HTML/
 
 The required local build and complete suite passed **367 tests, zero failures and one Windows-only skip**, 540.931 seconds. Exact native CI passed ARM64 340/0/0 but failed x64 339/1/0; shared Mac Qt failed 352/3/13. The confirmed Save defect and fixture corrections are detailed in the Windows status. Ordinary packaged desktop menu checks remain incomplete. Qualification still requires menu activation, checked/enabled state, date/sort independence, responsive geometry and unchanged document bytes/history. [Workspace/menu tests](../../tests/tst_fomawrite.cpp), [platform lookup](../../tests/platform-menu-helpers.inc), [Windows menu tests](../../tests/windows-menu.inc), [Windows menu](../../src/WindowsMenuBar.qml).
 
+## Focus/chrome implementation awaiting native qualification
+
+Cycle 154 implements the existing Focus, style-check, Title Bar and Toolbar/Stats Only menu routes. Five existing tests now require real Windows nodes and state instead of accepting absent controls or invoking only shared commands. Full local build/suite passed **370/0/1**; exact native red/green and ordinary popup interaction remain pending. The corresponding entries below describe the earlier route inventory and are not yet qualified as complete. [Cycle record](../../research/cycle-154/README.md).
+
 ## Remaining desktop route scope
 
 These portable affordances remain outside the implemented slices. Shared Backend, command, dialog or footer tests establish underlying behavior only. Missing additional routes prevent a claim of complete desktop menu parity; they are broader affordance work, not newly demonstrated data-loss or rendering defects. Unsupported routes must remain explicit rather than become Mac-only test exemptions.

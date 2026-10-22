@@ -227,6 +227,48 @@ public static class NormalLaunchInput {
                 delegate() { root=ReacquireOwnedRoot(handle, owner); }, budget);
         }, "bounded control search: " + pattern);
     }
+    public static string RequireOwnedMenuPopup(AutomationElement item, int pid) {
+        return Bounded(delegate() {
+            var current=item.Current;
+            if(pid<=0 || (uint)pid!=expectedProcessId || current.ProcessId!=pid ||
+                current.ControlType!=ControlType.MenuItem || !current.IsEnabled ||
+                current.IsOffscreen || current.BoundingRectangle.IsEmpty)
+                throw new InvalidOperationException("File menu item is not visible and owned");
+            var parent=TreeWalker.ControlViewWalker.GetParent(item);
+            if(parent==null) throw new InvalidOperationException("File menu popup is missing");
+            var popup=parent.Current;
+            var bounds=current.BoundingRectangle;
+            if(popup.ProcessId!=pid || popup.ControlType!=ControlType.Menu ||
+                popup.ClassName!="QQuickPopupItem" || popup.IsOffscreen ||
+                !popup.BoundingRectangle.Contains(bounds.Left+bounds.Width/2, bounds.Top+bounds.Height/2))
+                throw new InvalidOperationException("File menu popup is not visible and owned");
+            return "pid="+pid+" | popup="+popup.BoundingRectangle+" | item="+current.Name+" | bounds="+bounds;
+        }, "owned File popup before keyboard scrolling");
+    }
+    public static string ScrollOwnedMenuDown(AutomationElement item, int pid) {
+        string proof=RequireOwnedMenuPopup(item,pid);
+        var bounds=Bounded(delegate(){return item.Current.BoundingRectangle;},"owned menu wheel position");
+        RequireInputForeground();
+        MovePhysical((int)(bounds.Left+bounds.Width/2),(int)(bounds.Top+bounds.Height/2));
+        RequireInputForeground();
+        INPUT input=new INPUT();input.type=0;input.u.mi.dwFlags=0x0800;
+        input.u.mi.mouseData=unchecked((uint)-360);Send(input);
+        return proof+" | physical wheel delta=-360";
+    }
+    public static System.Windows.Rect OwnedMenuBounds(AutomationElement item, int pid) {
+        RequireOwnedMenuPopup(item,pid);
+        return Bounded(delegate(){return TreeWalker.ControlViewWalker.GetParent(item).Current.BoundingRectangle;},"owned File popup bounds");
+    }
+    public static void ClickOwnedMenuPoint(AutomationElement anchor, int pid, int x, int y, System.Windows.Rect measuredPopup, long capturedAt) {
+        var popup=OwnedMenuBounds(anchor,pid);
+        if(popup!=measuredPopup || !popup.Contains(x,y))
+            throw new InvalidOperationException("OCR menu target or popup geometry changed");
+        double ageMs=(Stopwatch.GetTimestamp()-capturedAt)*1000.0/Stopwatch.Frequency;
+        if(ageMs<0 || ageMs>750) throw new InvalidOperationException("Final menu crop is no longer current; refusing input");
+        RequireInputForeground();MovePhysical(x,y);RequireInputForeground();
+        INPUT input=new INPUT();input.type=0;input.u.mi.dwFlags=2;Send(input);
+        input.u.mi.dwFlags=4;Send(input);
+    }
     public static bool OpenedDocument(AutomationElement main, IntPtr pickerHandle, string title) {
         return Bounded(delegate() {
             if(pickerHandle==IntPtr.Zero) throw new InvalidOperationException("Missing native picker identity");

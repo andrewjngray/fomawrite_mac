@@ -4164,17 +4164,15 @@ QtObject {
         auto *settings = window->findChild<QObject *>("workspaceSettings");
         auto *layout = window->findChild<QObject *>("workspaceLayout");
         auto *editor = window->findChild<QObject *>("sourceEditor");
-        auto *focusMenu = window->findChild<QObject *>("focusModeMenu");
-        auto *sentence = window->findChild<QObject *>("native_sentence");
-        auto *paragraph = window->findChild<QObject *>("native_paragraph");
-        auto *typewriter = window->findChild<QObject *>("native_typewriter");
-        auto *review = window->findChild<QObject *>("focusWritingReview");
+        auto *focusMenu = window->findChild<QObject *>(window->property("isMac").toBool() ? "focusModeMenu" : "windowsFocusModeMenu");
+        auto *sentence = testDesktopCommand(window.data(), QStringLiteral("sentence"));
+        auto *paragraph = testDesktopCommand(window.data(), QStringLiteral("paragraph"));
+        auto *typewriter = testDesktopCommand(window.data(), QStringLiteral("typewriter"));
+        auto *review = window->property("isMac").toBool() ? window->findChild<QObject *>("focusWritingReview") : testDesktopCommand(window.data(), QStringLiteral("writingReview"));
         auto *reviewDialog = window->findChild<QObject *>("writingReviewDialog");
         QVERIFY(testDesktopMenusMatchPlatform(window.data()));
-        const bool mac = window->property("isMac").toBool();
         QVERIFY(commands && settings && editor && reviewDialog);
-        if (mac) QVERIFY(focusMenu && sentence && paragraph && typewriter && review);
-        else { QVERIFY(!focusMenu && !sentence && !paragraph && !typewriter && !review); }
+        QVERIFY(focusMenu && sentence && paragraph && typewriter && review);
 
         const bool originalSentence = settings->property("sentenceFocus").toBool();
         const bool originalParagraph = settings->property("paragraphFocus").toBool();
@@ -4190,7 +4188,6 @@ QtObject {
         editor->setProperty("text", QStringLiteral("Focus modes keep this source unchanged."));
         const QString source = editor->property("text").toString();
 
-        if (mac) {
         QCOMPARE(focusMenu->property("title").toString(), QStringLiteral("Enable Focus Mode"));
         QCOMPARE(sentence->property("text").toString(), QStringLiteral("Sentence"));
         QCOMPARE(paragraph->property("text").toString(), QStringLiteral("Paragraph"));
@@ -4199,31 +4196,26 @@ QtObject {
         QVERIFY(paragraph->property("checkable").toBool());
         QVERIFY(typewriter->property("checkable").toBool());
 
-        } else {
-            QCOMPARE(testCommandLabel(window.data(), QStringLiteral("sentence")), QStringLiteral("Sentence Focus"));
-            QCOMPARE(testCommandLabel(window.data(), QStringLiteral("paragraph")), QStringLiteral("Paragraph Focus"));
-            QCOMPARE(testCommandLabel(window.data(), QStringLiteral("typewriter")), QStringLiteral("Typewriter Scrolling (Source)"));
-        }
         auto run = [&](const QString &id) {
-            return QMetaObject::invokeMethod(commands, "run", Q_ARG(QVariant, id));
+            return testTriggerDesktopCommand(window.data(), id);
         };
         QVERIFY(run(QStringLiteral("sentence")));
         QVERIFY(settings->property("sentenceFocus").toBool());
         QVERIFY(!settings->property("paragraphFocus").toBool());
         QVERIFY(!settings->property("typewriter").toBool());
-        QVERIFY((mac ? sentence->property("checked").toBool() : testCommandState(window.data(), "isChecked", QStringLiteral("sentence"))));
+        QVERIFY(sentence->property("checked").toBool());
 
         QVERIFY(run(QStringLiteral("typewriter")));
         QVERIFY(settings->property("sentenceFocus").toBool());
         QVERIFY(settings->property("typewriter").toBool());
-        QVERIFY((mac ? typewriter->property("checked").toBool() : testCommandState(window.data(), "isChecked", QStringLiteral("typewriter"))));
+        QVERIFY(typewriter->property("checked").toBool());
 
         QVERIFY(run(QStringLiteral("paragraph")));
         QVERIFY(!settings->property("sentenceFocus").toBool());
         QVERIFY(settings->property("paragraphFocus").toBool());
         QVERIFY(settings->property("typewriter").toBool());
-        QVERIFY((mac ? paragraph->property("checked").toBool() : testCommandState(window.data(), "isChecked", QStringLiteral("paragraph"))));
-        QVERIFY(!(mac ? sentence->property("checked").toBool() : testCommandState(window.data(), "isChecked", QStringLiteral("sentence"))));
+        QVERIFY(paragraph->property("checked").toBool());
+        QVERIFY(!sentence->property("checked").toBool());
 
         QVERIFY(run(QStringLiteral("paragraph")));
         QVERIFY(!settings->property("sentenceFocus").toBool());
@@ -4231,13 +4223,9 @@ QtObject {
         QVERIFY(settings->property("typewriter").toBool());
         QCOMPARE(editor->property("text").toString(), source);
 
-        if (mac) {
-            QCOMPARE(review->property("text").toString(), QStringLiteral("Writing Review…"));
-            QVERIFY(QMetaObject::invokeMethod(review, "triggered"));
-        } else {
-            QCOMPARE(testCommandLabel(window.data(), QStringLiteral("writingReview")), QStringLiteral("Writing Review…"));
-            QVERIFY(testRunCommand(window.data(), QStringLiteral("writingReview")));
-        }
+        QCOMPARE(review->property("text").toString(), QStringLiteral("Writing Review…"));
+        QVERIFY(review->property("enabled").toBool());
+        QVERIFY(QMetaObject::invokeMethod(review, "triggered"));
         QTRY_VERIFY(reviewDialog->property("opened").toBool());
         QVERIFY(QMetaObject::invokeMethod(reviewDialog, "close"));
         backend.discardRecovery();
@@ -4254,13 +4242,11 @@ QtObject {
         auto *settings = window->findChild<QObject *>("workspaceSettings");
         auto *layout = window->findChild<QObject *>("workspaceLayout");
         auto *editor = window->findChild<QObject *>("sourceEditor");
-        auto *styleMenu = window->findChild<QObject *>("focusStyleCheckMenu");
-        auto *custom = window->findChild<QObject *>("native_customStyleCheck");
+        auto *styleMenu = window->findChild<QObject *>(window->property("isMac").toBool() ? "focusStyleCheckMenu" : "windowsFocusStyleCheckMenu");
+        auto *custom = testDesktopCommand(window.data(), QStringLiteral("customStyleCheck"));
         QVERIFY(testDesktopMenusMatchPlatform(window.data()));
-        const bool mac = window->property("isMac").toBool();
         QVERIFY(commands && settings && editor);
-        if (mac) QVERIFY(styleMenu && custom);
-        else QVERIFY(!styleMenu && !custom);
+        QVERIFY(styleMenu && custom);
 
         const bool originalEnabled = settings->property("styleCheckCustom").toBool();
         const QString originalWords = settings->property("reviewWords").toString();
@@ -4271,16 +4257,13 @@ QtObject {
         const QString source = editor->property("text").toString();
         const bool canUndo = editor->property("canUndo").toBool();
 
-        if (mac) {
-            QCOMPARE(styleMenu->property("title").toString(), QStringLiteral("Enable Style Check"));
-            QCOMPARE(custom->property("text").toString(), QStringLiteral("Custom"));
-            QVERIFY(custom->property("checkable").toBool());
-        } else QCOMPARE(testCommandLabel(window.data(), QStringLiteral("customStyleCheck")), QStringLiteral("Custom"));
-        QVERIFY(!(mac ? custom->property("checked").toBool() : testCommandState(window.data(), "isChecked", QStringLiteral("customStyleCheck"))));
-        QVERIFY(QMetaObject::invokeMethod(commands, "run",
-                                          Q_ARG(QVariant, QStringLiteral("customStyleCheck"))));
+        QCOMPARE(styleMenu->property("title").toString(), QStringLiteral("Enable Style Check"));
+        QCOMPARE(custom->property("text").toString(), QStringLiteral("Custom"));
+        QVERIFY(custom->property("checkable").toBool());
+        QVERIFY(!custom->property("checked").toBool());
+        QVERIFY(testTriggerDesktopCommand(window.data(), QStringLiteral("customStyleCheck")));
         QVERIFY(settings->property("styleCheckCustom").toBool());
-        QVERIFY((mac ? custom->property("checked").toBool() : testCommandState(window.data(), "isChecked", QStringLiteral("customStyleCheck"))));
+        QVERIFY(custom->property("checked").toBool());
 
         auto *quick = qvariant_cast<QQuickTextDocument *>(editor->property("textDocument"));
         QVERIFY(quick);
@@ -4306,27 +4289,25 @@ QtObject {
         settings->setProperty("reviewWords", QStringLiteral("custom"));
         QTRY_VERIFY_WITH_TIMEOUT(backgroundAt(6).style() != Qt::NoBrush, 1000);
         QCOMPARE(backgroundAt(0).style(), Qt::NoBrush);
-        QVERIFY(QMetaObject::invokeMethod(commands, "run",
-                                          Q_ARG(QVariant, QStringLiteral("customStyleCheck"))));
+        QVERIFY(testTriggerDesktopCommand(window.data(), QStringLiteral("customStyleCheck")));
         QVERIFY(!settings->property("styleCheckCustom").toBool());
         QCOMPARE(backgroundAt(6).style(), Qt::NoBrush);
         QCOMPARE(editor->property("text").toString(), QStringLiteral("other custom"));
 
-        QVERIFY(QMetaObject::invokeMethod(commands, "run",
-                                          Q_ARG(QVariant, QStringLiteral("customStyleCheck"))));
+        QVERIFY(testTriggerDesktopCommand(window.data(), QStringLiteral("customStyleCheck")));
         QVERIFY(QMetaObject::invokeMethod(settings, "sync"));
         window.reset();
 
         QScopedPointer<QObject> reopened(component.create());
         QVERIFY2(reopened, qPrintable(component.errorString()));
         auto *reopenedSettings = reopened->findChild<QObject *>("workspaceSettings");
-        auto *reopenedCustom = reopened->findChild<QObject *>("native_customStyleCheck");
+        auto *reopenedCustom = testDesktopCommand(reopened.data(), QStringLiteral("customStyleCheck"));
         QVERIFY(testDesktopMenusMatchPlatform(reopened.data()));
         QVERIFY(reopenedSettings);
-        if (mac) QVERIFY(reopenedCustom); else QVERIFY(!reopenedCustom);
+        QVERIFY(reopenedCustom);
         QCOMPARE(reopenedSettings->property("styleCheckCustom").toBool(), true);
         QCOMPARE(reopenedSettings->property("reviewWords").toString(), QStringLiteral("custom"));
-        QVERIFY((mac ? reopenedCustom->property("checked").toBool() : testCommandState(reopened.data(), "isChecked", QStringLiteral("customStyleCheck"))));
+        QVERIFY(reopenedCustom->property("checked").toBool());
 
         reopenedSettings->setProperty("reviewWords", originalWords);
         reopenedSettings->setProperty("styleCheckCustom", originalEnabled);
@@ -4351,12 +4332,11 @@ QtObject {
         auto *settings = window->findChild<QObject *>("workspaceSettings");
         auto *layout = window->findChild<QObject *>("workspaceLayout");
         auto *commands = window->findChild<QObject *>("workspaceCommands");
-        auto *fillers = window->findChild<QObject *>("native_fillersStyleCheck");
-        auto *custom = window->findChild<QObject *>("native_customStyleCheck");
+        auto *fillers = testDesktopCommand(window.data(), QStringLiteral("fillersStyleCheck"));
+        auto *custom = testDesktopCommand(window.data(), QStringLiteral("customStyleCheck"));
         QVERIFY(testDesktopMenusMatchPlatform(window.data()));
-        const bool mac = window->property("isMac").toBool();
         QVERIFY(settings && commands);
-        if (mac) QVERIFY(fillers && custom); else QVERIFY(!fillers && !custom);
+        QVERIFY(fillers && custom);
         const bool originalFillers = settings->property("styleCheckFillers").toBool();
         const bool originalCustom = settings->property("styleCheckCustom").toBool();
         const QString originalWords = settings->property("reviewWords").toString();
@@ -4365,16 +4345,15 @@ QtObject {
         settings->setProperty("reviewWords", QStringLiteral("custom"));
 
         auto run = [&](const QString &id) {
-            return QMetaObject::invokeMethod(commands, "run", Q_ARG(QVariant, id));
+            auto *item = id == QStringLiteral("fillersStyleCheck") ? fillers : custom;
+            return item && item->property("enabled").toBool() && QMetaObject::invokeMethod(item, "triggered");
         };
-        if (mac) {
-            QCOMPARE(fillers->property("text").toString(), QStringLiteral("Fillers"));
-            QVERIFY(fillers->property("checkable").toBool());
-        } else QCOMPARE(testCommandLabel(window.data(), QStringLiteral("fillersStyleCheck")), QStringLiteral("Fillers"));
+        QCOMPARE(fillers->property("text").toString(), QStringLiteral("Fillers"));
+        QVERIFY(fillers->property("checkable").toBool());
         QVERIFY(run(QStringLiteral("fillersStyleCheck")));
         QVERIFY(settings->property("styleCheckFillers").toBool());
         QVERIFY(!settings->property("styleCheckCustom").toBool());
-        QVERIFY((mac ? fillers->property("checked").toBool() : testCommandState(window.data(), "isChecked", QStringLiteral("fillersStyleCheck"))));
+        QVERIFY(fillers->property("checked").toBool());
         QVERIFY(QMetaObject::invokeMethod(settings, "sync"));
         window.reset();
 
@@ -4382,15 +4361,15 @@ QtObject {
         QVERIFY2(reopened, qPrintable(component.errorString()));
         settings = reopened->findChild<QObject *>("workspaceSettings");
         commands = reopened->findChild<QObject *>("workspaceCommands");
-        fillers = reopened->findChild<QObject *>("native_fillersStyleCheck");
-        custom = reopened->findChild<QObject *>("native_customStyleCheck");
+        fillers = testDesktopCommand(reopened.data(), QStringLiteral("fillersStyleCheck"));
+        custom = testDesktopCommand(reopened.data(), QStringLiteral("customStyleCheck"));
         auto *editor = reopened->findChild<QObject *>("sourceEditor");
         QVERIFY(testDesktopMenusMatchPlatform(reopened.data()));
         QVERIFY(settings && commands && editor);
-        if (mac) QVERIFY(fillers && custom); else QVERIFY(!fillers && !custom);
+        QVERIFY(fillers && custom);
         QCOMPARE(settings->property("styleCheckFillers").toBool(), true);
         QCOMPARE(settings->property("styleCheckCustom").toBool(), false);
-        QVERIFY((mac ? fillers->property("checked").toBool() : testCommandState(reopened.data(), "isChecked", QStringLiteral("fillersStyleCheck"))));
+        QVERIFY(fillers->property("checked").toBool());
 
         backend.open(QUrl::fromLocalFile(path));
         QCoreApplication::processEvents(); // Let the document-loaded caret reset finish first.
@@ -4417,9 +4396,12 @@ QtObject {
         QCOMPARE(backgroundAt(7).style(), Qt::NoBrush);
 
         QVERIFY(run(QStringLiteral("customStyleCheck")));
+        QVERIFY(custom->property("checked").toBool());
         QTRY_VERIFY_WITH_TIMEOUT(backgroundAt(7).style() != Qt::NoBrush, 1000);
         QVERIFY(run(QStringLiteral("fillersStyleCheck")));
         QVERIFY(!settings->property("styleCheckFillers").toBool());
+        QVERIFY(!fillers->property("checked").toBool());
+        QVERIFY(custom->property("checked").toBool());
         QCOMPARE(backgroundAt(0).style(), Qt::NoBrush);
         QCOMPARE(backgroundAt(14).style(), Qt::NoBrush);
         QVERIFY(backgroundAt(7).style() != Qt::NoBrush);
@@ -5030,7 +5012,7 @@ QtObject {
         QCOMPARE(annotated.value("referenceWords").toInt(), 2);
         QCOMPARE(backend.documentStatistics(markdown + QStringLiteral(" ")).value("humanWords").toInt(), 0);
 
-        QVERIFY(QMetaObject::invokeMethod(commands, "run", Q_ARG(QVariant, QStringLiteral("statistics"))));
+        QVERIFY(testTriggerDesktopCommand(window.data(), QStringLiteral("statistics")));
         QTRY_VERIFY(statisticsDialog->property("opened").toBool());
         const int before = statisticsDialog->property("statistics").toMap().value("words").toInt();
         editor->setProperty("text", markdown + QStringLiteral(" Extra."));
@@ -5044,16 +5026,37 @@ QtObject {
 
         settings->setProperty("toolbarMode", 0);
         for (const QString &property : metricProperties) settings->setProperty(property.toUtf8().constData(), true);
-        QVERIFY(QMetaObject::invokeMethod(commands, "run", Q_ARG(QVariant, QStringLiteral("toolbarTasks"))));
+        QVERIFY(testDesktopMenusMatchPlatform(window.data()));
+        auto *statsOnlyAction = testDesktopCommand(window.data(), QStringLiteral("toolbarStatsOnly"));
+        auto *defaultAction = testDesktopCommand(window.data(), QStringLiteral("toolbarDefault"));
+        QVERIFY(statsOnlyAction && defaultAction);
+        QVERIFY(statsOnlyAction->property("checkable").toBool());
+        QVERIFY(!statsOnlyAction->property("checked").toBool());
+        QVERIFY(defaultAction->property("checked").toBool());
+        for (const QString &property : metricProperties) {
+            auto *action = testDesktopCommand(window.data(), property);
+            QVERIFY2(action, qPrintable(property));
+            QVERIFY(action->property("checkable").toBool());
+            QCOMPARE(action->property("text").toString(), testCommandLabel(window.data(), property));
+            QVERIFY(action->property("checked").toBool());
+            QVERIFY(testTriggerDesktopCommand(window.data(), property));
+            QVERIFY(!settings->property(property.toUtf8().constData()).toBool());
+            QVERIFY(!action->property("checked").toBool());
+            QCOMPARE(settings->property("toolbarMode").toInt(), 1);
+            QVERIFY(statsOnlyAction->property("checked").toBool());
+            QVERIFY(!defaultAction->property("checked").toBool());
+            QVERIFY(testTriggerDesktopCommand(window.data(), property));
+            QVERIFY(settings->property(property.toUtf8().constData()).toBool());
+            QVERIFY(action->property("checked").toBool());
+        }
+        QVERIFY(testTriggerDesktopCommand(window.data(), QStringLiteral("toolbarDefault")));
+        QVERIFY(testTriggerDesktopCommand(window.data(), QStringLiteral("toolbarTasks")));
         QCOMPARE(settings->property("toolbarMode").toInt(), 1);
         QVERIFY(!settings->property("toolbarTasks").toBool());
         QVERIFY(toolbarStatistic->property("text").toString().contains(QStringLiteral("words")));
         QVERIFY(!toolbarStatistic->property("text").toString().contains(QStringLiteral("tasks")));
-#ifdef Q_OS_MACOS
-        auto *tasksAction = window->findChild<QObject *>("native_toolbarTasks");
-        auto *defaultAction = window->findChild<QObject *>("native_toolbarDefault");
-        auto *statsOnlyAction = window->findChild<QObject *>("native_toolbarStatsOnly");
-        QVERIFY(tasksAction && defaultAction && statsOnlyAction);
+        auto *tasksAction = testDesktopCommand(window.data(), QStringLiteral("toolbarTasks"));
+        QVERIFY(tasksAction);
         QVERIFY(!tasksAction->property("checked").toBool());
         QVERIFY(QMetaObject::invokeMethod(tasksAction, "triggered"));
         QVERIFY(tasksAction->property("checked").toBool());
@@ -5063,7 +5066,6 @@ QtObject {
         QCOMPARE(settings->property("toolbarMode").toInt(), 0);
         QVERIFY(defaultAction->property("checked").toBool());
         QVERIFY(!statsOnlyAction->property("checked").toBool());
-#endif
 
         settings->setProperty("toolbarMode", 1);
         const bool expectedTasks = settings->property("toolbarTasks").toBool();
@@ -5081,6 +5083,11 @@ QtObject {
         restoreSettings = reopenedSettings;
         QCOMPARE(reopenedSettings->property("toolbarMode").toInt(), 1);
         QCOMPARE(reopenedSettings->property("toolbarTasks").toBool(), expectedTasks);
+        auto *reopenedStatsOnly = testDesktopCommand(reopened.data(), QStringLiteral("toolbarStatsOnly"));
+        auto *reopenedTasks = testDesktopCommand(reopened.data(), QStringLiteral("toolbarTasks"));
+        QVERIFY(reopenedStatsOnly && reopenedTasks);
+        QVERIFY(reopenedStatsOnly->property("checked").toBool());
+        QCOMPARE(reopenedTasks->property("checked").toBool(), expectedTasks);
         reopenedSettings->setProperty("toolbarMode", originalMode);
         for (auto it = originalMetrics.cbegin(); it != originalMetrics.cend(); ++it)
             reopenedSettings->setProperty(it.key().toUtf8().constData(), it.value());
@@ -5107,6 +5114,18 @@ QtObject {
         auto *libraryButton = window->findChild<QObject *>("topChromeLibraryButton");
         auto *editor = window->findChild<QObject *>("sourceEditor");
         QVERIFY(settings && commands && chrome && title && leading && trailing && libraryButton && editor);
+        QVERIFY(testDesktopMenusMatchPlatform(window.data()));
+        auto *titleBarMenu = window->findChild<QObject *>(window->property("isMac").toBool() ? "nativeTitleBarMenu" : "windowsTitleBarMenu");
+        QVERIFY(titleBarMenu);
+        QCOMPARE(titleBarMenu->property("title").toString(), QStringLiteral("Title Bar"));
+        const QStringList chromeCommands = {QStringLiteral("titleBarFade"), QStringLiteral("titleBarAlways"),
+            QStringLiteral("toolbarFade"), QStringLiteral("toolbarAlways"), QStringLiteral("toolbarHide")};
+        for (const QString &id : chromeCommands) {
+            auto *action = testDesktopCommand(window.data(), id);
+            QVERIFY2(action, qPrintable(id));
+            QVERIFY(action->property("enabled").toBool());
+            QVERIFY(action->property("checkable").toBool());
+        }
 
         const bool originalAutoHide = settings->property("autoHideChrome").toBool();
         const int originalToolbarVisibility = settings->property("toolbarVisibilityMode").toInt();
@@ -5117,10 +5136,13 @@ QtObject {
             restoreSettings->setProperty("toolbarVisibilityMode", originalToolbarVisibility);
         });
 
-        QVERIFY(QMetaObject::invokeMethod(commands, "run", Q_ARG(QVariant, QStringLiteral("titleBarFade"))));
-        QVERIFY(QMetaObject::invokeMethod(commands, "run", Q_ARG(QVariant, QStringLiteral("toolbarFade"))));
+        QVERIFY(testTriggerDesktopCommand(window.data(), QStringLiteral("titleBarFade")));
+        QVERIFY(testTriggerDesktopCommand(window.data(), QStringLiteral("toolbarFade")));
         QVERIFY(settings->property("autoHideChrome").toBool());
         QCOMPARE(settings->property("toolbarVisibilityMode").toInt(), 0);
+        QVERIFY(testDesktopCommand(window.data(), QStringLiteral("titleBarFade"))->property("checked").toBool());
+        QVERIFY(!testDesktopCommand(window.data(), QStringLiteral("titleBarAlways"))->property("checked").toBool());
+        QVERIFY(testDesktopCommand(window.data(), QStringLiteral("toolbarFade"))->property("checked").toBool());
         QVERIFY(leading->property("visible").toBool());
         qobject_cast<QQuickItem *>(libraryButton)->forceActiveFocus(Qt::TabFocusReason);
         QTRY_VERIFY(chrome->property("keyboardReveal").toBool());
@@ -5129,25 +5151,24 @@ QtObject {
         QVERIFY(QMetaObject::invokeMethod(editor, "forceActiveFocus"));
         QTRY_VERIFY(!chrome->property("keyboardReveal").toBool());
 
-        QVERIFY(QMetaObject::invokeMethod(commands, "run", Q_ARG(QVariant, QStringLiteral("titleBarAlways"))));
+        QVERIFY(testTriggerDesktopCommand(window.data(), QStringLiteral("titleBarAlways")));
         QTRY_COMPARE(title->property("opacity").toReal(), 1.0);
-        QVERIFY(QMetaObject::invokeMethod(commands, "run", Q_ARG(QVariant, QStringLiteral("toolbarHide"))));
+        QVERIFY(testTriggerDesktopCommand(window.data(), QStringLiteral("toolbarHide")));
         QVERIFY(!leading->property("visible").toBool());
         QVERIFY(!trailing->property("visible").toBool());
         QCOMPARE(chrome->property("height").toInt(), 52);
         QVERIFY(title->property("visible").toBool());
 
-#ifdef Q_OS_MACOS
-        auto native = [&](const char *id) { return window->findChild<QObject *>(QStringLiteral("native_") + id); };
-        QVERIFY(native("titleBarAlways") && native("titleBarAlways")->property("checked").toBool());
-        QVERIFY(native("toolbarHide") && native("toolbarHide")->property("checked").toBool());
-        QVERIFY(native("outline") && native("outline")->property("enabled").toBool());
-        QVERIFY(QMetaObject::invokeMethod(native("toolbarAlways"), "triggered"));
+        QVERIFY(testDesktopCommand(window.data(), QStringLiteral("titleBarAlways"))->property("checked").toBool());
+        QVERIFY(!testDesktopCommand(window.data(), QStringLiteral("titleBarFade"))->property("checked").toBool());
+        QVERIFY(testDesktopCommand(window.data(), QStringLiteral("toolbarHide"))->property("checked").toBool());
+        QVERIFY(!testDesktopCommand(window.data(), QStringLiteral("toolbarFade"))->property("checked").toBool());
+        auto *outline = testDesktopCommand(window.data(), QStringLiteral("outline"));
+        QVERIFY(outline && outline->property("enabled").toBool());
+        QVERIFY(testTriggerDesktopCommand(window.data(), QStringLiteral("toolbarAlways")));
         QCOMPARE(settings->property("toolbarVisibilityMode").toInt(), 1);
-        QVERIFY(native("toolbarAlways")->property("checked").toBool());
-#else
-        QVERIFY(QMetaObject::invokeMethod(commands, "run", Q_ARG(QVariant, QStringLiteral("toolbarAlways"))));
-#endif
+        QVERIFY(testDesktopCommand(window.data(), QStringLiteral("toolbarAlways"))->property("checked").toBool());
+        QVERIFY(!testDesktopCommand(window.data(), QStringLiteral("toolbarHide"))->property("checked").toBool());
         QVERIFY(leading->property("visible").toBool());
         QTRY_COMPARE(leading->property("opacity").toReal(), 1.0);
 
@@ -5167,6 +5188,11 @@ QtObject {
         restoreSettings = reopenedSettings;
         QVERIFY(reopenedSettings->property("autoHideChrome").toBool());
         QCOMPARE(reopenedSettings->property("toolbarVisibilityMode").toInt(), 2);
+        auto *reopenedTitleFade = testDesktopCommand(reopened.data(), QStringLiteral("titleBarFade"));
+        auto *reopenedToolbarHide = testDesktopCommand(reopened.data(), QStringLiteral("toolbarHide"));
+        QVERIFY(reopenedTitleFade && reopenedToolbarHide);
+        QVERIFY(reopenedTitleFade->property("checked").toBool());
+        QVERIFY(reopenedToolbarHide->property("checked").toBool());
         reopenedSettings->setProperty("autoHideChrome", originalAutoHide);
         reopenedSettings->setProperty("toolbarVisibilityMode", originalToolbarVisibility);
         QVERIFY(QMetaObject::invokeMethod(reopenedSettings, "sync"));

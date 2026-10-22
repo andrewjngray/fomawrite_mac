@@ -22,6 +22,10 @@ QObject *testDesktopCommand(QObject *window, const QString &id) {
     if (!testDesktopMenusMatchPlatform(window)) return nullptr;
     return window->findChild<QObject *>((window->property("isMac").toBool() ? QStringLiteral("native_") : QStringLiteral("windows_")) + id);
 }
+bool testTriggerDesktopCommand(QObject *window, const QString &id) {
+    auto *item = testDesktopCommand(window, id);
+    return item && item->property("enabled").toBool() && QMetaObject::invokeMethod(item, "triggered");
+}
 bool testCommandState(QObject *window, const char *method, const QString &id) {
     auto *commands = window->findChild<QObject *>("workspaceCommands");
     QVariant result;

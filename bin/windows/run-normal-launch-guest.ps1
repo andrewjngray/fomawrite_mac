@@ -150,8 +150,81 @@ function Launch {
 function Activate-Application {
     [NormalLaunchInput]::Foreground([IntPtr]$script:main.Current.NativeWindowHandle)
 }
+function Read-ExitMenuTarget($anchor) {
+    $popup = [NormalLaunchInput]::OwnedMenuBounds($anchor, $script:process.Id)
+    $window = $script:main.Current.BoundingRectangle
+    if (-not $window.Contains($popup)) { throw 'File popup crop escaped owned application window.' }
+    [NormalLaunchInput]::RequireInputForeground()
+    $left=[int][Math]::Ceiling($popup.Left); $top=[int][Math]::Ceiling($popup.Top)
+    $width=[int][Math]::Floor($popup.Right)-$left; $height=[int][Math]::Floor($popup.Bottom)-$top
+    $script:ExitMenuOcrAttempt++
+    $prefix='exit-menu-' + $script:process.Id + '-sample-' + $script:ExitMenuOcrAttempt
+    $path=Join-Path $outputRoot ($prefix + '-content.png')
+    $bitmap=New-Object Drawing.Bitmap($width,$height); $graphics=[Drawing.Graphics]::FromImage($bitmap)
+    try { $graphics.CopyFromScreen($left,$top,0,0,$bitmap.Size); $capturedAt=[Diagnostics.Stopwatch]::GetTimestamp(); $bitmap.Save($path,[Drawing.Imaging.ImageFormat]::Png) }
+    finally { $graphics.Dispose(); $bitmap.Dispose() }
+    $file=Wait-WinRt ([Windows.Storage.StorageFile]::GetFileFromPathAsync($path)) ([Windows.Storage.StorageFile])
+    $stream=Wait-WinRt ($file.OpenAsync([Windows.Storage.FileAccessMode]::Read)) ([Windows.Storage.Streams.IRandomAccessStream])
+    $software=$null
+    try {
+        $decoder=Wait-WinRt ([Windows.Graphics.Imaging.BitmapDecoder]::CreateAsync($stream)) ([Windows.Graphics.Imaging.BitmapDecoder])
+        $software=Wait-WinRt ($decoder.GetSoftwareBitmapAsync()) ([Windows.Graphics.Imaging.SoftwareBitmap])
+        $engine=[Windows.Media.Ocr.OcrEngine]::TryCreateFromLanguage((New-Object Windows.Globalization.Language('en-US')))
+        if (-not $engine) { throw 'English Windows OCR is required for the clipped File menu.' }
+        $result=Wait-WinRt ($engine.RecognizeAsync($software)) ([Windows.Media.Ocr.OcrResult])
+        $text=$result.Text
+        $words=@($result.Lines | ForEach-Object { $_.Words | Where-Object { $_.Text -ceq 'Exit' } | ForEach-Object {
+            [ordered]@{text=$_.Text;left=[double]$_.BoundingRect.X;top=[double]$_.BoundingRect.Y;width=[double]$_.BoundingRect.Width;height=[double]$_.BoundingRect.Height}
+        } })
+    } finally { if($software){$software.Dispose()}; $stream.Dispose() }
+    $text | Set-Content -LiteralPath (Join-Path $outputRoot ($prefix + '-ocr.txt')) -Encoding UTF8
+    if ($words.Count -eq 0) { return $null }
+    if ($words.Count -ne 1) { throw 'Exit OCR match is not unique inside the owned File popup.' }
+    $word=$words[0]; $x=[int][Math]::Round($left+$word.left+$word.width/2); $y=[int][Math]::Round($top+$word.top+$word.height/2)
+    if (-not $popup.Contains($x,$y)) { throw 'Exit OCR target escaped File popup.' }
+    $observation=[ordered]@{processId=$script:process.Id;popup=@{left=$left;top=$top;width=$width;height=$height};word=$word;x=$x;y=$y;contentSha256=Hash $path;contentFile=[IO.Path]::GetFileName($path);captureTicks=$capturedAt;uiaExitAbsent=$script:ExitMenuUiaAbsent;wheelDelta=-360;observedUtc=[DateTime]::UtcNow.ToString('o')}
+    $observation | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath (Join-Path $outputRoot ($prefix + '-target.json')) -Encoding UTF8
+    return $observation
+}
 function Open-Menu([string]$menu, [string]$item) {
     Click-Control ('^' + $menu + '$')
+    if ($menu -ceq 'File' -and $item -ceq '^Exit$') {
+        # Exit can be below the viewport in a short window. Scroll the actual
+        # owned File popup with one guarded physical wheel gesture, then click its exact item.
+        $first = Wait-For { Find-Control '^New Document$' } 'visible owned File menu'
+        $proof = [NormalLaunchInput]::RequireOwnedMenuPopup($first, $script:process.Id)
+        $proof | Add-Content -LiteralPath (Join-Path $outputRoot 'exit-menu-scroll.txt') -Encoding UTF8
+        [NormalLaunchInput]::ScrollOwnedMenuDown($first, $script:process.Id) | Add-Content -LiteralPath (Join-Path $outputRoot 'exit-menu-scroll.txt') -Encoding UTF8
+        $exit = Find-Control '^Exit$'
+        $script:ExitMenuUiaAbsent=($null -eq $exit)
+        $uiaObservation=if($exit){[ordered]@{name=$exit.Current.Name;bounds=$exit.Current.BoundingRectangle.ToString();processId=$exit.Current.ProcessId}}else{$null}
+        $uiaObservation | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $outputRoot ('exit-menu-uia-target-' + $script:process.Id + '.json')) -Encoding UTF8
+        # Even exposed UIA bounds can describe an intermediate wheel frame.
+        # Always measure the settled pixels before clicking the actual Exit.
+        [NormalLaunchInput]::Describe($script:main) | Set-Content -LiteralPath (Join-Path $outputRoot ('exit-menu-uia-after-scroll-' + $script:process.Id + '.txt')) -Encoding UTF8
+        $anchor = Wait-For { Find-Control ('^Page Setup' + [char]0x2026 + '$') } 'visible owned File row after wheel scroll'
+        Capture ('exit-menu-visible-' + $script:process.Id)
+        $script:ExitMenuOcrAttempt=0
+        $script:ExitMenuStableKey=$null; $script:ExitMenuStable=@(); $script:ExitMenuStableClock=[Diagnostics.Stopwatch]::StartNew()
+        $target = Wait-For {
+            $candidate=Read-ExitMenuTarget $anchor
+            if (-not $candidate) { $script:ExitMenuStableKey=$null; $script:ExitMenuStable=@(); $script:ExitMenuStableClock=[Diagnostics.Stopwatch]::StartNew(); return $null }
+            $key=$candidate.contentSha256 + ':' + $candidate.x + ':' + $candidate.y
+            if ($key -ceq $script:ExitMenuStableKey) { $script:ExitMenuStable+=,$candidate }
+            else { $script:ExitMenuStableKey=$key; $script:ExitMenuStable=@($candidate); $script:ExitMenuStableClock.Restart() }
+            if ($script:ExitMenuStable.Count -ge 3 -and $script:ExitMenuStableClock.ElapsedMilliseconds -ge 300) {
+                $fresh=Read-ExitMenuTarget $anchor
+                if ($fresh -and $fresh.contentSha256 -ceq $candidate.contentSha256 -and $fresh.x -eq $candidate.x -and $fresh.y -eq $candidate.y) {
+                    $script:ExitMenuStable+=,$fresh
+                    $fresh
+                } else { $script:ExitMenuStableKey=$null; $script:ExitMenuStable=@(); $script:ExitMenuStableClock.Restart() }
+            }
+        } 'three identical popup crops/Exit coordinates spanning 300ms, then matching fresh owned crop'
+        @($script:ExitMenuStable) | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath (Join-Path $outputRoot ('exit-menu-stable-' + $script:process.Id + '.json')) -Encoding UTF8
+        $measuredPopup=New-Object Windows.Rect($target.popup.left,$target.popup.top,$target.popup.width,$target.popup.height)
+        [NormalLaunchInput]::ClickOwnedMenuPoint($anchor, $script:process.Id, $target.x, $target.y, $measuredPopup, $target.captureTicks)
+        return
+    }
     Click-Control $item
 }
 function Native-Picker([string]$title) {
