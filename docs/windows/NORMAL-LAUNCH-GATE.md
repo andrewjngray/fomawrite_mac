@@ -9,10 +9,24 @@ Run this in Windows PowerShell 5.1 in an unlocked, interactive English Windows
 desktop. Do not use the mouse or keyboard during the run. The runner needs no Qt
 SDK, Python or PowerShell 7. Use a new output directory on each run:
 
+Copy the current driver and `normal-launch-input.cs` into a local gate
+folder. Restricted script execution policy can be retained: load the driver as
+a script block and supply its actual directory explicitly:
+
 ```powershell
-powershell.exe -NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File .\bin\windows\run-normal-launch-guest.ps1 `
+$gateDirectory = 'C:\FomawriteQA\gate'
+$driver = [ScriptBlock]::Create([IO.File]::ReadAllText((Join-Path $gateDirectory 'run-normal-launch-guest.ps1')))
+& $driver -DriverDirectory $gateDirectory `
     -Package C:\FomawriteQA\candidate\Fomawrite -Output C:\FomawriteQA\normal-launch-001
 ```
+
+For Parallels automation, execute these commands inside
+`powershell.exe -NoProfile -WindowStyle Hidden -Command <commands>`.
+`-DriverDirectory` supplies the helper and driver paths used for loading and
+report hashes when ScriptBlock execution has no `PSScriptRoot`/`PSCommandPath`.
+Direct `-File` invocation can use its default directory when existing execution
+policy permits it; the gate requires no execution-policy change.
+
 
 `-WindowStyle Hidden` is required when invoking PowerShell through Parallels
 `prlctl exec --current-user`: a visible PowerShell console can steal foreground
@@ -32,7 +46,12 @@ read their bounds, editor visibility and Source text. Discovery uses bounded
 breadth-first child queries with runtime-ID deduplication and avoids browser
 subtrees for menu/toolbar/Source searches. Pointer clicks and keyboard
 input enter through Windows `SendInput`; there are no QML calls, Qt test events,
-UIA Invoke/Value setters or command-dispatch shortcuts. It requires all of:
+UIA Invoke/Value setters or command-dispatch shortcuts. The current PowerShell
+thread must enter verified per-monitor-v2 DPI awareness. Pointer placement uses
+`SetPhysicalCursorPos` and verifies the result with `GetPhysicalCursorPos`, so
+UIA's physical bounds remain physical at 200% desktop scaling. Clicks recheck
+foreground after accessibility queries, and Unicode input rechecks it for each
+character pair. It requires all of:
 
 1. An ordinary application window with acknowledged isolation.
 2. The organizer's **Add library location** button opening a native Windows
@@ -70,7 +89,8 @@ python3 bin/windows/check-normal-launch.py \
 ```
 
 The verifier requires every ordered stage, two clean argument-free launches,
-timestamps inside the run, exact package/executable/driver identities,
+timestamps inside the run (including .NET seven-digit fractions on Python 3.9),
+exact package/executable/driver identities,
 app-written isolation receipt, screenshots, UIA/native-picker observations,
 Live writing-region screenshot/OCR proof, clean renderer/page-load logs and
 byte-exact expected saved sample (allowing Windows line

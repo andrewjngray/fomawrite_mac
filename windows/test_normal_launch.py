@@ -110,6 +110,26 @@ class NormalLaunchEvidenceTests(unittest.TestCase):
         self.report["checks"][0]["observedUtc"] = "2026-10-21T23:59:59Z"
         self.assertTrue(self.failures())
 
+    def test_dotnet_seven_digit_utc_timestamps_are_accepted(self):
+        self.report["startedUtc"] = "2026-10-22T00:00:00.1234567Z"
+        self.report["finishedUtc"] = "2026-10-22T00:00:02.1234567+00:00"
+        for index, check in enumerate(self.report["checks"]):
+            check["observedUtc"] = f"2026-10-22T00:00:01.123456{index}Z"
+        self.assertEqual([], self.failures())
+        timestamp, tick = GATE.parse_timestamp(self.report["startedUtc"])
+        self.assertEqual(123456, timestamp.microsecond)
+        self.assertEqual(7, tick)
+
+    def test_dotnet_submicrosecond_stage_reversal_is_rejected(self):
+        for check in self.report["checks"]:
+            check["observedUtc"] = "2026-10-22T00:00:01.1234567Z"
+        self.report["checks"][0]["observedUtc"] = "2026-10-22T00:00:01.1234568Z"
+        self.assertTrue(any("Invalid run interval" in error for error in self.failures()))
+
+    def test_fraction_normalization_does_not_discard_timezone_requirement(self):
+        self.report["startedUtc"] = "2026-10-22T00:00:00.1234567"
+        self.assertTrue(self.failures())
+
     def test_missing_native_picker_evidence_is_rejected(self):
         del self.report["evidenceSha256"]["file-menu-and-native-picker-picker-uia.txt"]
         self.assertTrue(self.failures())

@@ -121,6 +121,11 @@ Rectangle {
         anchors.topMargin: 20
         anchors.bottomMargin: organizerFooter.height + 8
         contentWidth: availableWidth
+        // Material fades scrollbar paint while its pointer target stays live.
+        // Keep the whole header/row action clear of that overlaid target, even
+        // when the content fits and the bar has nothing to scroll.
+        rightPadding: effectiveScrollBarWidth
+        ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
         clip: true
         ColumnLayout {
             width: organizerScroll.availableWidth

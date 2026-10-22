@@ -25,6 +25,14 @@ The ARM64 artifact was downloaded into `dist/windows-testing/diagnostic-candidat
 
 The original testing shelf remains `b45cb34` in two architectures. Separately staging diagnostics does not update `BUILD-CATALOG.json`, `COPY-VERIFICATION.json`, `START-HERE.txt` or a latest-build recommendation. See [testing builds](TESTING-BUILDS.md).
 
+## Confirmed Organizer click interception
+
+The ordinary Windows gate reproduced a second defect even from local NTFS storage: the Add Library Location button centre was covered by a Material scrollbar whose paint had faded out. UI Automation hit testing at the button centre returned `ControlType.ScrollBar`. Clicking the unobstructed left interior of the same button opened the native folder picker. With that diagnostic click only, all remaining normal-launch stages passed, including Live writing-region OCR, byte-exact save, clean exit and normal document restore. Offline verification of the diagnostic driver and package passed. This does not qualify the unchanged standard centre-click gate.
+
+The fix reserves the ScrollView vertical scrollbar gutter so the full header and row actions remain clear, and disables unused horizontal scrolling. Two regressions (short and scrolling Organizer lists) failed on the previous source because actual centre clicks never opened the folder dialog. Both pass with the fix and also verify the Favorites menu and full button clearance: **4 passed, 0 failed, 0 skipped**, including setup/cleanup. The app build passed.
+
+The same fresh-profile diagnostic run from Mac-shared storage still produced repeated Live page-load failures and failed to complete folder navigation. The same executable from local NTFS completed the workflow. This strengthens the storage-dependent renderer finding without claiming the underlying Qt/Parallels failure mechanism is fully explained.
+
 ## Bounded Live recovery change
 
 The working QML change replaces an unconditional immediate reload after renderer termination with **one delayed automatic retry**. Repeated termination reports do not queue additional reloads or replenish that retry. A later failure stops with a visible error and **Retry Live** control; a nonmodal notice also exposes failure when the Live page was prewarmed behind Source. Source remains available for writing.

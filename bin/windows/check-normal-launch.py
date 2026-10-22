@@ -39,6 +39,22 @@ def same_executable(actual, expected):
     return all(p.is_absolute() and ".." not in p.parts for p in paths) and paths[0] == paths[1]
 
 
+def parse_timestamp(value):
+    """Read .NET round-trip UTC timestamps on Python 3.9 without losing order.
+
+    datetime stores microseconds; retain the seventh fractional digit as a
+    separate 100 ns tick so comparisons still detect sub-microsecond reversals.
+    Only six digits reach fromisoformat, including on older Python versions.
+    """
+    match = re.fullmatch(r"(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})(?:\.(\d{1,7}))?(Z|[+-]\d{2}:\d{2})", value)
+    if not match:
+        raise ValueError("Expected an ISO timestamp with an explicit timezone and up to seven fractional digits")
+    whole, fraction, zone = match.groups()
+    fraction = (fraction or "").ljust(7, "0")
+    normalized = whole + "." + fraction[:6] + ("+00:00" if zone == "Z" else zone)
+    return datetime.fromisoformat(normalized), int(fraction[6])
+
+
 def verify(report, package, evidence, expected_executable, driver_root=None):
     """Fail closed on incomplete workflows, stale/missing evidence and identity."""
     errors = []
@@ -70,10 +86,10 @@ def verify(report, package, evidence, expected_executable, driver_root=None):
                                 for launch in launches)):
         errors.append("Expected two argument-free ordinary launches and clean exits")
     try:
-        start = datetime.fromisoformat(report["startedUtc"].replace("Z", "+00:00"))
-        finish = datetime.fromisoformat(report["finishedUtc"].replace("Z", "+00:00"))
-        observations = [datetime.fromisoformat(check["observedUtc"].replace("Z", "+00:00")) for check in checks]
-        if (start.tzinfo is None or finish.tzinfo is None or start >= finish
+        start = parse_timestamp(report["startedUtc"])
+        finish = parse_timestamp(report["finishedUtc"])
+        observations = [parse_timestamp(check["observedUtc"]) for check in checks]
+        if (start >= finish
                 or any(not start <= t <= finish for t in observations)
                 or observations != sorted(observations)):
             raise ValueError("invalid timing")

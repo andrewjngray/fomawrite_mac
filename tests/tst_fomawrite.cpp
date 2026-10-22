@@ -232,6 +232,8 @@ private slots:
     void spellCheckPlatformAvailabilityFollowsHarper();
     void windowsAppearanceTracksQtColorScheme();
     void windowsMenuRoutesPortableCommands();
+    void organizerHeaderButtonsStayClickable_data();
+    void organizerHeaderButtonsStayClickable();
     void acceptanceProfileRejectsInvalidRoots();
     void acceptanceProfileKeepsStableCanonicalNamespaceAndExistingFiles();
     void harperUpdaterReportsUpToDateAndUpdateAvailable();
@@ -5789,6 +5791,7 @@ private:
 #include "cycle146-harper-updates.inc"
 #include "windows-platform.inc"
 #include "windows-menu.inc"
+#include "organizer-scrollbar-hit.inc"
 #include "acceptance-profile.inc"
 
 int main(int argc, char **argv) {
