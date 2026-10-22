@@ -195,9 +195,13 @@ public static class NormalLaunchInput {
                 if(budget.ElapsedMilliseconds>=budgetMs) throw new TimeoutException("UIA search retry budget expired");
                 return found;
             } catch(COMException error) {
-                // Picker teardown can disconnect a provider during FindAll.
-                // Discard that incomplete traversal; never turn it into absence.
-                if(error.ErrorCode!=unchecked((int)0x80010108) || retry>=2) throw;
+                // Popup publication or picker teardown can invalidate a provider traversal.
+                // E_FAIL was observed in FindAll after opening File on x64.
+                // Discard the entire read, reacquire the same owned HWND and
+                // retry at most twice; never turn incomplete traversal into absence.
+                if((error.ErrorCode!=unchecked((int)0x80010108) &&
+                    error.ErrorCode!=unchecked((int)0x80004005)) || retry>=2) throw;
+                Console.Error.WriteLine("UIA provider read retry {0}: HRESULT 0x{1:X8}", retry+1, unchecked((uint)error.ErrorCode));
                 if(budget.ElapsedMilliseconds+100>=budgetMs) throw new TimeoutException("UIA search retry budget expired", error);
                 Thread.Sleep(100);
                 reacquire(); // Failure or a changed owner/handle remains fatal.

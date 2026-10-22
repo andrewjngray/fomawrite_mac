@@ -26,6 +26,9 @@ $expected = [ordered]@{
     fillerStyleCheckTogglesIndependentlyWithoutEditing = 'fillers && custom'
     statisticsCountRenderedUnicodeTasksAndAuthorship = 'statsOnlyAction && defaultAction'
     chromePresentationModesPersistAndKeepCommandsReachable = 'titleBarMenu'
+    goMenuRoutesSavedQueriesHashtagsAndGuardedRecents = 'saved'
+    navigationHistoryAndQuickOpenStayIndependent = 'back && forward'
+    recentMenuTracksLibraryAndGuardsOpen = 'recent'
 }
 $testNames = @($expected.Keys)
 $originalBytes = [IO.File]::ReadAllBytes($menuPath)
@@ -79,7 +82,7 @@ function Invoke-MenuProofPhase {
     $skips = @($junit.SelectNodes('//skipped'))
     $errors = @($junit.SelectNodes('//error'))
     $report[$Phase] = [ordered]@{ exitCode = $status; cases = $cases.Count; failures = $failures.Count; skips = $skips.Count; errors = $errors.Count }
-    if ($cases.Count -ne 7 -or $skips.Count -ne 0 -or $errors.Count -ne 0) { throw "$Phase must contain exactly five cases plus init/cleanup, with no skips/errors." }
+    if ($cases.Count -ne ($expected.Count + 2) -or $skips.Count -ne 0 -or $errors.Count -ne 0) { throw "$Phase must contain exactly $($expected.Count) cases plus init/cleanup, with no skips/errors." }
     foreach ($name in @('initTestCase', 'cleanupTestCase') + $testNames) {
         $matching = @($cases | Where-Object { $_.GetAttribute('name') -eq $name })
         if ($matching.Count -ne 1) { throw "$Phase is missing or duplicates $name." }
@@ -104,7 +107,7 @@ function Invoke-MenuProofPhase {
             if ([IO.File]::ReadAllText($logPath) -notmatch $pattern) { throw "Red log does not identify the expected missing-node source location for $name." }
         }
     }
-    $expectedFailures = if ($Phase -eq 'red') { 5 } else { 0 }
+    $expectedFailures = if ($Phase -eq 'red') { $expected.Count } else { 0 }
     if ($status -ne $expectedFailures -or $failures.Count -ne $expectedFailures) { throw "$Phase has unexpected process status or failure count." }
 }
 

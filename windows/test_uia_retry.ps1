@@ -51,6 +51,7 @@ public static class Probe {
     static T Bounded<T>(Func<T> action,string operation) { return action(); }
     static AutomationElement Walk(AutomationElement root,string pattern,List<string> description,Stopwatch budget=null) {
         Calls++;
+        if(Mode=="always-fail" || (Mode=="fail-once" && Calls==1)) throw new COMException("provider E_FAIL",unchecked((int)0x80004005));
         if(Mode=="other-com") throw new COMException("access denied",unchecked((int)0x80070005));
         if(Mode=="incomplete") throw new InvalidOperationException("UIA search incomplete");
         if(Mode=="always-disconnect" || Calls==1) throw new COMException("disconnected",unchecked((int)0x80010108));
@@ -90,6 +91,13 @@ $checks.Add('disconnected-provider-restarts-complete-traversal')
 $result=[Probe]::Run('always-disconnect')
 Assert ($result -match '^COMException:' -and [Probe]::Calls -eq 3) 'Repeated disconnection did not fail within two retries.'
 $checks.Add('repeated-disconnect-is-fatal')
+$result=[Probe]::Run('fail-once')
+Assert ($result -eq 'found' -and [Probe]::Calls -eq 2) ('Provider E_FAIL did not complete a fresh search: '+$result)
+$checks.Add('provider-efail-restarts-complete-traversal')
+$result=[Probe]::Run('always-fail')
+Assert ($result -match '^COMException:' -and [Probe]::Calls -eq 3) 'Repeated E_FAIL did not fail within two retries.'
+$checks.Add('repeated-efail-is-fatal')
+
 foreach($mode in @('other-com','incomplete')) {
     $result=[Probe]::Run($mode)
     Assert ($result -notin @('found','null') -and [Probe]::Calls -eq 1) ("Unexpected error was retried or became absence: "+$mode)

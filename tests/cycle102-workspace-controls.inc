@@ -1,3 +1,5 @@
+#include "publishingthemes.h"
+
 namespace {
 // Menus can receive macOS input-method commits even with a non-activating
 // window. This mouse-only fixture rejects unsolicited native text events;
@@ -288,9 +290,36 @@ void FomawriteTest::previewTemplateFooterAndNativeMenuShareState() {
         QVERIFY(desktopLoader->property("active").toBool());
         QTRY_VERIFY(window->findChild<QObject *>("windowsMenuBar"));
     }
+    // Verify production platform loading first; then exercise the actual Windows
+    // QML menu on the host too, as the portable Windows menu fixtures do.
+    QVERIFY(testDesktopMenusMatchPlatform(window.data()));
+    auto *desktopLoader = window->findChild<QObject *>("windowsMenuLoader"); QVERIFY(desktopLoader);
+    if (!window->property("isWindows").toBool()) desktopLoader->setProperty("active", true);
+    QTRY_VERIFY(window->findChild<QObject *>("windowsMenuBar"));
+    auto *desktop = window->findChild<QObject *>("windowsMenuBar");
+    QObject *desktopView = nullptr;
+    for (QObject *candidate : desktop->findChildren<QObject *>())
+        if (candidate->property("title").toString() == "&View") { desktopView = candidate; break; }
+    QVERIFY(desktopView);
+    auto *desktopOutput = desktop->findChild<QObject *>("windowsTemplateMenu");
+    auto *desktopThemes = desktop->findChild<QObject *>("windowsCustomThemesMenu");
+    auto *desktopPalatino = desktop->findChild<QObject *>("windowsTemplate6");
+    auto *desktopHelvetica = desktop->findChild<QObject *>("windowsTemplate5");
+    auto *exact = desktop->findChild<QObject *>("windows_liveThemeExact");
+    QVERIFY(desktopOutput && desktopThemes && desktopPalatino && desktopHelvetica && exact);
+    auto *settings = window->findChild<QObject *>("workspaceSettings"); QVERIFY(settings);
     Cycle106MouseInputIsolation mouseInput(quick);
     const int originalStyle = backend.outputStyle();
-    const auto cleanup = qScopeGuard([&] { backend.setOutputStyle(originalStyle); backend.discardRecovery(); });
+    const QString originalTheme = backend.publishingThemeId();
+    const bool originalExact = settings->property("liveThemeExact").toBool();
+    const QString themePath = PublishingThemes::directory() + "/cycle156-menu.css";
+    const auto cleanup = qScopeGuard([&] {
+        QFile::remove(themePath);
+        backend.setOutputStyle(originalStyle);
+        if (!originalTheme.isEmpty()) backend.selectPublishingTheme(originalTheme);
+        settings->setProperty("liveThemeExact", originalExact);
+        backend.discardRecovery();
+    });
     quick->resize(1100, 800);
     layout->setProperty("layoutMode", 2);
     layout->setProperty("liveEditEnabled", false);
@@ -357,9 +386,7 @@ void FomawriteTest::previewTemplateFooterAndNativeMenuShareState() {
         QVERIFY2(inRoot, qPrintable(name + " is missing from the Output Style root"));
     }
     } else {
-        // Windows M1 exposes library/organizer state in its real desktop menu.
-        // Output Style remains in the common footer; its desktop affordance is M2.
-        auto *desktop = window->findChild<QObject *>("windowsMenuBar"); QVERIFY(desktop);
+        // Windows requires its real desktop library/organizer actions too.
         for (const char *id : {"library", "organizer"}) {
             auto *action = desktop->findChild<QObject *>(QStringLiteral("windows_") + QLatin1String(id)); QVERIFY(action);
             QCOMPARE(action->property("text").toString(), QLatin1String(id) == QLatin1String("library") ? QStringLiteral("Toggle Library") : QStringLiteral("Toggle Organizer"));
@@ -369,6 +396,133 @@ void FomawriteTest::previewTemplateFooterAndNativeMenuShareState() {
             QTRY_VERIFY(!action->property("checked").toBool());
         }
     }
+    QCOMPARE(desktopOutput->property("title").toString(), QStringLiteral("Output Style"));
+    QCOMPARE(desktopThemes->property("title").toString(), QStringLiteral("Custom Themes"));
+    QCOMPARE(desktopThemes->property("count").toInt(), backend.publishingThemes().size());
+    // Choices must be real root menu entries, not footer or registry substitutes.
+    QList<QObject *> basicChoices;
+    for (int style = 0; style < 8; ++style) {
+        auto *choice = desktopOutput->findChild<QObject *>(QString("windowsTemplate%1").arg(style));
+        QVERIFY(choice && choice->property("checkable").toBool());
+        bool rootEntry = false;
+        for (int index = 0; index < desktopOutput->property("count").toInt(); ++index) {
+            QQuickItem *item = nullptr;
+            QVERIFY(QMetaObject::invokeMethod(desktopOutput, "itemAt", Q_RETURN_ARG(QQuickItem *, item), Q_ARG(int, index)));
+            rootEntry |= item == choice;
+        }
+        QVERIFY(rootEntry);
+        basicChoices.append(choice);
+    }
+    const auto selectedCount = [&] {
+        int count = 0;
+        for (QObject *choice : basicChoices) count += choice->property("checked").toBool();
+        for (QObject *choice : desktopThemes->findChildren<QObject *>())
+            if (choice->objectName().startsWith("windowsPublishingTheme_")) count += choice->property("checked").toBool();
+        return count;
+    };
+    for (int style = 0; style < 8; ++style) {
+        QVERIFY(QMetaObject::invokeMethod(basicChoices.at(style), "triggered"));
+        QCOMPARE(backend.outputStyle(), style);
+        QVERIFY(backend.publishingThemeId().isEmpty());
+        QTRY_VERIFY(basicChoices.at(style)->property("checked").toBool());
+        QTRY_COMPARE(selectedCount(), 1);
+        for (int other = 0; other < 8; ++other)
+            QCOMPARE(window->findChild<QObject *>(QString("previewTemplate%1").arg(other))->property("checked").toBool(), other == style);
+    }
+    // A repeated physical activation toggles MenuItem before triggered; the
+    // backend selection must restore the one checked item immediately.
+    QVERIFY(QMetaObject::invokeMethod(desktopView, "open"));
+    QTRY_VERIFY(desktopView->property("opened").toBool());
+    QVERIFY(QMetaObject::invokeMethod(desktopOutput, "open"));
+    QTRY_VERIFY(desktopOutput->property("opened").toBool());
+    QVERIFY(cycle102Click(quick, qobject_cast<QQuickItem *>(basicChoices.at(7))));
+    QTRY_VERIFY(!desktopOutput->property("visible").toBool());
+    QVERIFY(basicChoices.at(7)->property("checked").toBool());
+    QCOMPARE(selectedCount(), 1);
+    for (const char *name : {"windowsTemplateCustomEdit", "windowsTemplateCustomLoad", "windowsGetMoreThemes",
+                             "windowsThemeImport", "windowsThemesFolder", "windowsThemesReload"}) {
+        auto *action = desktopOutput->findChild<QObject *>(QLatin1String(name));
+        QVERIFY(action && action->property("enabled").toBool());
+    }
+    auto *hub = window->findChild<QObject *>("exportHub"); QVERIFY(hub);
+    QVERIFY(QMetaObject::invokeMethod(desktopOutput->findChild<QObject *>("windowsTemplateCustomEdit"), "triggered"));
+    QTRY_VERIFY(hub->property("opened").toBool());
+    QCOMPARE(hub->property("selectedFormat").toString(), QStringLiteral("pdf"));
+    QVERIFY(QMetaObject::invokeMethod(hub, "close"));
+    QTRY_VERIFY(!hub->property("visible").toBool());
+    for (const auto &[actionName, dialogName] : {
+             std::pair{"windowsTemplateCustomLoad", "outputStyleDialog"},
+             std::pair{"windowsThemeImport", "publishingThemeDialog"}}) {
+        auto *dialog = window->findChild<QObject *>(QLatin1String(dialogName)); QVERIFY(dialog);
+        QVERIFY(QMetaObject::invokeMethod(desktopOutput->findChild<QObject *>(QLatin1String(actionName)), "triggered"));
+        QTRY_VERIFY(dialog->property("visible").toBool());
+        QVERIFY(QMetaObject::invokeMethod(dialog, "close"));
+        QTRY_VERIFY(!dialog->property("visible").toBool());
+    }
+    // The actual reload route updates dynamic delegates, and invalid local CSS
+    // uses the existing validation notice while retaining the previous style.
+    QVERIFY(QDir().mkpath(PublishingThemes::directory()));
+    QFile themeFile(themePath); QVERIFY(themeFile.open(QIODevice::WriteOnly));
+    QVERIFY(themeFile.write("#write { color: #123456; }") > 0); themeFile.close();
+    auto *reload = desktopOutput->findChild<QObject *>("windowsThemesReload"); QVERIFY(reload);
+    QVERIFY(QMetaObject::invokeMethod(reload, "triggered"));
+    QTRY_COMPARE(desktopThemes->property("count").toInt(), backend.publishingThemes().size());
+    const QString customName = QStringLiteral("windowsPublishingTheme_cycle156-menu");
+    QTRY_VERIFY(desktopThemes->findChild<QObject *>(customName));
+    QVERIFY(QMetaObject::invokeMethod(desktopThemes->findChild<QObject *>(customName), "triggered"));
+    QTRY_COMPARE(backend.publishingThemeId(), QStringLiteral("cycle156-menu"));
+    QTRY_COMPARE(selectedCount(), 1);
+    QVERIFY(desktopThemes->findChild<QObject *>(customName)->property("checked").toBool());
+    QVERIFY(QMetaObject::invokeMethod(desktopView, "open"));
+    QTRY_VERIFY(desktopView->property("opened").toBool());
+    QVERIFY(QMetaObject::invokeMethod(desktopOutput, "open"));
+    QTRY_VERIFY(desktopOutput->property("opened").toBool());
+    QVERIFY(QMetaObject::invokeMethod(desktopThemes, "open"));
+    QTRY_VERIFY(desktopThemes->property("opened").toBool());
+    QVERIFY(cycle102Click(quick, desktopThemes->findChild<QQuickItem *>(customName)));
+    QTRY_VERIFY(!desktopThemes->property("visible").toBool());
+    QCOMPARE(backend.publishingThemeId(), QStringLiteral("cycle156-menu"));
+    QCOMPARE(selectedCount(), 1);
+    QVERIFY(QMetaObject::invokeMethod(basicChoices.at(5), "triggered"));
+    QVERIFY(themeFile.open(QIODevice::WriteOnly | QIODevice::Truncate));
+    QVERIFY(themeFile.write("@import url(https://example.invalid/theme.css);") > 0); themeFile.close();
+    QVERIFY(QMetaObject::invokeMethod(desktopView, "open"));
+    QTRY_VERIFY(desktopView->property("opened").toBool());
+    QVERIFY(QMetaObject::invokeMethod(desktopOutput, "open"));
+    QTRY_VERIFY(desktopOutput->property("opened").toBool());
+    QVERIFY(QMetaObject::invokeMethod(desktopThemes, "open"));
+    QTRY_VERIFY(desktopThemes->property("opened").toBool());
+    QVERIFY(cycle102Click(quick, desktopThemes->findChild<QQuickItem *>(customName)));
+    QTRY_VERIFY(!desktopThemes->property("visible").toBool());
+    QCOMPARE(backend.outputStyle(), 5);
+    QVERIFY(backend.publishingThemeId().isEmpty());
+    QVERIFY(!backend.publishingThemeError().isEmpty());
+    QTRY_COMPARE(selectedCount(), 1);
+    QVERIFY(desktopHelvetica->property("checked").toBool());
+    QVERIFY(!desktopThemes->findChild<QObject *>(customName)->property("checked").toBool());
+    auto *notice = window->findChild<QObject *>("publishingThemeNotice"); QVERIFY(notice);
+    QTRY_VERIFY(notice->property("opened").toBool());
+    QVERIFY(QMetaObject::invokeMethod(notice, "close"));
+    QTRY_VERIFY(!notice->property("visible").toBool());
+    QVERIFY(QFile::remove(themePath));
+    QVERIFY(QMetaObject::invokeMethod(reload, "triggered"));
+    QTRY_VERIFY(!desktopThemes->findChild<QObject *>(customName));
+    // Live's existing command guard applies equally through the desktop menu.
+    settings->setProperty("liveThemeExact", false);
+    QVERIFY(!exact->property("enabled").toBool());
+    QVERIFY(QMetaObject::invokeMethod(exact, "triggered"));
+    QVERIFY(!settings->property("liveThemeExact").toBool());
+    layout->setProperty("liveEditEnabled", true);
+    QTRY_VERIFY(exact->property("enabled").toBool());
+    QVERIFY(QMetaObject::invokeMethod(exact, "triggered"));
+    QTRY_VERIFY(settings->property("liveThemeExact").toBool());
+    QVERIFY(exact->property("checked").toBool());
+    layout->setProperty("liveEditEnabled", false);
+    QTRY_VERIFY(!exact->property("enabled").toBool());
+    QVERIFY(QMetaObject::invokeMethod(exact, "triggered"));
+    QVERIFY(settings->property("liveThemeExact").toBool());
+    QVERIFY(exact->property("checked").toBool());
+    backend.setOutputStyle(0);
     // A quick show/hide pair must cancel any deferred compact-navigation open.
     QCoreApplication::processEvents();
     auto *drawer = window->findChild<QObject *>("workspaceNavigationDrawer");
@@ -389,21 +543,36 @@ void FomawriteTest::previewTemplateFooterAndNativeMenuShareState() {
     QTRY_VERIFY(!menu->property("visible").toBool());
     QCOMPARE(button->property("text").toString(), QStringLiteral("Output Style"));
     QVERIFY(button->property("hint").toString().contains("Palatino"));
+    QVERIFY(desktopPalatino->property("checked").toBool());
+    QVERIFY(!desktopHelvetica->property("checked").toBool());
     if (nativeView) {
         QVERIFY(nativePalatino->property("checked").toBool());
         QVERIFY(!nativeHelvetica->property("checked").toBool());
         QVERIFY(QMetaObject::invokeMethod(nativeHelvetica, "triggered"));
-    } else {
-        auto *helvetica = window->findChild<QQuickItem *>("previewTemplate5"); QVERIFY(helvetica);
-        QVERIFY(palatino->property("checked").toBool());
-        QVERIFY(!helvetica->property("checked").toBool());
-        QVERIFY(cycle102Click(quick, button));
-        QTRY_VERIFY(menu->property("opened").toBool());
-        QVERIFY(cycle102Click(quick, helvetica));
-        QTRY_VERIFY(!menu->property("visible").toBool());
+        QTRY_COMPARE(backend.outputStyle(), 5);
+        QVERIFY(!nativePalatino->property("checked").toBool());
+        QVERIFY(nativeHelvetica->property("checked").toBool());
         QVERIFY(!palatino->property("checked").toBool());
-        QVERIFY(helvetica->property("checked").toBool());
+        QVERIFY(window->findChild<QObject *>("previewTemplate5")->property("checked").toBool());
+        QCOMPARE(button->property("text").toString(), QStringLiteral("Output Style"));
+        QVERIFY(button->property("hint").toString().contains("Helvetica"));
     }
+    // Reset independently so a working native action cannot mask a broken
+    // Windows route, and vice versa.
+    backend.setOutputStyle(6);
+    QCOMPARE(backend.outputStyle(), 6);
+    QVERIFY(palatino->property("checked").toBool());
+    QVERIFY(!window->findChild<QObject *>("previewTemplate5")->property("checked").toBool());
+    QVERIFY(desktopPalatino->property("checked").toBool());
+    QVERIFY(!desktopHelvetica->property("checked").toBool());
+    QCOMPARE(selectedCount(), 1);
+    // Both hosts must select through the real Windows menu, sharing footer state.
+    QVERIFY(QMetaObject::invokeMethod(desktopHelvetica, "triggered"));
+    QVERIFY(!palatino->property("checked").toBool());
+    QVERIFY(window->findChild<QObject *>("previewTemplate5")->property("checked").toBool());
+    QVERIFY(!desktopPalatino->property("checked").toBool());
+    QVERIFY(desktopHelvetica->property("checked").toBool());
+    QCOMPARE(selectedCount(), 1);
     QTRY_COMPARE(backend.outputStyle(), 5);
     QCOMPARE(button->property("text").toString(), QStringLiteral("Output Style"));
     QVERIFY(button->property("hint").toString().contains("Helvetica"));

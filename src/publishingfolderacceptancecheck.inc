@@ -25,20 +25,21 @@
                     : prefix + "PublishingTheme_" + backend.publishingThemeId();
                 return checkedCount == 1 && checkedName == expected;
             };
-            // Every platform uses the real footer menu. macOS also exposes
-            // the same choices in its native menu; Windows M1 does not yet have
-            // an Output Style desktop submenu. Never infer platform from a
-            // missing object, which would hide a broken Mac menu loader.
+            // Verify both the real footer and the platform desktop menu. A
+            // missing desktop subtree must not silently reduce the coverage.
             const bool macThemeMenu = window->property("isMac").toBool();
             auto *nativeThemes = window->findChild<QObject *>("nativeCustomThemesMenu");
             auto *desktopThemeLoader = window->findChild<QObject *>("windowsMenuLoader");
             check(macThemeMenu ? nativeThemes != nullptr
                 : window->property("isWindows").toBool() && nativeThemes == nullptr
                     && desktopThemeLoader && desktopThemeLoader->property("active").toBool()
-                    && window->findChild<QObject *>("windowsMenuBar") != nullptr,
+                    && window->findChild<QObject *>("windowsMenuBar")
+                    && window->findChild<QObject *>("windowsTemplateMenu")
+                    && window->findChild<QObject *>("windowsCustomThemesMenu"),
                 "Publishing theme desktop menu does not match the active platform");
+            const QString desktopThemePrefix = macThemeMenu ? "native" : "windows";
             const auto authoritativeSelection = [&] {
-                return soleSelection("preview") && (!macThemeMenu || soleSelection("native"));
+                return soleSelection("preview") && soleSelection(desktopThemePrefix);
             };
             auto *customThemes = window->findChild<QObject *>("previewCustomThemesMenu");
             const auto itemAt = [](QObject *owner, int index) {

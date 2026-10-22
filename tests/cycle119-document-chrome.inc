@@ -158,22 +158,26 @@ void FomawriteTest::documentChromeKeepsMenusKeyboardAndNativeToggleAccessible() 
         QCOMPARE(always->property("text").toString(), QString("Always Show"));
     } else {
         QVERIFY(!toggle && !fade && !always);
-        QVERIFY(!testDesktopCommand(f.window.data(), QStringLiteral("titleBarFade")));
-        QVERIFY(!testDesktopCommand(f.window.data(), QStringLiteral("titleBarAlways")));
-        QCOMPARE(testCommandLabel(f.window.data(), QStringLiteral("titleBarFade")), QStringLiteral("Fade In/Out"));
-        QCOMPARE(testCommandLabel(f.window.data(), QStringLiteral("titleBarAlways")), QStringLiteral("Always Show"));
+        fade = testDesktopCommand(f.window.data(), QStringLiteral("titleBarFade"));
+        always = testDesktopCommand(f.window.data(), QStringLiteral("titleBarAlways"));
+        QVERIFY(fade && always);
+        QCOMPARE(fade->property("text").toString(), QStringLiteral("Fade In/Out"));
+        QCOMPARE(always->property("text").toString(), QStringLiteral("Always Show"));
     }
     const auto checked = [&](QObject *nativeItem, const QString &id) {
-        return mac ? nativeItem->property("checked").toBool() : testCommandState(f.window.data(), "isChecked", id);
+        Q_UNUSED(id);
+        return nativeItem->property("checked").toBool();
     };
     const auto choose = [&](QObject *nativeItem, const QString &id) {
-        return mac ? QMetaObject::invokeMethod(nativeItem, "triggered") : testRunCommand(f.window.data(), id);
+        Q_UNUSED(id);
+        return QMetaObject::invokeMethod(nativeItem, "triggered");
     };
     const auto toggleBars = [&] {
         if (mac) return QMetaObject::invokeMethod(toggle, "triggered");
-        // Auto-hide menu affordance is omitted in Windows M1; the persisted
-        // common setting and both chrome behaviors remain covered here.
-        return settings->setProperty("autoHideChrome", !settings->property("autoHideChrome").toBool());
+        // Windows exposes the two explicit Title Bar choices. Exercise those
+        // real menu routes instead of mutating the shared setting directly.
+        return QMetaObject::invokeMethod(settings->property("autoHideChrome").toBool()
+                                            ? always : fade, "triggered");
     };
     QVERIFY(f.mode(0));
     settings->setProperty("autoHideChrome", true);

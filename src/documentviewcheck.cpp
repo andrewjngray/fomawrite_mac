@@ -1345,33 +1345,28 @@ int runDocumentViewCheck(QApplication &app, const QString &outputDirectory) {
                     && loader->property("active").toBool() && desktop
                     && !window->findChild<QObject *>("nativeViewMenu"),
                     "Windows chrome check requires the active production desktop menu and command registry")) return;
-            check(!toggle && !fade && !always
-                    && !desktop->findChild<QObject *>("windows_titleBarFade")
-                    && !desktop->findChild<QObject *>("windows_titleBarAlways"),
-                    "Windows M1 unexpectedly exposes the omitted document-bar menu affordances");
-            report.insert("documentChromeCommandRoute", "workspaceCommands and autoHideChrome setting; Windows desktop menu affordances omitted pending M2");
+            check(!toggle && !fade && !always, "Windows must not load the macOS chrome menu");
+            fade = desktop->findChild<QObject *>("windows_titleBarFade");
+            always = desktop->findChild<QObject *>("windows_titleBarAlways");
+            if (!check(fade && always, "Windows Title Bar menu controls are missing")) return;
+            report.insert("documentChromeCommandRoute", "Windows Title Bar desktop menu");
         } else {
             if (!check(header && toggle && fade && always, "Document chrome menu controls are missing")) return;
-            check(fade->property("text").toString() == "Fade In/Out"
-                && always->property("text").toString() == "Always Show", "Native Title Bar labels differ from the requested choices");
             report.insert("documentChromeCommandRoute", "nativeAutoHideDocumentChrome and native Title Bar menu");
         }
-        const auto titleChecked = [&](QObject *nativeItem, const QString &command) {
-            if (!windows) return nativeItem->property("checked").toBool();
-            QVariant value;
-            check(QMetaObject::invokeMethod(commands, "isChecked", Q_RETURN_ARG(QVariant, value), Q_ARG(QVariant, command)),
-                "Cannot read document-bar command state: " + command);
-            return value.toBool();
+        check(fade->property("text").toString() == "Fade In/Out"
+            && always->property("text").toString() == "Always Show", "Title Bar labels differ from the requested choices");
+        const auto titleChecked = [&](QObject *item, const QString &command) {
+            Q_UNUSED(command);
+            return item->property("checked").toBool();
         };
-        const auto chooseTitle = [&](QObject *nativeItem, const QString &command) {
-            return windows ? QMetaObject::invokeMethod(commands, "run", Q_ARG(QVariant, command))
-                : QMetaObject::invokeMethod(nativeItem, "triggered");
+        const auto chooseTitle = [&](QObject *item, const QString &command) {
+            Q_UNUSED(command);
+            return QMetaObject::invokeMethod(item, "triggered");
         };
         const auto toggleBars = [&] {
-            // Windows M1 omits this desktop affordance. Exercise the same
-            // persisted setting while retaining every actual input/paint check.
-            return windows ? settings->setProperty("autoHideChrome", !settings->property("autoHideChrome").toBool())
-                : QMetaObject::invokeMethod(toggle, "triggered");
+            return QMetaObject::invokeMethod(windows
+                ? (settings->property("autoHideChrome").toBool() ? always : fade) : toggle, "triggered");
         };
         const auto autoHideChecked = [&] {
             return windows ? settings->property("autoHideChrome").toBool() : toggle->property("checked").toBool();

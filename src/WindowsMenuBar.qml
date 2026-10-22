@@ -30,6 +30,9 @@ MenuBar {
     Component.onCompleted: rememberEditingFocus(win.activeFocusItem)
     component WorkspaceMenu: Menu {
         id: popup
+        // A closing Material popup blocks WindowShortcut until its exit ends.
+        // Release that boundary before the next writing shortcut arrives.
+        exit: null
         // Long menus must scroll inside short windows instead of placing
         // enabled commands below the area that can receive a pointer click.
         height: Math.min(implicitHeight, Math.max(0, win.contentItem.height - 16))
@@ -56,12 +59,37 @@ MenuBar {
             checked = Qt.binding(function() { return workspaceCommands.isChecked(item.commandId) })
         }
     }
+    component RecentMenu: WorkspaceMenu {
+        id: recents
+        Instantiator {
+            model: backend.library.recentFiles
+            delegate: MenuItem {
+                required property var modelData
+                required property int index
+                objectName: "recentFile_" + index
+                text: modelData.name + " — " + modelData.url.toString().replace(/^file:\/\//, "")
+                    + (modelData.available ? "" : " (Unavailable)")
+                enabled: modelData.available
+                onTriggered: {
+                    // Opening can rebuild the model; retain the URL before dispatch.
+                    var file = modelData.url;
+                    root.dispatch(function() { win.requestOpen(file) })
+                }
+            }
+            onObjectAdded: function(index, object) { recents.insertItem(index, object); }
+            onObjectRemoved: function(index, object) { recents.removeItem(object); }
+        }
+        MenuItem { text: "No Recent Files"; enabled: false; visible: backend.library.recentFiles.length === 0 }
+        MenuSeparator { visible: backend.library.recentFiles.length > 0 }
+        MenuItem { text: "Clear Recent Files"; enabled: backend.library.recentFiles.length > 0; onTriggered: root.dispatch(function() { backend.library.clearRecentFiles() }) }
+    }
     WorkspaceMenu {
         title: "&File"
         Command { commandId: "new" }
         Command { commandId: "newWindow" }
         Command { commandId: "open" }
         Command { commandId: "openPath" }
+        RecentMenu { objectName: "windowsOpenRecentMenu"; title: "Open Recent" }
         MenuSeparator {}
         Command { commandId: "save" }
         Command { commandId: "saveAs" }
@@ -120,6 +148,37 @@ MenuBar {
             Command { commandId: "checkGrammarWhileTyping" }
             Command { commandId: "checkStyleWhileTyping" }
         }
+        WorkspaceMenu {
+            title: "Substitutions"
+            MenuItem {
+                objectName: "windows_editSmartQuotes"
+                text: "Smart Quotes"
+                checkable: true
+                checked: workspaceSettings.smartQuotes
+                onTriggered: {
+                    root.dispatch(function() { workspaceSettings.smartQuotes = !workspaceSettings.smartQuotes })
+                    checked = Qt.binding(function() { return workspaceSettings.smartQuotes })
+                }
+            }
+            MenuItem {
+                objectName: "windows_editSmartDashes"
+                text: "Smart Dashes"
+                checkable: true
+                checked: workspaceSettings.smartDashes
+                onTriggered: {
+                    root.dispatch(function() { workspaceSettings.smartDashes = !workspaceSettings.smartDashes })
+                    checked = Qt.binding(function() { return workspaceSettings.smartDashes })
+                }
+            }
+        }
+        WorkspaceMenu {
+            objectName: "windows_editTransformations"
+            title: "Transformations"
+            MenuItem { objectName: "windows_editUppercase"; text: "Make Upper Case"; enabled: win.canFormatSource && editor.selectedText.length > 0; onTriggered: root.dispatch(function() { win.editMarkdown("uppercase") }) }
+            MenuItem { objectName: "windows_editLowercase"; text: "Make Lower Case"; enabled: win.canFormatSource && editor.selectedText.length > 0; onTriggered: root.dispatch(function() { win.editMarkdown("lowercase") }) }
+            MenuItem { objectName: "windows_editCapitalize"; text: "Capitalize"; enabled: win.canFormatSource && editor.selectedText.length > 0; onTriggered: root.dispatch(function() { win.editMarkdown("capitalize") }) }
+            MenuItem { objectName: "windows_editTitleCase"; text: "Make Title Case"; enabled: win.canFormatSource && editor.selectedText.length > 0; onTriggered: root.dispatch(function() { win.editMarkdown("titlecase") }) }
+        }
     }
     WorkspaceMenu {
         title: "F&ormat"
@@ -134,6 +193,7 @@ MenuBar {
         title: "&View"
         Command { commandId: "sourceEditing" }
         Command { commandId: "liveEditing" }
+        Command { commandId: "liveThemeExact" }
         MenuSeparator {}
         Command { commandId: "editor" }
         Command { commandId: "split" }
@@ -225,6 +285,64 @@ MenuBar {
             Command { commandId: "writingOmawrite" }
         }
         WorkspaceMenu {
+            id: outputStyleMenu
+            objectName: "windowsTemplateMenu"
+            title: "Output Style"
+            onAboutToShow: win.restorePublishingMenuChecks(outputStyleMenu, false)
+            component PublishingChoice: MenuItem {
+                id: choice
+                property string publishingId: ""
+                property int basicStyle: -1
+                readonly property bool backendSelected: publishingId.length > 0
+                    ? backend.publishingThemeId === publishingId
+                    : backend.publishingThemeId.length === 0 && backend.outputStyle === basicStyle
+                checkable: true
+                checked: backendSelected
+                function restoreSelectionCheck() { checked = Qt.binding(function() { return choice.backendSelected; }); }
+                onTriggered: {
+                    root.dispatch(function() { win.choosePublishingStyle(publishingId, basicStyle) })
+                    // MenuItem toggles first, even for repeated or rejected choices.
+                    restoreSelectionCheck();
+                }
+            }
+            WorkspaceMenu {
+                id: customThemesMenu
+                objectName: "windowsCustomThemesMenu"
+                title: "Custom Themes"
+                onAboutToShow: win.restorePublishingMenuChecks(customThemesMenu, false)
+                Instantiator {
+                    model: backend.publishingThemes
+                    delegate: PublishingChoice {
+                        required property var modelData
+                        objectName: "windowsPublishingTheme_" + modelData.id
+                        text: modelData.name
+                        publishingId: modelData.id
+                    }
+                    onObjectAdded: function(index, object) { customThemesMenu.insertItem(index, object); }
+                    onObjectRemoved: function(index, object) { customThemesMenu.removeItem(object); }
+                }
+            }
+            MenuSeparator {}
+            MenuItem { text: "Basic Font & Page Settings"; enabled: false }
+            PublishingChoice { text: "Modern (Sans)"; objectName: "windowsTemplate0"; basicStyle: 0 }
+            PublishingChoice { text: "Classic (Serif)"; objectName: "windowsTemplate1"; basicStyle: 1 }
+            PublishingChoice { text: "Manuscript (Mono)"; objectName: "windowsTemplate2"; basicStyle: 2 }
+            MenuSeparator {}
+            PublishingChoice { text: "GitHub"; objectName: "windowsTemplate4"; basicStyle: 4 }
+            PublishingChoice { text: "Helvetica"; objectName: "windowsTemplate5"; basicStyle: 5 }
+            PublishingChoice { text: "Palatino"; objectName: "windowsTemplate6"; basicStyle: 6 }
+            PublishingChoice { text: "MLA Draft"; objectName: "windowsTemplate7"; basicStyle: 7 }
+            MenuSeparator {}
+            PublishingChoice { text: "Custom Settings"; objectName: "windowsTemplate3"; basicStyle: 3 }
+            MenuItem { objectName: "windowsTemplateCustomEdit"; text: "Edit Basic Settings…"; onTriggered: root.dispatch(function() { win.openExportHub("pdf") }) }
+            MenuItem { objectName: "windowsTemplateCustomLoad"; text: "Load Custom Settings…"; onTriggered: root.dispatch(function() { outputStyleDialog.open() }) }
+            MenuSeparator {}
+            MenuItem { objectName: "windowsGetMoreThemes"; text: "Get More Themes…"; onTriggered: root.dispatch(function() { Qt.openUrlExternally("https://theme.typora.io/") }) }
+            MenuItem { objectName: "windowsThemeImport"; text: "Import Theme…"; onTriggered: root.dispatch(function() { publishingThemeDialog.open() }) }
+            MenuItem { objectName: "windowsThemesFolder"; text: "Open Themes Folder"; onTriggered: root.dispatch(function() { win.openPublishingThemesFolder() }) }
+            MenuItem { objectName: "windowsThemesReload"; text: "Reload Themes"; onTriggered: root.dispatch(function() { win.reloadPublishingThemes() }) }
+        }
+        WorkspaceMenu {
             title: "Appearance"
             Command { commandId: "themeSystem" }
             Command { commandId: "themeLight" }
@@ -255,8 +373,86 @@ MenuBar {
         Command { commandId: "writingReview" }
     }
     WorkspaceMenu {
+        objectName: "windowsGoMenu"
+        title: "&Go"
+        MenuItem { objectName: "goBack"; text: "Back"; enabled: backend.canGoBack; onTriggered: root.dispatch(function() { win.requestHistory(-1) }) }
+        MenuItem { objectName: "goForward"; text: "Forward"; enabled: backend.canGoForward; onTriggered: root.dispatch(function() { win.requestHistory(1) }) }
+        MenuSeparator {}
+        MenuItem { objectName: "goLibraryBack"; text: "Back in Library"; enabled: backend.library.canGoBack; onTriggered: root.dispatch(function() { backend.library.navigateHistory(-1) }) }
+        MenuItem { objectName: "goLibraryForward"; text: "Forward in Library"; enabled: backend.library.canGoForward; onTriggered: root.dispatch(function() { backend.library.navigateHistory(1) }) }
+        MenuItem { objectName: "goEnclosingFolder"; text: "Enclosing Folder"; enabled: backend.library.rootFolder.toString() !== ""; onTriggered: root.dispatch(function() { backend.library.enclosingFolder() }) }
+        MenuSeparator {}
+        MenuItem { objectName: "goOpenLink"; text: "Open Link"; enabled: backend.sourceLinkAt(editor.cursorPosition).toString() !== ""; onTriggered: root.dispatch(function() { win.openSourceLink() }) }
+        Command { commandId: "quickOpen"; objectName: "goQuickSearch"; text: "Quick Search…" }
+        MenuItem { objectName: "goCommandPalette"; text: "Command Palette…"; onTriggered: root.dispatch(function() { commandPalette.open() }) }
+        MenuSeparator {}
+        WorkspaceMenu {
+            id: locationsMenu
+            objectName: "windowsLocationsMenu"
+            title: "Locations"
+            Instantiator {
+                model: backend.library.locations
+                delegate: MenuItem {
+                    required property var modelData
+                    required property int index
+                    objectName: "goLocation_" + index
+                    text: modelData.name + (modelData.available ? "" : " (Unavailable)")
+                    enabled: modelData.available
+                    onTriggered: root.dispatch(function() { backend.library.rootFolder = modelData.url; workspaceLayout.filesVisible = true; })
+                }
+                onObjectAdded: function(index, object) { locationsMenu.insertItem(index, object); }
+                onObjectRemoved: function(index, object) { locationsMenu.removeItem(object); }
+            }
+            MenuSeparator {}
+            MenuItem { objectName: "goAddLocation"; text: "Add Location…"; onTriggered: root.dispatch(function() { libraryPane.chooseFolder() }) }
+        }
+        WorkspaceMenu {
+            id: smartFoldersMenu
+            objectName: "windowsSmartFoldersMenu"
+            title: "Smart Folders"
+            RecentMenu { objectName: "windowsSmartFolderRecentsMenu"; title: "Recents" }
+            MenuItem { objectName: "goNewSmartFolder"; text: "New Smart Folder…"; enabled: backend.library.rootFolder.toString() !== ""; onTriggered: root.dispatch(function() { win.openQuickSearchState("", false, backend.library.rootFolder, true) }) }
+            MenuSeparator { visible: backend.library.savedSearches.length > 0 }
+            Instantiator {
+                model: backend.library.savedSearches
+                delegate: MenuItem {
+                    required property var modelData
+                    required property int index
+                    objectName: "goSavedSearch_" + index
+                    text: modelData.query + (modelData.contents ? " — contents" : " — filenames")
+                    onTriggered: root.dispatch(function() { win.openSavedSearch(modelData) })
+                }
+                onObjectAdded: function(index, object) { smartFoldersMenu.insertItem(index + 3, object); }
+                onObjectRemoved: function(index, object) { smartFoldersMenu.removeItem(object); }
+            }
+        }
+        WorkspaceMenu {
+            id: hashtagsMenu
+            objectName: "windowsHashtagsMenu"
+            title: "Hashtags"
+            Instantiator {
+                model: backend.library.tagIndex
+                delegate: MenuItem {
+                    required property var modelData
+                    required property int index
+                    objectName: "goHashtag_" + modelData.tag
+                    text: "#" + modelData.tag + " (" + modelData.count + ")"
+                    enabled: backend.library.rootFolder.toString() !== ""
+                    onTriggered: root.dispatch(function() { win.openHashtag(modelData.tag) })
+                }
+                onObjectAdded: function(index, object) { hashtagsMenu.insertItem(index, object); }
+                onObjectRemoved: function(index, object) { hashtagsMenu.removeItem(object); }
+            }
+            MenuItem { objectName: "goHashtagsEmpty"; text: backend.library.tagStatus; enabled: false; visible: backend.library.tagIndex.length === 0 }
+            MenuSeparator {}
+            MenuItem { objectName: "goHashtagStatus"; text: backend.library.tagStatus; enabled: false; visible: backend.library.tagIndex.length > 0 }
+            Command { commandId: "refreshTags"; objectName: "goRefreshHashtags"; text: "Refresh Hashtags" }
+        }
+    }
+    WorkspaceMenu {
         title: "&Help"
         MenuItem { text: "Fomawrite Help"; onTriggered: root.dispatch(function() { helpDialog.showPage("help", "Fomawrite Help") }) }
+        MenuItem { objectName: "windows_helpWhatsNew"; text: "What’s New in Fomawrite"; onTriggered: root.dispatch(function() { helpDialog.showPage("whats-new", "What’s New in Fomawrite") }) }
         MenuItem { text: "Keyboard Shortcuts"; onTriggered: root.dispatch(function() { shortcutsDialog.open() }) }
         MenuSeparator {}
         Command { commandId: "checkWritingCheckerUpdates" }

@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       menu_baseline_revision:
-        description: 'Optional full commit SHA for native Focus/chrome menu red/green proof'
+        description: 'Optional full commit SHA for native Focus/chrome/Go menu red/green proof'
         required: false
         type: string
         default: ''
@@ -102,7 +102,7 @@ jobs:
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         run: ./bin/windows/test.ps1 -Architecture ${{ matrix.architecture }}
 
-      - name: Prove native Focus and chrome menu regressions
+      - name: Prove native Focus, chrome and Go menu regressions
         if: ${{ !cancelled() && steps.qt-tests.outcome == 'success' && steps.menu-baseline.outcome == 'success' }}
         env:
           MENU_BASELINE_REVISION: ${{ inputs.menu_baseline_revision }}

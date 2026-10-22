@@ -247,6 +247,7 @@ private slots:
     void spellCheckPlatformAvailabilityFollowsHarper();
     void windowsAppearanceTracksQtColorScheme();
     void windowsMenuRoutesPortableCommands();
+    void windowsMenuFormattingKeepsImmediateSaveShortcut();
     void windowsClipboardSearchMenusPreserveFocusAndUndo();
     void windowsMenuWorkspaceActionsShareState_data();
     void windowsMenuWorkspaceActionsShareState();
@@ -1288,7 +1289,16 @@ private slots:
         QVERIFY(!document.isUndoAvailable());
     }
 
+    void bundledHelpIsAllowlistedAndDoesNotEditDraft_data() {
+        QTest::addColumn<bool>("windowsFixture");
+        QTest::newRow("production-platform") << false;
+#ifndef Q_OS_WIN
+        QTest::newRow("windows-component") << true;
+#endif
+    }
+
     void bundledHelpIsAllowlistedAndDoesNotEditDraft() {
+        QFETCH(bool, windowsFixture);
         Backend backend;
         const QString help = backend.bundledHelp(QStringLiteral("help"));
         const QString whatsNew = backend.bundledHelp(QStringLiteral("whats-new"));
@@ -1307,18 +1317,31 @@ private slots:
         QVERIFY2(window, qPrintable(component.errorString()));
         auto *editor = window->findChild<QObject *>("sourceEditor");
         QVERIFY(testDesktopMenusMatchPlatform(window.data()));
-        const bool windowsMenus = window->property("isWindows").toBool();
-        auto *helpAction = windowsMenus ? testWindowsMenuItem(window.data(), QStringLiteral("Fomawrite Help"))
-                                       : window->findChild<QObject *>("helpFomawrite");
-        auto *whatsNewAction = window->findChild<QObject *>("helpWhatsNew");
-        auto *shortcutsAction = windowsMenus ? testWindowsMenuItem(window.data(), QStringLiteral("Keyboard Shortcuts"))
-                                            : window->findChild<QObject *>("helpKeyboardShortcuts");
+        if (windowsFixture) {
+            auto *loader = window->findChild<QObject *>("windowsMenuLoader");
+            QVERIFY(loader && loader->setProperty("active", true));
+            QTRY_VERIFY(window->findChild<QObject *>("windowsMenuBar"));
+        }
+        const bool windowsMenus = windowsFixture || window->property("isWindows").toBool();
+        auto *menuRoot = windowsMenus ? window->findChild<QObject *>("windowsMenuBar") : window.data();
+        QVERIFY(menuRoot);
+        const auto menuNode = [&](const char *id) {
+            return menuRoot->findChild<QObject *>((windowsMenus ? QStringLiteral("windows_") : QString()) + QString::fromLatin1(id));
+        };
+        const auto helpItem = [&](const char *nativeId, const QString &windowsText) -> QObject * {
+            if (!windowsMenus) return menuNode(nativeId);
+            for (auto *item : menuRoot->findChildren<QObject *>())
+                if (item->property("text").toString() == windowsText && item->metaObject()->indexOfSignal("triggered()") >= 0) return item;
+            return nullptr;
+        };
+        auto *helpAction = helpItem("helpFomawrite", QStringLiteral("Fomawrite Help"));
+        auto *whatsNewAction = menuNode("helpWhatsNew");
+        auto *shortcutsAction = helpItem("helpKeyboardShortcuts", QStringLiteral("Keyboard Shortcuts"));
         auto *dialog = window->findChild<QObject *>("helpDialog");
         auto *viewer = window->findChild<QObject *>("helpDocumentText");
         auto *shortcuts = window->findChild<QObject *>("shortcutsDialog");
         QVERIFY(editor && helpAction && shortcutsAction && dialog && viewer && shortcuts);
-        if (windowsMenus) QVERIFY(!whatsNewAction); // Desktop affordance remains M2.
-        else QVERIFY(whatsNewAction);
+        QVERIFY(whatsNewAction);
 
         editor->setProperty("text", QStringLiteral("# Synthetic dirty draft\n\nKeep this exact text."));
         QVERIFY(editor->setProperty("cursorPosition", 12));
@@ -1360,12 +1383,7 @@ private slots:
         QTest::keyClick(quickWindow, Qt::Key_Escape);
         QTRY_VERIFY(!dialog->property("opened").toBool());
 
-        if (windowsMenus) {
-            QVERIFY(QMetaObject::invokeMethod(dialog, "showPage", Q_ARG(QVariant, "whats-new"),
-                                              Q_ARG(QVariant, "What’s New in Fomawrite")));
-        } else {
-            QVERIFY(QMetaObject::invokeMethod(whatsNewAction, "triggered"));
-        }
+        QVERIFY(QMetaObject::invokeMethod(whatsNewAction, "triggered"));
         QTRY_VERIFY(dialog->property("opened").toBool());
         QCOMPARE(dialog->property("title").toString(), QStringLiteral("What’s New in Fomawrite"));
         QVERIFY(viewer->property("text").toString().startsWith(QStringLiteral("# What’s New in Fomawrite")));
@@ -2546,26 +2564,15 @@ QtObject {
         QVERIFY(dialog && query && contents && savedChoice && saveSmartFolder && removeSmartFolder);
         QVERIFY(testDesktopMenusMatchPlatform(window.data()));
         const bool windowsMenus = window->property("isWindows").toBool();
-        if (windowsMenus) {
-            // Go and Open Recent desktop menus are M2; shared routes are exercised below.
-            for (const char *id : {"goSavedSearch_0", "goNewSmartFolder", "goRefreshHashtags", "goHashtag_work", "goHashtagsEmpty", "recentFile_0", "recentFile_1"})
-                QVERIFY(!window->findChild<QObject *>(id));
-        }
-        auto openSavedSearch = [&] {
-            QVariant opened;
-            return QMetaObject::invokeMethod(window.data(), "openSavedSearch", Q_RETURN_ARG(QVariant, opened),
-                                             Q_ARG(QVariant, library->savedSearches().first())) && opened.toBool();
-        };
-
         library->setRootFolder(rootTwo);
         auto *saved = window->findChild<QObject *>("goSavedSearch_0");
-        if (windowsMenus) {
-            QVERIFY(!saved);
-            QVERIFY(openSavedSearch());
-        } else {
-            QVERIFY(saved);
-            QVERIFY(QMetaObject::invokeMethod(saved, "triggered"));
-        }
+        QVERIFY(saved);
+        auto *location = window->findChild<QObject *>("goLocation_0");
+        QVERIFY(location && location->property("enabled").toBool());
+        QVERIFY(QMetaObject::invokeMethod(location, "triggered"));
+        QCOMPARE(library->rootFolder(), rootOne);
+        library->setRootFolder(rootTwo);
+        QVERIFY(QMetaObject::invokeMethod(saved, "triggered"));
         QTRY_VERIFY(dialog->property("opened").toBool());
         QCOMPARE(library->rootFolder(), rootOne);
         QCOMPARE(query->property("text").toString(), QStringLiteral("#work"));
@@ -2576,17 +2583,8 @@ QtObject {
         contents->setProperty("checked", true);
         const int searchCount = library->savedSearches().size();
         auto *newSmartFolder = window->findChild<QObject *>("goNewSmartFolder");
-        if (windowsMenus) {
-            QVERIFY(!newSmartFolder);
-            QVariant opened;
-            QVERIFY(QMetaObject::invokeMethod(window.data(), "openQuickSearchState", Q_RETURN_ARG(QVariant, opened),
-                                              Q_ARG(QVariant, QString()), Q_ARG(QVariant, false),
-                                              Q_ARG(QVariant, library->rootFolder()), Q_ARG(QVariant, true)));
-            QVERIFY(opened.toBool());
-        } else {
-            QVERIFY(newSmartFolder);
-            QVERIFY(QMetaObject::invokeMethod(newSmartFolder, "triggered"));
-        }
+        QVERIFY(newSmartFolder && newSmartFolder->property("enabled").toBool());
+        QVERIFY(QMetaObject::invokeMethod(newSmartFolder, "triggered"));
         QTRY_VERIFY(dialog->property("opened").toBool());
         QVERIFY(dialog->property("creationMode").toBool());
         QCOMPARE(query->property("text").toString(), QString());
@@ -2597,41 +2595,24 @@ QtObject {
         QTRY_COMPARE(library->savedSearches().size(), searchCount + 1);
         QCOMPARE(library->savedSearches().first().toMap().value("query").toString(), QStringLiteral("fresh query"));
         QVERIFY(!library->savedSearches().first().toMap().value("contents").toBool());
-        if (!windowsMenus)
-            QTRY_COMPARE(window->findChild<QObject *>("goSavedSearch_0")->property("text").toString(),
-                         QStringLiteral("fresh query — filenames"));
+        QTRY_COMPARE(window->findChild<QObject *>("goSavedSearch_0")->property("text").toString(),
+                     QStringLiteral("fresh query — filenames"));
         savedChoice->setProperty("currentIndex", 0);
         QVERIFY(QMetaObject::invokeMethod(removeSmartFolder, "clicked"));
         QTRY_COMPARE(library->savedSearches().size(), searchCount);
         QCOMPARE(library->savedSearches().first().toMap().value("query").toString(), QStringLiteral("#work"));
         QVERIFY(library->savedSearches().first().toMap().value("contents").toBool());
-        if (!windowsMenus)
-            QTRY_COMPARE(window->findChild<QObject *>("goSavedSearch_0")->property("text").toString(),
-                         QStringLiteral("#work — contents"));
+        QTRY_COMPARE(window->findChild<QObject *>("goSavedSearch_0")->property("text").toString(),
+                     QStringLiteral("#work — contents"));
         QVERIFY(QMetaObject::invokeMethod(dialog, "close"));
 
         auto *refreshTags = window->findChild<QObject *>("goRefreshHashtags");
-        if (windowsMenus) {
-            QVERIFY(!refreshTags);
-            QVERIFY(testCommandState(window.data(), "isEnabled", QStringLiteral("refreshTags")));
-            QVERIFY(testRunCommand(window.data(), QStringLiteral("refreshTags")));
-        } else {
-            QVERIFY(refreshTags && refreshTags->property("enabled").toBool());
-            QVERIFY(QMetaObject::invokeMethod(refreshTags, "triggered"));
-        }
+        QVERIFY(refreshTags && refreshTags->property("enabled").toBool());
+        QVERIFY(QMetaObject::invokeMethod(refreshTags, "triggered"));
         QTRY_VERIFY_WITH_TIMEOUT(!library->tagStatus().startsWith(QStringLiteral("Scanning")), 10000);
         auto *hashtag = window->findChild<QObject *>("goHashtag_work");
-        if (windowsMenus) {
-            QVERIFY(!hashtag);
-            QVERIFY(!library->tagIndex().isEmpty());
-            QVariant opened;
-            QVERIFY(QMetaObject::invokeMethod(window.data(), "openHashtag", Q_RETURN_ARG(QVariant, opened),
-                                              Q_ARG(QVariant, "work")));
-            QVERIFY(opened.toBool());
-        } else {
-            QVERIFY(hashtag);
-            QVERIFY(QMetaObject::invokeMethod(hashtag, "triggered"));
-        }
+        QVERIFY(hashtag && hashtag->property("enabled").toBool());
+        QVERIFY(QMetaObject::invokeMethod(hashtag, "triggered"));
         QTRY_VERIFY(dialog->property("opened").toBool());
         QCOMPARE(query->property("text").toString(), QStringLiteral("#work"));
         QVERIFY(contents->property("checked").toBool());
@@ -2640,50 +2621,39 @@ QtObject {
         library->setRootFolder(rootTwo);
         QCOMPARE(library->tagIndex().size(), 0);
         QTRY_VERIFY(!window->findChild<QObject *>("goHashtag_work"));
-        if (!windowsMenus)
-            QVERIFY(window->findChild<QObject *>("goHashtagsEmpty")->property("visible").toBool());
+        auto *emptyTags = window->findChild<QObject *>("goHashtagsEmpty");
+        QVERIFY(emptyTags && !emptyTags->property("enabled").toBool());
+        QCOMPARE(emptyTags->property("text").toString(), library->tagStatus());
+        if (windowsMenus) {
+            auto *menu = window->findChild<QObject *>("windowsHashtagsMenu"); QVERIFY(menu);
+            QVERIFY(QMetaObject::invokeMethod(menu, "open"));
+            QTRY_VERIFY(emptyTags->property("visible").toBool());
+            QVERIFY(QMetaObject::invokeMethod(menu, "close"));
+        } else QVERIFY(emptyTags->property("visible").toBool());
 
         library->setRootFolder(missingRoot);
         library->saveSearch(QStringLiteral("missing root"), false);
         library->setRootFolder(rootTwo);
         QVERIFY(QDir(missingRoot.toLocalFile()).removeRecursively());
-        if (windowsMenus) {
-            QVERIFY(!openSavedSearch());
-        } else {
-            QTRY_VERIFY(window->findChild<QObject *>("goSavedSearch_0"));
-            QVERIFY(QMetaObject::invokeMethod(window->findChild<QObject *>("goSavedSearch_0"), "triggered"));
-        }
+        QTRY_VERIFY(window->findChild<QObject *>("goSavedSearch_0"));
+        QVERIFY(QMetaObject::invokeMethod(window->findChild<QObject *>("goSavedSearch_0"), "triggered"));
         QVERIFY(!dialog->property("opened").toBool());
         QCOMPARE(library->rootFolder(), rootTwo);
         QVERIFY(!library->error().isEmpty());
 
         const auto unavailableItems = window->findChildren<QObject *>(QStringLiteral("recentFile_0"));
         const auto availableItems = window->findChildren<QObject *>(QStringLiteral("recentFile_1"));
-        if (windowsMenus) {
-            QVERIFY(unavailableItems.isEmpty() && availableItems.isEmpty());
-            const auto recents = library->recentFiles();
-            QCOMPARE(recents.size(), 2);
-            QVERIFY(!recents.at(0).toMap().value("available").toBool());
-            QVERIFY(recents.at(1).toMap().value("available").toBool());
-            auto *editor = window->findChild<QObject *>("sourceEditor"); QVERIFY(editor);
-            const QString source = editor->property("text").toString();
-            const QUrl fileBefore = backend.fileUrl();
-            QVariant opened;
-            QVERIFY(QMetaObject::invokeMethod(window.data(), "requestOpen", Q_RETURN_ARG(QVariant, opened),
-                                              Q_ARG(QVariant, recents.at(0).toMap().value("url"))));
-            QVERIFY(!opened.toBool());
-            QCOMPARE(backend.fileUrl(), fileBefore);
-            QCOMPARE(editor->property("text").toString(), source);
-            QVERIFY(QMetaObject::invokeMethod(window.data(), "requestOpen", Q_RETURN_ARG(QVariant, opened),
-                                              Q_ARG(QVariant, recents.at(1).toMap().value("url"))));
-            QVERIFY(opened.toBool());
-        } else {
-            QCOMPARE(unavailableItems.size(), 2); // File → Open Recent and Go → Smart Folders → Recents.
-            QCOMPARE(availableItems.size(), 2);
-            for (QObject *item : unavailableItems) QVERIFY(!item->property("enabled").toBool());
-            for (QObject *item : availableItems) QVERIFY(item->property("enabled").toBool());
-            QVERIFY(QMetaObject::invokeMethod(availableItems.first(), "triggered"));
+        QCOMPARE(unavailableItems.size(), 2); // File → Open Recent and Go → Smart Folders → Recents.
+        QCOMPARE(availableItems.size(), 2);
+        for (QObject *item : unavailableItems) {
+            QVERIFY(!item->property("enabled").toBool());
+            QVERIFY(item->property("text").toString().endsWith(QStringLiteral(" (Unavailable)")));
         }
+        for (QObject *item : availableItems) {
+            QVERIFY(item->property("enabled").toBool());
+            QVERIFY(item->property("text").toString().startsWith(QStringLiteral("Available.md — ")));
+        }
+        QVERIFY(QMetaObject::invokeMethod(availableItems.first(), "triggered"));
         QCOMPARE(backend.fileUrl(), QUrl::fromLocalFile(QFileInfo(available.fileName()).canonicalFilePath()));
         backend.discardRecovery();
     }
@@ -2736,33 +2706,87 @@ QtObject {
         QScopedPointer<QObject> window(component.create());
         QVERIFY2(window, qPrintable(component.errorString()));
         auto *editor = window->findChild<QObject *>("sourceEditor");
+        auto *back = window->findChild<QObject *>("goBack");
+        auto *forward = window->findChild<QObject *>("goForward");
+        auto *prompt = window->findChild<QObject *>("unsavedChangesPrompt");
+        QVERIFY(testDesktopMenusMatchPlatform(window.data()));
+        QVERIFY(back && forward);
+        QVERIFY(editor && prompt);
+        for (const char *id : {"goLibraryBack", "goLibraryForward", "goEnclosingFolder", "goOpenLink", "goQuickSearch", "goCommandPalette", "goAddLocation"})
+            QVERIFY2(window->findChild<QObject *>(id), id);
+        auto trigger = [&](const char *id) {
+            auto *item = window->findChild<QObject *>(id);
+            return item && item->property("enabled").toBool() && QMetaObject::invokeMethod(item, "triggered");
+        };
         QVERIFY(backend.open(QUrl::fromLocalFile(first.fileName())));
         backend.rememberCursor(7);
         QVERIFY(backend.open(QUrl::fromLocalFile(second.fileName())));
+        // Go records the visible caret; finish Main's document-loaded reset first.
+        QTRY_COMPARE(editor->property("cursorPosition").toInt(), 0);
         QVERIFY(backend.canGoBack());
-        QCOMPARE(backend.navigateHistory(-1), 7);
-        QCOMPARE(backend.fileUrl(), QUrl::fromLocalFile(first.fileName()));
+        QVERIFY(back->property("enabled").toBool());
+        QVERIFY(trigger("goBack"));
+        QTRY_COMPARE(backend.fileUrl(), QUrl::fromLocalFile(first.fileName()));
+        QTRY_COMPARE(editor->property("cursorPosition").toInt(), 7);
         QVERIFY(backend.canGoForward());
-        QCOMPARE(backend.navigateHistory(1), 0);
+        QVERIFY(forward->property("enabled").toBool());
+        QVERIFY(trigger("goForward"));
+        QTRY_COMPARE(backend.fileUrl(), QUrl::fromLocalFile(second.fileName()));
+        QTRY_COMPARE(editor->property("cursorPosition").toInt(), 0);
         QVERIFY(QMetaObject::invokeMethod(editor, "insert", Q_ARG(int, 0), Q_ARG(QString, "dirty ")));
-        QVERIFY(QMetaObject::invokeMethod(window.data(), "requestHistory", Q_ARG(QVariant, -1)));
-        QCOMPARE(window->property("pendingAction").toString(), QString("history"));
-        QVERIFY(QMetaObject::invokeMethod(window->findChild<QObject *>("unsavedChangesPrompt"), "cancelRequested"));
+        const QString dirty = editor->property("text").toString();
+        const bool canUndo = editor->property("canUndo").toBool();
+        QVERIFY(trigger("goBack"));
+        QTRY_COMPARE(window->property("pendingAction").toString(), QString("history"));
+        QTRY_VERIFY(prompt->property("opened").toBool());
+        QVERIFY(QMetaObject::invokeMethod(prompt, "reject"));
+        QCOMPARE(window->property("pendingAction").toString(), QString());
+        QCOMPARE(editor->property("text").toString(), dirty);
+        QCOMPARE(editor->property("canUndo").toBool(), canUndo);
         QCOMPARE(backend.fileUrl(), QUrl::fromLocalFile(second.fileName()));
         QVERIFY(backend.modified());
         QVERIFY(first.remove());
-        QCOMPARE(backend.navigateHistory(-1), -1);
+        QVERIFY(trigger("goBack"));
+        QTRY_COMPARE(window->property("pendingAction").toString(), QString("history"));
+        QVERIFY(QMetaObject::invokeMethod(prompt, "close"));
+        QVERIFY(QMetaObject::invokeMethod(prompt, "discardRequested"));
+        QCOMPARE(window->property("pendingAction").toString(), QString());
+        QVERIFY(backend.status().startsWith(QStringLiteral("Could not open")));
+        QCOMPARE(editor->property("text").toString(), dirty);
+        QCOMPARE(editor->property("canUndo").toBool(), canUndo);
         QCOMPARE(backend.fileUrl(), QUrl::fromLocalFile(second.fileName()));
         QVERIFY(backend.modified());
         auto *library = qobject_cast<FileLibrary *>(backend.library());
         library->setRootFolder(QUrl::fromLocalFile(directory.path()));
         library->setRootFolder(QUrl::fromLocalFile(directory.filePath("nested")));
-        QVERIFY(library->navigateHistory(-1));
+        QVERIFY(trigger("goLibraryBack"));
         QCOMPARE(library->rootFolder(), QUrl::fromLocalFile(QFileInfo(directory.path()).canonicalFilePath()));
         QCOMPARE(backend.fileUrl(), QUrl::fromLocalFile(second.fileName()));
-        library->quickSearch("Second");
+        QVERIFY(trigger("goLibraryForward"));
+        QCOMPARE(library->rootFolder(), QUrl::fromLocalFile(QFileInfo(directory.filePath("nested")).canonicalFilePath()));
+        QVERIFY(trigger("goEnclosingFolder"));
+        QCOMPARE(library->rootFolder(), QUrl::fromLocalFile(QFileInfo(directory.path()).canonicalFilePath()));
+        QCOMPARE(backend.fileUrl(), QUrl::fromLocalFile(second.fileName()));
+        QCOMPARE(editor->property("text").toString(), dirty);
+        QVERIFY(backend.modified());
+        auto *quickDialog = window->findChild<QObject *>("quickOpenDialog");
+        auto *quickQuery = window->findChild<QObject *>("quickQuery");
+        auto *quickContents = window->findChild<QObject *>("quickContents");
+        auto *palette = window->findChild<QObject *>("commandPalette");
+        QVERIFY(quickDialog && quickQuery && quickContents && palette);
+        QVERIFY(trigger("goQuickSearch"));
+        QTRY_VERIFY(quickDialog->property("opened").toBool());
+        QCOMPARE(quickQuery->property("text").toString(), QString());
+        QVERIFY(!quickContents->property("checked").toBool());
+        quickQuery->setProperty("text", QStringLiteral("Second"));
         QTRY_COMPARE(library->quickResults().size(), 1);
         QCOMPARE(library->quickResults().first().toMap()["name"].toString(), QString("Second.md"));
+        QVERIFY(QMetaObject::invokeMethod(quickDialog, "close"));
+        QVERIFY(trigger("goCommandPalette"));
+        QTRY_VERIFY(palette->property("opened").toBool());
+        QVERIFY(QMetaObject::invokeMethod(palette, "close"));
+        QCOMPARE(editor->property("text").toString(), dirty);
+        QCOMPARE(editor->property("canUndo").toBool(), canUndo);
         library->quickSearch("Second");
         library->quickSearch("missing");
         QTRY_VERIFY(library->quickStatus() != "Searching filenames…");
@@ -2770,6 +2794,16 @@ QtObject {
         editor->setProperty("text", "[local](First.md) [bad](javascript:alert)");
         QCOMPARE(backend.sourceLinkAt(2), backend.resolveDocumentLink("First.md"));
         QVERIFY(backend.sourceLinkAt(22).isEmpty());
+        editor->setProperty("cursorPosition", 2);
+        const QString links = editor->property("text").toString();
+        QVERIFY(trigger("goOpenLink"));
+        QTRY_COMPARE(window->property("pendingAction").toString(), QStringLiteral("open"));
+        QVERIFY(QMetaObject::invokeMethod(prompt, "reject"));
+        QCOMPARE(editor->property("text").toString(), links);
+        QCOMPARE(backend.fileUrl(), QUrl::fromLocalFile(second.fileName()));
+        QVERIFY(backend.modified());
+        editor->setProperty("cursorPosition", 22);
+        QVERIFY(!window->findChild<QObject *>("goOpenLink")->property("enabled").toBool());
         backend.discardRecovery();
     }
 
@@ -2837,7 +2871,16 @@ QtObject {
         backend.discardRecovery();
     }
 
+    void titleCaseTransformationIsDistinctAndPreservesUndo_data() {
+        QTest::addColumn<bool>("windowsFixture");
+        QTest::newRow("production-platform") << false;
+#ifndef Q_OS_WIN
+        QTest::newRow("windows-component") << true;
+#endif
+    }
+
     void titleCaseTransformationIsDistinctAndPreservesUndo() {
+        QFETCH(bool, windowsFixture);
         Backend backend;
         QQmlEngine engine;
         engine.rootContext()->setContextProperty("backend", &backend);
@@ -2845,19 +2888,25 @@ QtObject {
         QScopedPointer<QObject> window(component.create());
         QVERIFY2(window, qPrintable(component.errorString()));
         auto *editor = window->findChild<QObject *>("sourceEditor");
-        auto *transformations = window->findChild<QObject *>("editTransformations");
         QVERIFY(testDesktopMenusMatchPlatform(window.data()));
-        const bool mac = window->property("isMac").toBool();
-        QVERIFY(editor);
-        if (mac) QVERIFY(transformations);
-        else QVERIFY(!transformations); // Transformations desktop submenu is M2.
-        const auto transform = [&](QObject *item, const QString &operation) {
-            if (mac) return QMetaObject::invokeMethod(item, "triggered");
+        if (windowsFixture) {
+            auto *loader = window->findChild<QObject *>("windowsMenuLoader");
+            QVERIFY(loader && loader->setProperty("active", true));
+            QTRY_VERIFY(window->findChild<QObject *>("windowsMenuBar"));
+        }
+        const bool windowsMenus = windowsFixture || window->property("isWindows").toBool();
+        auto *menuRoot = windowsMenus ? window->findChild<QObject *>("windowsMenuBar") : window.data();
+        QVERIFY(menuRoot);
+        const auto menuNode = [&](const char *id) {
+            return menuRoot->findChild<QObject *>((windowsMenus ? QStringLiteral("windows_") : QString()) + QString::fromLatin1(id));
+        };
+        auto *transformations = menuNode("editTransformations");
+        QVERIFY(editor && transformations);
+        const auto transform = [&](QObject *item) {
             QMetaObject::invokeMethod(editor, "forceActiveFocus");
-            return QMetaObject::invokeMethod(window.data(), "editMarkdown", Q_ARG(QVariant, operation));
+            return item && item->property("enabled").toBool() && QMetaObject::invokeMethod(item, "triggered");
         };
 
-        if (mac) {
         const QStringList expectedLabels = {QStringLiteral("Make Upper Case"),
                                             QStringLiteral("Make Lower Case"),
                                             QStringLiteral("Capitalize"),
@@ -2869,25 +2918,24 @@ QtObject {
         QStringList labels;
         QStringList orderedNames;
         for (auto *item : transformations->children()) {
-            if (objectNames.contains(item->objectName()))
-                orderedNames.append(item->objectName());
+            if (objectNames.contains(windowsMenus ? item->objectName().mid(8) : item->objectName()))
+                orderedNames.append(windowsMenus ? item->objectName().mid(8) : item->objectName());
         }
         QCOMPARE(orderedNames, objectNames);
         for (const auto &name : orderedNames) {
-            auto *item = transformations->findChild<QObject *>(name);
+            auto *item = transformations->findChild<QObject *>((windowsMenus ? QStringLiteral("windows_") : QString()) + name);
             QVERIFY(item);
             labels.append(item->property("text").toString());
         }
         QCOMPARE(labels, expectedLabels);
 
-        }
         const QString source = QStringLiteral("tEST of THE wORLD");
         editor->setProperty("text", source);
         QVERIFY(QMetaObject::invokeMethod(editor, "select", Q_ARG(int, 0),
                                           Q_ARG(int, source.size())));
-        auto *titleCase = mac ? transformations->findChild<QObject *>("editTitleCase") : nullptr;
-        if (mac) QVERIFY(titleCase->property("enabled").toBool());
-        QVERIFY(transform(titleCase, QStringLiteral("titlecase")));
+        auto *titleCase = menuNode("editTitleCase");
+        QVERIFY(titleCase);
+        QVERIFY(transform(titleCase));
         QCOMPARE(editor->property("text").toString(), QStringLiteral("tEST of the wORLD"));
         QCOMPARE(editor->property("selectedText").toString(), QStringLiteral("tEST of the wORLD"));
         QVERIFY(QMetaObject::invokeMethod(editor, "undo"));
@@ -2897,7 +2945,7 @@ QtObject {
         editor->setProperty("text", lowerMajorWords);
         QVERIFY(QMetaObject::invokeMethod(editor, "select", Q_ARG(int, 0),
                                           Q_ARG(int, lowerMajorWords.size())));
-        QVERIFY(transform(titleCase, QStringLiteral("titlecase")));
+        QVERIFY(transform(titleCase));
         QCOMPARE(editor->property("text").toString(),
                  QStringLiteral("The QUICK BROWN Fox and a DOG in New YORK"));
         QVERIFY(QMetaObject::invokeMethod(editor, "undo"));
@@ -2911,9 +2959,9 @@ QtObject {
         editor->setProperty("text", source);
         QVERIFY(QMetaObject::invokeMethod(editor, "select", Q_ARG(int, 0),
                                           Q_ARG(int, source.size())));
-        auto *capitalize = mac ? transformations->findChild<QObject *>("editCapitalize") : nullptr;
-        if (mac) QVERIFY(capitalize->property("enabled").toBool());
-        QVERIFY(transform(capitalize, QStringLiteral("capitalize")));
+        auto *capitalize = menuNode("editCapitalize");
+        QVERIFY(capitalize);
+        QVERIFY(transform(capitalize));
         QCOMPARE(editor->property("text").toString(),
                  QStringLiteral("Test Of The World"));
         QCOMPARE(editor->property("selectedText").toString(),
@@ -2925,13 +2973,36 @@ QtObject {
         editor->setProperty("text", unicodeSource);
         QVERIFY(QMetaObject::invokeMethod(editor, "select", Q_ARG(int, 0),
                                           Q_ARG(int, unicodeSource.size())));
-        QVERIFY(transform(capitalize, QStringLiteral("capitalize")));
+        QVERIFY(transform(capitalize));
         QCOMPARE(editor->property("text").toString(), QStringLiteral("Café Straße"));
         QVERIFY(QMetaObject::invokeMethod(editor, "undo"));
         QCOMPARE(editor->property("text").toString(), unicodeSource);
         editor->setProperty("text", protectedLink);
         QVERIFY(backend.editMarkdown("capitalize", 0, protectedLink.size()).isEmpty());
         QCOMPARE(editor->property("text").toString(), protectedLink);
+        const QString cased = QString::fromUtf8("Straße CAFÉ");
+        for (const auto &choice : {qMakePair("editUppercase", QString::fromUtf8("STRASSE CAFÉ")),
+                                  qMakePair("editLowercase", QString::fromUtf8("straße café"))}) {
+            editor->setProperty("text", cased);
+            QVERIFY(QMetaObject::invokeMethod(editor, "select", Q_ARG(int, 0), Q_ARG(int, cased.size())));
+            QVERIFY(transform(menuNode(choice.first)));
+            QCOMPARE(editor->property("text").toString(), choice.second);
+            QCOMPARE(editor->property("selectedText").toString(), choice.second);
+            QVERIFY(QMetaObject::invokeMethod(editor, "undo"));
+            QCOMPARE(editor->property("text").toString(), cased);
+        }
+        // Menu guards apply to the real auxiliary owner, not the selected draft.
+        editor->setProperty("text", source);
+        QVERIFY(QMetaObject::invokeMethod(editor, "select", Q_ARG(int, 0), Q_ARG(int, source.size())));
+        QVERIFY(QMetaObject::invokeMethod(editor, "forceActiveFocus"));
+        for (const auto &id : objectNames) QVERIFY(menuNode(id.toLatin1().constData())->property("enabled").toBool());
+        QVERIFY(QMetaObject::invokeMethod(window.data(), "openSearch", Q_ARG(QVariant, false), Q_ARG(QVariant, false)));
+        auto *query = window->findChild<QObject *>("searchField"); QVERIFY(query);
+        QVERIFY(QMetaObject::invokeMethod(query, "forceActiveFocus"));
+        QTRY_VERIFY(!window->property("canFormatSource").toBool());
+        for (const auto &id : objectNames) QTRY_VERIFY(!menuNode(id.toLatin1().constData())->property("enabled").toBool());
+        QCOMPARE(editor->property("text").toString(), source);
+        QVERIFY(QMetaObject::invokeMethod(window.data(), "closeSearch", Q_ARG(QVariant, true)));
         backend.discardRecovery();
     }
 
@@ -3067,7 +3138,16 @@ QtObject {
         backend.discardRecovery();
     }
 
+    void smartQuotesAreOptInAtomicAndMarkdownAware_data() {
+        QTest::addColumn<bool>("windowsFixture");
+        QTest::newRow("production-platform") << false;
+#ifndef Q_OS_WIN
+        QTest::newRow("windows-component") << true;
+#endif
+    }
+
     void smartQuotesAreOptInAtomicAndMarkdownAware() {
+        QFETCH(bool, windowsFixture);
         QSettings settings;
         const QString key = QStringLiteral("workspace/smartQuotes");
         const bool hadSetting = settings.contains(key);
@@ -3087,13 +3167,44 @@ QtObject {
         QScopedPointer<QObject> window(component.create());
         QVERIFY2(window, qPrintable(component.errorString()));
         auto *editor = window->findChild<QObject *>(QStringLiteral("sourceEditor"));
-        auto *menuItem = window->findChild<QObject *>(QStringLiteral("editSmartQuotes"));
         QVERIFY(testDesktopMenusMatchPlatform(window.data()));
-        const bool mac = window->property("isMac").toBool();
         auto *workspaceSettings = window->findChild<QObject *>("workspaceSettings");
         QVERIFY(editor && workspaceSettings);
-        if (mac) { QVERIFY(menuItem); QVERIFY(menuItem->property("checked").toBool()); }
-        else { QVERIFY(!menuItem); QVERIFY(workspaceSettings->property("smartQuotes").toBool()); }
+        if (windowsFixture) {
+            auto *loader = window->findChild<QObject *>("windowsMenuLoader");
+            QVERIFY(loader && loader->setProperty("active", true));
+            QTRY_VERIFY(window->findChild<QObject *>("windowsMenuBar"));
+        }
+        const bool windowsMenus = windowsFixture || window->property("isWindows").toBool();
+        auto *menuRoot = windowsMenus ? window->findChild<QObject *>("windowsMenuBar") : window.data();
+        QVERIFY(menuRoot);
+        const auto menuNode = [&](const char *id) {
+            return menuRoot->findChild<QObject *>((windowsMenus ? QStringLiteral("windows_") : QString()) + QString::fromLatin1(id));
+        };
+        auto *menuItem = menuNode("editSmartQuotes");
+        QVERIFY(menuItem && menuItem->property("checkable").toBool());
+        QVERIFY(menuItem->property("checked").toBool());
+        editor->setProperty("text", QString::fromUtf8("Keep café draft"));
+        QVERIFY(QMetaObject::invokeMethod(editor, "select", Q_ARG(int, 2), Q_ARG(int, 7)));
+        const QString toggleSource = editor->property("text").toString();
+        const int toggleRevision = backend.documentRevision();
+        const bool toggleUndo = editor->property("canUndo").toBool(), toggleModified = backend.modified();
+        QVERIFY(QMetaObject::invokeMethod(menuItem, "triggered"));
+        QVERIFY(!workspaceSettings->property("smartQuotes").toBool());
+        QVERIFY(!menuItem->property("checked").toBool());
+        workspaceSettings->setProperty("smartQuotes", true);
+        QVERIFY(menuItem->property("checked").toBool());
+        workspaceSettings->setProperty("smartQuotes", false);
+        QVERIFY(!menuItem->property("checked").toBool());
+        QVERIFY(QMetaObject::invokeMethod(menuItem, "triggered"));
+        QVERIFY(workspaceSettings->property("smartQuotes").toBool());
+        QVERIFY(menuItem->property("checked").toBool());
+        QCOMPARE(editor->property("text").toString(), toggleSource);
+        QCOMPARE(editor->property("selectionStart").toInt(), 2);
+        QCOMPARE(editor->property("selectionEnd").toInt(), 7);
+        QCOMPARE(backend.documentRevision(), toggleRevision);
+        QCOMPARE(editor->property("canUndo").toBool(), toggleUndo);
+        QCOMPARE(backend.modified(), toggleModified);
 
         editor->setProperty("text", QString());
         editor->setProperty("cursorPosition", 0);
@@ -3138,7 +3249,16 @@ QtObject {
         backend.discardRecovery();
     }
 
+    void smartDashesAreOptInAtomicAndMarkdownAware_data() {
+        QTest::addColumn<bool>("windowsFixture");
+        QTest::newRow("production-platform") << false;
+#ifndef Q_OS_WIN
+        QTest::newRow("windows-component") << true;
+#endif
+    }
+
     void smartDashesAreOptInAtomicAndMarkdownAware() {
+        QFETCH(bool, windowsFixture);
         QSettings settings;
         const QString key = QStringLiteral("workspace/smartDashes");
         const bool hadSetting = settings.contains(key);
@@ -3158,13 +3278,44 @@ QtObject {
         QScopedPointer<QObject> window(component.create());
         QVERIFY2(window, qPrintable(component.errorString()));
         auto *editor = window->findChild<QObject *>(QStringLiteral("sourceEditor"));
-        auto *menuItem = window->findChild<QObject *>(QStringLiteral("editSmartDashes"));
         auto *workspaceSettings = window->findChild<QObject *>(QStringLiteral("workspaceSettings"));
         QVERIFY(testDesktopMenusMatchPlatform(window.data()));
-        const bool mac = window->property("isMac").toBool();
         QVERIFY(editor && workspaceSettings);
-        if (mac) { QVERIFY(menuItem); QVERIFY(menuItem->property("checked").toBool()); }
-        else { QVERIFY(!menuItem); QVERIFY(workspaceSettings->property("smartDashes").toBool()); }
+        if (windowsFixture) {
+            auto *loader = window->findChild<QObject *>("windowsMenuLoader");
+            QVERIFY(loader && loader->setProperty("active", true));
+            QTRY_VERIFY(window->findChild<QObject *>("windowsMenuBar"));
+        }
+        const bool windowsMenus = windowsFixture || window->property("isWindows").toBool();
+        auto *menuRoot = windowsMenus ? window->findChild<QObject *>("windowsMenuBar") : window.data();
+        QVERIFY(menuRoot);
+        const auto menuNode = [&](const char *id) {
+            return menuRoot->findChild<QObject *>((windowsMenus ? QStringLiteral("windows_") : QString()) + QString::fromLatin1(id));
+        };
+        auto *menuItem = menuNode("editSmartDashes");
+        QVERIFY(menuItem && menuItem->property("checkable").toBool());
+        QVERIFY(menuItem->property("checked").toBool());
+        editor->setProperty("text", QString::fromUtf8("Keep café draft"));
+        QVERIFY(QMetaObject::invokeMethod(editor, "select", Q_ARG(int, 2), Q_ARG(int, 7)));
+        const QString toggleSource = editor->property("text").toString();
+        const int toggleRevision = backend.documentRevision();
+        const bool toggleUndo = editor->property("canUndo").toBool(), toggleModified = backend.modified();
+        QVERIFY(QMetaObject::invokeMethod(menuItem, "triggered"));
+        QVERIFY(!workspaceSettings->property("smartDashes").toBool());
+        QVERIFY(!menuItem->property("checked").toBool());
+        workspaceSettings->setProperty("smartDashes", true);
+        QVERIFY(menuItem->property("checked").toBool());
+        workspaceSettings->setProperty("smartDashes", false);
+        QVERIFY(!menuItem->property("checked").toBool());
+        QVERIFY(QMetaObject::invokeMethod(menuItem, "triggered"));
+        QVERIFY(workspaceSettings->property("smartDashes").toBool());
+        QVERIFY(menuItem->property("checked").toBool());
+        QCOMPARE(editor->property("text").toString(), toggleSource);
+        QCOMPARE(editor->property("selectionStart").toInt(), 2);
+        QCOMPARE(editor->property("selectionEnd").toInt(), 7);
+        QCOMPARE(backend.documentRevision(), toggleRevision);
+        QCOMPARE(editor->property("canUndo").toBool(), toggleUndo);
+        QCOMPARE(backend.modified(), toggleModified);
 
         editor->setProperty("text", QStringLiteral("one -"));
         editor->setProperty("cursorPosition", 5);
@@ -3179,8 +3330,7 @@ QtObject {
         QCOMPARE(editor->property("text").toString(), QStringLiteral("one -"));
 
         workspaceSettings->setProperty("smartDashes", false);
-        if (mac) QVERIFY(!menuItem->property("checked").toBool());
-        else QVERIFY(!workspaceSettings->property("smartDashes").toBool());
+        QVERIFY(!menuItem->property("checked").toBool());
         QVERIFY(QMetaObject::invokeMethod(window.data(), "insertSmartDash",
                                           Q_RETURN_ARG(QVariant, inserted)));
         QVERIFY(!inserted.toBool());
@@ -3775,31 +3925,78 @@ QtObject {
         library->clearRecentFiles();
         library->recordRecentFile(QUrl::fromLocalFile(sample.fileName()));
         QCoreApplication::processEvents();
-#ifdef Q_OS_MACOS
-        int count = 0;
-        for (auto *item : window->findChildren<QObject *>()) {
-            if (item->property("text").toString().startsWith("Recent.md — ")) {
-                ++count;
-                QVERIFY(QMetaObject::invokeMethod(item, "triggered"));
-                break; // Opening reorders/recreates the dynamic menu delegates.
-            }
-        }
-        QCOMPARE(count, 1);
+        QVERIFY(testDesktopMenusMatchPlatform(window.data()));
+        auto *recent = window->findChild<QObject *>("recentFile_0");
+        QVERIFY(recent);
+        QCOMPARE(window->findChildren<QObject *>(QStringLiteral("recentFile_0")).size(), 2);
+        QVERIFY(recent->property("enabled").toBool());
+        QVERIFY(recent->property("text").toString().startsWith(QStringLiteral("Recent.md — ")));
+        QVERIFY(QMetaObject::invokeMethod(recent, "triggered"));
         QCOMPARE(backend.fileUrl(), QUrl::fromLocalFile(QFileInfo(sample.fileName()).canonicalFilePath()));
-#endif
         auto *editor = window->findChild<QObject *>("sourceEditor");
         QVERIFY(editor);
-        editor->setProperty("text", "preserve dirty buffer");
+        auto *prompt = window->findChild<QObject *>("unsavedChangesPrompt"); QVERIFY(prompt);
+        QCoreApplication::processEvents(); // Finish the document-loaded caret reset before selecting the draft.
+        editor->setProperty("text", QStringLiteral("preserve dirty buffer"));
+        QVERIFY(QMetaObject::invokeMethod(editor, "insert", Q_ARG(int, editor->property("text").toString().size()), Q_ARG(QString, QStringLiteral(" draft"))));
+        QVERIFY(QMetaObject::invokeMethod(editor, "select", Q_ARG(int, 3), Q_ARG(int, 9)));
+        const QString source = editor->property("text").toString();
+        const QUrl originalFile = backend.fileUrl();
+        const bool canUndo = editor->property("canUndo").toBool();
+        QVERIFY(canUndo);
+        // Both File and Go recent routes must reach the unsaved-change guard.
+        for (int route = 0; route < 2; ++route) {
+            const auto items = window->findChildren<QObject *>(QStringLiteral("recentFile_0"));
+            QCOMPARE(items.size(), 2);
+            QVERIFY(items.at(route)->property("enabled").toBool());
+            QVERIFY(QMetaObject::invokeMethod(items.at(route), "triggered"));
+            QTRY_COMPARE(window->property("pendingAction").toString(), QStringLiteral("open"));
+            QTRY_VERIFY(prompt->property("opened").toBool());
+            QCOMPARE(backend.fileUrl(), originalFile);
+            QCOMPARE(editor->property("text").toString(), source);
+            QVERIFY(backend.modified());
+            QVERIFY(QMetaObject::invokeMethod(prompt, "reject"));
+            QCOMPARE(window->property("pendingAction").toString(), QString());
+            QCOMPARE(editor->property("selectionStart").toInt(), 3);
+            QCOMPARE(editor->property("selectionEnd").toInt(), 9);
+            QCOMPARE(editor->property("canUndo").toBool(), canUndo);
+        }
+        // A formerly available row may outlive its target; failed Discard/open
+        // must still preserve the unsaved buffer and its Undo history.
+        recent = window->findChild<QObject *>("recentFile_0"); QVERIFY(recent);
         QVERIFY(sample.remove());
-        QVERIFY(QMetaObject::invokeMethod(window.data(), "requestOpen", Q_ARG(QVariant, QUrl::fromLocalFile(sample.fileName()))));
-        QCOMPARE(window->property("pendingAction").toString(), QStringLiteral("open"));
-        QVERIFY(QMetaObject::invokeMethod(window.data(), "completePendingAction"));
-        QCOMPARE(editor->property("text").toString(), QStringLiteral("preserve dirty buffer"));
+        QVERIFY(QMetaObject::invokeMethod(recent, "triggered"));
+        QTRY_COMPARE(window->property("pendingAction").toString(), QStringLiteral("open"));
+        QVERIFY(QMetaObject::invokeMethod(prompt, "close"));
+        QVERIFY(QMetaObject::invokeMethod(prompt, "discardRequested"));
+        QCOMPARE(editor->property("text").toString(), source);
+        QCOMPARE(backend.fileUrl(), originalFile);
         QVERIFY(backend.modified());
+        QCOMPARE(editor->property("canUndo").toBool(), canUndo);
         QVERIFY(backend.status().startsWith("Could not open"));
-        library->clearRecentFiles();
+        QObject *clear = nullptr;
+        for (auto *item : window->findChildren<QObject *>())
+            if (item->property("text").toString() == QStringLiteral("Clear Recent Files")) { clear = item; break; }
+        QVERIFY(clear && clear->property("enabled").toBool());
+        QVERIFY(QMetaObject::invokeMethod(clear, "triggered"));
         QCoreApplication::processEvents();
         QVERIFY(library->recentFiles().isEmpty());
+        QVERIFY(!window->findChild<QObject *>("recentFile_0"));
+        int emptyCount = 0, clearCount = 0;
+        for (auto *item : window->findChildren<QObject *>()) {
+            if (item->property("text").toString() == QStringLiteral("No Recent Files")) {
+                ++emptyCount;
+                QVERIFY(!item->property("enabled").toBool());
+            } else if (item->property("text").toString() == QStringLiteral("Clear Recent Files")) {
+                ++clearCount;
+                QVERIFY(!item->property("enabled").toBool());
+            }
+        }
+        QCOMPARE(emptyCount, 2);
+        QCOMPARE(clearCount, 2);
+        QCOMPARE(editor->property("text").toString(), source);
+        QCOMPARE(editor->property("canUndo").toBool(), canUndo);
+        backend.discardRecovery();
     }
 
     void dateDisplayMigratesLegacyPreference() {

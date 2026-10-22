@@ -4,6 +4,14 @@ One line per cycle, newest first. Each line links to the cycle's record under `r
 
 ## 0.3.0 development series (Cycles 97–)
 
+- **158 — Windows immediate Save repair candidate** — Close desktop menus immediately so rapid Bold → Ctrl+S reaches the existing Save path; genuine host red/green and immediate Live/Source controls pass with exact saved bytes. Required build and focused **7/0/0** pass; native packaged zero-gap qualification remains pending. [Record](research/cycle-158/README.md)
+
+- **157 — Windows Edit/Help menu candidate** — Expose existing text transformations, Smart Quotes/Smart Dashes and bundled What's New through real menu routes; native Mac and Windows-component checks pass **12/0/0** after four missing-route reds. Exact native CI and packaged input remain pending. [Record](research/cycle-157/README.md)
+
+- **156 — Windows Output Style menu candidate** — Expose existing basic/custom publishing styles and Live's exact-theme switch, preserving one selected check and existing validation guards. Required build and scoped old-View red/restored **4/0/0** pass; native Windows qualification remains pending. [Record](research/cycle-156/README.md)
+
+- **155 — Windows M2 Go/Open Recent candidate** — Expose guarded document navigation, Library navigation, saved queries, hashtags and both recent-file menus through actual desktop routes; strengthen three existing menu regressions. Required local build and three focused cases pass **5/0/0**; complete integration regression, native menu proof and packaged qualification remain pending. [Record](research/cycle-155/README.md)
+
 - **154 — Windows M2 Focus/chrome parity candidate** — Expose existing Focus, style-check, Title Bar and Toolbar/Stats Only commands through actual desktop menus; tighten five existing platform-menu tests and add optional native red/green proof. Required local build and all 370 tests pass; native red/green and packaged qualification remain pending. [Record](research/cycle-154/README.md)
 
 - **Windows M2 delayed Live selection repair candidate** — Let Save await earlier selection commands within its existing three-second deadline, retain standalone fallback and cancel late commands safely. Real-page red/green regressions pass; final integration, native CI and packaged qualification remain pending. [Record](docs/windows/M2-LIVE-PERSISTENCE.md#delayed-selection-and-save-deadline)

@@ -441,3 +441,99 @@ void FomawriteTest::windowsClipboardSearchMenusPreserveFocusAndUndo() {
     QCOMPARE(f.editor->property("text").toString(), draft);
     QVERIFY(file.open(QIODevice::ReadOnly)); QCOMPARE(file.readAll(), draft.toUtf8());
 }
+
+// A menu's exit transition must not swallow the next writing shortcut. The
+// shipped page and real popup clicks exercise routing before the Save barrier.
+void FomawriteTest::windowsMenuFormattingKeepsImmediateSaveShortcut() {
+    Cycle103SettingsSnapshot settings;
+    QTemporaryDir directory; QVERIFY(directory.isValid());
+    const QString original = QStringLiteral("# Save shortcut\n\nKeep input. intact.\n");
+    const QString expected = QStringLiteral("# Save shortcut\n\nKeep **input.** intact.\n");
+    const int start = original.indexOf(QStringLiteral("input."));
+    // Establish the settled Live control before the immediate Live witness;
+    // Source then checks that the same menu fix preserves its shortcut route.
+    for (const auto &[live, settled] : {std::pair{true, true}, std::pair{true, false}, std::pair{false, false}}) {
+        const QString label = live ? (settled ? "live-settled" : "live-immediate") : "source-immediate";
+        const QString path = directory.filePath(label + ".md");
+        QVERIFY(cycle103Write(path, original.toUtf8()));
+        Cycle117Window f; QVERIFY2(f.start(1100), qPrintable(f.error));
+        QVERIFY(testDesktopMenusMatchPlatform(f.window.data()));
+        auto *loader = f.window->findChild<QObject *>("windowsMenuLoader"); QVERIFY(loader);
+        if (!f.window->property("isWindows").toBool()) loader->setProperty("active", true);
+        QTRY_VERIFY(f.window->findChild<QObject *>("windowsMenuBar"));
+        auto *bar = f.window->findChild<QObject *>("windowsMenuBar");
+        QVERIFY(f.backend.open(QUrl::fromLocalFile(path)));
+        auto *bridge = f.backend.editorBridge();
+        if (live) {
+            QVERIFY(QMetaObject::invokeMethod(f.window.data(), "setLiveEditing", Q_ARG(QVariant, true)));
+            QTRY_VERIFY_WITH_TIMEOUT(bridge->isReady(), 15000);
+            auto *view = f.window->findChild<QQuickItem *>("liveEditorView"); QVERIFY(view);
+            QTRY_COMPARE_WITH_TIMEOUT(cycle143PageResult(view, "window.fomawriteEditor.getText()", 0).toString(), original, 10000);
+            const QString selection = QStringLiteral("(()=>{const v=window.fomawriteEditor.view;v.dispatch({selection:{anchor:%1,head:%2}});v.focus();return v.state.sliceDoc(v.state.selection.main.from,v.state.selection.main.to);})()").arg(start).arg(start + 6);
+            QCOMPARE(cycle143PageResult(view, selection, 0).toString(), QStringLiteral("input."));
+            view->forceActiveFocus();
+            QTRY_VERIFY(f.window->property("canFormatLive").toBool());
+        } else {
+            // Document opening queues its restored caret; complete that setup
+            // before establishing the selection for the subsequent menu click.
+            QTRY_COMPARE(f.editor->property("text").toString(), original);
+            QCoreApplication::processEvents();
+            f.editor->forceActiveFocus();
+            QVERIFY(QMetaObject::invokeMethod(f.editor, "select", Q_ARG(int, start), Q_ARG(int, start + 6)));
+            QCOMPARE(f.editor->property("selectedText").toString(), QStringLiteral("input."));
+            QTRY_VERIFY(f.window->property("canFormatSource").toBool());
+        }
+        // This fixture sends intentional shortcut keys, unlike the mouse-only
+        // fixtures whose Cocoa isolation rejects spontaneous QtTest key events.
+        f.isolation.reset();
+        f.quick->requestActivate();
+        QTRY_VERIFY(f.quick->isActive());
+        QObject *format = nullptr;
+        for (auto *candidate : bar->findChildren<QObject *>())
+            if (candidate->property("title").toString() == "F&ormat") { format = candidate; break; }
+        QVERIFY(format);
+        QQuickItem *formatEntry = nullptr, *bold = nullptr;
+        for (auto *candidate : f.window->findChildren<QQuickItem *>())
+            if (candidate->inherits("QQuickMenuBarItem") && qvariant_cast<QObject *>(candidate->property("menu")) == format) { formatEntry = candidate; break; }
+        for (auto *candidate : format->findChildren<QQuickItem *>())
+            if (candidate->property("text").toString() == "&Bold") { bold = candidate; break; }
+        QVERIFY(formatEntry && bold);
+        QObject *shortcut = nullptr;
+        for (auto *candidate : f.window->findChildren<QObject *>())
+            if (candidate->metaObject()->indexOfSignal("activated()") >= 0
+                && candidate->property("sequence").toString() == "Ctrl+S") { shortcut = candidate; break; }
+        QVERIFY(shortcut);
+        QSignalSpy activated(shortcut, SIGNAL(activated()));
+        QSignalSpy triggered(bold, SIGNAL(triggered()));
+        QSignalSpy selections(bridge, &EditorBridge::requestSelection);
+        QSignalSpy saved(&f.backend, &Backend::saveSucceeded), failed(&f.backend, &Backend::saveFailed);
+        QVERIFY(cycle102Click(f.quick, formatEntry));
+        QTRY_VERIFY(format->property("opened").toBool());
+        QVERIFY(bold->isEnabled());
+        const QPoint point = bold->mapToScene(QPointF(bold->width() / 2, bold->height() / 2)).toPoint();
+        QVERIFY(QRect(QPoint(0, 0), f.quick->size()).contains(point));
+        QElapsedTimer pairTime; pairTime.start();
+        QTest::mouseClick(f.quick, Qt::LeftButton, Qt::NoModifier, point, 0);
+        if (settled) QTRY_VERIFY(!format->property("visible").toBool());
+        // No waits, focus repair, page request or observation separates these
+        // inputs in the immediate cases. QtTest processes each input normally.
+        QTest::keyClick(f.quick, Qt::Key_S, Qt::ControlModifier, 0);
+        qInfo() << "Windows menu Bold/Save" << label << "elapsed ms" << pairTime.elapsed()
+                << "menu visible/opened" << format->property("visible") << format->property("opened")
+                << "focus" << f.quick->activeFocusItem() << "shortcut activations" << activated.count()
+                << "selection requests" << selections.count() << "save success/failure" << saved.count() << failed.count();
+        QCOMPARE(triggered.count(), 1);
+        QCOMPARE(selections.count(), live ? 1 : 0);
+        QCOMPARE(activated.count(), 1);
+        QTRY_COMPARE_WITH_TIMEOUT(saved.count(), 1, Backend::LivePersistenceTimeout + 1000);
+        QCOMPARE(failed.count(), 0);
+        QTRY_COMPARE(cycle103Read(path), expected.toUtf8());
+        QTRY_COMPARE(f.editor->property("text").toString(), expected);
+        QVERIFY(!f.backend.modified());
+        if (live) {
+            auto *view = f.window->findChild<QQuickItem *>("liveEditorView"); QVERIFY(view);
+            QCOMPARE(cycle143PageResult(view, "window.fomawriteEditor.getText()", 0).toString(), expected);
+        }
+        QVERIFY2(f.error.isEmpty(), qPrintable(f.error));
+    }
+}
