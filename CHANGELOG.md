@@ -4,6 +4,7 @@ One line per cycle, newest first. Each line links to the cycle's record under `r
 
 ## 0.3.0 development series (Cycles 97–)
 
+- **154** — Fomawrite as the Mac's default text editor (`0.3.0-dev50`, build 154, 28 Oct): Markdown and plain text declared by content type, so Fomawrite is offered for every text file; the installer makes it the default app for Markdown and plain text (so other apps' "Default app", such as Codex's Open menu, opens it) and tidies stale registrations. [Record](research/cycle-154/README.md)
 - **153** — Stability: revision-neutral checker refresh, real Live typing/save/history acceptance, current theme/rendering checks, embedded editor/theme verification and editor CI gates. [Record](research/cycle-153/README.md)
 - **152** — The Omawrite-like look (`0.3.0-dev48`, build 152, 15 Oct): IBM Plex Mono at 20 px, 140% lines, a 65-character column and Omawrite's dark and light colours, as a Source Writing appearance and as a built-in Output Style for Live, Preview and exports. [Record](research/cycle-152/README.md)
 - **151** — Back and forward for folders (`0.3.0-dev47`, build 151, 12 Oct): arrows before the folder name in the middle pane step through the folders it has shown (Explore Folder can be undone); ⌘↑ goes to the enclosing folder while the middle pane has focus (Source and Live keep ⌘↑ for the top of the document). [Record](research/cycle-151/README.md)

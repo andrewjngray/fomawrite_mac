@@ -1,16 +1,16 @@
 # Fomawrite — status
 
-Updated 22 October 2026. This is the authoritative current-build record. Direction: [MISSION.md](MISSION.md). History: [CHANGELOG.md](CHANGELOG.md). Source map: [ARCHITECTURE.md](ARCHITECTURE.md).
+Updated 28 October 2026. This is the authoritative current-build record. Direction: [MISSION.md](MISSION.md). History: [CHANGELOG.md](CHANGELOG.md). Source map: [ARCHITECTURE.md](ARCHITECTURE.md).
 
 | Item | Current state |
 | --- | --- |
-| **Current review build** | **`0.3.0-dev49` / macOS `0.3.0 (153)`** |
-| **Last completed cycle** | 153 — stability: revision-neutral spelling refresh, native Live keyboard/save/history checks, embedded editor/theme identity verification, editor CI, and reconciled documentation. [Evidence](research/cycle-153/README.md). |
+| **Current review build** | **`0.3.0-dev50` / macOS `0.3.0 (154)`** |
+| **Last completed cycle** | 154 — Fomawrite as the default app for Markdown and plain text; the installer sets it ([record](research/cycle-154/README.md)); 153 — stability: revision-neutral spelling refresh, native Live keyboard/save/history checks, embedded editor/theme identity verification, editor CI, and reconciled documentation. [Evidence](research/cycle-153/README.md). |
 | **Repository** | [andrewjngray/fomawrite_mac](https://github.com/andrewjngray/fomawrite_mac), `master`; local checkout `/Users/andrewgray/repo/projects/fomawrite_mac`. The former `omawrite_mac` directory name is obsolete. |
 | **Local regression suite** | **299 passed, 0 failed, 0 skipped** (`./bin/test`, Qt 6.11.2, Apple Silicon); **321 editor tests passed**, TypeScript typecheck passed, editor assets rebuilt identically. |
 | **Native app acceptance** | Dev, distribution and installed build 153 all pass: 124 footer states, 5 daily-writing, 5 zoom, 7 editing, 3 pane-chrome, 5 editing-layout and 12 publishing-theme groups. Tests check actual Web/PDF pixels and current document identity. [Bundle identities](research/cycle-153/verified-builds.json). |
 | **Startup** | **Cold and restored passed**, two document windows, correct PDF content and visible page paint, normal quit. Separate instrumented startup binary from the same source. |
-| **Synchronized bundles** | `/Applications/Fomawrite.app`, `dist/Fomawrite.app`, `dist/Fomawrite Dev.app`. All build 153, with verified signatures and matching embedded resources. Installed and distribution release executables are byte-identical; Dev has its own signed identity. |
+| **Synchronized bundles** | `/Applications/Fomawrite.app`, `dist/Fomawrite.app`, `dist/Fomawrite Dev.app`, all build 154 (28 Oct). Build 154 changes only the app's declared file types and the install scripts; the native acceptance above was run on build 153. |
 | **CI** | [Workflow](.github/workflows/ci.yml): macOS Qt 6.11.3 build/test; independent Ubuntu Node 22.16.0 editor lockfile install, pinned Harper download, tests, typecheck, build, and committed-asset freshness check. [Latest runs](https://github.com/andrewjngray/fomawrite_mac/actions/workflows/ci.yml). |
 | **Review baseline** | [INDEPENDENT_REVIEW.md](INDEPENDENT_REVIEW.md), 6 October. Cycles 131–134 closed the listed correctness findings and established the current Live-editor direction. |
 
@@ -33,7 +33,7 @@ Earlier byte-preservation and preview robustness regressions remain in the full 
 
 ## Next steps
 
-1. Use build 153 for ordinary writing and record reproducible friction in [docs/live-friction.md](docs/live-friction.md), particularly physical selection/format/link interactions, rapid document changes, and quit/reopen.
+1. Use build 154 for ordinary writing and record reproducible friction in [docs/live-friction.md](docs/live-friction.md), particularly physical selection/format/link interactions, rapid document changes, and quit/reopen.
 2. Keep both CI jobs green and require native current-document/paint checks before distributing preview or editor changes. `bin/test` regenerates tracked gallery images; review or restore only those generated images after a run.
 3. Prioritize demonstrated correctness and usability problems before adding features or restructuring the backend.
 
