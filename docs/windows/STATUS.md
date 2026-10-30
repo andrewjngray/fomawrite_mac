@@ -11,8 +11,8 @@ only updates. [Short instructions](../../START-HERE.md).
   ARM64 and x64, from successful full Windows CI run `39845554167`.
   `dist/windows-testing/current.json` is the local selected-build record; both
   manifests and every packaged file were verified. The previous b056 packages remain available.
-- **Fresh launcher verification:** 19 Windows PowerShell 5.1 checks plus updater
-  and Mac-orchestration tests; actual ARM64 staging, Mac-to-VM launch and root
+- **Fresh launcher verification:** 19 Windows PowerShell 5.1 checks plus 22 updater/Mac-orchestration tests;
+  [focused launcher CI passed](https://github.com/andrewjngray/fomawrite_mac/actions/runs/41093374244); actual ARM64 staging, Mac-to-VM launch and root
   Launch.cmd document opening passed. One responsive app process handled both
   launches. The older saved workspace was copied without overwriting existing state.
   This is a launcher smoke check, not a rerun of all desktop acceptance.

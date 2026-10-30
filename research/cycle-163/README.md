@@ -27,7 +27,7 @@ Current Windows package identity and remaining qualification limits are in
 
 ## Verification
 
-- Python updater and Mac orchestration fixture tests: **21 passed**. The updater
+- Python updater and Mac orchestration fixture tests: **22 passed**. The updater
   trust regression failed on the previous selector for eight PR/fork/missing or
   malformed repository-metadata cases, then passed with strict origin/event checks.
 - Windows PowerShell 5.1: **19 checks passed**, using synthetic packages and mocked
@@ -45,6 +45,7 @@ Current Windows package identity and remaining qualification limits are in
 - The previous full Windows CI for these application bytes passed 390 Qt tests per
   architecture, 3 appearance checks, 124 deployed scenarios and 210 guards. Those
   historical results are not represented as a fresh full desktop run here.
+- **Final focused CI passed:** [run 41093374244](https://github.com/andrewjngray/fomawrite_mac/actions/runs/41093374244) at `f4d00bb`: 22 Python tests and 19 native Windows fixture checks. The first CI run exposed Windows ZIP-name normalization; original-name validation and a portable regression corrected it. Both records are retained. Root Update.command also completed against the final history, retaining the latest complete application build rather than selecting a launcher-only run.
 - Focused launcher CI is invoked with windows.yml input `launcher_only=true`, so
   application builds and artifact promotion are skipped. This prevents launcher-only
   verification runs from being selected as downloadable application builds.

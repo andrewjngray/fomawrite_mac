@@ -15,5 +15,16 @@
       "manifestSha256": "95940624db621493f22ba966adf18f66289515c01f9cc9f12ef062d0abbb4b4c",
       "version": "0.3.0-dev49"
     }
+  },
+  "launcherVerification": {
+    "commit": "f4d00bbea5747b6c004b88be419eb6d4156aa342",
+    "ciRun": 41093374244,
+    "ciConclusion": "success",
+    "pythonTestsPassed": 22,
+    "windowsLauncherChecksPassed": 19,
+    "actualArm64VmLaunch": "passed",
+    "rootCmdOpenedGuideInSameProcess": "passed",
+    "macUpdateOnlyCommand": "passed",
+    "applicationRebuilt": false
   }
 }
