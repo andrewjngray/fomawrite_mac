@@ -73,7 +73,7 @@ def select_run():
 
 def safe_name(name):
     path = PurePosixPath(name)
-    if (not name or "\\" in name or ":" in name or name.startswith("/")
+    if (not name or "\0" in name or "\\" in name or ":" in name or name.startswith("/")
             or any(part in ("", ".", "..") for part in name.rstrip("/").split("/"))
             or any(part.endswith((" ", ".")) for part in path.parts)):
         raise ValueError(f"Unsafe package path: {name!r}")
@@ -90,7 +90,10 @@ def extract(archive_path, destination):
             raise ValueError("Archive exceeds extraction limits")
         seen = set()
         for member in members:
-            path = safe_name(member.filename)
+            # ZipInfo normalizes Windows separators and truncates NULs in filename.
+            path = safe_name(member.orig_filename)
+            if member.orig_filename != member.filename:
+                raise ValueError("Archive path was normalized or truncated")
             key = str(path).casefold()
             mode = member.external_attr >> 16
             if (member.flag_bits & 1 or key in seen or stat.S_IFMT(mode) not in (0, stat.S_IFREG, stat.S_IFDIR)

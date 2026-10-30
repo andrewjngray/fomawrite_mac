@@ -200,10 +200,33 @@ class UpdateTests(unittest.TestCase):
             with self.subTest(name=name):
                 archive = self.root / "bad.zip"
                 with zipfile.ZipFile(archive, "w") as stream:
-                    stream.writestr(name, b"bad")
+                    # ZipInfo normalizes backslashes at construction on Windows.
+                    # Set both fields explicitly to write the actual unsafe ZIP name.
+                    member = zipfile.ZipInfo("fixture")
+                    member.filename = member.orig_filename = name
+                    stream.writestr(member, b"bad")
+                with zipfile.ZipFile(archive) as stream:
+                    self.assertEqual(stream.infolist()[0].orig_filename, name)
                 with self.assertRaises(ValueError):
                     updater.extract(archive, self.root / "unpack")
         self.assertFalse((self.root / "escape").exists())
+
+    def test_original_archive_name_checked_before_normalization(self):
+        for index, name in enumerate(("a\\escape", "a\0escape")):
+            with self.subTest(name=name):
+                archive = self.root / "original-name.zip"
+                member = zipfile.ZipInfo("fixture")
+                member.filename = member.orig_filename = name
+                with zipfile.ZipFile(archive, "w") as stream:
+                    stream.writestr(member, b"bad")
+                # Exercise Windows ZipInfo normalization even when tests run on Mac.
+                with mock.patch.object(zipfile.os, "sep", "\\"):
+                    with zipfile.ZipFile(archive) as stream:
+                        info = stream.infolist()[0]
+                        self.assertEqual(info.orig_filename, name)
+                        self.assertNotEqual(info.filename, name)
+                    with self.assertRaises(ValueError):
+                        updater.extract(archive, self.root / f"unpack-original-{index}")
 
     def test_symlinks_duplicates_and_bombs_rejected(self):
         for kind in ("symlink", "duplicate", "bomb"):
