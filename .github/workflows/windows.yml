@@ -6,6 +6,11 @@ on:
   pull_request:
   workflow_dispatch:
     inputs:
+      launcher_only:
+        description: 'Verify launch/update scripts only; no application rebuild or artifact promotion'
+        required: false
+        type: boolean
+        default: false
       theme_atomic_diagnostics:
         description: 'Run only the bounded ARM64 atomic-theme diagnostic (no full-suite qualification)'
         required: false
@@ -25,11 +30,27 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  launcher-checks:
+    if: ${{ github.event_name != 'workflow_dispatch' || !inputs.theme_atomic_diagnostics }}
+    name: Windows launch and update checks
+    runs-on: windows-2022
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Verify update selection, downloads and Mac launch orchestration
+        run: python -B -m unittest windows.test_update_testing windows.test_launch_from_mac -v
+      - name: Verify Windows launch and workspace preservation
+        shell: powershell
+        run: ./windows/test_launch_current.ps1
+
   theme-diagnostics:
     if: ${{ github.event_name == 'workflow_dispatch' && inputs.theme_atomic_diagnostics }}
     uses: ./.github/workflows/windows-theme-diagnostics.yml
   native:
-    if: ${{ github.event_name != 'workflow_dispatch' || !inputs.theme_atomic_diagnostics }}
+    if: ${{ github.event_name != 'workflow_dispatch' || (!inputs.theme_atomic_diagnostics && !inputs.launcher_only) }}
     name: Native ${{ matrix.architecture }} / Qt 6.11.3 / MSVC2022 v143
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 90

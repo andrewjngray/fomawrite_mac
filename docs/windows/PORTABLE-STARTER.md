@@ -1,5 +1,13 @@
 # Windows-local portable starter
 
+**Current entry:** use root [Launch.cmd](../../Launch.cmd) in Windows, or
+[Launch.command](../../Launch.command) / [Update.command](../../Update.command) on the Mac.
+See [the short guide](../../START-HERE.md) and [current status](STATUS.md). The
+version-pinned launchers described below are historical verification records;
+they are not the current recommended entry.
+
+## Original starter and historical verification
+
 The current repair candidate packages **START-FOMAWRITE.cmd** beside
 `Fomawrite.exe`. Final ARM64 package identity and actual command-file launch
 passed. The promoted shelf entry is

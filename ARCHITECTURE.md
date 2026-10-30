@@ -135,3 +135,17 @@ CI ([.github/workflows/ci.yml](.github/workflows/ci.yml)) runs `./bin/build` and
 | `.<filename>.omawrite-authors.json` beside a document | Authorship sidecar (legacy name kept for compatibility) |
 
 Workspace filenames include an identity derived from the executable path, so copies at different paths restore different workspaces, but themes are shared. Do not delete recovery files or overwrite a running app to troubleshoot preview state.
+
+
+## Windows development launch and update
+
+The Windows branch has separate development-package entry points: `Launch.cmd`
+uses `bin/windows/launch-current.ps1` and the existing verified local stager;
+`Launch.command` / `Update.command` use `launch-from-mac.py` and `update-testing.py`.
+The updater selects successful same-repository Windows branch builds, verifies
+GitHub artifact and package hashes, and atomically writes the local ignored
+`dist/windows-testing/current.json` after both architectures verify. Existing
+version caches are immutable. The launcher copies only missing saved workspace
+state between executable identities and never edits documents or recovery files.
+This development delivery path is separate from the in-app Harper engine updater
+and from future signed application installation/update distribution.

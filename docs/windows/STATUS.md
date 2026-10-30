@@ -1,5 +1,40 @@
 # Windows workstream status
 
+## Current launch setup — 31 October 2026 (Auckland)
+
+Double-click **[Launch.cmd](../../Launch.cmd)** in the Windows repo root. On the Mac,
+**[Launch.command](../../Launch.command)** checks GitHub, refreshes the local builds,
+starts Parallels Windows 11 if needed, and opens the Windows app. **[Update.command](../../Update.command)**
+only updates. [Short instructions](../../START-HERE.md).
+
+- **Current downloaded packages:** `0.3.0-dev49`, commit `78b9d9c2540d44fc3fa73ae4a6e0a4ccc284d08b`,
+  ARM64 and x64, from successful full Windows CI run `39845554167`.
+  `dist/windows-testing/current.json` is the local selected-build record; both
+  manifests and every packaged file were verified. The previous b056 packages remain available.
+- **Fresh launcher verification:** 19 Windows PowerShell 5.1 checks plus updater
+  and Mac-orchestration tests; actual ARM64 staging, Mac-to-VM launch and root
+  Launch.cmd document opening passed. One responsive app process handled both
+  launches. The older saved workspace was copied without overwriting existing state.
+  This is a launcher smoke check, not a rerun of all desktop acceptance.
+- **Updates:** Windows Launch reads the newest locally downloaded selection on
+  every click, including offline. GitHub downloads happen through Launch.command
+  or Update.command on the Mac using its existing GitHub CLI authentication.
+  Only successful complete builds from this repository's Windows branch are selected;
+  standalone diagnostics and PR builds are excluded. Failed updates retain the previous
+  selected packages. An older running app must be closed normally before switching versions.
+- **Mac alignment:** primary Mac `master` is `5e70545`, `0.3.0-dev50` / build 154.
+  Windows includes the common build-153 editor baseline and later Windows repairs.
+  Mac 154 adds Mac file associations/default-editor installation and version metadata,
+  not an editor feature missing from Windows. The two branches remain separate;
+  complete Windows parity and release qualification are not claimed.
+- **Still open:** intermittent imported-theme atomic replacement failure cause,
+  remaining clipboard/search and Print desktop checks, broader recovery/display/storage
+  acceptance, physical x64 hardware, and installer/signing/distribution qualification.
+
+[Launcher/update record](../../research/cycle-163/README.md). Root `STATUS.md` is the
+Mac baseline snapshot; this page records the Windows branch status.
+
+## Historical verification and handoff (23 October and earlier)
 
 **Manual-test handoff:** Double-click [TEST-FOMAWRITE.cmd](../../TEST-FOMAWRITE.cmd) in the Windows checkout root. Its actual VM launch passed with exact b056 ARM64 identity, an isolated ordinary profile and normal Alt+F4 exit zero; root independently checked the capture and evidence hashes. [Developer handoff](../../WINDOWS-REVIEW-HANDOFF.md) and [manual checklist](../../MANUAL-TEST-CHECKLIST.md) are ready. This is an internal candidate, not full Windows qualification. The VM is free for manual use.
 
@@ -10,7 +45,7 @@
 At `6c12569`, [shared CI 39835545936](https://github.com/andrewjngray/fomawrite_mac/actions/runs/39835545936) passed **414 Mac Qt / 0 failures / 13 capability skips** and **324 editor tests / 0 failures / 0 skips**. Its [Windows CI 39836302810](https://github.com/andrewjngray/fomawrite_mac/actions/runs/39836302810) passed x64 **390/0/0** but failed ARM64 **389/1/0**: `publishingFolderThemesReloadAndAtomicResourcesSettle` could not atomically replace imported theme CSS (`Access is denied`, native error 5). That intermittent failure remains retained and unexplained despite the later full-suite pass. [Bounded diagnostic 39843298436](https://github.com/andrewjngray/fomawrite_mac/actions/runs/39843298436) at `be99f89` also passed ten fresh-process target attempts (30 Qt rows including setup/cleanup). Neither passing run exercised failure-only owner diagnostics or established the earlier cause. Both architectures at `6c12569` passed 3 appearance checks and 124 deployed scenarios; all three stale-page/recovery cases passed on every platform. Prior Mac fixture failures remain recorded. Andrew renewed VM control for the final launcher check, which completed; no test app was left running. The final scoped supplement above supersedes the pending Review/Center status; broader interactive qualification remains in the manual-review backlog.
 Updated: 22 October 2026 UTC / 23 October Brisbane. Windows only; the root `STATUS.md` records the Mac baseline.
 
-## Current state — `b056ab5`, not promoted
+## Previous manual checkpoint — `b056ab5`, not promoted
 
 Exact application candidate **`b056ab5e6a73078b69c99916a4c5bce52772dfa6`** passed [Windows CI 39806145688](https://github.com/andrewjngray/fomawrite_mac/actions/runs/39806145688) on ARM64 and x64: each **389 Qt tests / 0 failures / 0 skips**, **3 appearance checks**, **124 deployed scenarios** and **126 deployment/driver guards**. The native menu proof produced exactly eight missing-route failures against its old-menu baseline and ten green cases after restoring current bytes, with zero skips. No QML warnings or access-violation traces were reported. These automated checks are separate from ordinary desktop acceptance.
 
