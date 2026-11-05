@@ -1,130 +1,130 @@
 {
   "qtVersion": "6.11.3",
-  "recordedUtc": "2026-10-22",
+  "recordedUtc": "2026-11-05",
   "source": "Official Qt SDK repositories; selected build/runtime archives, no examples/docs/debug symbols. SHA-1 is the upstream archive checksum; installation also records SHA-256.",
   "architectures": {
     "arm64": [
       {
         "package": "qt.qt6.6113.win64_msvc2022_arm64",
-        "packageVersion": "6.11.3-0-202609240253",
-        "url": "https://download.qt.io/online/qtsdkrepository/windows_arm64/desktop/qt6_6113/qt6_6113/qt.qt6.6113.win64_msvc2022_arm64/6.11.3-0-202609240253qtbase-Windows-Windows_11_23H2-MSVC2022-Windows-Windows_11_23H2-AARCH64.7z",
-        "sha1": "1ae1676981b8ffff97d1ec316dd955593eca7c45"
+        "packageVersion": "6.11.3-0-202610220312",
+        "url": "https://download.qt.io/online/qtsdkrepository/windows_arm64/desktop/qt6_6113/qt6_6113/qt.qt6.6113.win64_msvc2022_arm64/6.11.3-0-202610220312qtbase-Windows-Windows_11_23H2-MSVC2022-Windows-Windows_11_23H2-AARCH64.7z",
+        "sha1": "afbedd868ea42f30e94e2884c7eecd60021d152e"
       },
       {
         "package": "qt.qt6.6113.win64_msvc2022_arm64",
-        "packageVersion": "6.11.3-0-202609240253",
-        "url": "https://download.qt.io/online/qtsdkrepository/windows_arm64/desktop/qt6_6113/qt6_6113/qt.qt6.6113.win64_msvc2022_arm64/6.11.3-0-202609240253qtsvg-Windows-Windows_11_23H2-MSVC2022-Windows-Windows_11_23H2-AARCH64.7z",
-        "sha1": "77321992fd64e835ea4bd8e0b6fb3cbe2697c282"
+        "packageVersion": "6.11.3-0-202610220312",
+        "url": "https://download.qt.io/online/qtsdkrepository/windows_arm64/desktop/qt6_6113/qt6_6113/qt.qt6.6113.win64_msvc2022_arm64/6.11.3-0-202610220312qtsvg-Windows-Windows_11_23H2-MSVC2022-Windows-Windows_11_23H2-AARCH64.7z",
+        "sha1": "bf018197d1165c4234d99865427208902c054f78"
       },
       {
         "package": "qt.qt6.6113.win64_msvc2022_arm64",
-        "packageVersion": "6.11.3-0-202609240253",
-        "url": "https://download.qt.io/online/qtsdkrepository/windows_arm64/desktop/qt6_6113/qt6_6113/qt.qt6.6113.win64_msvc2022_arm64/6.11.3-0-202609240253qtdeclarative-Windows-Windows_11_23H2-MSVC2022-Windows-Windows_11_23H2-AARCH64.7z",
-        "sha1": "30f8ef0bf1f2cc4a9409f7f830e821dfd8643d14"
+        "packageVersion": "6.11.3-0-202610220312",
+        "url": "https://download.qt.io/online/qtsdkrepository/windows_arm64/desktop/qt6_6113/qt6_6113/qt.qt6.6113.win64_msvc2022_arm64/6.11.3-0-202610220312qtdeclarative-Windows-Windows_11_23H2-MSVC2022-Windows-Windows_11_23H2-AARCH64.7z",
+        "sha1": "596097c2377a499c9adeb946a1f2f260ff69fc19"
       },
       {
         "package": "qt.qt6.6113.win64_msvc2022_arm64",
-        "packageVersion": "6.11.3-0-202609240253",
-        "url": "https://download.qt.io/online/qtsdkrepository/windows_arm64/desktop/qt6_6113/qt6_6113/qt.qt6.6113.win64_msvc2022_arm64/6.11.3-0-202609240253qttools-Windows-Windows_11_23H2-MSVC2022-Windows-Windows_11_23H2-AARCH64.7z",
-        "sha1": "bb5bfa96d9161be3a00eb19e98250ca38f7ff288"
+        "packageVersion": "6.11.3-0-202610220312",
+        "url": "https://download.qt.io/online/qtsdkrepository/windows_arm64/desktop/qt6_6113/qt6_6113/qt.qt6.6113.win64_msvc2022_arm64/6.11.3-0-202610220312qttools-Windows-Windows_11_23H2-MSVC2022-Windows-Windows_11_23H2-AARCH64.7z",
+        "sha1": "fdd3da087a069fd3004af8bb9e609a776a8c17bb"
       },
       {
         "package": "qt.qt6.6113.win64_msvc2022_arm64",
-        "packageVersion": "6.11.3-0-202609240253",
-        "url": "https://download.qt.io/online/qtsdkrepository/windows_arm64/desktop/qt6_6113/qt6_6113/qt.qt6.6113.win64_msvc2022_arm64/6.11.3-0-202609240253qttranslations-Windows-Windows_11_23H2-MSVC2022-Windows-Windows_11_23H2-AARCH64.7z",
-        "sha1": "8f541f34942059b12d7d529b3ec64012e9cc02f6"
+        "packageVersion": "6.11.3-0-202610220312",
+        "url": "https://download.qt.io/online/qtsdkrepository/windows_arm64/desktop/qt6_6113/qt6_6113/qt.qt6.6113.win64_msvc2022_arm64/6.11.3-0-202610220312qttranslations-Windows-Windows_11_23H2-MSVC2022-Windows-Windows_11_23H2-AARCH64.7z",
+        "sha1": "ea066dca2943c7b30b0f6a40bb5348e861e0a4d6"
       },
       {
         "package": "qt.qt6.6113.addons.qtpositioning.win64_msvc2022_arm64",
-        "packageVersion": "6.11.3-0-202609240253",
-        "url": "https://download.qt.io/online/qtsdkrepository/windows_arm64/desktop/qt6_6113/qt6_6113/qt.qt6.6113.addons.qtpositioning.win64_msvc2022_arm64/6.11.3-0-202609240253qtpositioning-Windows-Windows_11_23H2-MSVC2022-Windows-Windows_11_23H2-AARCH64.7z",
-        "sha1": "8d0f8982387994bc665e05faff38c2bd2109fb80"
+        "packageVersion": "6.11.3-0-202610220312",
+        "url": "https://download.qt.io/online/qtsdkrepository/windows_arm64/desktop/qt6_6113/qt6_6113/qt.qt6.6113.addons.qtpositioning.win64_msvc2022_arm64/6.11.3-0-202610220312qtpositioning-Windows-Windows_11_23H2-MSVC2022-Windows-Windows_11_23H2-AARCH64.7z",
+        "sha1": "20e23c8f3e2d01ec1eb7d13f51765a8c3ba0bd1f"
       },
       {
         "package": "qt.qt6.6113.addons.qtwebchannel.win64_msvc2022_arm64",
-        "packageVersion": "6.11.3-0-202609240253",
-        "url": "https://download.qt.io/online/qtsdkrepository/windows_arm64/desktop/qt6_6113/qt6_6113/qt.qt6.6113.addons.qtwebchannel.win64_msvc2022_arm64/6.11.3-0-202609240253qtwebchannel-Windows-Windows_11_23H2-MSVC2022-Windows-Windows_11_23H2-AARCH64.7z",
-        "sha1": "04523cb07845017c66fcecc90600c178a94d687a"
+        "packageVersion": "6.11.3-0-202610220312",
+        "url": "https://download.qt.io/online/qtsdkrepository/windows_arm64/desktop/qt6_6113/qt6_6113/qt.qt6.6113.addons.qtwebchannel.win64_msvc2022_arm64/6.11.3-0-202610220312qtwebchannel-Windows-Windows_11_23H2-MSVC2022-Windows-Windows_11_23H2-AARCH64.7z",
+        "sha1": "84de3a9a6a049b0cb61df85ba72cffae96289ab5"
       },
       {
         "package": "extensions.qtwebengine.6113.win64_msvc2022_arm64",
-        "packageVersion": "6.11.3-0-202609240437",
-        "url": "https://download.qt.io/online/qtsdkrepository/windows_arm64/extensions/qtwebengine/6113/msvc2022_arm64/extensions.qtwebengine.6113.win64_msvc2022_arm64/6.11.3-0-202609240437qtwebengine-Windows-Windows_11_24H2-MSVC2022-Windows-Windows_11_24H2-ARM64.7z",
-        "sha1": "3e1b6aa3f62c0c1c3235a41bf9befc1716fbdf41"
+        "packageVersion": "6.11.3-0-202610220311",
+        "url": "https://download.qt.io/online/qtsdkrepository/windows_arm64/extensions/qtwebengine/6113/msvc2022_arm64/extensions.qtwebengine.6113.win64_msvc2022_arm64/6.11.3-0-202610220311qtwebengine-Windows-Windows_11_24H2-MSVC2022-Windows-Windows_11_24H2-ARM64.7z",
+        "sha1": "fb0326ae0786ac04008fb4d5a2852112943f0404"
       },
       {
         "package": "extensions.qtpdf.6113.win64_msvc2022_arm64",
-        "packageVersion": "6.11.3-0-202609240404",
-        "url": "https://download.qt.io/online/qtsdkrepository/windows_arm64/extensions/qtpdf/6113/msvc2022_arm64/extensions.qtpdf.6113.win64_msvc2022_arm64/6.11.3-0-202609240404qtpdf-Windows-Windows_11_23H2-MSVC2022-Windows-Windows_11_23H2-AARCH64.7z",
-        "sha1": "0f8db89a68b0f555b89af3a8f22204fcc8690cee"
+        "packageVersion": "6.11.3-0-202610220313",
+        "url": "https://download.qt.io/online/qtsdkrepository/windows_arm64/extensions/qtpdf/6113/msvc2022_arm64/extensions.qtpdf.6113.win64_msvc2022_arm64/6.11.3-0-202610220313qtpdf-Windows-Windows_11_23H2-MSVC2022-Windows-Windows_11_23H2-AARCH64.7z",
+        "sha1": "30ce166c7e40001538ff1f240b5421e1e0a6fc4f"
       }
     ],
     "x64": [
       {
         "package": "qt.qt6.6113.win64_msvc2022_64",
-        "packageVersion": "6.11.3-0-202609240253",
-        "url": "https://download.qt.io/online/qtsdkrepository/windows_x86/desktop/qt6_6113/qt6_6113_msvc2022_64/qt.qt6.6113.win64_msvc2022_64/6.11.3-0-202609240253qtbase-Windows-Windows_11_24H2-MSVC2022-Windows-Windows_11_24H2-X86_64.7z",
-        "sha1": "fed33357645f1a562c5c9790fcee23ab16d7d313"
+        "packageVersion": "6.11.3-0-202610220312",
+        "url": "https://download.qt.io/online/qtsdkrepository/windows_x86/desktop/qt6_6113/qt6_6113_msvc2022_64/qt.qt6.6113.win64_msvc2022_64/6.11.3-0-202610220312qtbase-Windows-Windows_11_24H2-MSVC2022-Windows-Windows_11_24H2-X86_64.7z",
+        "sha1": "2df6e5efa3d116e47f289cd120730da4842159db"
       },
       {
         "package": "qt.qt6.6113.win64_msvc2022_64",
-        "packageVersion": "6.11.3-0-202609240253",
-        "url": "https://download.qt.io/online/qtsdkrepository/windows_x86/desktop/qt6_6113/qt6_6113_msvc2022_64/qt.qt6.6113.win64_msvc2022_64/6.11.3-0-202609240253qtsvg-Windows-Windows_11_24H2-MSVC2022-Windows-Windows_11_24H2-X86_64.7z",
-        "sha1": "be63361d952491704b4c13d41d3615a28ee58e95"
+        "packageVersion": "6.11.3-0-202610220312",
+        "url": "https://download.qt.io/online/qtsdkrepository/windows_x86/desktop/qt6_6113/qt6_6113_msvc2022_64/qt.qt6.6113.win64_msvc2022_64/6.11.3-0-202610220312qtsvg-Windows-Windows_11_24H2-MSVC2022-Windows-Windows_11_24H2-X86_64.7z",
+        "sha1": "93d487693c3d7c406356eb5e1467aac5c1bdf501"
       },
       {
         "package": "qt.qt6.6113.win64_msvc2022_64",
-        "packageVersion": "6.11.3-0-202609240253",
-        "url": "https://download.qt.io/online/qtsdkrepository/windows_x86/desktop/qt6_6113/qt6_6113_msvc2022_64/qt.qt6.6113.win64_msvc2022_64/6.11.3-0-202609240253qtdeclarative-Windows-Windows_11_24H2-MSVC2022-Windows-Windows_11_24H2-X86_64.7z",
-        "sha1": "16e7b810685d4bcbfd2ad4b4e84d853b48e964ec"
+        "packageVersion": "6.11.3-0-202610220312",
+        "url": "https://download.qt.io/online/qtsdkrepository/windows_x86/desktop/qt6_6113/qt6_6113_msvc2022_64/qt.qt6.6113.win64_msvc2022_64/6.11.3-0-202610220312qtdeclarative-Windows-Windows_11_24H2-MSVC2022-Windows-Windows_11_24H2-X86_64.7z",
+        "sha1": "d312e49d686d05d3fa051925c675c8183c56776e"
       },
       {
         "package": "qt.qt6.6113.win64_msvc2022_64",
-        "packageVersion": "6.11.3-0-202609240253",
-        "url": "https://download.qt.io/online/qtsdkrepository/windows_x86/desktop/qt6_6113/qt6_6113_msvc2022_64/qt.qt6.6113.win64_msvc2022_64/6.11.3-0-202609240253qttools-Windows-Windows_11_24H2-MSVC2022-Windows-Windows_11_24H2-X86_64.7z",
-        "sha1": "f9e2389d600f141600c0e6ce285f2396da94c57e"
+        "packageVersion": "6.11.3-0-202610220312",
+        "url": "https://download.qt.io/online/qtsdkrepository/windows_x86/desktop/qt6_6113/qt6_6113_msvc2022_64/qt.qt6.6113.win64_msvc2022_64/6.11.3-0-202610220312qttools-Windows-Windows_11_24H2-MSVC2022-Windows-Windows_11_24H2-X86_64.7z",
+        "sha1": "1bc540906a47205276a4fbcb5f4ac69cb5a71db0"
       },
       {
         "package": "qt.qt6.6113.win64_msvc2022_64",
-        "packageVersion": "6.11.3-0-202609240253",
-        "url": "https://download.qt.io/online/qtsdkrepository/windows_x86/desktop/qt6_6113/qt6_6113_msvc2022_64/qt.qt6.6113.win64_msvc2022_64/6.11.3-0-202609240253qttranslations-Windows-Windows_11_24H2-MSVC2022-Windows-Windows_11_24H2-X86_64.7z",
-        "sha1": "038c51f1a9337b9f0202b1c969469dea5deb03ae"
+        "packageVersion": "6.11.3-0-202610220312",
+        "url": "https://download.qt.io/online/qtsdkrepository/windows_x86/desktop/qt6_6113/qt6_6113_msvc2022_64/qt.qt6.6113.win64_msvc2022_64/6.11.3-0-202610220312qttranslations-Windows-Windows_11_24H2-MSVC2022-Windows-Windows_11_24H2-X86_64.7z",
+        "sha1": "94434c35b599b9dd46e5d70f349718df958fce22"
       },
       {
         "package": "qt.qt6.6113.win64_msvc2022_64",
-        "packageVersion": "6.11.3-0-202609240253",
-        "url": "https://download.qt.io/online/qtsdkrepository/windows_x86/desktop/qt6_6113/qt6_6113_msvc2022_64/qt.qt6.6113.win64_msvc2022_64/6.11.3-0-202609240253d3dcompiler_47-x64.7z",
-        "sha1": "de9c51f5881bf8e04f4c509964ec62ed04b4854b"
+        "packageVersion": "6.11.3-0-202610220312",
+        "url": "https://download.qt.io/online/qtsdkrepository/windows_x86/desktop/qt6_6113/qt6_6113_msvc2022_64/qt.qt6.6113.win64_msvc2022_64/6.11.3-0-202610220312d3dcompiler_47-x64.7z",
+        "sha1": "ff8d43e5fad3de0e046c05deb29d1a6ab8ab59b7"
       },
       {
         "package": "qt.qt6.6113.win64_msvc2022_64",
-        "packageVersion": "6.11.3-0-202609240253",
-        "url": "https://download.qt.io/online/qtsdkrepository/windows_x86/desktop/qt6_6113/qt6_6113_msvc2022_64/qt.qt6.6113.win64_msvc2022_64/6.11.3-0-202609240253opengl32sw-64-mesa_11_2_2-signed_sha256.7z",
-        "sha1": "f87dcab12810b792beee5ab1ed0c28dca0189f9c"
+        "packageVersion": "6.11.3-0-202610220312",
+        "url": "https://download.qt.io/online/qtsdkrepository/windows_x86/desktop/qt6_6113/qt6_6113_msvc2022_64/qt.qt6.6113.win64_msvc2022_64/6.11.3-0-202610220312opengl32sw-64-mesa_11_2_2-signed_sha256.7z",
+        "sha1": "25cb71aeb6c75f403edc56ea29a0ca4e31b49055"
       },
       {
         "package": "qt.qt6.6113.addons.qtpositioning.win64_msvc2022_64",
-        "packageVersion": "6.11.3-0-202609240253",
-        "url": "https://download.qt.io/online/qtsdkrepository/windows_x86/desktop/qt6_6113/qt6_6113_msvc2022_64/qt.qt6.6113.addons.qtpositioning.win64_msvc2022_64/6.11.3-0-202609240253qtpositioning-Windows-Windows_11_24H2-MSVC2022-Windows-Windows_11_24H2-X86_64.7z",
-        "sha1": "1ea1565ece50abca764ef536b49bec89d2195a06"
+        "packageVersion": "6.11.3-0-202610220312",
+        "url": "https://download.qt.io/online/qtsdkrepository/windows_x86/desktop/qt6_6113/qt6_6113_msvc2022_64/qt.qt6.6113.addons.qtpositioning.win64_msvc2022_64/6.11.3-0-202610220312qtpositioning-Windows-Windows_11_24H2-MSVC2022-Windows-Windows_11_24H2-X86_64.7z",
+        "sha1": "8a296862290e81089ab733b1de72618e369a0580"
       },
       {
         "package": "qt.qt6.6113.addons.qtwebchannel.win64_msvc2022_64",
-        "packageVersion": "6.11.3-0-202609240253",
-        "url": "https://download.qt.io/online/qtsdkrepository/windows_x86/desktop/qt6_6113/qt6_6113_msvc2022_64/qt.qt6.6113.addons.qtwebchannel.win64_msvc2022_64/6.11.3-0-202609240253qtwebchannel-Windows-Windows_11_24H2-MSVC2022-Windows-Windows_11_24H2-X86_64.7z",
-        "sha1": "5df2ba742e1c88aca3ebea7136c0615aefa40f74"
+        "packageVersion": "6.11.3-0-202610220312",
+        "url": "https://download.qt.io/online/qtsdkrepository/windows_x86/desktop/qt6_6113/qt6_6113_msvc2022_64/qt.qt6.6113.addons.qtwebchannel.win64_msvc2022_64/6.11.3-0-202610220312qtwebchannel-Windows-Windows_11_24H2-MSVC2022-Windows-Windows_11_24H2-X86_64.7z",
+        "sha1": "6280d211c9e0c4012f6986babede713cbbfe8a57"
       },
       {
         "package": "extensions.qtwebengine.6113.win64_msvc2022_64",
-        "packageVersion": "6.11.3-0-202609240437",
-        "url": "https://download.qt.io/online/qtsdkrepository/windows_x86/extensions/qtwebengine/6113/msvc2022_64/extensions.qtwebengine.6113.win64_msvc2022_64/6.11.3-0-202609240437qtwebengine-Windows-Windows_11_24H2-MSVC2022-Windows-Windows_11_24H2-X86_64.7z",
-        "sha1": "a19c2dc15864fe042e93adc0e73d42f429a83c1d"
+        "packageVersion": "6.11.3-0-202610220311",
+        "url": "https://download.qt.io/online/qtsdkrepository/windows_x86/extensions/qtwebengine/6113/msvc2022_64/extensions.qtwebengine.6113.win64_msvc2022_64/6.11.3-0-202610220311qtwebengine-Windows-Windows_11_24H2-MSVC2022-Windows-Windows_11_24H2-X86_64.7z",
+        "sha1": "ec78b77c03d124d57a5716e562e689a25ec97ba2"
       },
       {
         "package": "extensions.qtpdf.6113.win64_msvc2022_64",
-        "packageVersion": "6.11.3-0-202609240404",
-        "url": "https://download.qt.io/online/qtsdkrepository/windows_x86/extensions/qtpdf/6113/msvc2022_64/extensions.qtpdf.6113.win64_msvc2022_64/6.11.3-0-202609240404qtpdf-Windows-Windows_11_24H2-MSVC2022-Windows-Windows_11_24H2-X86_64.7z",
-        "sha1": "052e354f01fa524026cb8c5e1e2041714bf16885"
+        "packageVersion": "6.11.3-0-202610220313",
+        "url": "https://download.qt.io/online/qtsdkrepository/windows_x86/extensions/qtpdf/6113/msvc2022_64/extensions.qtpdf.6113.win64_msvc2022_64/6.11.3-0-202610220313qtpdf-Windows-Windows_11_24H2-MSVC2022-Windows-Windows_11_24H2-X86_64.7z",
+        "sha1": "7b73e49774556fb12b6b5ecc1b5433e3f75ed24d"
       }
     ]
   }
