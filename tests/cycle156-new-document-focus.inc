@@ -48,12 +48,21 @@ void FomawriteTest::libraryPlusPutsTheCaretInTheNewDocument() {
     QVERIFY(create(QStringLiteral("Second.md")));
     QTRY_VERIFY_WITH_TIMEOUT(pane->property("hasLiveFocus").toBool(), 5000);
     QVERIFY(!plus->hasActiveFocus());
+    // Ask the page for its selection and wait for that reply before asking
+    // again: a slow runner's reply can take longer than one short poll.
     QSignalSpy selection(bridge, &EditorBridge::selectionReceived);
-    QTRY_VERIFY_WITH_TIMEOUT(([&] {
-        const int token = bridge->fetchSelection(); QTest::qWait(60);
-        for (const auto &args : selection)
-            if (args.at(0).toInt() == token) return args.at(1).toInt() == 0 && args.at(2).toInt() == 0;
-        return false;
-    })(), 8000);
+    auto reply = [&](int token) -> const QList<QVariant> * {
+        for (const auto &args : selection) if (args.at(0).toInt() == token) return &args;
+        return nullptr;
+    };
+    const bool caretAtStart = QTest::qWaitFor([&] {
+        const int token = bridge->fetchSelection();
+        if (!QTest::qWaitFor([&] { return reply(token) != nullptr; }, 5000)) return false;
+        const auto *args = reply(token);
+        return args->at(1).toInt() == 0 && args->at(2).toInt() == 0;
+    }, 30000);
+    if (!caretAtStart && !selection.isEmpty())
+        qWarning() << "last Live selection" << selection.last();
+    QVERIFY(caretAtStart);
     f.backend.discardRecovery();
 }
