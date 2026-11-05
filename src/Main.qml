@@ -87,7 +87,7 @@ ApplicationWindow {
         var item = activeFocusItem;
         var keyboardChrome = item && (item.focusReason === Qt.TabFocusReason
             || item.focusReason === Qt.BacktabFocusReason || item.focusReason === Qt.ShortcutFocusReason)
-            && (isInside(item, topChrome) || isInside(item, documentFooter));
+            && (isInside(item, topChrome) || isInside(item, formatBar) || isInside(item, documentFooter));
         if (keyboardChrome) return;
         topChrome.keyboardReveal = false;
         documentFooter.keyboardReveal = false;
@@ -335,22 +335,45 @@ ApplicationWindow {
     property bool sourceFormattingOwned: false
     readonly property bool sourceEditorVisible: editorPane.visible && !workspaceLayout.liveEditEnabled
     onSourceEditorVisibleChanged: if (!sourceEditorVisible && completionPopup) completionPopup.close()
-    // Format commands reach the Live editor while it has focus (see Backend::liveWrapSelection).
     // Quick desktop menus take QML focus. Keep their originating editor/field
     // as the edit target until an action restores its focus and dispatches.
     readonly property bool windowsMenuHasFocus: windowsMenuLoader.item !== null && windowsMenuLoader.item.ownsFocus(activeFocusItem)
     readonly property var editingFocusItem: windowsMenuHasFocus ? windowsMenuLoader.item.previousFocusItem : activeFocusItem
+    // Live owns formatting the same way: from the moment focus is in the page until focus goes
+    // anywhere other than the page or formatting chrome. A toolbar button takes keyboard focus
+    // when pressed, so the page's own focus is already gone by the time the click is handled.
+    property bool liveFormattingOwned: false
+    // Format commands reach the Live editor while it owns formatting (see Backend::liveWrapSelection).
     readonly property bool canFormatLive: !lifecycleInputBlocked && workspaceLayout.liveEditEnabled && liveEditorLoader.item !== null
-        && (liveEditorLoader.item.hasLiveFocus || (windowsMenuHasFocus && isInside(editingFocusItem, liveEditorLoader.item)))
+        && (liveFormattingOwned || (windowsMenuHasFocus && isInside(editingFocusItem, liveEditorLoader.item)))
     readonly property bool canFormatSource: !lifecycleInputBlocked && sourceEditorVisible && sourceFormattingOwned
         && !editor.readOnly && !editor.inputMethodComposing
+    // The Format Bar is usable whenever an editing surface is on screen, not only while one has
+    // keyboard focus (opening a document from the Library leaves focus on its row).
+    readonly property bool formatSurfaceAvailable: (sourceEditorVisible && !editor.readOnly)
+        || (workspaceLayout.liveEditEnabled && liveEditorLoader.item !== null)
+    // A Format Bar click with no owner takes the visible surface at its current caret/selection
+    // (Live when Live is the editing mode, else Source); the command that follows then applies.
+    function claimFormattingSurface() {
+        if (lifecycleInputBlocked) return false;
+        if (canFormatSource || canFormatLive) return true;
+        if (workspaceLayout.liveEditEnabled) {
+            if (liveEditorLoader.item === null) return false;
+            liveFormattingOwned = true;
+            return true;
+        }
+        if (!sourceEditorVisible || editor.readOnly) return false;
+        sourceFormattingOwned = true;
+        return !editor.inputMethodComposing;
+    }
+    function focusFormatBar() { formatBar.focusFirstControl(); }
     function isSourceFormattingChrome(item) {
         var current = item;
         while (current) {
             if (current.sourceFormattingControl === true) return true;
             current = current.parent;
         }
-        for (var menu of [formatQuickMenu, formatPopover]) {
+        for (var menu of [formatQuickMenu, formatPopover, formatBar.styleMenu, formatBar.overflowMenu]) {
             if (menu && menu.visible && menu.contentItem && isInside(item, menu.contentItem.parent))
                 return true;
         }
@@ -363,8 +386,26 @@ ApplicationWindow {
         var item = activeFocusItem;
         if (windowsMenuLoader.item && windowsMenuLoader.item.ownsFocus(item))
             item = windowsMenuLoader.item.previousFocusItem;
+        var liveItem = workspaceLayout.liveEditEnabled ? liveEditorLoader.item : null;
         if (sourceEditorVisible && isInside(item, editor)) sourceFormattingOwned = true;
         else if (!isSourceFormattingChrome(item)) sourceFormattingOwned = false;
+        if (liveItem && (isInside(item, liveItem) || liveItem.hasLiveFocus)) liveFormattingOwned = true;
+        else if (!liveItem || !isSourceFormattingChrome(item)) liveFormattingOwned = false;
+    }
+    // After a format command the writer is typing again: focus returns to the surface it acted on.
+    // Deferred so a closing menu's own focus restore cannot take it back.
+    function returnFocusAfterFormatting(surface, keepPagePanel) {
+        Qt.callLater(function() {
+            if (surface === "live") {
+                if (!workspaceLayout.liveEditEnabled || !liveEditorLoader.item) return;
+                if (keepPagePanel) liveEditorLoader.item.focusWeb(); else liveEditorLoader.item.focusLive();
+            } else if (surface === "source" && sourceEditorVisible) editor.forceActiveFocus();
+        });
+    }
+    Connections {
+        target: liveEditorLoader.item
+        ignoreUnknownSignals: true
+        function onHasLiveFocusChanged() { Qt.callLater(win.updateSourceFormattingOwner); }
     }
 
     // F6 offers an explicit route out of the text editor, where Tab is writing input.
@@ -469,7 +510,7 @@ ApplicationWindow {
         // Pointer focus from a previous toolbar click must not pin the bars open.
         var keyboardFocus = activeFocusItem && (activeFocusItem.focusReason === Qt.TabFocusReason
             || activeFocusItem.focusReason === Qt.BacktabFocusReason || activeFocusItem.focusReason === Qt.ShortcutFocusReason);
-        topChrome.keyboardReveal = keyboardFocus && isInside(activeFocusItem, topChrome);
+        topChrome.keyboardReveal = keyboardFocus && (isInside(activeFocusItem, topChrome) || isInside(activeFocusItem, formatBar));
         documentFooter.keyboardReveal = keyboardFocus && isInside(activeFocusItem, documentFooter);
         updateWritingSurfaceFromFocus();
         updateSourceFormattingOwner();
@@ -487,13 +528,14 @@ ApplicationWindow {
         function onLiveEditEnabledChanged() {
             backend.liveEditingActive = workspaceLayout.liveEditEnabled;
             win.sourceFormattingOwned = false;
+            win.liveFormattingOwned = false;
             Qt.callLater(win.rescueHiddenWorkspaceFocus);
         }
         function onEffectiveOrganizerVisibleChanged() { Qt.callLater(win.rescueHiddenWorkspaceFocus); }
         function onEffectiveFilesVisibleChanged() { Qt.callLater(win.rescueHiddenWorkspaceFocus); }
         function onEffectiveReviewVisibleChanged() { Qt.callLater(win.rescueHiddenWorkspaceFocus); }
         function onEffectiveLayoutModeChanged() {
-            if (workspaceLayout.effectiveLayoutMode === 2) win.sourceFormattingOwned = false;
+            if (workspaceLayout.effectiveLayoutMode === 2) { win.sourceFormattingOwned = false; win.liveFormattingOwned = false; }
             Qt.callLater(win.rescueHiddenWorkspaceFocus);
         }
     }
@@ -747,7 +789,49 @@ ApplicationWindow {
         property bool toolbarAI: true
         property bool toolbarReference: true
         property bool automaticVersions: false
+        // The Word-like Format Bar under the document header, and Word's Show/Hide formatting marks.
+        property bool formatBarVisible: true
+        property bool showFormattingMarks: false
         onShowMarkupChanged: backend.setShowMarkup(true)
+    }
+
+    // Source draws its marks through the document's text option; Live through the page's appearance.
+    Binding { target: backend; property: "showFormattingMarks"; value: workspaceSettings.showFormattingMarks }
+    function toggleFormattingMarks() {
+        workspaceSettings.showFormattingMarks = !workspaceSettings.showFormattingMarks;
+        if (canFormatLive) returnFocusAfterFormatting("live", false);
+        else if (canFormatSource) returnFocusAfterFormatting("source", false);
+    }
+    // The bar follows the editing pane (hidden in Preview Only) and the toolbar-visibility choice.
+    readonly property bool formatBarShown: workspaceSettings.formatBarVisible && editorPane.visible && topChrome.toolbarContentVisible
+    readonly property int formatBarInset: formatBarShown ? formatBar.height : 0
+    property string currentBlockStyle: "Body"
+    function refreshBlockStyle() {
+        if (!formatBarShown) return;
+        var position = workspaceLayout.liveEditEnabled ? Math.max(0, backend.liveCursor()) : editor.cursorPosition;
+        currentBlockStyle = backend.blockStyleAt(position);
+    }
+    Timer { id: blockStyleTimer; interval: 60; onTriggered: win.refreshBlockStyle() }
+    onFormatBarShownChanged: if (formatBarShown) blockStyleTimer.restart()
+    Connections {
+        target: editor
+        function onCursorPositionChanged() { if (win.formatBarShown) blockStyleTimer.restart(); }
+    }
+    Connections {
+        target: backend.editorBridge
+        function onCursorMoved(anchor, head) { if (win.formatBarShown) blockStyleTimer.restart(); }
+    }
+    Connections {
+        target: workspaceLayout
+        function onLiveEditEnabledChanged() { blockStyleTimer.restart(); }
+    }
+    Connections {
+        target: backend
+        function onDocumentLoaded() { blockStyleTimer.restart(); }
+    }
+    Shortcut {
+        sequence: "Ctrl+8"; context: Qt.WindowShortcut; enabled: !win.isMac
+        onActivated: workspaceCommands.run("formattingMarks")
     }
 
     PaneZoomState {
@@ -913,14 +997,16 @@ ApplicationWindow {
                 Qt.callLater(function() { if (anchor && !anchor.enabled) libraryPane.focusList(); });
                 break;
             case "newDocument": libraryPane.newDocument(); break;
+            case "libraryNewMenu": libraryPane.showOptions(anchor, true); break;
             case "libraryOptions": win.openAnchoredMenu(libraryActions, anchor); break;
             case "back": win.requestHistory(-1); break;
             case "forward": win.requestHistory(1); break;
             case "find": win.openSearch(false, false); break;
             case "bold": win.tryWrapSelection("**", "**"); break;
             case "italic": win.tryWrapSelection("*", "*"); break;
-            case "link": win.openLinkEditor(anchor); break;
+            case "link": win.tryInsertLink(); break;
             case "format": win.openQuickFormat(anchor); break;
+            case "formattingMarks": workspaceCommands.run("formattingMarks"); break;
             case "smaller": workspaceCommands.run("smaller"); break;
             case "larger": workspaceCommands.run("larger"); break;
             case "appearance": win.openAnchoredMenu(writingOptions, anchor); break;
@@ -1089,19 +1175,19 @@ ApplicationWindow {
         id: formatQuickMenu
         objectName: "quickFormatMenu"
         width: 230
-        CompactMenuItem { enabled: win.canFormatSource; text: "Bold"; onTriggered: win.tryWrapSelection("**", "**") }
-        CompactMenuItem { enabled: win.canFormatSource; text: "Italic"; onTriggered: win.tryWrapSelection("*", "*") }
+        CompactMenuItem { enabled: win.canFormatSource || win.canFormatLive; text: "Bold"; onTriggered: win.tryWrapSelection("**", "**") }
+        CompactMenuItem { enabled: win.canFormatSource || win.canFormatLive; text: "Italic"; onTriggered: win.tryWrapSelection("*", "*") }
         CompactMenuItem { enabled: win.canFormatSource || win.canFormatLive; text: "Link…"; onTriggered: win.tryInsertLink() }
         MenuSeparator {}
-        CompactMenuItem { enabled: win.canFormatSource; text: "Body"; onTriggered: win.editMarkdown("body") }
-        CompactMenuItem { enabled: win.canFormatSource; text: "Heading 1"; onTriggered: win.editMarkdown("heading1") }
-        CompactMenuItem { enabled: win.canFormatSource; text: "Heading 2"; onTriggered: win.editMarkdown("heading2") }
-        CompactMenuItem { enabled: win.canFormatSource; text: "Heading 3"; onTriggered: win.editMarkdown("heading3") }
+        CompactMenuItem { enabled: win.canFormatSource || win.canFormatLive; text: "Body"; onTriggered: win.editMarkdown("body") }
+        CompactMenuItem { enabled: win.canFormatSource || win.canFormatLive; text: "Heading 1"; onTriggered: win.editMarkdown("heading1") }
+        CompactMenuItem { enabled: win.canFormatSource || win.canFormatLive; text: "Heading 2"; onTriggered: win.editMarkdown("heading2") }
+        CompactMenuItem { enabled: win.canFormatSource || win.canFormatLive; text: "Heading 3"; onTriggered: win.editMarkdown("heading3") }
         MenuSeparator {}
-        CompactMenuItem { enabled: win.canFormatSource; text: "Blockquote"; onTriggered: win.editMarkdown("quote") }
-        CompactMenuItem { enabled: win.canFormatSource; text: "Bullet List"; onTriggered: win.editMarkdown("bullet") }
-        CompactMenuItem { enabled: win.canFormatSource; text: "Ordered List"; onTriggered: win.editMarkdown("ordered") }
-        CompactMenuItem { enabled: win.canFormatSource; text: "Task List"; onTriggered: win.editMarkdown("task") }
+        CompactMenuItem { enabled: win.canFormatSource || win.canFormatLive; text: "Blockquote"; onTriggered: win.editMarkdown("quote") }
+        CompactMenuItem { enabled: win.canFormatSource || win.canFormatLive; text: "Bullet List"; onTriggered: win.editMarkdown("bullet") }
+        CompactMenuItem { enabled: win.canFormatSource || win.canFormatLive; text: "Ordered List"; onTriggered: win.editMarkdown("ordered") }
+        CompactMenuItem { enabled: win.canFormatSource || win.canFormatLive; text: "Task List"; onTriggered: win.editMarkdown("task") }
     }
 
     CompactMenu {
@@ -1112,8 +1198,8 @@ ApplicationWindow {
         CompactMenuItem { objectName: "openButton"; text: "Open…"; onTriggered: backend.openDialog() }
         CompactMenuItem { text: "Open by Path…"; onTriggered: openPathDialog.open() }
         MenuSeparator {}
-        CompactMenuItem { enabled: win.canFormatSource; text: "Strikethrough"; onTriggered: workspaceCommands.run("strike") }
-        CompactMenuItem { enabled: win.canFormatSource; text: "Inline code"; onTriggered: workspaceCommands.run("inlineCode") }
+        CompactMenuItem { enabled: win.canFormatSource || win.canFormatLive; text: "Strikethrough"; onTriggered: workspaceCommands.run("strike") }
+        CompactMenuItem { enabled: win.canFormatSource || win.canFormatLive; text: "Inline code"; onTriggered: workspaceCommands.run("inlineCode") }
     }
     // Right-click on an underlined word in the Source editor: suggestions, then
     // Learn Spelling and Ignore Spelling. Replacements go through
@@ -1442,8 +1528,8 @@ ApplicationWindow {
     }
 
     function tryWrapSelection(before, after) {
-        if (liveFormattingAllowed()) { backend.liveWrapSelection(before, after); return; }
-        if (sourceFormattingAllowed()) editor.wrapSelection(before, after)
+        if (liveFormattingAllowed()) { backend.liveWrapSelection(before, after); returnFocusAfterFormatting("live", false); return; }
+        if (sourceFormattingAllowed()) { editor.wrapSelection(before, after); returnFocusAfterFormatting("source", false); }
     }
 
     function liveWebAction(name) {
@@ -1453,12 +1539,12 @@ ApplicationWindow {
 
     function tryInsertLink() {
         // The Source link editor dialog works on the Source text; the Live page has its own link panel.
-        if (liveFormattingAllowed()) { backend.editorBridge.runCommand("link"); return; }
+        if (liveFormattingAllowed()) { backend.editorBridge.runCommand("link"); returnFocusAfterFormatting("live", true); return; }
         if (sourceFormattingAllowed()) openLinkEditor(null)
     }
 
     function tryInsertSourceSnippet(replacement) {
-        if (liveFormattingAllowed()) { backend.liveReplaceSelection(replacement); return; }
+        if (liveFormattingAllowed()) { backend.liveReplaceSelection(replacement); returnFocusAfterFormatting("live", false); return; }
         if (!sourceFormattingAllowed()) return;
         var start = editor.selectionStart;
         var end = editor.selectionEnd;
@@ -1467,11 +1553,12 @@ ApplicationWindow {
     }
 
     function editMarkdown(action) {
-        if (liveFormattingAllowed()) { backend.liveEditMarkdown(action); return; }
+        if (liveFormattingAllowed()) { backend.liveEditMarkdown(action); returnFocusAfterFormatting("live", false); return; }
         if (!sourceFormattingAllowed()) return
         var result = backend.editMarkdown(action, editor.selectionStart, editor.selectionEnd);
         editor.forceActiveFocus();
         if (result.start !== undefined) editor.select(result.start, result.end);
+        returnFocusAfterFormatting("source", false);
     }
 
     function decodeSimpleMarkdownLinkPart(value) { return LinkSyntax.decode(value); }
@@ -2740,11 +2827,27 @@ ApplicationWindow {
             SplitView.fillWidth: true
             SplitView.minimumWidth: workspaceLayout.effectiveLayoutMode === 1 ? 480 : 320
 
+        FormatBar {
+            id: formatBar
+            anchors.top: parent.top; anchors.left: parent.left; anchors.right: parent.right
+            visible: win.formatBarShown
+            window: win
+            settings: workspaceSettings
+            blockStyle: win.currentBlockStyle
+            // Fades with the header's toolbar content (opacity only: nothing reflows).
+            opacity: topChrome.toolbarContentOpacity
+            enabled: opacity > 0
+            onRevealChrome: topChrome.pointerReveal = true
+            // The pane's own colour: Omawrite and the other presets recolour the page.
+            color: editorPane.color
+            z: 5
+        }
+
         RowLayout {
             id: documentMeta
             anchors.top: parent.top; anchors.left: parent.left; anchors.right: parent.right
             objectName: "documentMeta"
-            anchors.topMargin: win.searchOpen ? searchPane.height + 24 : 0
+            anchors.topMargin: win.formatBarInset + (win.searchOpen ? searchPane.height + 24 : 0)
             anchors.leftMargin: 24; anchors.rightMargin: 24; height: 48
             Label {
                 objectName: "topChromeTitle"
@@ -2781,7 +2884,69 @@ ApplicationWindow {
             Timer {
                 id: codeDecorationsTimer
                 interval: 0
-                onTriggered: editorFlick.codeLines = backend.sourceLineDecorations(editorFlick.contentY - editor.y, editorFlick.contentY + editorFlick.height - editor.y)
+                onTriggered: {
+                    editorFlick.codeLines = backend.sourceLineDecorations(editorFlick.contentY - editor.y, editorFlick.contentY + editorFlick.height - editor.y);
+                    editorFlick.refreshFormattingMarks();
+                }
+            }
+            // Show Formatting Marks in Source: Qt Quick's TextEdit ignores QTextOption's show-spaces
+            // flags, so the marks are an overlay (like the code-block decorations above). Only the
+            // visible range is scanned; the text, selection and undo stack are never touched.
+            property var formattingMarks: []
+            readonly property bool formattingMarksOn: workspaceSettings.showFormattingMarks && !workspaceLayout.liveEditEnabled
+            readonly property color formattingMarkColor: win.omawriteSurface ? (win.darkMode ? "#4f525a" : "#aeb1b5") : win.mutedColor
+            onFormattingMarksOnChanged: codeDecorationsTimer.restart()
+            onFormattingMarkColorChanged: codeDecorationsTimer.restart()
+            onHeightChanged: if (formattingMarksOn) codeDecorationsTimer.restart()
+            function refreshFormattingMarks() {
+                if (!formattingMarksOn || !editor.visible) { if (formattingMarks.length) formattingMarks = []; return; }
+                var length = editor.length;
+                var first = Math.max(0, editor.positionAt(0, contentY - editor.y - 2));
+                var last = Math.min(length, editor.positionAt(editor.width, contentY + height - editor.y + 2));
+                // One extra character so a paragraph end exactly at the bottom edge is seen.
+                var end = Math.min(length, last + 1);
+                var text = editor.getText(first, end);
+                var space = codeMetrics.advanceWidth;
+                var marks = [];
+                for (var i = 0; i < text.length && marks.length < 4000; ++i) {
+                    var c = text.charCodeAt(i);
+                    if (c !== 32 && c !== 9 && c !== 10) continue;
+                    var position = first + i;
+                    if (position > last) break;
+                    var rect = editor.positionToRectangle(position);
+                    if (c === 32) marks.push({ x: rect.x, y: rect.y, w: space, h: rect.height, t: "\u00b7" });
+                    else if (c === 9) {
+                        var next = editor.positionToRectangle(position + 1);
+                        marks.push({ x: rect.x, y: rect.y, w: next.y === rect.y && next.x > rect.x ? next.x - rect.x : space * 4, h: rect.height, t: "\u2192" });
+                    } else marks.push({ x: rect.x, y: rect.y, w: space * 1.5, h: rect.height, t: "\u00b6", end: true });
+                }
+                // The last line has no newline: it still ends in a paragraph mark.
+                if (end === length && last === length) {
+                    var tail = editor.positionToRectangle(length);
+                    marks.push({ x: tail.x, y: tail.y, w: space * 1.5, h: tail.height, t: "\u00b6", end: true });
+                }
+                formattingMarks = marks;
+            }
+            Repeater {
+                id: marksRepeater
+                objectName: "sourceFormattingMarks"
+                model: editorFlick.formattingMarks.length
+                delegate: Text {
+                    required property int index
+                    readonly property var mark: editorFlick.formattingMarks[index]
+                    objectName: "sourceFormattingMark"
+                    z: 1
+                    x: editor.x + mark.x; y: editor.y + mark.y
+                    width: mark.w; height: mark.h
+                    horizontalAlignment: mark.end ? Text.AlignLeft : Text.AlignHCenter
+                    verticalAlignment: Text.AlignVCenter
+                    text: mark.t
+                    font.family: editor.font.family; font.pixelSize: editor.font.pixelSize
+                    color: editorFlick.formattingMarkColor
+                    textFormat: Text.PlainText
+                    renderType: Text.QtRendering
+                    Accessible.ignored: true
+                }
             }
             TextMetrics { id: codeMetrics; font: editor.font; text: " " }
             Repeater {
@@ -3052,6 +3217,7 @@ ApplicationWindow {
                 font.weight: Font.Normal
                 onFontChanged: Qt.callLater(function() { backend.setSourceAppearance(win.activeWritingAppearance); codeDecorationsTimer.restart(); })
                 onContentHeightChanged: codeDecorationsTimer.restart()
+                onWidthChanged: if (editorFlick.formattingMarksOn) codeDecorationsTimer.restart()
                 // Native rendering hints glyphs to the pixel grid, which is
                 // crispest at whole scale factors but misplaces and unevenly
                 // rasterizes glyphs at fractional ones (and goes stale when
@@ -3418,6 +3584,7 @@ ApplicationWindow {
                 fontSize: win.liveFontPixelSize
                 typewriter: workspaceSettings.typewriter
                 focusMode: workspaceSettings.paragraphFocus || workspaceSettings.sentenceFocus
+                showMarks: workspaceSettings.showFormattingMarks
                 dark: win.darkMode
                 onWritingActivity: win.writingActivity()
                 onNoticeRequested: function(message) { win.showNavigationNotice(message); }
@@ -3435,7 +3602,7 @@ ApplicationWindow {
             anchors.top: parent.top
             anchors.left: parent.left
             anchors.right: parent.right
-            anchors.topMargin: 12
+            anchors.topMargin: 12 + win.formatBarInset
             anchors.leftMargin: 20
             anchors.rightMargin: 20
             visible: win.searchOpen

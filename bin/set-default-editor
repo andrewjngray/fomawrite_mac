@@ -1,0 +1,26 @@
+#!/usr/bin/env sh
+# Make Fomawrite the default app for Markdown and plain-text files, so Finder,
+# `open`, and other apps' "Default app" (for example Codex's Open menu) use it.
+# Run by bin/install-mac; set FOMAWRITE_KEEP_DEFAULT_APPS=1 to skip it there.
+set -eu
+[ "$(uname -s)" = Darwin ] || { echo 'Run on macOS.' >&2; exit 1; }
+BUNDLE_ID="${1:-io.github.andrewjngray.fomawrite}"
+status=0
+for type in net.daringfireball.markdown public.plain-text; do
+    result="$(/usr/bin/osascript -l JavaScript -e "ObjC.import('CoreServices'); \$.LSSetDefaultRoleHandlerForContentType(\$('$type'), \$.kLSRolesAll, \$('$BUNDLE_ID'))" 2>&1)" || result="error: $result"
+    # Launch Services applies the change asynchronously; give it a few seconds to settle.
+    tries=0
+    while :; do
+        current="$(/usr/bin/osascript -l JavaScript -e "ObjC.import('CoreServices'); ObjC.unwrap(ObjC.castRefToObject(\$.LSCopyDefaultRoleHandlerForContentType(\$('$type'), \$.kLSRolesAll)))" 2>/dev/null || true)"
+        [ "$current" = "$BUNDLE_ID" ] && break
+        tries=$((tries + 1)); [ "$tries" -ge 20 ] && break
+        sleep 0.5
+    done
+    if [ "$current" = "$BUNDLE_ID" ]; then
+        printf 'Default app for %s: %s\n' "$type" "$BUNDLE_ID"
+    else
+        printf 'Could not set the default app for %s (result %s, now %s)\n' "$type" "$result" "${current:-none}" >&2
+        status=1
+    fi
+done
+exit "$status"

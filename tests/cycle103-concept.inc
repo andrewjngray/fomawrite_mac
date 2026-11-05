@@ -11,7 +11,8 @@ struct Cycle103SettingsSnapshot {
         QSettings settings;
         for (const auto &key : settings.allKeys()) values.insert(key, settings.value(key));
         settings.clear();
-        settings.setValue("workspace/autoHideChrome", false); settings.sync();
+        // The Format Bar is on by default; older tests are about the header's own cluster.
+        settings.setValue("workspace/autoHideChrome", false); settings.setValue("workspace/formatBarVisible", false); settings.sync();
     }
     ~Cycle103SettingsSnapshot() {
         QGuiApplication::setFont(originalFont);
@@ -223,11 +224,13 @@ void FomawriteTest::referenceWorkspaceCompositionMatchesConcept() {
         QVERIFY(c.bottom() < card->height());
         if (label->property("text").toString() == names[1] + ".md") secondCard = card;
     }
-    // Cycle 151: at the reference 232 px Library column the folder arrows and the folder
-    // name keep their room and New Document steps aside (Cmd+N still creates documents).
+    // Cycle 155: at the reference 232 px Library column (208 px of header content) the folder
+    // name keeps its room beside the "+ ▾" split button; the folder arrows step aside first
+    // (the Go menu keeps Back and Forward).
     {
-        auto *newDocument = window->findChild<QQuickItem *>("newDocumentButton"); QVERIFY(newDocument && !newDocument->isVisible());
-        auto *arrows = window->findChild<QQuickItem *>("libraryHistoryControls"); QVERIFY(arrows && arrows->isVisible());
+        auto *newControls = window->findChild<QQuickItem *>("libraryNewControls"); QVERIFY(newControls && newControls->isVisible());
+        auto *newMenu = window->findChild<QQuickItem *>("libraryNewMenuButton"); QVERIFY(newMenu && newMenu->isVisible());
+        auto *arrows = window->findChild<QQuickItem *>("libraryHistoryControls"); QVERIFY(arrows && !arrows->isVisible());
         auto *folder = window->findChild<QQuickItem *>("workspaceFolderButton"); QVERIFY(folder && folder->width() >= 76);
     }
     for (const char *name : {"collapseOrganizerButton", "collapseFilesButton", "documentSearchButton", "topChromeLibraryButton"}) {

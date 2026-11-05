@@ -52,6 +52,10 @@ html, body {
   color-scheme: light;
 }
 html.dark, html.dark body { color-scheme: dark; }
+/* Live: the body is the surface behind a short document. A theme that paints only <html> (a bundled preset's
+   `html { background: white }`) would otherwise show as a white band below the text in dark mode, because the
+   body ends where the text does. A theme that paints its own body keeps it (this only sets the height). */
+html.fw-live-filtered body { min-height: 100vh; box-sizing: border-box; }
 
 #write {
   box-sizing: border-box;
@@ -324,3 +328,14 @@ html.dark, html.dark body { color-scheme: dark; }
   background-repeat: no-repeat;
   background-size: calc(var(--fw-guides, 0) * var(--fw-indent, 4) * 1ch) 100%;
 }
+
+/* ---- Formatting marks (Show/Hide ¶, marks.ts): overlays only, no width of their own, not selectable or copyable */
+.fw-ws-space, .fw-ws-tab { position: relative; }
+.fw-ws-space::after, .fw-ws-tab::after, .fw-ws-eol::before {
+  position: absolute; pointer-events: none; user-select: none; -webkit-user-select: none;
+  color: var(--md-char-color, var(--fw-muted)); font-weight: 400; font-style: normal; text-decoration: none; opacity: 0.8;
+}
+.fw-ws-space::after { content: "\00B7"; left: 0; width: 100%; text-align: center; }
+.fw-ws-tab::after { content: "\2192"; left: 0; font-size: 0.85em; }
+.fw-ws-eol { position: relative; display: inline-block; width: 0; height: 1em; overflow: visible; user-select: none; -webkit-user-select: none; }
+.fw-ws-eol::before { content: "\00B6"; left: 0.15em; }

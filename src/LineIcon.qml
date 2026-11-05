@@ -124,6 +124,30 @@ Item {
                 c.moveTo(3,3); c.lineTo(12,3); c.lineTo(21,12); c.lineTo(12,21); c.lineTo(3,12); c.closePath()
                 c.moveTo(8,7); c.arc(7,7,1,0,Math.PI*2); break
             case "format": line(4,4,20,4); line(12,4,12,20); line(8,20,16,20); break
+            case "list-bullet":
+                for (let y=7;y<=17;y+=5) { c.moveTo(6.4,y); c.arc(5,y,1.4,0,Math.PI*2); line(10,y,21,y) }
+                break
+            case "list-ordered":
+                for (let y=7;y<=17;y+=5) line(11,y,21,y)
+                line(4.5,5.5,5.8,4.5); line(5.8,4.5,5.8,9.5)
+                c.moveTo(3.8,11.2); c.bezierCurveTo(3.8,9.8,7.4,9.8,7.4,12); c.lineTo(3.8,14.5); c.lineTo(7.6,14.5)
+                c.moveTo(3.8,16.2); c.lineTo(7.4,16.2); c.lineTo(5.4,17.8); c.bezierCurveTo(8,18,8,20.4,3.8,19.8)
+                break
+            case "list-task":
+                c.roundedRect(3,4,6,6,1.2,1.2); c.roundedRect(3,14,6,6,1.2,1.2)
+                c.moveTo(4.4,7.2); c.lineTo(5.8,8.6); c.lineTo(7.8,5.6)
+                line(13,7,21,7); line(13,17,21,17); break
+            case "indent":
+                line(4,5,20,5); line(12,10,20,10); line(12,14,20,14); line(4,19,20,19)
+                c.moveTo(4,9); c.lineTo(8,12); c.lineTo(4,15); c.closePath(); break
+            case "outdent":
+                line(4,5,20,5); line(12,10,20,10); line(12,14,20,14); line(4,19,20,19)
+                c.moveTo(8,9); c.lineTo(4,12); c.lineTo(8,15); c.closePath(); break
+            case "code": c.moveTo(8,7); c.lineTo(3,12); c.lineTo(8,17); c.moveTo(16,7); c.lineTo(21,12); c.lineTo(16,17); line(14,5,10,19); break
+            case "highlight":
+                c.moveTo(15,4); c.lineTo(20,9); c.lineTo(11,18); c.lineTo(6,13); c.closePath(); line(6,13,4,19); line(4,19,11,18); line(13,21.5,21,21.5); break
+            case "clear-format": line(4,5,14,5); line(9,5,9,16); line(6,16,12,16); line(14,14,20,20); line(20,14,14,20); break
+            case "chevrons-right": c.moveTo(5,6); c.lineTo(11,12); c.lineTo(5,18); c.moveTo(12,6); c.lineTo(18,12); c.lineTo(12,18); break
             case "appearance":
                 c.arc(12,12,4,0,Math.PI*2)
                 for (let a=0;a<8;a++) { const t=a*Math.PI/4; line(12+Math.cos(t)*8,12+Math.sin(t)*8,12+Math.cos(t)*10,12+Math.sin(t)*10) }

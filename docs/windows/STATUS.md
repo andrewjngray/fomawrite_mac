@@ -22,11 +22,13 @@ only updates. [Short instructions](../../START-HERE.md).
   Only successful complete builds from this repository's Windows branch are selected;
   standalone diagnostics and PR builds are excluded. Failed updates retain the previous
   selected packages. An older running app must be closed normally before switching versions.
-- **Mac alignment:** primary Mac `master` is `5e70545`, `0.3.0-dev50` / build 154.
-  Windows includes the common build-153 editor baseline and later Windows repairs.
-  Mac 154 adds Mac file associations/default-editor installation and version metadata,
-  not an editor feature missing from Windows. The two branches remain separate;
-  complete Windows parity and release qualification are not claimed.
+- **Mac alignment (4 Nov):** Mac `master` `3b4fbb0` (`0.3.0-dev51` / build 155) is merged into
+  this branch: Format Bar, formatting marks, Library "+ ▾" and the Live/Source formatting fixes,
+  with View → Show Format Bar / Show Formatting Marks added to the Windows menu. Mac 154's
+  default-editor installation is Mac-only. Mac cycles 154–155 records are `README-mac.md` beside
+  the Windows cycle 154–155 records. On the Mac host the merged tree passes 448 Qt tests with one
+  intermittent Windows Format-menu wheel-scroll row (`windowsFormatMenuSourceEditsAreAtomic`,
+  a different row each run, also with the Format Bar hidden) and 330/0 page tests.
 - **Still open:** intermittent imported-theme atomic replacement failure cause,
   remaining clipboard/search and Print desktop checks, broader recovery/display/storage
   acceptance, physical x64 hardware, and installer/signing/distribution qualification.

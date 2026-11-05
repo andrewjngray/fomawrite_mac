@@ -177,7 +177,7 @@ Platform.MenuBar {
     Platform.Menu {
         objectName: "nativeFormatMenu"
         title: "Format"
-        enabled: win.canFormatSource
+        enabled: win.canFormatSource || win.canFormatLive
         Platform.Menu {
             title: "Headings"
             Platform.MenuItem { enabled: win.canFormatSource || win.canFormatLive; text: "Heading 1"; onTriggered: win.editMarkdown("heading1") }
@@ -254,6 +254,8 @@ Platform.MenuBar {
             onTriggered: workspaceSettings.autoHideChrome = !workspaceSettings.autoHideChrome
         }
 
+        NativeCommand { objectName: "nativeShowFormatBar"; commandId: "formatBar"; text: "Show Format Bar" }
+        NativeCommand { objectName: "nativeShowFormattingMarks"; commandId: "formattingMarks"; text: "Show Formatting Marks"; shortcut: "Ctrl+8" }
         Platform.MenuItem { text: "Synchronized Scrolling"; checkable: true; checked: workspaceSettings.synchronizedScroll; onTriggered: workspaceSettings.synchronizedScroll = !workspaceSettings.synchronizedScroll }
         NativeCommand { commandId: "sortBar" }
         NativeCommand { commandId: "filterBar" }

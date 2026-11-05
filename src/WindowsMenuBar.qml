@@ -274,6 +274,8 @@ MenuBar {
         Command { commandId: "sourceEditing" }
         Command { commandId: "liveEditing" }
         Command { commandId: "liveThemeExact" }
+        Command { commandId: "formatBar" }
+        Command { commandId: "formattingMarks" }
         MenuItem {
             objectName: "windows_synchronizedScroll"
             text: "Synchronized Scrolling"

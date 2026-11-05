@@ -13,6 +13,7 @@ import { Tag, styleTags, tags as t } from "@lezer/highlight";
 import { changesToJson, jsonToChangeSpecs } from "./changes";
 import { liveExtension } from "./live";
 import { appearanceEffect, parseAppearancePatch, AppearanceState } from "./appearance";
+import { marksExtension, parseShowMarks, showMarksEffect } from "./marks";
 import { fenceLanguages } from "./blocks";
 import { mathMarkdown } from "./math";
 import { extrasMarkdown } from "./extras";
@@ -33,6 +34,8 @@ export interface Appearance {
   liveThemeFilter?: boolean;
   /** Live mode only: host colours used when the theme sets no background / text colour on #write. */
   palette?: { background: string; text: string };
+  /** Word-style formatting marks (spaces as dots, tabs, ¶ at line ends) in Live and Source; absent = off. See marks.ts. */
+  showMarks?: boolean;
 }
 
 /** Marks transactions that come from the host (setDocument/applyChanges/mode) so they are not echoed back. */
@@ -107,6 +110,7 @@ export function baseExtensions(): Extension[] {
   return [
     history(),
     drawSelection(),
+    marksExtension(),
     search({ top: true }),
     // GFM (Table, TaskList, Strikethrough, Autolink) is already part of markdownLanguage's parser.
     markdown({ base: markdownLanguage, codeLanguages: fenceLanguages, extensions: [{ props: [styleTags({ ListMark: listMarkTag })] }, mathMarkdown, extrasMarkdown] }),
@@ -183,6 +187,8 @@ export class Session {
    *  (so `appearance.typewriter` is never set here; `presentation` holds the merged patch). */
   appearance: Appearance = {};
   private presentation: Partial<AppearanceState> = {};
+  /** Formatting marks (marks.ts); kept here so setDocument can put them back on the fresh state. */
+  private showMarks = false;
   /** Live-theme filter state (livetheme.ts); the overlay is on unless the host sends `liveThemeFilter: false`. */
   private liveTheme: Omit<LiveThemeState, "mode"> = { filter: true };
   /** Called for every user (non-External) doc-changing transaction. */
@@ -219,7 +225,7 @@ export class Session {
     this.view.setState(this.createState(text));
     this.revision = revision;
     // A fresh state starts with default presentation; put the current one back (same tick, no repaint between).
-    this.view.dispatch({ effects: appearanceEffect.of({ ...this.presentation, mode: this.mode }), annotations: External.of(true) });
+    this.view.dispatch({ effects: [appearanceEffect.of({ ...this.presentation, mode: this.mode }), showMarksEffect.of(this.showMarks)], annotations: External.of(true) });
   }
 
   /** Apply host-side changes without echoing them back. Throws on malformed/out-of-range input. */
@@ -265,13 +271,18 @@ export class Session {
   }
 
   setAppearance(a: Appearance) {
-    const { focus: _f, typewriter: _t, appearance: _a, liveThemeFilter: _l, palette: _p, ...legacy } = a;
+    const { focus: _f, typewriter: _t, appearance: _a, liveThemeFilter: _l, palette: _p, showMarks: _m, ...legacy } = a;
     this.appearance = { ...this.appearance, ...legacy };
     applyAppearanceDom(a);
     const live = parseLiveThemePatch(a);
     if (live.liveThemeFilter !== undefined) this.liveTheme.filter = live.liveThemeFilter;
     if (live.palette) this.liveTheme.palette = live.palette;
     this.syncLiveTheme();
+    const marks = parseShowMarks(a);
+    if (marks !== undefined && marks !== this.showMarks) {
+      this.showMarks = marks;
+      this.view.dispatch({ effects: showMarksEffect.of(marks), annotations: External.of(true) });
+    }
     const patch = parseAppearancePatch(a);
     this.presentation = { ...this.presentation, ...patch };
     if (Object.keys(patch).length)

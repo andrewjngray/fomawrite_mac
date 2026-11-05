@@ -32,6 +32,7 @@
         <file>DocumentOutline.qml</file>
         <file>ReviewPane.qml</file>
         <file>LiveEditorPane.qml</file>
+        <file>FormatBar.qml</file>
         <file>editor/index.html</file>
         <file>editor/editor.css</file>
         <file>editor/blocks.css</file>

@@ -18,3 +18,18 @@ codesign --verify --deep --strict "$SOURCE"
 rm -rf "$TARGET"
 ditto "$SOURCE" "$TARGET"
 printf 'Installed %s (build %s)\n' "$TARGET" "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$TARGET/Contents/Info.plist")"
+# Tell Launch Services about the installed copy, and forget registered copies of
+# this app that no longer exist (old staging folders, deleted worktrees), so
+# "Open With" and default-app lookups land on the installed bundle.
+LSREGISTER=/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister
+if [ -x "$LSREGISTER" ]; then
+    "$LSREGISTER" -f "$TARGET" || true
+    "$LSREGISTER" -dump 2>/dev/null | /usr/bin/sed -n -E 's/^path: +(.*Fomawrite[^/]*\.app)( \(0x[0-9a-f]+\))?$/\1/p' | /usr/bin/sort -u |
+        while IFS= read -r registered; do
+            [ -e "$registered" ] || "$LSREGISTER" -u "$registered" 2>/dev/null || true
+        done
+fi
+# Fomawrite opens Markdown and plain text by default (Finder, `open`, other apps' "Default app").
+if [ "${FOMAWRITE_KEEP_DEFAULT_APPS:-0}" != 1 ] && [ "$TARGET" = /Applications/Fomawrite.app ]; then
+    "$ROOT/bin/set-default-editor" || echo 'Default app not changed; run ./bin/set-default-editor to retry.' >&2
+fi

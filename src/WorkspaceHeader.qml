@@ -36,13 +36,18 @@ Item {
     readonly property real writingControlsWidth: documentHeader.width - documentHeader.nativeInset
         - (paneRestoreControls.visible ? paneRestoreControls.implicitWidth + 8 : 0)
     readonly property bool writingClusterExpanded: writingControlsWidth >= 580
+    // The Format Bar carries the formatting controls; the header's cluster returns when it is hidden.
+    readonly property bool formattingClusterShown: !root.window.formatBarShown
     signal actionRequested(string action, var anchor)
     signal documentMenuRequested(var anchor, point position)
     function focusWorkspaceControl() {
         keyboardReveal = true;
         // F6 from Source can enter formatting without first transferring its
         // selection ownership to an unrelated workspace action.
-        if ((window.canFormatSource || window.canFormatLive) && toolbarContentVisible && toolbarContentOpacity > 0) {
+        if (window.formatBarShown && toolbarContentVisible && window.formatSurfaceAvailable) {
+            // The Format Bar replaces the header's cluster: F6 lands on its Style button.
+            window.focusFormatBar();
+        } else if ((window.canFormatSource || window.canFormatLive) && toolbarContentVisible && toolbarContentOpacity > 0 && formattingClusterShown) {
             if (writingClusterExpanded) sourceBoldButton.forceActiveFocus(Qt.TabFocusReason);
             else sourceFormatButton.forceActiveFocus(Qt.TabFocusReason);
         } else workspaceButton.forceActiveFocus(Qt.TabFocusReason);
@@ -164,16 +169,20 @@ Item {
         color: backend.palette.library
         MouseArea { anchors.fill: parent; onPressed: root.window.startSystemMove(); onDoubleClicked: root.window.visibility === Window.Maximized ? root.window.showNormal() : root.window.showMaximized() }
         RowLayout {
-            anchors.fill: parent; anchors.leftMargin: root.window.isMac && !organizerHeader.visible ? 84 : 12; anchors.rightMargin: 12; spacing: 8
+            anchors.fill: parent; anchors.leftMargin: root.window.isMac && !organizerHeader.visible ? 84 : 12; anchors.rightMargin: 12; spacing: 6
             visible: root.toolbarContentVisible; opacity: root.settings.toolbarVisibilityMode === 1 || root.revealRequested ? 1 : 0; enabled: opacity > 0
             id: filesHeaderRow
-            // Narrow headers give way in order: first New Document (Cmd+N and the file
-            // menus still create documents), then the folder arrows, so the folder name
-            // always keeps room beside them. The default 288 px column behind the macOS
-            // window buttons (192 px of content) keeps the arrows; the 232 px minimum
-            // (136 px) does not. The Go menu keeps the same commands at any width.
-            readonly property bool historyFits: width >= 66 + 8 + 76 + 8 + 34
-            readonly property bool newDocumentFits: width >= 66 + 8 + 80 + 8 + 34 + 8 + 34 || !historyFits
+            // Narrow headers give way in reverse priority: folder name (kept at 76 px or more
+            // beside the other controls) > "+" > the chevron beside it > the folder arrows.
+            // The Go menu keeps Back and Forward, and Cmd+N plus the File menu create
+            // documents, at any width.
+            readonly property real folderMinimum: 76
+            readonly property real plusOnlyWidth: folderMinimum + 34 + 34 + 2 * spacing
+            readonly property real newMenuWidth: folderMinimum + 66 + 34 + 2 * spacing
+            readonly property real historyWidth: folderMinimum + 66 + 66 + 34 + 3 * spacing
+            readonly property bool newFits: width >= plusOnlyWidth
+            readonly property bool newMenuFits: width >= newMenuWidth
+            readonly property bool historyFits: width >= historyWidth
             ToolbarGroup {
                 objectName: "libraryHistoryControls"
                 visible: filesHeaderRow.historyFits
@@ -193,7 +202,15 @@ Item {
                 Layout.minimumWidth: 32
                 onClicked: root.actionRequested("chooseFolder", this)
             }
-            ToolbarButton { objectName: "newDocumentButton"; visible: filesHeaderRow.newDocumentFits; iconName: "compose"; hint: "New document"; onClicked: root.actionRequested("newDocument", this) }
+            // iA Writer's split control: "+" creates a document; the chevron opens New File,
+            // New Folder, Sort By, View Options and the two bar toggles.
+            ToolbarGroup {
+                id: libraryNewControls
+                objectName: "libraryNewControls"
+                visible: filesHeaderRow.newFits
+                ToolbarButton { objectName: "libraryNewButton"; grouped: true; iconName: "plus"; hint: "New document"; onClicked: root.actionRequested("newDocument", this) }
+                ToolbarButton { objectName: "libraryNewMenuButton"; visible: filesHeaderRow.newMenuFits; grouped: true; showDivider: true; iconName: "down"; iconSize: 14; hint: "New and view options"; onClicked: root.actionRequested("libraryNewMenu", libraryNewControls) }
+            }
             ToolbarButton { objectName: "collapseFilesButton"; iconName: "panel-left-close"; hint: "Hide library"; onClicked: root.actionRequested("hideFiles", this) }
         }
         Rectangle { objectName: "filesHeaderDivider"; x: parent.width; width: 1; height: parent.height; color: backend.palette.border }
@@ -272,13 +289,13 @@ Item {
                 ToolbarGroup {
                     objectName: "compactWritingControls"
                     property bool sourceFormattingControl: true
-                    visible: !root.fullPreview && root.writingClusterExpanded
+                    visible: !root.fullPreview && root.writingClusterExpanded && root.formattingClusterShown
                     ToolbarButton { id: sourceBoldButton; objectName: "compactBoldButton"; grouped: true; text: "B"; font.pixelSize: 16; font.weight: Font.Bold; hint: trailing.formattingAllowed ? "Bold selection" : "Choose Source to apply formatting"; enabled: trailing.formattingAllowed; onClicked: root.actionRequested("bold", this) }
                     ToolbarButton { objectName: "compactItalicButton"; grouped: true; text: "I"; font.family: "Times New Roman"; font.pixelSize: 18; font.italic: true; hint: "Italic selection"; enabled: trailing.formattingAllowed; onClicked: root.actionRequested("italic", this) }
                     ToolbarButton { objectName: "compactLinkButton"; grouped: true; iconName: "link"; hint: "Insert or edit link"; enabled: trailing.formattingAllowed; onClicked: root.actionRequested("link", this) }
-                    ToolbarButton { objectName: "compactParagraphButton"; grouped: true; iconName: "paragraph"; hint: "Paragraph formatting"; enabled: trailing.formattingAllowed; onClicked: root.actionRequested("format", this) }
+                    ToolbarButton { objectName: "compactParagraphButton"; grouped: true; iconName: "paragraph"; hint: "Show formatting marks"; checked: root.settings.showFormattingMarks; Accessible.role: Accessible.CheckBox; onClicked: root.actionRequested("formattingMarks", this) }
                 }
-                ToolbarButton { id: sourceFormatButton; property bool sourceFormattingControl: true; objectName: "compactFormatButton"; visible: !root.fullPreview && !root.writingClusterExpanded; iconName: "paragraph"; hint: "Formatting"; enabled: trailing.formattingAllowed; onClicked: root.actionRequested("format", this) }
+                ToolbarButton { id: sourceFormatButton; property bool sourceFormattingControl: true; objectName: "compactFormatButton"; visible: !root.fullPreview && !root.writingClusterExpanded && root.formattingClusterShown; iconName: "format"; hint: "Formatting"; enabled: trailing.formattingAllowed; onClicked: root.actionRequested("format", this) }
                 PaneZoomControls {
                     id: editorZoomControls
                     zoomController: root.zoomController

@@ -213,6 +213,25 @@ private slots:
     void liveOmawriteLoadsPlexMonoAndFollowsLightAndDark();
     void omawriteHtmlExportIsLightEmbedsPlexMonoAndLoadsIt();
     void omawritePdfExportIsLightAndEmbedsPlexMono();
+    void liveToolbarButtonsFormatBySelectionWithRealClicks();
+    void sourceToolbarButtonsStillFormatWithRealClicks();
+    void formatBarTakesTheHeaderControlsPlaceAndFollowsTheSetting();
+    void formatBarButtonsWriteMarkdownInSourceAndLiveWithRealClicks();
+    void formatBarFoldsIntoTheOverflowMenuWithoutOverlap();
+    void showFormattingMarksChangesOnlyThePresentationInSource();
+    void showFormattingMarksReachesTheLivePageAndLeavesTheDocumentAlone();
+    void sourceFormattingMarksAreAnOverlayOfDotsTabsAndParagraphMarks();
+    void sourceFormattingMarksCoverOnlyTheVisibleRangeOfALongDocument();
+    void formatBarWorksWhileFocusIsOutsideTheEditorInSourceAndLive();
+    void formatBarStyleButtonShowsItsWholeLabel();
+    void formatBarFadesWithTheHeaderWithoutReflow();
+    void f6FromSourceLandsOnTheFormatBarStyleButton();
+    void narrowHeaderFormattingButtonHasItsOwnGlyph();
+    void darkLivePageFillsBelowAShortDocument();
+    void wrappingTogglesAndComposesInlineMarkers();
+    void consecutiveFormatBarClicksToggleInSourceAndLive();
+    void codeBlockFencesWholeParagraphsAndUnfences();
+    void styleMenuCodeBlockAndBodyWorkWithRealClicksInSourceAndLive();
     void exploreFolderMakesTheFilesFolderCurrentInTreeAndListModes();
     void exploreFolderInsideALocationAddsNoLocation();
     void exploreFolderRefusesMissingRemoteFolderAndNonTextTargets();
@@ -230,6 +249,10 @@ private slots:
     void omawriteSourcePresetIsInTheMenuAndSelectsPlexMono();
     void omawriteSourceUsesItsPaletteInDarkAndLightAndManuscriptComesBack();
     void omawriteSourceKeepsAtMostSixtyFiveCharactersAndCentres();
+    void libraryNewSplitButtonFitsAtEveryWidthAndFoldsInOrder();
+    void libraryNewMenuListsTheNewAndViewItemsInOrder();
+    void libraryPlusCreatesADocumentAndNewFolderOpensTheFolderDialog();
+    void libraryNewMenuItemsAreDisabledWithoutAFolder();
     void harperBridgeAnswersLintRequestsFromTheHost();
     void harperEngineCachesDedupesAndMapsKinds();
     void harperEngineQueuesNewestFirstAndBoundsItsCache();
@@ -6302,3 +6325,7 @@ int main(int argc, char **argv) {
 #include "cycle152-omawrite-style.inc"
 
 #include "live-persistence.inc"
+#include "cycle155-new-menu.inc"
+#include "cycle155-format-bar.inc"
+#include "cycle155-ui-fixes.inc"
+#include "cycle155-editing-fixes.inc"

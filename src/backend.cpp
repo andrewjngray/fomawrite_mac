@@ -1248,6 +1248,31 @@ QVariantMap Backend::wrapSelection(int start, int end, const QString &before, co
         while (position > 0 && text.at(--position) == '\\') ++slashes;
         return slashes % 2 != 0;
     };
+    // `*` and `**` share a character: a run of n asterisks around the text is italic when n is
+    // odd and bold when n >= 2 (`***` is both), so the inner `*` of `**` is never mistaken for
+    // italic and B then I composes to `***word***`. The run may sit outside the selection or be
+    // the selection's own ends.
+    const bool asterisks = (before == "*" || before == "**") && after == before;
+    if (asterisks) {
+        const int m = before.size();
+        int left = 0, right = 0;
+        while (first - left > 0 && text.at(first - left - 1) == '*') ++left;
+        while (last + right < text.size() && text.at(last + right) == '*') ++right;
+        if (left > 0 && escaped(first - left)) --left;
+        int run = qMin(left, right);
+        const bool outside = run > 0;
+        if (!outside) {
+            int lead = 0, trail = 0;
+            while (lead < selected.size() && selected.at(lead) == '*') ++lead;
+            while (trail < selected.size() && selected.at(selected.size() - trail - 1) == '*') ++trail;
+            run = qMin(lead, trail);
+            if (run > 0 && (selected.size() <= run * 2 || escaped(first))) run = 0;
+        }
+        if (m == 1 ? run % 2 == 1 : run >= 2) {
+            if (outside) return replaceText(first - m, last + m, selected);
+            return replaceText(first, last, selected.mid(m, selected.size() - m * 2));
+        }
+    }
     if (before == "`" && after == "`") {
         int left = first, right = last;
         if (left > 0 && text.at(left - 1) == ' ' && right < text.size() && text.at(right) == ' ') { --left; ++right; }
@@ -1265,12 +1290,12 @@ QVariantMap Backend::wrapSelection(int start, int end, const QString &before, co
             return replaceText(first, last, content);
         }
     }
-    if (before != "`" && selected.size() >= before.size() + after.size() && selected.startsWith(before)
+    if (!asterisks && before != "`" && selected.size() >= before.size() + after.size() && selected.startsWith(before)
             && selected.endsWith(after) && !escaped(first) && !escaped(last - after.size())) {
         selected = selected.mid(before.size(), selected.size() - before.size() - after.size());
         return replaceText(first, last, selected);
     }
-    if (before != "`" && first >= before.size() && text.mid(first - before.size(), before.size()) == before
+    if (!asterisks && before != "`" && first >= before.size() && text.mid(first - before.size(), before.size()) == before
             && text.mid(last, after.size()) == after && !escaped(first - before.size()) && !escaped(last)) {
         return replaceText(first - before.size(), last + after.size(), selected);
     }
@@ -1371,6 +1396,63 @@ QVariantMap Backend::editMarkdown(const QString &action, int start, int end) {
         }
         return replaceText(first, last, selected);
     }
+    if (action == "codeBlock" || action == "body") {
+        // The lines the selection touches (a caret touches its own line).
+        const int touchedStart = first == 0 ? 0 : text.lastIndexOf('\n', first - 1) + 1;
+        int touchedEnd = text.indexOf('\n', last > first ? last - 1 : last);
+        if (touchedEnd < 0) touchedEnd = text.size();
+        // A fenced block whose lines (fences included) the selection touches is unfenced: both
+        // fence lines go, the content stays.
+        static const QRegularExpression fenceLine(QStringLiteral("^ {0,3}(`{3,}|~{3,})(.*)$"));
+        QChar openMark;
+        int openLength = 0, openStart = 0, offset = 0;
+        for (;;) {
+            int next = text.indexOf('\n', offset);
+            const bool lastLine = next < 0;
+            if (lastLine) next = text.size();
+            const auto match = fenceLine.match(text.mid(offset, next - offset));
+            bool closed = false;
+            if (match.hasMatch()) {
+                const QString marker = match.captured(1);
+                if (openMark.isNull()) { openMark = marker.front(); openLength = marker.size(); openStart = offset; }
+                else if (marker.front() == openMark && marker.size() >= openLength && match.captured(2).trimmed().isEmpty()) closed = true;
+            }
+            if (!openMark.isNull() && (closed || lastLine)) {
+                const int blockEnd = closed ? next : text.size();
+                if (openStart <= touchedStart && blockEnd >= touchedEnd) {
+                    int contentStart = text.indexOf('\n', openStart);
+                    contentStart = contentStart < 0 || contentStart >= blockEnd ? blockEnd : contentStart + 1;
+                    int contentEnd = closed ? offset - 1 : blockEnd;
+                    if (contentEnd < contentStart) contentEnd = contentStart;
+                    return replaceText(openStart, blockEnd, text.mid(contentStart, contentEnd - contentStart));
+                }
+                openMark = QChar();
+            }
+            if (lastLine) break;
+            offset = next + 1;
+        }
+        if (action == "codeBlock") {
+            // Fence the whole paragraph(s) the selection touches, never splitting a line.
+            const auto blank = [&](int lineStart) {
+                int end = text.indexOf('\n', lineStart);
+                if (end < 0) end = text.size();
+                return text.mid(lineStart, end - lineStart).trimmed().isEmpty();
+            };
+            first = touchedStart;
+            last = touchedEnd;
+            if (!blank(first)) while (first > 0) {
+                const int previous = first >= 2 ? text.lastIndexOf('\n', first - 2) + 1 : 0;
+                if (blank(previous)) break;
+                first = previous;
+            }
+            const int lastLineStart = touchedEnd == 0 ? 0 : text.lastIndexOf('\n', touchedEnd - 1) + 1;
+            if (!blank(qMax(lastLineStart, touchedStart))) while (last < text.size()) {
+                if (last + 1 >= text.size() || blank(last + 1)) break;
+                const int next = text.indexOf('\n', last + 1);
+                last = next < 0 ? text.size() : next;
+            }
+        }
+    }
     if (action == "codeBlock" || action == "rule") {
         const QString selected = text.mid(first, last - first);
         QString block;
@@ -1381,7 +1463,9 @@ QVariantMap Backend::editMarkdown(const QString &action, int start, int end) {
             block = fence + "\n" + selected + (selected.endsWith('\n') ? "" : "\n") + fence;
         } else block = "---";
         if (first > 0) block.prepend(text.left(first).endsWith("\n\n") ? "" : text.at(first - 1) == '\n' ? "\n" : "\n\n");
-        if (last < text.size()) block += text.mid(last).startsWith("\n\n") ? "" : text.at(last) == '\n' ? "\n" : "\n\n";
+        // Nothing but the document's final newline follows a fenced paragraph: no blank line to add.
+        if (action == "codeBlock" && last < text.size() && text.mid(last).trimmed().isEmpty()) {}
+        else if (last < text.size()) block += text.mid(last).startsWith("\n\n") ? "" : text.at(last) == '\n' ? "\n" : "\n\n";
         else block += "\n";
         return replaceText(first, last, block);
     }
@@ -1738,11 +1822,60 @@ void Backend::setSourceAppearance(const QString &appearance) {
         m_highlighter->setCodeLanguage(QFileInfo(m_fileUrl.toLocalFile()).suffix());
     }
     if (m_document) {
-        auto option = m_document->defaultTextOption();
-        option.setTabStopDistance(QFontMetricsF(m_document->defaultFont()).horizontalAdvance(' ') * 4);
-        m_document->setDefaultTextOption(option);
+        applySourceTextOption();
         refreshSourceTypography();
     }
+}
+
+// Tab stops. Show Formatting Marks is drawn by an overlay in Main.qml: Qt Quick's TextEdit ignores the
+// text option's ShowTabsAndSpaces / ShowLineAndParagraphSeparators flags.
+void Backend::applySourceTextOption() {
+    if (!m_document) return;
+    auto option = m_document->defaultTextOption();
+    option.setTabStopDistance(QFontMetricsF(m_document->defaultFont()).horizontalAdvance(' ') * 4);
+    m_document->setDefaultTextOption(option);
+}
+
+void Backend::setShowFormattingMarks(bool show) {
+    if (m_showFormattingMarks == show) return;
+    m_showFormattingMarks = show;
+    emit showFormattingMarksChanged();
+}
+
+// The style name of the block holding `position`: Heading 1-6, Quote, Code Block, else Body.
+QString Backend::blockStyleAt(int position) const {
+    if (!m_document) return QStringLiteral("Body");
+    const QString text = currentDocumentText();
+    position = qBound(0, position, int(text.size()));
+    const int lineStart = position == 0 ? 0 : text.lastIndexOf('\n', position - 1) + 1;
+    int lineEnd = text.indexOf('\n', lineStart);
+    if (lineEnd < 0) lineEnd = text.size();
+    static const QRegularExpression fencePattern(QStringLiteral("^ {0,3}(`{3,}|~{3,})(.*)$"));
+    QChar fence;
+    int fenceLength = 0;
+    int offset = 0;
+    while (offset <= lineStart) {
+        int next = text.indexOf('\n', offset);
+        if (next < 0) next = text.size();
+        const QString line = text.mid(offset, next - offset);
+        const bool wasInside = !fence.isNull();
+        const auto match = fencePattern.match(line);
+        if (match.hasMatch()) {
+            const QString marker = match.captured(1);
+            if (fence.isNull()) { fence = marker.front(); fenceLength = marker.size(); }
+            else if (marker.front() == fence && marker.size() >= fenceLength && match.captured(2).trimmed().isEmpty()) fence = QChar();
+        }
+        if (offset == lineStart && (wasInside || match.hasMatch())) return QStringLiteral("Code Block");
+        if (next >= text.size()) break;
+        offset = next + 1;
+    }
+    const QString line = text.mid(lineStart, lineEnd - lineStart);
+    static const QRegularExpression heading(QStringLiteral("^ {0,3}(#{1,6})(?: +|$)"));
+    const auto headingMatch = heading.match(line);
+    if (headingMatch.hasMatch()) return QStringLiteral("Heading %1").arg(headingMatch.captured(1).size());
+    static const QRegularExpression quote(QStringLiteral("^ {0,3}>"));
+    if (quote.match(line).hasMatch()) return QStringLiteral("Quote");
+    return QStringLiteral("Body");
 }
 
 QVariantList Backend::sourceLineDecorations(qreal top, qreal bottom) const {
@@ -3900,7 +4033,8 @@ bool Backend::liveWrapSelection(const QString &before, const QString &after) {
         if (!m_liveMirrorValid || start < 0) return false;
         const auto result = wrapSelection(start, end, before, after);
         if (!result.contains("end")) return false;
-        m_editorBridge->placeCursor(result.value("end").toInt());
+        // Keep the inner text selected, as Source does, so the next click toggles it again.
+        m_editorBridge->placeSelection(result.value("start").toInt(), result.value("end").toInt());
         return true;
     };
     if (!m_editorBridge->isReady()) return apply(m_editorBridge->lastSelectionStart(), m_editorBridge->lastSelectionEnd());

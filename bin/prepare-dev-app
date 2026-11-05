@@ -18,7 +18,12 @@ ditto "$ROOT/build/Fomawrite.app" "$DEV_APP"
 /usr/libexec/PlistBuddy -c 'Set :CFBundleIdentifier io.github.andrewjngray.fomawrite.dev' "$DEV_APP/Contents/Info.plist"
 /usr/libexec/PlistBuddy -c 'Set :CFBundleName Fomawrite Dev' "$DEV_APP/Contents/Info.plist"
 /usr/libexec/PlistBuddy -c 'Set :CFBundleDisplayName Fomawrite Dev' "$DEV_APP/Contents/Info.plist"
+# The Dev bundle is for testing: it does not offer itself in Open With lists.
+/usr/libexec/PlistBuddy -c 'Set :CFBundleDocumentTypes:0:LSHandlerRank None' "$DEV_APP/Contents/Info.plist"
+/usr/libexec/PlistBuddy -c 'Set :CFBundleDocumentTypes:1:LSHandlerRank None' "$DEV_APP/Contents/Info.plist"
 codesign --force --deep --sign - "$DEV_APP"
 codesign --verify --deep --strict "$DEV_APP"
+# Re-register so Launch Services drops the Dev bundle from Open With lists.
+/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -f "$DEV_APP" 2>/dev/null || true
 printf 'Prepared %s\n' "$DEV_APP"
 echo 'Approve this app yourself if asked. Reuse this path and bundle identifier for later UI checks.'

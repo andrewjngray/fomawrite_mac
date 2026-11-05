@@ -58,6 +58,8 @@ public:
     Q_INVOKABLE void pushChanges(const QString &changesJson);
     // Place the page's caret (UTF-16 offset); the page scrolls it into view.
     Q_INVOKABLE void placeCursor(int position);
+    // Selects [anchor, head] (UTF-16 offsets) and scrolls it into view.
+    Q_INVOKABLE void placeSelection(int anchor, int head);
     // The page's last reported caret (selection head), -1 before any report.
     int lastCursor() const { return m_lastCursor; }
     // True once the writer moved the page caret since the last host placement.

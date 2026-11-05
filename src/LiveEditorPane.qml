@@ -20,6 +20,8 @@ Rectangle {
     property bool typewriter: false
     property bool focusMode: false
     property bool dark: false
+    // Word-style Show Formatting Marks (View menu); the page draws dots, arrows and pilcrows.
+    property bool showMarks: false
     // Live follows the publishing theme with its layout filtered out unless the
     // writer asks for the exact theme (View > Live Follows Theme Exactly).
     property bool themeFilter: true
@@ -81,6 +83,8 @@ Rectangle {
         interval: 1000
         onTriggered: root.reloadPage()
     }
+    // Native focus to the page without touching the editor DOM focus (a link panel may own it).
+    function focusWeb() { web.forceActiveFocus(); }
 
     function scrollToFraction(fraction) { if (root.bridge) root.bridge.scrollTo(fraction); }
 
@@ -88,7 +92,7 @@ Rectangle {
         if (!root.bridge) return;
         root.bridge.applyAppearance(JSON.stringify({ appearance: root.appearance, fontFamily: root.fontFamily,
             fontSize: root.fontSize, typewriter: root.typewriter, focus: root.focusMode, dark: root.dark,
-            liveThemeFilter: root.themeFilter, palette: { background: root.paletteBackground, text: root.paletteText } }));
+            liveThemeFilter: root.themeFilter, showMarks: root.showMarks, palette: { background: root.paletteBackground, text: root.paletteText } }));
     }
     onAppearanceChanged: pushAppearance()
     onThemeFilterChanged: pushAppearance()
@@ -99,6 +103,7 @@ Rectangle {
     onTypewriterChanged: pushAppearance()
     onFocusModeChanged: pushAppearance()
     onDarkChanged: pushAppearance()
+    onShowMarksChanged: pushAppearance()
 
     color: backend.palette.editor
 

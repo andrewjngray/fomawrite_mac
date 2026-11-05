@@ -151,7 +151,14 @@ async function main() {
       case "find": case "replace": view.focus(); openSearchPanel(view); break;
       case "selectAll": view.focus(); selectAll(view); break;
       case "link": view.focus(); openLinkPanel(view); break;
-      default: bridge.log("unknown command: " + name);
+      default: {
+        // "select:<anchor>:<head>": the host keeps the wrapped text selected, so repeated clicks keep working.
+        const m = /^select:(\d+):(\d+)$/.exec(name);
+        if (m) {
+          const len = view.state.doc.length;
+          view.dispatch({ selection: { anchor: Math.min(len, +m[1]), head: Math.min(len, +m[2]) }, scrollIntoView: true });
+        } else bridge.log("unknown command: " + name);
+      }
     }
   }));
   onSignal(bridge.setCursor, guard("setCursor", (pos: number) => {

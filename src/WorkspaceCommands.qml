@@ -122,6 +122,8 @@ QtObject {
         { id: "typewriter", title: "Typewriter Scrolling (Source)", toggle: true },
         { id: "fillersStyleCheck", title: "Fillers", toggle: true },
         { id: "customStyleCheck", title: "Custom", toggle: true },
+        { id: "formatBar", title: "Format Bar", toggle: true },
+        { id: "formattingMarks", title: "Formatting Marks", toggle: true },
         { id: "strike", title: "Strikethrough" },
         { id: "inlineCode", title: "Inline Code" }
     ]
@@ -138,6 +140,7 @@ QtObject {
         var item = entry(id);
         if (!item) return "";
         if (id === "library" || id === "organizer") return "Toggle " + item.title;
+        if (id === "formatBar" || id === "formattingMarks") return (isChecked(id) ? "Hide " : "Show ") + item.title;
         if (["sortBar", "filterBar", "togglePreview"].indexOf(id) >= 0)
             return (isChecked(id) ? "Hide " : "Show ") + item.title;
         return item.title;
@@ -220,6 +223,8 @@ QtObject {
         case "sentence": return settings.sentenceFocus;
         case "paragraph": return settings.paragraphFocus;
         case "typewriter": return settings.typewriter;
+        case "formatBar": return settings.formatBarVisible;
+        case "formattingMarks": return settings.showFormattingMarks;
         case "liveThemeExact": return settings.liveThemeExact;
         case "appearanceFollowsOutputStyle": return backend.appearanceFollowsOutputStyle;
         case "checkSpellingWhileTyping": return backend.spellCheck.available && backend.spellCheck.enabled;
@@ -301,6 +306,8 @@ QtObject {
         case "sentence": settings.sentenceFocus = !settings.sentenceFocus; if (settings.sentenceFocus) settings.paragraphFocus = false; break;
         case "paragraph": settings.paragraphFocus = !settings.paragraphFocus; if (settings.paragraphFocus) settings.sentenceFocus = false; break;
         case "typewriter": settings.typewriter = !settings.typewriter; typewriterChanged(); break;
+        case "formatBar": settings.formatBarVisible = !settings.formatBarVisible; break;
+        case "formattingMarks": window.toggleFormattingMarks(); break;
         case "liveThemeExact": if (layoutState.liveEditEnabled) settings.liveThemeExact = !settings.liveThemeExact; break;
         case "appearanceFollowsOutputStyle": backend.appearanceFollowsOutputStyle = !backend.appearanceFollowsOutputStyle; break;
         case "checkSpellingWhileTyping": backend.spellCheck.enabled = !backend.spellCheck.enabled; break;

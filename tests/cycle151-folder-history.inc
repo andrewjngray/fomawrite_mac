@@ -9,7 +9,7 @@ bool cycle151FilesHeaderFits(QObject *window) {
     if (!header || !header->isVisible()) return false;
     const QRectF box = cycle103SceneBounds(header).adjusted(-0.1, -0.1, 0.1, 0.1);
     QList<QRectF> seen;
-    for (const char *name : {"libraryHistoryControls", "workspaceFolderButton", "newDocumentButton", "collapseFilesButton"}) {
+    for (const char *name : {"libraryHistoryControls", "workspaceFolderButton", "libraryNewControls", "collapseFilesButton"}) {
         auto *item = window->findChild<QQuickItem *>(name);
         if (!item || !item->isVisible()) continue;
         const QRectF bounds = cycle103SceneBounds(item);
@@ -158,9 +158,11 @@ void FomawriteTest::libraryHeaderArrowsStepAsideBeforeTheyCanOverlap() {
     const bool mac = f.window->property("isMac").toBool();
     auto *arrows = f.window->findChild<QQuickItem *>("libraryHistoryControls"); QVERIFY(arrows);
     auto *folder = f.window->findChild<QQuickItem *>("workspaceFolderButton"); QVERIFY(folder);
-    auto *newDocument = f.window->findChild<QQuickItem *>("newDocumentButton"); QVERIFY(newDocument);
-    // Narrow headers give way in order: New Document first (below 238 px of content),
-    // then the arrows (below 192), so the folder name keeps room beside them.
+    auto *newControls = f.window->findChild<QQuickItem *>("libraryNewControls"); QVERIFY(newControls);
+    auto *newMenu = f.window->findChild<QQuickItem *>("libraryNewMenuButton"); QVERIFY(newMenu);
+    // Narrow headers give way in reverse priority (cycle 155): the arrows first (below 260 px
+    // of content), then the chevron beside "+" (below 188), then "+" itself (below 156), so
+    // the folder name keeps 76 px or more beside the controls that remain.
     // On macOS with the organizer hidden the window buttons take an 84 px inset instead of 12.
     for (bool organizer : {true, false}) {
         f.layout->setProperty("organizerVisible", organizer); f.layout->setProperty("filesVisible", true);
@@ -170,16 +172,18 @@ void FomawriteTest::libraryHeaderArrowsStepAsideBeforeTheyCanOverlap() {
             auto *header = f.window->findChild<QQuickItem *>("filesHeader");
             QTRY_COMPARE(header->width(), double(width));
             const int content = width - ((mac && !organizer) ? 84 : 12) - 12;
-            const bool arrowsExpected = content >= 192;
-            const bool newExpected = content >= 238 || !arrowsExpected;
+            const bool arrowsExpected = content >= 260;
+            const bool menuExpected = content >= 188;
+            const bool plusExpected = content >= 156;
             QTRY_COMPARE_WITH_TIMEOUT(arrows->isVisible(), arrowsExpected, 3000);
-            QTRY_COMPARE_WITH_TIMEOUT(newDocument->isVisible(), newExpected, 3000);
-            QVERIFY2(folder->width() >= (arrowsExpected ? 76 : 32), qPrintable(QStringLiteral("organizer %1 width %2 folder %3").arg(organizer).arg(width).arg(folder->width())));
+            QTRY_COMPARE_WITH_TIMEOUT(newMenu->isVisible(), menuExpected, 3000);
+            QTRY_COMPARE_WITH_TIMEOUT(newControls->isVisible(), plusExpected, 3000);
+            QVERIFY2(folder->width() >= (plusExpected ? 76 : 32), qPrintable(QStringLiteral("organizer %1 width %2 folder %3").arg(organizer).arg(width).arg(folder->width())));
             QVERIFY2(cycle151FilesHeaderFits(f.window.data()), qPrintable(QStringLiteral("organizer %1 width %2").arg(organizer).arg(width)));
         }
     }
-    // The default column behind the macOS window buttons keeps the arrows.
-    QVERIFY(288 - 84 - 12 >= 192);
+    // The default 288 px column (organizer shown) keeps the arrows beside the whole split button.
+    QVERIFY(288 - 12 - 12 >= 260);
     f.backend.discardRecovery();
 }
 
