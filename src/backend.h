@@ -187,6 +187,10 @@ public:
     Q_INVOKABLE void attachDocument(QObject *textDocument);
     Q_INVOKABLE bool refreshSourceTypography();
     Q_INVOKABLE void setSourceAppearance(const QString &appearance);
+    Q_PROPERTY(bool showFormattingMarks READ showFormattingMarks WRITE setShowFormattingMarks NOTIFY showFormattingMarksChanged)
+    bool showFormattingMarks() const { return m_showFormattingMarks; }
+    void setShowFormattingMarks(bool show);
+    Q_INVOKABLE QString blockStyleAt(int position) const;
     Q_INVOKABLE QVariantList sourceLineDecorations(qreal top, qreal bottom) const;
     Q_INVOKABLE QVariantMap editCode(const QString &action, int start, int end);
     Q_INVOKABLE int undoSource(int position);
@@ -319,6 +323,7 @@ signals:
     void documentLoaded();
     void fileUrlChanged();
     void modifiedChanged();
+    void showFormattingMarksChanged();
     void statusChanged();
     void documentStatisticsChanged();
     void reviewIssuesChanged();
@@ -443,6 +448,8 @@ private:
     void watchOmarchyTheme();
 
     bool m_showMarkup = true;
+    bool m_showFormattingMarks = false;
+    void applySourceTextOption();
     QString m_sourceAppearance = "manuscript";
     int m_codeIndentWidth = 0;
     bool m_codeIndentTabs = false;

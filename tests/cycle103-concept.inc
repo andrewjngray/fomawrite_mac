@@ -11,7 +11,8 @@ struct Cycle103SettingsSnapshot {
         QSettings settings;
         for (const auto &key : settings.allKeys()) values.insert(key, settings.value(key));
         settings.clear();
-        settings.setValue("workspace/autoHideChrome", false); settings.sync();
+        // The Format Bar is on by default; older tests are about the header's own cluster.
+        settings.setValue("workspace/autoHideChrome", false); settings.setValue("workspace/formatBarVisible", false); settings.sync();
     }
     ~Cycle103SettingsSnapshot() {
         QGuiApplication::setFont(originalFont);

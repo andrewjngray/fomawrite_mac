@@ -165,6 +165,13 @@ private slots:
     void liveOmawriteLoadsPlexMonoAndFollowsLightAndDark();
     void omawriteHtmlExportIsLightEmbedsPlexMonoAndLoadsIt();
     void omawritePdfExportIsLightAndEmbedsPlexMono();
+    void liveToolbarButtonsFormatBySelectionWithRealClicks();
+    void sourceToolbarButtonsStillFormatWithRealClicks();
+    void formatBarTakesTheHeaderControlsPlaceAndFollowsTheSetting();
+    void formatBarButtonsWriteMarkdownInSourceAndLiveWithRealClicks();
+    void formatBarFoldsIntoTheOverflowMenuWithoutOverlap();
+    void showFormattingMarksChangesOnlyThePresentationInSource();
+    void showFormattingMarksReachesTheLivePageAndLeavesTheDocumentAlone();
     void exploreFolderMakesTheFilesFolderCurrentInTreeAndListModes();
     void exploreFolderInsideALocationAddsNoLocation();
     void exploreFolderRefusesMissingRemoteFolderAndNonTextTargets();
@@ -5345,3 +5352,4 @@ int main(int argc, char **argv) {
 #include "cycle152-omawrite-source.inc"
 #include "cycle152-omawrite-style.inc"
 #include "cycle155-new-menu.inc"
+#include "cycle155-format-bar.inc"

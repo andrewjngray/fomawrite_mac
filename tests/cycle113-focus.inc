@@ -188,7 +188,8 @@ void FomawriteTest::formattingToolbarAndMenusKeepSourceSelection() {
     QVERIFY(!editor->property("canUndo").toBool());
     QVERIFY(selectSource());
     auto *paragraph = window->findChild<QQuickItem *>("compactParagraphButton"); QVERIFY(paragraph);
-    QVERIFY(cycle102Click(quick, paragraph));
+    // The header's pilcrow now toggles Show Formatting Marks (Cycle 155); the quick menu opens from the narrow cluster's button.
+    QVERIFY(QMetaObject::invokeMethod(window.data(), "openQuickFormat", Q_ARG(QVariant, QVariant::fromValue(paragraph))));
     auto *menu = window->findChild<QObject *>("quickFormatMenu"); QVERIFY(menu);
     QTRY_VERIFY(menu->property("opened").toBool());
     QTRY_VERIFY(window->property("canFormatSource").toBool());

@@ -36,13 +36,15 @@ Item {
     readonly property real writingControlsWidth: documentHeader.width - documentHeader.nativeInset
         - (paneRestoreControls.visible ? paneRestoreControls.implicitWidth + 8 : 0)
     readonly property bool writingClusterExpanded: writingControlsWidth >= 580
+    // The Format Bar carries the formatting controls; the header's cluster returns when it is hidden.
+    readonly property bool formattingClusterShown: !root.window.formatBarShown
     signal actionRequested(string action, var anchor)
     signal documentMenuRequested(var anchor, point position)
     function focusWorkspaceControl() {
         keyboardReveal = true;
         // F6 from Source can enter formatting without first transferring its
         // selection ownership to an unrelated workspace action.
-        if ((window.canFormatSource || window.canFormatLive) && toolbarContentVisible && toolbarContentOpacity > 0) {
+        if ((window.canFormatSource || window.canFormatLive) && toolbarContentVisible && toolbarContentOpacity > 0 && formattingClusterShown) {
             if (writingClusterExpanded) sourceBoldButton.forceActiveFocus(Qt.TabFocusReason);
             else sourceFormatButton.forceActiveFocus(Qt.TabFocusReason);
         } else workspaceButton.forceActiveFocus(Qt.TabFocusReason);
@@ -284,13 +286,13 @@ Item {
                 ToolbarGroup {
                     objectName: "compactWritingControls"
                     property bool sourceFormattingControl: true
-                    visible: !root.fullPreview && root.writingClusterExpanded
+                    visible: !root.fullPreview && root.writingClusterExpanded && root.formattingClusterShown
                     ToolbarButton { id: sourceBoldButton; objectName: "compactBoldButton"; grouped: true; text: "B"; font.pixelSize: 16; font.weight: Font.Bold; hint: trailing.formattingAllowed ? "Bold selection" : "Choose Source to apply formatting"; enabled: trailing.formattingAllowed; onClicked: root.actionRequested("bold", this) }
                     ToolbarButton { objectName: "compactItalicButton"; grouped: true; text: "I"; font.family: "Times New Roman"; font.pixelSize: 18; font.italic: true; hint: "Italic selection"; enabled: trailing.formattingAllowed; onClicked: root.actionRequested("italic", this) }
                     ToolbarButton { objectName: "compactLinkButton"; grouped: true; iconName: "link"; hint: "Insert or edit link"; enabled: trailing.formattingAllowed; onClicked: root.actionRequested("link", this) }
-                    ToolbarButton { objectName: "compactParagraphButton"; grouped: true; iconName: "paragraph"; hint: "Paragraph formatting"; enabled: trailing.formattingAllowed; onClicked: root.actionRequested("format", this) }
+                    ToolbarButton { objectName: "compactParagraphButton"; grouped: true; iconName: "paragraph"; hint: "Show formatting marks"; checked: root.settings.showFormattingMarks; Accessible.role: Accessible.CheckBox; onClicked: root.actionRequested("formattingMarks", this) }
                 }
-                ToolbarButton { id: sourceFormatButton; property bool sourceFormattingControl: true; objectName: "compactFormatButton"; visible: !root.fullPreview && !root.writingClusterExpanded; iconName: "paragraph"; hint: "Formatting"; enabled: trailing.formattingAllowed; onClicked: root.actionRequested("format", this) }
+                ToolbarButton { id: sourceFormatButton; property bool sourceFormattingControl: true; objectName: "compactFormatButton"; visible: !root.fullPreview && !root.writingClusterExpanded && root.formattingClusterShown; iconName: "paragraph"; hint: "Formatting"; enabled: trailing.formattingAllowed; onClicked: root.actionRequested("format", this) }
                 PaneZoomControls {
                     id: editorZoomControls
                     zoomController: root.zoomController

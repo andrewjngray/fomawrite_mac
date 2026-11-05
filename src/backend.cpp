@@ -1718,11 +1718,65 @@ void Backend::setSourceAppearance(const QString &appearance) {
         m_highlighter->setCodeLanguage(QFileInfo(m_fileUrl.toLocalFile()).suffix());
     }
     if (m_document) {
-        auto option = m_document->defaultTextOption();
-        option.setTabStopDistance(QFontMetricsF(m_document->defaultFont()).horizontalAdvance(' ') * 4);
-        m_document->setDefaultTextOption(option);
+        applySourceTextOption();
         refreshSourceTypography();
     }
+}
+
+// Tab stops and, while Show Formatting Marks is on, the spaces/tabs/paragraph-end marks. Only the
+// document's presentation changes: no text, revision, modified flag or undo step.
+void Backend::applySourceTextOption() {
+    if (!m_document) return;
+    auto option = m_document->defaultTextOption();
+    option.setTabStopDistance(QFontMetricsF(m_document->defaultFont()).horizontalAdvance(' ') * 4);
+    auto flags = option.flags();
+    const QTextOption::Flags marks = QTextOption::ShowTabsAndSpaces | QTextOption::ShowLineAndParagraphSeparators;
+    if (m_showFormattingMarks) flags |= marks; else flags &= ~marks;
+    option.setFlags(flags);
+    m_document->setDefaultTextOption(option);
+}
+
+void Backend::setShowFormattingMarks(bool show) {
+    if (m_showFormattingMarks == show) return;
+    m_showFormattingMarks = show;
+    applySourceTextOption();
+    emit showFormattingMarksChanged();
+}
+
+// The style name of the block holding `position`: Heading 1-6, Quote, Code Block, else Body.
+QString Backend::blockStyleAt(int position) const {
+    if (!m_document) return QStringLiteral("Body");
+    const QString text = currentDocumentText();
+    position = qBound(0, position, int(text.size()));
+    const int lineStart = position == 0 ? 0 : text.lastIndexOf('\n', position - 1) + 1;
+    int lineEnd = text.indexOf('\n', lineStart);
+    if (lineEnd < 0) lineEnd = text.size();
+    static const QRegularExpression fencePattern(QStringLiteral("^ {0,3}(`{3,}|~{3,})(.*)$"));
+    QChar fence;
+    int fenceLength = 0;
+    int offset = 0;
+    while (offset <= lineStart) {
+        int next = text.indexOf('\n', offset);
+        if (next < 0) next = text.size();
+        const QString line = text.mid(offset, next - offset);
+        const bool wasInside = !fence.isNull();
+        const auto match = fencePattern.match(line);
+        if (match.hasMatch()) {
+            const QString marker = match.captured(1);
+            if (fence.isNull()) { fence = marker.front(); fenceLength = marker.size(); }
+            else if (marker.front() == fence && marker.size() >= fenceLength && match.captured(2).trimmed().isEmpty()) fence = QChar();
+        }
+        if (offset == lineStart && (wasInside || match.hasMatch())) return QStringLiteral("Code Block");
+        if (next >= text.size()) break;
+        offset = next + 1;
+    }
+    const QString line = text.mid(lineStart, lineEnd - lineStart);
+    static const QRegularExpression heading(QStringLiteral("^ {0,3}(#{1,6})(?: +|$)"));
+    const auto headingMatch = heading.match(line);
+    if (headingMatch.hasMatch()) return QStringLiteral("Heading %1").arg(headingMatch.captured(1).size());
+    static const QRegularExpression quote(QStringLiteral("^ {0,3}>"));
+    if (quote.match(line).hasMatch()) return QStringLiteral("Quote");
+    return QStringLiteral("Body");
 }
 
 QVariantList Backend::sourceLineDecorations(qreal top, qreal bottom) const {
@@ -1835,6 +1889,7 @@ void Backend::attachDocument(QObject *textDocument) {
     invalidatePublishingDocument();
     m_lastDocumentText = currentDocumentText();
     m_highlighter = new MarkdownHighlighter(m_document);
+    if (m_showFormattingMarks) applySourceTextOption();
     m_highlighter->setDarkMode(m_darkMode);
     m_highlighter->setShowMarkup(m_showMarkup);
     m_highlighter->setCodeStyle(m_sourceAppearance == "code");
