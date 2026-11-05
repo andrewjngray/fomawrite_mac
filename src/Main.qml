@@ -855,6 +855,7 @@ ApplicationWindow {
                 Qt.callLater(function() { if (anchor && !anchor.enabled) libraryPane.focusList(); });
                 break;
             case "newDocument": libraryPane.newDocument(); break;
+            case "libraryNewMenu": libraryPane.showOptions(anchor, true); break;
             case "libraryOptions": win.openAnchoredMenu(libraryActions, anchor); break;
             case "back": win.requestHistory(-1); break;
             case "forward": win.requestHistory(1); break;

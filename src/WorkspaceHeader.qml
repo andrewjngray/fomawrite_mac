@@ -164,16 +164,20 @@ Item {
         color: backend.palette.library
         MouseArea { anchors.fill: parent; onPressed: root.window.startSystemMove(); onDoubleClicked: root.window.visibility === Window.Maximized ? root.window.showNormal() : root.window.showMaximized() }
         RowLayout {
-            anchors.fill: parent; anchors.leftMargin: root.window.isMac && !organizerHeader.visible ? 84 : 12; anchors.rightMargin: 12; spacing: 8
+            anchors.fill: parent; anchors.leftMargin: root.window.isMac && !organizerHeader.visible ? 84 : 12; anchors.rightMargin: 12; spacing: 6
             visible: root.toolbarContentVisible; opacity: root.settings.toolbarVisibilityMode === 1 || root.revealRequested ? 1 : 0; enabled: opacity > 0
             id: filesHeaderRow
-            // Narrow headers give way in order: first New Document (Cmd+N and the file
-            // menus still create documents), then the folder arrows, so the folder name
-            // always keeps room beside them. The default 288 px column behind the macOS
-            // window buttons (192 px of content) keeps the arrows; the 232 px minimum
-            // (136 px) does not. The Go menu keeps the same commands at any width.
-            readonly property bool historyFits: width >= 66 + 8 + 76 + 8 + 34
-            readonly property bool newDocumentFits: width >= 66 + 8 + 80 + 8 + 34 + 8 + 34 || !historyFits
+            // Narrow headers give way in reverse priority: folder name (kept at 76 px or more
+            // beside the other controls) > "+" > the chevron beside it > the folder arrows.
+            // The Go menu keeps Back and Forward, and Cmd+N plus the File menu create
+            // documents, at any width.
+            readonly property real folderMinimum: 76
+            readonly property real plusOnlyWidth: folderMinimum + 34 + 34 + 2 * spacing
+            readonly property real newMenuWidth: folderMinimum + 66 + 34 + 2 * spacing
+            readonly property real historyWidth: folderMinimum + 66 + 66 + 34 + 3 * spacing
+            readonly property bool newFits: width >= plusOnlyWidth
+            readonly property bool newMenuFits: width >= newMenuWidth
+            readonly property bool historyFits: width >= historyWidth
             ToolbarGroup {
                 objectName: "libraryHistoryControls"
                 visible: filesHeaderRow.historyFits
@@ -193,7 +197,15 @@ Item {
                 Layout.minimumWidth: 32
                 onClicked: root.actionRequested("chooseFolder", this)
             }
-            ToolbarButton { objectName: "newDocumentButton"; visible: filesHeaderRow.newDocumentFits; iconName: "compose"; hint: "New document"; onClicked: root.actionRequested("newDocument", this) }
+            // iA Writer's split control: "+" creates a document; the chevron opens New File,
+            // New Folder, Sort By, View Options and the two bar toggles.
+            ToolbarGroup {
+                id: libraryNewControls
+                objectName: "libraryNewControls"
+                visible: filesHeaderRow.newFits
+                ToolbarButton { objectName: "libraryNewButton"; grouped: true; iconName: "plus"; hint: "New document"; onClicked: root.actionRequested("newDocument", this) }
+                ToolbarButton { objectName: "libraryNewMenuButton"; visible: filesHeaderRow.newMenuFits; grouped: true; showDivider: true; iconName: "down"; iconSize: 14; hint: "New and view options"; onClicked: root.actionRequested("libraryNewMenu", libraryNewControls) }
+            }
             ToolbarButton { objectName: "collapseFilesButton"; iconName: "panel-left-close"; hint: "Hide library"; onClicked: root.actionRequested("hideFiles", this) }
         }
         Rectangle { objectName: "filesHeaderDivider"; x: parent.width; width: 1; height: parent.height; color: backend.palette.border }

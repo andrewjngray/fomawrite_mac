@@ -97,7 +97,7 @@ Rectangle {
             fileList.positionViewAtIndex(index, ListView.Contain);
         });
     }
-    function showOptions(anchor) { folderMenu.parent = anchor; folderMenu.x = anchor.width - folderMenu.width; folderMenu.y = anchor.height + 3; folderMenu.open(); }
+    function showOptions(anchor, alignLeft) { folderMenu.parent = anchor; folderMenu.x = alignLeft ? 0 : anchor.width - folderMenu.width; folderMenu.y = anchor.height + 3; folderMenu.open(); }
 
     LibraryContextMenu { id: contextMenu; library: root.library; commands: root.commands; darkMode: root.darkMode }
     ColumnLayout {
@@ -411,12 +411,13 @@ Rectangle {
         id: folderMenu
         objectName: "libraryOptionsMenu"
         darkMode: root.darkMode
-        CompactMenuItem { text: "New File"; iconName: "plus"; enabled: root.library.rootFolder.toString() !== ""; onTriggered: root.newDocument(false) }
-        CompactMenuItem { text: "New Folder"; iconName: "folder"; enabled: root.library.rootFolder.toString() !== ""; onTriggered: root.newFolder() }
+        CompactMenuItem { objectName: "libraryMenuNewFile"; text: "New File…"; iconName: "plus"; enabled: root.library.rootFolder.toString() !== ""; onTriggered: root.newDocument(false) }
+        CompactMenuItem { objectName: "libraryMenuNewFolder"; text: "New Folder…"; iconName: "folder"; enabled: root.library.rootFolder.toString() !== ""; onTriggered: root.newFolder() }
         MenuSeparator {}
         LibrarySortMenu { title: "Sort By"; objectName: "libraryOptionsSortMenu" }
         CompactMenu {
             title: "View Options"
+            objectName: "libraryOptionsViewMenu"
             darkMode: root.darkMode
             CompactMenu {
                 title: "Show Date"
@@ -457,10 +458,11 @@ Rectangle {
         standardButtons: Dialog.Ok | Dialog.Cancel
         onOpened: { newFileName.text = "Untitled.md"; newFileName.forceActiveFocus(); newFileName.selectAll(); }
         onAccepted: root.createRequested(newFileName.text, inNewWindow)
-        TextField { id: newFileName; width: parent.width; placeholderText: "Document.md"; onAccepted: newFileDialog.accept() }
+        TextField { id: newFileName; objectName: "newLibraryFileName"; width: parent.width; placeholderText: "Document.md"; onAccepted: newFileDialog.accept() }
     }
     Dialog {
         id: newFolderDialog
+        objectName: "newLibraryFolderDialog"
         title: "New folder"
         anchors.centerIn: parent
         modal: true
@@ -468,6 +470,6 @@ Rectangle {
         standardButtons: Dialog.Ok | Dialog.Cancel
         onOpened: { newFolderName.text = ""; newFolderName.forceActiveFocus(); }
         onAccepted: root.library.createFolder(newFolderName.text)
-        TextField { id: newFolderName; width: parent.width; placeholderText: "Folder name"; onAccepted: newFolderDialog.accept() }
+        TextField { id: newFolderName; objectName: "newLibraryFolderName"; width: parent.width; placeholderText: "Folder name"; onAccepted: newFolderDialog.accept() }
     }
 }

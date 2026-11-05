@@ -182,6 +182,10 @@ private slots:
     void omawriteSourcePresetIsInTheMenuAndSelectsPlexMono();
     void omawriteSourceUsesItsPaletteInDarkAndLightAndManuscriptComesBack();
     void omawriteSourceKeepsAtMostSixtyFiveCharactersAndCentres();
+    void libraryNewSplitButtonFitsAtEveryWidthAndFoldsInOrder();
+    void libraryNewMenuListsTheNewAndViewItemsInOrder();
+    void libraryPlusCreatesADocumentAndNewFolderOpensTheFolderDialog();
+    void libraryNewMenuItemsAreDisabledWithoutAFolder();
     void harperBridgeAnswersLintRequestsFromTheHost();
     void harperEngineCachesDedupesAndMapsKinds();
     void harperEngineQueuesNewestFirstAndBoundsItsCache();
@@ -5340,3 +5344,4 @@ int main(int argc, char **argv) {
 #include "cycle151-folder-history.inc"
 #include "cycle152-omawrite-source.inc"
 #include "cycle152-omawrite-style.inc"
+#include "cycle155-new-menu.inc"
