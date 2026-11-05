@@ -1,0 +1,108 @@
+---
+---
+
+<footer>
+  <div class="footer-container">
+    <div class="footer-content">
+      <div class="footer-section">
+        <h3>Fomawrite</h3>
+        <p>A calm, local-file Markdown editor for macOS</p>
+      </div>
+      
+      <div class="footer-section">
+        <h4>Resources</h4>
+        <a href="/changelog">Changelog</a>
+        <a href="/docs">Documentation</a>
+        <a href="https://github.com/andrewjngray/fomawrite_mac" target="_blank" rel="noopener noreferrer">GitHub</a>
+      </div>
+      
+      <div class="footer-section">
+        <h4>About</h4>
+        <a href="/about">About</a>
+        <a href="/waitlist">Join Waitlist</a>
+      </div>
+    </div>
+    
+    <div class="footer-bottom">
+      <p>© {new Date().getFullYear()} Fomawrite. Forked from <a href="https://github.com/omacom/omawrite" target="_blank" rel="noopener noreferrer">Omawrite</a> under the MIT license.</p>
+    </div>
+  </div>
+</footer>
+
+<style>
+  footer {
+    margin-top: var(--spacing-3xl);
+    border-top: 1px solid var(--color-border);
+    background: var(--color-surface);
+  }
+
+  .footer-container {
+    max-width: var(--max-width);
+    margin: 0 auto;
+    padding: var(--spacing-2xl) var(--spacing-md);
+  }
+
+  .footer-content {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: var(--spacing-xl);
+    margin-bottom: var(--spacing-xl);
+  }
+
+  .footer-section h3 {
+    font-size: 1.125rem;
+    margin-bottom: var(--spacing-xs);
+    color: var(--color-text);
+  }
+
+  .footer-section h4 {
+    font-size: 0.875rem;
+    margin-bottom: var(--spacing-xs);
+    color: var(--color-text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .footer-section p {
+    color: var(--color-text-muted);
+    font-size: 0.9375rem;
+  }
+
+  .footer-section a {
+    display: block;
+    color: var(--color-text-muted);
+    font-size: 0.9375rem;
+    margin-top: 0.5rem;
+    transition: color 0.2s ease;
+  }
+
+  .footer-section a:hover {
+    color: var(--color-accent);
+  }
+
+  .footer-bottom {
+    padding-top: var(--spacing-lg);
+    border-top: 1px solid var(--color-border);
+    text-align: center;
+  }
+
+  .footer-bottom p {
+    color: var(--color-text-dim);
+    font-size: 0.875rem;
+  }
+
+  .footer-bottom a {
+    color: var(--color-text-muted);
+  }
+
+  .footer-bottom a:hover {
+    color: var(--color-accent);
+  }
+
+  @media (max-width: 768px) {
+    .footer-content {
+      grid-template-columns: 1fr;
+      gap: var(--spacing-lg);
+    }
+  }
+</style>

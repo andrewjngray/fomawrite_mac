@@ -1,0 +1,258 @@
+---
+import Layout from '../layouts/Layout.astro';
+import Nav from '../components/Nav.astro';
+import Footer from '../components/Footer.astro';
+---
+
+<Layout title="Documentation - Fomawrite" description="Getting started with Fomawrite">
+  <Nav />
+  
+  <main>
+    <div class="container">
+      <header class="page-header">
+        <h1>Documentation</h1>
+        <p>Get started with Fomawrite</p>
+      </header>
+
+      <div class="docs">
+        <section class="doc-section">
+          <h2>Getting Started</h2>
+          <p>Fomawrite is currently in active development. The app is not yet available for download, but you can build it from source.</p>
+        </section>
+
+        <section class="doc-section">
+          <h2>Build from Source</h2>
+          <p>On macOS, install Apple's Command Line Tools and Homebrew Qt, then run:</p>
+          
+          <pre><code>brew install qtbase qtdeclarative qttools qtwebengine
+
+git clone https://github.com/andrewjngray/fomawrite_mac.git
+cd fomawrite_mac
+
+./bin/build
+./bin/test
+./bin/run examples/Welcome.md</code></pre>
+
+          <p>To create the app bundles:</p>
+          
+          <pre><code>./bin/package-mac
+./bin/prepare-dev-app
+open dist/Fomawrite.app</code></pre>
+
+          <p><code>dist/Fomawrite.app</code> is the ordinary app. <code>dist/Fomawrite Dev.app</code> is the stable QA app.</p>
+        </section>
+
+        <section class="doc-section">
+          <h2>Requirements</h2>
+          <ul>
+            <li><strong>Platform:</strong> macOS 14.0 or later</li>
+            <li><strong>Dependencies:</strong> Qt 6 with WebEngine (Homebrew provides qtwebengine which includes QtPdf)</li>
+            <li><strong>Build tools:</strong> Apple Command Line Tools</li>
+          </ul>
+        </section>
+
+        <section class="doc-section">
+          <h2>Using Fomawrite</h2>
+          
+          <h3>Editing Modes</h3>
+          <p>Fomawrite offers three ways to work on the same Markdown text:</p>
+          <ul>
+            <li><strong>Source:</strong> Edit as literal Markdown with syntax highlighting. Choose between Manuscript, Editorial, Book, or Code appearances.</li>
+            <li><strong>Live:</strong> Edit with Markdown rendered in place (Typora-style). Markers hide until the caret enters them.</li>
+            <li><strong>Preview:</strong> Read-only publishing output as Web or PDF.</li>
+          </ul>
+
+          <h3>Publishing</h3>
+          <p>The right pane shows read-only publishing output:</p>
+          <ul>
+            <li>Choose <strong>Web</strong> to see HTML output rendered in Chromium</li>
+            <li>Choose <strong>PDF</strong> to see the actual exported pages with paper settings</li>
+            <li>Select an <strong>Output Style</strong> from the footer (Claude Like, or import Typora CSS themes)</li>
+          </ul>
+
+          <h3>Themes</h3>
+          <p>Fomawrite supports Typora CSS themes with local resources:</p>
+          <ul>
+            <li>The Claude Like theme ships with the app</li>
+            <li>Import custom themes via <strong>View → Publishing Theme → Get More Themes...</strong></li>
+            <li>Themes are stored in <code>~/Library/Application Support/AndrewGray/fomawrite/publishing-themes/</code></li>
+          </ul>
+
+          <h3>Writing Assistance</h3>
+          <p>Harper (Automattic's offline grammar engine) checks grammar and style as you type:</p>
+          <ul>
+            <li>Red underlines mark spelling issues</li>
+            <li>Blue underlines mark grammar issues</li>
+            <li>Grey underlines mark style suggestions (when enabled)</li>
+            <li>The <strong>Review pane</strong> (Edit → Spelling and Grammar) lists all findings</li>
+            <li>Switch between Harper and macOS dictionaries via <strong>Edit → Writing Checker → Engine</strong></li>
+          </ul>
+        </section>
+
+        <section class="doc-section">
+          <h2>File Format</h2>
+          <p>Fomawrite preserves plain UTF-8 Markdown byte-exactly:</p>
+          <ul>
+            <li>No hidden state or proprietary format</li>
+            <li>CRLF, BOM, and special characters (NBSP, U+2028) are preserved</li>
+            <li>Lossy decodes (Latin-1, UTF-16) block in-place Save</li>
+            <li>Any Markdown file from another tool can be opened, edited, and saved without being rewritten</li>
+          </ul>
+        </section>
+
+        <section class="doc-section">
+          <h2>Keyboard Shortcuts</h2>
+          <p>Common shortcuts:</p>
+          <ul>
+            <li><strong>⌘N:</strong> New document</li>
+            <li><strong>⌘O:</strong> Open</li>
+            <li><strong>⌘S:</strong> Save</li>
+            <li><strong>⌘;:</strong> Toggle Review pane</li>
+            <li><strong>⌘K:</strong> Insert/Edit link</li>
+            <li><strong>⌘↑:</strong> Go to enclosing folder (in Library)</li>
+            <li><strong>F6/Shift+F6:</strong> Cycle through panes</li>
+          </ul>
+        </section>
+
+        <section class="doc-section">
+          <h2>Resources</h2>
+          <ul>
+            <li><a href="https://github.com/andrewjngray/fomawrite_mac" target="_blank" rel="noopener noreferrer">GitHub Repository</a></li>
+            <li><a href="https://github.com/andrewjngray/fomawrite_mac/blob/master/README.md" target="_blank" rel="noopener noreferrer">README</a></li>
+            <li><a href="https://github.com/andrewjngray/fomawrite_mac/blob/master/ARCHITECTURE.md" target="_blank" rel="noopener noreferrer">Architecture</a></li>
+            <li><a href="https://github.com/andrewjngray/fomawrite_mac/blob/master/MISSION.md" target="_blank" rel="noopener noreferrer">Mission</a></li>
+          </ul>
+        </section>
+
+        <section class="doc-section">
+          <h2>Support</h2>
+          <p>Fomawrite is a one-person project built with AI help. For issues and questions:</p>
+          <ul>
+            <li>Check the <a href="https://github.com/andrewjngray/fomawrite_mac/blob/master/STATUS.md" target="_blank" rel="noopener noreferrer">STATUS.md</a> for known issues</li>
+            <li>Review the <a href="/changelog">Changelog</a> for recent changes</li>
+            <li>Open an issue on <a href="https://github.com/andrewjngray/fomawrite_mac/issues" target="_blank" rel="noopener noreferrer">GitHub</a></li>
+          </ul>
+        </section>
+      </div>
+    </div>
+  </main>
+  
+  <Footer />
+</Layout>
+
+<style>
+  main {
+    min-height: calc(100vh - 64px);
+    padding: var(--spacing-2xl) 0;
+  }
+
+  .container {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 0 var(--spacing-md);
+  }
+
+  .page-header {
+    margin-bottom: var(--spacing-2xl);
+  }
+
+  .page-header h1 {
+    font-size: clamp(2.5rem, 5vw, 3.5rem);
+    margin-bottom: var(--spacing-xs);
+  }
+
+  .page-header p {
+    font-size: 1.125rem;
+    color: var(--color-text-muted);
+  }
+
+  .docs {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-2xl);
+  }
+
+  .doc-section {
+    padding: var(--spacing-lg);
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+  }
+
+  .doc-section h2 {
+    font-size: 1.75rem;
+    margin-bottom: var(--spacing-sm);
+    color: var(--color-text);
+  }
+
+  .doc-section h3 {
+    font-size: 1.25rem;
+    margin: var(--spacing-md) 0 var(--spacing-xs);
+    color: var(--color-text);
+  }
+
+  .doc-section p {
+    font-size: 0.9375rem;
+    color: var(--color-text-muted);
+    line-height: 1.6;
+    margin-bottom: var(--spacing-sm);
+  }
+
+  .doc-section ul {
+    list-style: none;
+    padding-left: 0;
+    margin: var(--spacing-sm) 0;
+  }
+
+  .doc-section li {
+    padding: 0.5rem 0 0.5rem 1.5rem;
+    position: relative;
+    color: var(--color-text-muted);
+    font-size: 0.9375rem;
+    line-height: 1.6;
+  }
+
+  .doc-section li::before {
+    content: '•';
+    position: absolute;
+    left: 0;
+    color: var(--color-accent);
+  }
+
+  .doc-section a {
+    color: var(--color-accent);
+    text-decoration: none;
+  }
+
+  .doc-section a:hover {
+    text-decoration: underline;
+  }
+
+  pre {
+    background: var(--color-bg);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    padding: var(--spacing-sm);
+    overflow-x: auto;
+    margin: var(--spacing-sm) 0;
+  }
+
+  code {
+    font-family: ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Consolas, 'DejaVu Sans Mono', monospace;
+    font-size: 0.875rem;
+    color: var(--color-text);
+  }
+
+  pre code {
+    display: block;
+    line-height: 1.5;
+  }
+
+  p code,
+  li code {
+    background: var(--color-bg);
+    padding: 0.125rem 0.375rem;
+    border-radius: 0.25rem;
+    font-size: 0.875em;
+  }
+</style>
