@@ -1,11 +1,11 @@
 # Fomawrite — status
 
-Updated 4 November 2026. This is the authoritative current-build record. Direction: [MISSION.md](MISSION.md). History: [CHANGELOG.md](CHANGELOG.md). Source map: [ARCHITECTURE.md](ARCHITECTURE.md).
+Updated 5 November 2026. This is the authoritative current-build record. Direction: [MISSION.md](MISSION.md). History: [CHANGELOG.md](CHANGELOG.md). Source map: [ARCHITECTURE.md](ARCHITECTURE.md).
 
 | Item | Current state |
 | --- | --- |
-| **Current review build** | **`0.3.0-dev51` / macOS `0.3.0 (155)`** |
-| **Last completed cycle** | 155 — toolbar formatting fixed in Live, Word-like Format Bar, formatting marks (¶ / ⌘8) in Live and Source, explorer "+ ▾" ([record](research/cycle-155/README.md)); 154 — Fomawrite as the default app for Markdown and plain text; the installer sets it ([record](research/cycle-154/README.md)); 153 — stability: revision-neutral spelling refresh, native Live keyboard/save/history checks, embedded editor/theme identity verification, editor CI, and reconciled documentation. [Evidence](research/cycle-153/README.md). |
+| **Current review build** | **`0.3.0-dev52` / macOS `0.3.0 (156)`** |
+| **Last completed cycle** | 156 — a new document takes the keyboard at its first line ([record](research/cycle-156/README.md)); 155 — toolbar formatting fixed in Live, Word-like Format Bar, formatting marks (¶ / ⌘8) in Live and Source, explorer "+ ▾" ([record](research/cycle-155/README.md)); 154 — Fomawrite as the default app for Markdown and plain text; the installer sets it ([record](research/cycle-154/README.md)); 153 — stability: revision-neutral spelling refresh, native Live keyboard/save/history checks, embedded editor/theme identity verification, editor CI, and reconciled documentation. [Evidence](research/cycle-153/README.md). |
 | **Repository** | [andrewjngray/fomawrite_mac](https://github.com/andrewjngray/fomawrite_mac), `master`; local checkout `/Users/andrewgray/repo/projects/fomawrite_mac`. The former `omawrite_mac` directory name is obsolete. |
 | **Local regression suite** | **299 passed, 0 failed, 0 skipped** (`./bin/test`, Qt 6.11.2, Apple Silicon); **321 editor tests passed**, TypeScript typecheck passed, editor assets rebuilt identically. |
 | **Native app acceptance** | Dev, distribution and installed build 153 all pass: 124 footer states, 5 daily-writing, 5 zoom, 7 editing, 3 pane-chrome, 5 editing-layout and 12 publishing-theme groups. Tests check actual Web/PDF pixels and current document identity. [Bundle identities](research/cycle-153/verified-builds.json). |
@@ -33,7 +33,7 @@ Earlier byte-preservation and preview robustness regressions remain in the full 
 
 ## Next steps
 
-1. Use build 155 for ordinary writing and record reproducible friction in [docs/live-friction.md](docs/live-friction.md), particularly physical selection/format/link interactions, rapid document changes, and quit/reopen.
+1. Use build 156 for ordinary writing and record reproducible friction in [docs/live-friction.md](docs/live-friction.md), particularly physical selection/format/link interactions, rapid document changes, and quit/reopen.
 2. Keep both CI jobs green and require native current-document/paint checks before distributing preview or editor changes. `bin/test` regenerates tracked gallery images; review or restore only those generated images after a run.
 3. Prioritize demonstrated correctness and usability problems before adding features or restructuring the backend.
 

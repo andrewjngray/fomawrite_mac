@@ -1757,7 +1757,24 @@ ApplicationWindow {
             backend.newDocument();
         } else if (action === "create") {
             var file = backend.library.createDocument(pendingFileName);
-            if (file.toString() !== "") backend.open(file);
+            if (file.toString() !== "" && backend.open(file)) newDocumentFocusTimer.begin();
+        }
+    }
+
+    // A created document takes the keyboard at its first line. Closing the New
+    // document dialog (or the unsaved-changes prompt) returns focus to "+", so
+    // wait until both have finished closing before moving into the text.
+    Timer {
+        id: newDocumentFocusTimer
+        property int attempts: 0
+        function begin() { attempts = 0; restart(); }
+        interval: 16
+        repeat: true
+        onTriggered: {
+            if ((libraryPane.newDocumentDialogVisible || unsavedChangesDialog.visible) && ++attempts < 120) return;
+            stop();
+            editor.cursorPosition = 0;
+            win.focusWritingSurface();
         }
     }
 
