@@ -27,7 +27,10 @@
         check(click(window, closeFind), "Cannot close focus-check Find");
         editor->forceActiveFocus();
         QMetaObject::invokeMethod(editor, "select", Q_ARG(int, text.indexOf("quiet")), Q_ARG(int, text.indexOf("quiet") + 5));
-        check(click(window, child("compactBoldButton")), "Cannot click enabled Bold");
+        // The Format Bar replaces the header's compact B/I cluster while it is shown.
+        QQuickItem *boldButton = child("formatBold");
+        if (!boldButton || !boldButton->isVisible()) boldButton = child("compactBoldButton");
+        check(click(window, boldButton), "Cannot click enabled Bold");
         check(editor->property("text").toString() == QString(text).replace("quiet", "**quiet**"), "Toolbar Bold lost its Source selection");
         QMetaObject::invokeMethod(editor, "undo");
         check(editor->property("text").toString() == text && !editor->property("canUndo").toBool(), "Bold was not one exact Undo");
