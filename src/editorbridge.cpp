@@ -86,6 +86,11 @@ void EditorBridge::placeCursor(int position) {
     m_caretMovedByUser = false;
     if (m_ready && m_hasDocument) emit setCursor(position);
 }
+void EditorBridge::placeSelection(int anchor, int head) {
+    if (anchor >= 0 && head >= 0) { m_lastAnchor = anchor; m_lastCursor = head; }
+    m_caretMovedByUser = false;
+    if (m_ready && m_hasDocument) emit command(QStringLiteral("select:%1:%2").arg(anchor).arg(head));
+}
 void EditorBridge::metric(const QString &name, double ms) { emit metricRecorded(name, ms); }
 void EditorBridge::log(const QString &message) { emit messageLogged(message); }
 void EditorBridge::textReply(int token, const QString &text) { emit textReceived(token, text); }

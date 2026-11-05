@@ -180,6 +180,10 @@ private slots:
     void f6FromSourceLandsOnTheFormatBarStyleButton();
     void narrowHeaderFormattingButtonHasItsOwnGlyph();
     void darkLivePageFillsBelowAShortDocument();
+    void wrappingTogglesAndComposesInlineMarkers();
+    void consecutiveFormatBarClicksToggleInSourceAndLive();
+    void codeBlockFencesWholeParagraphsAndUnfences();
+    void styleMenuCodeBlockAndBodyWorkWithRealClicksInSourceAndLive();
     void exploreFolderMakesTheFilesFolderCurrentInTreeAndListModes();
     void exploreFolderInsideALocationAddsNoLocation();
     void exploreFolderRefusesMissingRemoteFolderAndNonTextTargets();
@@ -5362,3 +5366,4 @@ int main(int argc, char **argv) {
 #include "cycle155-new-menu.inc"
 #include "cycle155-format-bar.inc"
 #include "cycle155-ui-fixes.inc"
+#include "cycle155-editing-fixes.inc"
