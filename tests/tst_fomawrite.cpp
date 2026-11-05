@@ -252,6 +252,7 @@ private slots:
     void libraryNewSplitButtonFitsAtEveryWidthAndFoldsInOrder();
     void libraryNewMenuListsTheNewAndViewItemsInOrder();
     void libraryPlusCreatesADocumentAndNewFolderOpensTheFolderDialog();
+    void libraryPlusPutsTheCaretInTheNewDocument();
     void libraryNewMenuItemsAreDisabledWithoutAFolder();
     void harperBridgeAnswersLintRequestsFromTheHost();
     void harperEngineCachesDedupesAndMapsKinds();
@@ -6329,3 +6330,4 @@ int main(int argc, char **argv) {
 #include "cycle155-format-bar.inc"
 #include "cycle155-ui-fixes.inc"
 #include "cycle155-editing-fixes.inc"
+#include "cycle156-new-document-focus.inc"

@@ -4,6 +4,10 @@ One line per cycle, newest first. Each line links to the cycle's record under `r
 
 ## 0.3.0 development series (Cycles 97–)
 
+- **Mac build 156 merged into Windows (5 Nov)** — Mac cycle 156 shares its number with the Windows cycle below; its record is `research/cycle-156/README-mac.md`. Windows gains the new-document focus fix: after "+" creates a document, the caret is in its first line in Source and Live.
+
+- **156 (Mac)** — A new document takes the keyboard (`0.3.0-dev52`, build 156, 5 Nov): after "+" creates a document, the caret is in its first line in Source and Live instead of on the "+" button; the built-in self-check clicks the Bold that is on screen now the Format Bar exists. [Record](research/cycle-156/README-mac.md)
+
 - **Mac builds 154–155 merged into Windows (4 Nov)** — The Mac line's own cycles 154 and 155 share numbers with the Windows cycles below; their records are `README-mac.md` beside the Windows `README.md`. Windows gains the Format Bar, formatting marks, the Library "+ ▾" button and the formatting fixes, plus View → Show Format Bar / Show Formatting Marks in the Windows menu. Mac default-app installation does not apply to Windows.
 
 - **155 (Mac)** — Formatting that works, a Word-like Format Bar, formatting marks and "+ ▾" (`0.3.0-dev51`, build 155, 4 Nov): the toolbar's formatting buttons work in Live (a click no longer loses Live's focus); a Format Bar with Style, inline marks, lists, indent, clear and ¶; ¶ / ⌘8 shows spaces, tabs and paragraph marks in Live and Source without touching the file; the explorer gets "+ ▾" for new documents, folders and view options. [Record](research/cycle-155/README-mac.md)

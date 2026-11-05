@@ -82,6 +82,7 @@ Rectangle {
         sequence: "Ctrl+Up"; context: Qt.WindowShortcut; enabled: root.inDrawer && root.ownsKeyboard
         onActivated: root.library.enclosingFolder()
     }
+    readonly property bool newDocumentDialogVisible: newFileDialog.visible
     function newDocument(inNewWindow) { newFileDialog.inNewWindow = !!inNewWindow; newFileDialog.open(); }
     function newFolder() { newFolderDialog.open(); }
     function showCurrentFile() {

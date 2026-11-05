@@ -29,6 +29,10 @@ only updates. [Short instructions](../../START-HERE.md).
   the Windows cycle 154–155 records. On the Mac host the merged tree passes 448 Qt tests with one
   intermittent Windows Format-menu wheel-scroll row (`windowsFormatMenuSourceEditsAreAtomic`,
   a different row each run, also with the Format Bar hidden) and 330/0 page tests.
+- **Mac alignment (5 Nov):** Mac `master` `bf92d9b` (`0.3.0-dev52` / build 156) is merged: after
+  "+" creates a document the caret is in its first line in Source and Live. Mac cycle 156's record
+  is `research/cycle-156/README-mac.md`; the Mac 154–156 records are now committed (the cycle
+  folder ignore rule had kept 154–155 out at the 4 Nov merge).
 - **Still open:** intermittent imported-theme atomic replacement failure cause,
   remaining clipboard/search and Print desktop checks, broader recovery/display/storage
   acceptance, physical x64 hardware, and installer/signing/distribution qualification.
