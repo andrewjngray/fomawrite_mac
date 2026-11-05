@@ -15,7 +15,15 @@ Rectangle {
     required property var settings
     // The current block's style name (Body, Heading 1-6, Quote, Code Block).
     property string blockStyle: "Body"
-    readonly property bool formattingAllowed: window.canFormatSource || window.canFormatLive
+    // Usable whenever an editing surface is on screen; a click with no owner claims it (see
+    // Main.qml claimFormattingSurface) and then applies at the surface's own caret/selection.
+    readonly property bool formattingAllowed: window.formatSurfaceAvailable
+    function wrap(before, after) { window.claimFormattingSurface(); window.tryWrapSelection(before, after); }
+    function md(action) { window.claimFormattingSurface(); window.editMarkdown(action); }
+    signal revealChrome()
+    function link() { window.claimFormattingSurface(); window.tryInsertLink(); }
+    // F6 lands here (WorkspaceHeader.focusWorkspaceControl).
+    function focusFirstControl() { styleButton.forceActiveFocus(Qt.TabFocusReason); }
     readonly property alias styleMenu: styleMenu
     readonly property alias overflowMenu: overflowMenu
 
@@ -24,7 +32,11 @@ Rectangle {
 
     // Group widths (a group that follows another carries its 13 px divider).
     readonly property real sideMargin: 16
-    readonly property var groupWidths: ({ style: 118, bi: 75, inline2: 96, link: 43, lists: 107, indent: 75, clear: 43, marks: 43 })
+    // The Style button is as wide as its longest label ("Code Block") plus the chevron.
+    TextMetrics { id: styleMetrics; font.family: Qt.application.font.family; font.pixelSize: 13; text: "Code Block" }
+    TextMetrics { id: styleMetrics2; font.family: Qt.application.font.family; font.pixelSize: 13; text: "Heading 6" }
+    readonly property real styleWidth: Math.max(118, Math.ceil(Math.max(styleMetrics.advanceWidth, styleMetrics2.advanceWidth)) + 38)
+    readonly property var groupWidths: ({ style: styleWidth, bi: 75, inline2: 96, link: 43, lists: 107, indent: 75, clear: 43, marks: 43 })
     readonly property real overflowWidth: 38
     // The first to fold is the first listed.
     readonly property var foldOrder: ["indent", "lists", "clear", "link", "inline2"]
@@ -53,6 +65,8 @@ Rectangle {
         implicitWidth: 30
         implicitHeight: 30
         padding: 0
+        // Material pads buttons by 24 px a side whatever `padding` says; the ribbon's tools size themselves.
+        leftPadding: 0; rightPadding: 0; topPadding: 0; bottomPadding: 0
         topInset: 0; bottomInset: 0; leftInset: 0; rightInset: 0
         focusPolicy: Qt.StrongFocus
         font.family: Qt.application.font.family
@@ -137,7 +151,7 @@ Rectangle {
                 border.width: styleButton.visualFocus ? 2 : 1
                 border.color: styleButton.visualFocus ? backend.palette.focus : (backend.palette.toolbarBorder || backend.palette.border)
             }
-            onClicked: bar.window.openAnchoredMenu(styleMenu, styleButton)
+            onClicked: { bar.window.claimFormattingSurface(); bar.window.openAnchoredMenu(styleMenu, styleButton); }
         }
 
         // Bold, Italic
@@ -146,8 +160,8 @@ Rectangle {
             Divider {}
             Row {
                 spacing: 2
-                FormatButton { objectName: "formatBold"; text: "B"; font.pixelSize: 16; font.weight: Font.Bold; hint: "Bold"; enabled: bar.formattingAllowed; onClicked: bar.window.tryWrapSelection("**", "**") }
-                FormatButton { objectName: "formatItalic"; text: "I"; font.family: "Times New Roman"; font.pixelSize: 18; font.italic: true; hint: "Italic"; enabled: bar.formattingAllowed; onClicked: bar.window.tryWrapSelection("*", "*") }
+                FormatButton { objectName: "formatBold"; text: "B"; font.pixelSize: 16; font.weight: Font.Bold; hint: "Bold"; enabled: bar.formattingAllowed; onClicked: bar.wrap("**", "**") }
+                FormatButton { objectName: "formatItalic"; text: "I"; font.family: "Times New Roman"; font.pixelSize: 18; font.italic: true; hint: "Italic"; enabled: bar.formattingAllowed; onClicked: bar.wrap("*", "*") }
             }
         }
         // Strikethrough, inline code, highlight
@@ -155,15 +169,15 @@ Rectangle {
             visible: bar.plan.inline2
             spacing: 2
             Item { width: 0; height: 30 }
-            FormatButton { objectName: "formatStrike"; text: "S"; font.pixelSize: 15; font.strikeout: true; hint: "Strikethrough"; enabled: bar.formattingAllowed; onClicked: bar.window.tryWrapSelection("~~", "~~") }
-            FormatButton { objectName: "formatCode"; iconName: "code"; hint: "Inline code"; enabled: bar.formattingAllowed; onClicked: bar.window.tryWrapSelection("`", "`") }
-            FormatButton { objectName: "formatHighlight"; iconName: "highlight"; hint: "Highlight"; enabled: bar.formattingAllowed; onClicked: bar.window.tryWrapSelection("==", "==") }
+            FormatButton { objectName: "formatStrike"; text: "S"; font.pixelSize: 15; font.strikeout: true; hint: "Strikethrough"; enabled: bar.formattingAllowed; onClicked: bar.wrap("~~", "~~") }
+            FormatButton { objectName: "formatCode"; iconName: "code"; hint: "Inline code"; enabled: bar.formattingAllowed; onClicked: bar.wrap("`", "`") }
+            FormatButton { objectName: "formatHighlight"; iconName: "highlight"; hint: "Highlight"; enabled: bar.formattingAllowed; onClicked: bar.wrap("==", "==") }
         }
         // Link
         Row {
             visible: bar.plan.link
             Divider {}
-            FormatButton { objectName: "formatLink"; iconName: "link"; hint: "Insert or edit link"; enabled: bar.formattingAllowed; onClicked: bar.window.tryInsertLink() }
+            FormatButton { objectName: "formatLink"; iconName: "link"; hint: "Insert or edit link"; enabled: bar.formattingAllowed; onClicked: bar.link() }
         }
         // Lists
         Row {
@@ -171,9 +185,9 @@ Rectangle {
             Divider {}
             Row {
                 spacing: 2
-                FormatButton { objectName: "formatBullet"; iconName: "list-bullet"; hint: "Bulleted list"; enabled: bar.formattingAllowed; onClicked: bar.window.editMarkdown("bullet") }
-                FormatButton { objectName: "formatOrdered"; iconName: "list-ordered"; hint: "Numbered list"; enabled: bar.formattingAllowed; onClicked: bar.window.editMarkdown("ordered") }
-                FormatButton { objectName: "formatTask"; iconName: "list-task"; hint: "Task list"; enabled: bar.formattingAllowed; onClicked: bar.window.editMarkdown("task") }
+                FormatButton { objectName: "formatBullet"; iconName: "list-bullet"; hint: "Bulleted list"; enabled: bar.formattingAllowed; onClicked: bar.md("bullet") }
+                FormatButton { objectName: "formatOrdered"; iconName: "list-ordered"; hint: "Numbered list"; enabled: bar.formattingAllowed; onClicked: bar.md("ordered") }
+                FormatButton { objectName: "formatTask"; iconName: "list-task"; hint: "Task list"; enabled: bar.formattingAllowed; onClicked: bar.md("task") }
             }
         }
         // Indent
@@ -182,15 +196,15 @@ Rectangle {
             Divider {}
             Row {
                 spacing: 2
-                FormatButton { objectName: "formatOutdent"; iconName: "outdent"; hint: "Decrease indent"; enabled: bar.formattingAllowed; onClicked: bar.window.editMarkdown("outdent") }
-                FormatButton { objectName: "formatIndent"; iconName: "indent"; hint: "Increase indent"; enabled: bar.formattingAllowed; onClicked: bar.window.editMarkdown("indent") }
+                FormatButton { objectName: "formatOutdent"; iconName: "outdent"; hint: "Decrease indent"; enabled: bar.formattingAllowed; onClicked: bar.md("outdent") }
+                FormatButton { objectName: "formatIndent"; iconName: "indent"; hint: "Increase indent"; enabled: bar.formattingAllowed; onClicked: bar.md("indent") }
             }
         }
         // Clear formatting
         Row {
             visible: bar.plan.clear
             Divider {}
-            FormatButton { objectName: "formatClear"; iconName: "clear-format"; hint: "Clear formatting"; enabled: bar.formattingAllowed; onClicked: bar.window.editMarkdown("clearInline") }
+            FormatButton { objectName: "formatClear"; iconName: "clear-format"; hint: "Clear formatting"; enabled: bar.formattingAllowed; onClicked: bar.md("clearInline") }
         }
         // Show formatting marks
         Row {
@@ -214,7 +228,7 @@ Rectangle {
                 objectName: "formatOverflowButton"
                 iconName: "chevrons-right"
                 hint: "More formatting"
-                onClicked: bar.window.openAnchoredMenu(overflowMenu, overflowButton)
+                onClicked: { bar.window.claimFormattingSurface(); bar.window.openAnchoredMenu(overflowMenu, overflowButton); }
             }
         }
     }
@@ -223,16 +237,16 @@ Rectangle {
         id: styleMenu
         objectName: "formatStyleMenu"
         width: 170
-        CompactMenuItem { objectName: "formatStyleBody"; text: "Body"; onTriggered: bar.window.editMarkdown("body") }
-        CompactMenuItem { text: "Heading 1"; onTriggered: bar.window.editMarkdown("heading1") }
-        CompactMenuItem { text: "Heading 2"; onTriggered: bar.window.editMarkdown("heading2") }
-        CompactMenuItem { text: "Heading 3"; onTriggered: bar.window.editMarkdown("heading3") }
-        CompactMenuItem { text: "Heading 4"; onTriggered: bar.window.editMarkdown("heading4") }
-        CompactMenuItem { text: "Heading 5"; onTriggered: bar.window.editMarkdown("heading5") }
-        CompactMenuItem { text: "Heading 6"; onTriggered: bar.window.editMarkdown("heading6") }
+        CompactMenuItem { objectName: "formatStyleBody"; text: "Body"; onTriggered: bar.md("body") }
+        CompactMenuItem { text: "Heading 1"; onTriggered: bar.md("heading1") }
+        CompactMenuItem { text: "Heading 2"; onTriggered: bar.md("heading2") }
+        CompactMenuItem { text: "Heading 3"; onTriggered: bar.md("heading3") }
+        CompactMenuItem { text: "Heading 4"; onTriggered: bar.md("heading4") }
+        CompactMenuItem { text: "Heading 5"; onTriggered: bar.md("heading5") }
+        CompactMenuItem { text: "Heading 6"; onTriggered: bar.md("heading6") }
         MenuSeparator {}
-        CompactMenuItem { text: "Quote"; onTriggered: bar.window.editMarkdown("quote") }
-        CompactMenuItem { text: "Code Block"; onTriggered: bar.window.editMarkdown("codeBlock") }
+        CompactMenuItem { text: "Quote"; onTriggered: bar.md("quote") }
+        CompactMenuItem { text: "Code Block"; onTriggered: bar.md("codeBlock") }
     }
 
     // Folded controls, in the order they fold.
@@ -240,17 +254,20 @@ Rectangle {
         id: overflowMenu
         objectName: "formatOverflowMenu"
         width: 200
-        CompactMenuItem { visible: !bar.plan.inline2; height: visible ? implicitHeight : 0; enabled: bar.formattingAllowed; text: "Strikethrough"; onTriggered: bar.window.tryWrapSelection("~~", "~~") }
-        CompactMenuItem { visible: !bar.plan.inline2; height: visible ? implicitHeight : 0; enabled: bar.formattingAllowed; text: "Inline Code"; onTriggered: bar.window.tryWrapSelection("`", "`") }
-        CompactMenuItem { visible: !bar.plan.inline2; height: visible ? implicitHeight : 0; enabled: bar.formattingAllowed; text: "Highlight"; onTriggered: bar.window.tryWrapSelection("==", "==") }
-        CompactMenuItem { visible: !bar.plan.link; height: visible ? implicitHeight : 0; enabled: bar.formattingAllowed; text: "Link…"; onTriggered: bar.window.tryInsertLink() }
-        CompactMenuItem { visible: !bar.plan.clear; height: visible ? implicitHeight : 0; enabled: bar.formattingAllowed; text: "Clear Formatting"; onTriggered: bar.window.editMarkdown("clearInline") }
-        CompactMenuItem { visible: !bar.plan.lists; height: visible ? implicitHeight : 0; enabled: bar.formattingAllowed; text: "Bulleted List"; onTriggered: bar.window.editMarkdown("bullet") }
-        CompactMenuItem { visible: !bar.plan.lists; height: visible ? implicitHeight : 0; enabled: bar.formattingAllowed; text: "Numbered List"; onTriggered: bar.window.editMarkdown("ordered") }
-        CompactMenuItem { visible: !bar.plan.lists; height: visible ? implicitHeight : 0; enabled: bar.formattingAllowed; text: "Task List"; onTriggered: bar.window.editMarkdown("task") }
-        CompactMenuItem { visible: !bar.plan.indent; height: visible ? implicitHeight : 0; enabled: bar.formattingAllowed; text: "Decrease Indent"; onTriggered: bar.window.editMarkdown("outdent") }
-        CompactMenuItem { visible: !bar.plan.indent; height: visible ? implicitHeight : 0; enabled: bar.formattingAllowed; text: "Increase Indent"; onTriggered: bar.window.editMarkdown("indent") }
+        CompactMenuItem { visible: !bar.plan.inline2; height: visible ? implicitHeight : 0; enabled: bar.formattingAllowed; text: "Strikethrough"; onTriggered: bar.wrap("~~", "~~") }
+        CompactMenuItem { visible: !bar.plan.inline2; height: visible ? implicitHeight : 0; enabled: bar.formattingAllowed; text: "Inline Code"; onTriggered: bar.wrap("`", "`") }
+        CompactMenuItem { visible: !bar.plan.inline2; height: visible ? implicitHeight : 0; enabled: bar.formattingAllowed; text: "Highlight"; onTriggered: bar.wrap("==", "==") }
+        CompactMenuItem { visible: !bar.plan.link; height: visible ? implicitHeight : 0; enabled: bar.formattingAllowed; text: "Link…"; onTriggered: bar.link() }
+        CompactMenuItem { visible: !bar.plan.clear; height: visible ? implicitHeight : 0; enabled: bar.formattingAllowed; text: "Clear Formatting"; onTriggered: bar.md("clearInline") }
+        CompactMenuItem { visible: !bar.plan.lists; height: visible ? implicitHeight : 0; enabled: bar.formattingAllowed; text: "Bulleted List"; onTriggered: bar.md("bullet") }
+        CompactMenuItem { visible: !bar.plan.lists; height: visible ? implicitHeight : 0; enabled: bar.formattingAllowed; text: "Numbered List"; onTriggered: bar.md("ordered") }
+        CompactMenuItem { visible: !bar.plan.lists; height: visible ? implicitHeight : 0; enabled: bar.formattingAllowed; text: "Task List"; onTriggered: bar.md("task") }
+        CompactMenuItem { visible: !bar.plan.indent; height: visible ? implicitHeight : 0; enabled: bar.formattingAllowed; text: "Decrease Indent"; onTriggered: bar.md("outdent") }
+        CompactMenuItem { visible: !bar.plan.indent; height: visible ? implicitHeight : 0; enabled: bar.formattingAllowed; text: "Increase Indent"; onTriggered: bar.md("indent") }
     }
+
+    // Pointing at the bar keeps the header chrome revealed, as pointing at the header does.
+    HoverHandler { onHoveredChanged: if (hovered && bar.settings.autoHideChrome) bar.revealChrome() }
 
     Rectangle { anchors.bottom: parent.bottom; width: parent.width; height: 1; color: backend.palette.border }
 }

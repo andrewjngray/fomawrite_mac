@@ -287,32 +287,28 @@ void FomawriteTest::showFormattingMarksChangesOnlyThePresentationInSource() {
     const bool canUndo = w.editor->property("canUndo").toBool();
     const qreal tabStop = document->defaultTextOption().tabStopDistance();
     QCOMPARE(w.canonical(), text);
-    QVERIFY(!document->defaultTextOption().flags().testFlag(QTextOption::ShowTabsAndSpaces));
-    const QImage plain = w.quick->grabWindow();
+    const QRect textArea = cycle103SceneBounds(w.item("editorScroll")).toAlignedRect();
+    const QImage plain = w.quick->grabWindow().copy(textArea);
     auto *marks = w.item("formatMarks"); QVERIFY(marks);
     QVERIFY(!marks->property("active").toBool());
     QVERIFY(w.click("formatMarks"));
     QTRY_VERIFY(w.backend.showFormattingMarks());
     QVERIFY(marks->property("active").toBool());
-    const auto flags = document->defaultTextOption().flags();
-    QVERIFY(flags.testFlag(QTextOption::ShowTabsAndSpaces));
-    QVERIFY(flags.testFlag(QTextOption::ShowLineAndParagraphSeparators));
     QCOMPARE(document->defaultTextOption().tabStopDistance(), tabStop);
     QCOMPARE(w.canonical(), text);
     QCOMPARE(document->revision(), revision);
     QCOMPARE(w.backend.modified(), modified);
     QCOMPARE(w.editor->property("canUndo").toBool(), canUndo);
     QTRY_VERIFY(QSettings().value("workspace/showFormattingMarks").toString() == QStringLiteral("true"));
-    // The editor shows them: the rendered pane differs from the plain one.
-    QTest::qWait(200);
-    const QImage marked = w.quick->grabWindow();
-    const QRect pane = cycle103SceneBounds(w.item("editorPane")).toAlignedRect();
-    QVERIFY2(marked.copy(pane) != plain.copy(pane), "Source renders spaces, tabs and paragraph ends as marks");
+    // The editor shows them: the text area alone (not the Format Bar's pressed toggle) differs from the plain one.
+    QTest::qWait(250);
+    QVERIFY2(w.quick->grabWindow().copy(textArea) != plain, "Source renders spaces, tabs and paragraph ends as marks");
     // Off again: presentation restored, document untouched.
     QVERIFY(w.click("formatMarks"));
     QTRY_VERIFY(!w.backend.showFormattingMarks());
-    QVERIFY(!document->defaultTextOption().flags().testFlag(QTextOption::ShowTabsAndSpaces));
     QCOMPARE(document->defaultTextOption().tabStopDistance(), tabStop);
+    QTest::qWait(250);
+    QCOMPARE(w.quick->grabWindow().copy(textArea), plain);
     QCOMPARE(w.canonical(), text);
     QCOMPARE(document->revision(), revision);
     QVERIFY(!w.backend.modified() || modified);

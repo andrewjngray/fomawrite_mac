@@ -52,6 +52,10 @@ html, body {
   color-scheme: light;
 }
 html.dark, html.dark body { color-scheme: dark; }
+/* Live: the body is the surface behind a short document. A theme that paints only <html> (a bundled preset's
+   `html { background: white }`) would otherwise show as a white band below the text in dark mode, because the
+   body ends where the text does. A theme that paints its own body keeps it (this only sets the height). */
+html.fw-live-filtered body { min-height: 100vh; box-sizing: border-box; }
 
 #write {
   box-sizing: border-box;

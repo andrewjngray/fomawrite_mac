@@ -44,7 +44,10 @@ Item {
         keyboardReveal = true;
         // F6 from Source can enter formatting without first transferring its
         // selection ownership to an unrelated workspace action.
-        if ((window.canFormatSource || window.canFormatLive) && toolbarContentVisible && toolbarContentOpacity > 0 && formattingClusterShown) {
+        if (window.formatBarShown && toolbarContentVisible && window.formatSurfaceAvailable) {
+            // The Format Bar replaces the header's cluster: F6 lands on its Style button.
+            window.focusFormatBar();
+        } else if ((window.canFormatSource || window.canFormatLive) && toolbarContentVisible && toolbarContentOpacity > 0 && formattingClusterShown) {
             if (writingClusterExpanded) sourceBoldButton.forceActiveFocus(Qt.TabFocusReason);
             else sourceFormatButton.forceActiveFocus(Qt.TabFocusReason);
         } else workspaceButton.forceActiveFocus(Qt.TabFocusReason);
@@ -292,7 +295,7 @@ Item {
                     ToolbarButton { objectName: "compactLinkButton"; grouped: true; iconName: "link"; hint: "Insert or edit link"; enabled: trailing.formattingAllowed; onClicked: root.actionRequested("link", this) }
                     ToolbarButton { objectName: "compactParagraphButton"; grouped: true; iconName: "paragraph"; hint: "Show formatting marks"; checked: root.settings.showFormattingMarks; Accessible.role: Accessible.CheckBox; onClicked: root.actionRequested("formattingMarks", this) }
                 }
-                ToolbarButton { id: sourceFormatButton; property bool sourceFormattingControl: true; objectName: "compactFormatButton"; visible: !root.fullPreview && !root.writingClusterExpanded && root.formattingClusterShown; iconName: "paragraph"; hint: "Formatting"; enabled: trailing.formattingAllowed; onClicked: root.actionRequested("format", this) }
+                ToolbarButton { id: sourceFormatButton; property bool sourceFormattingControl: true; objectName: "compactFormatButton"; visible: !root.fullPreview && !root.writingClusterExpanded && root.formattingClusterShown; iconName: "format"; hint: "Formatting"; enabled: trailing.formattingAllowed; onClicked: root.actionRequested("format", this) }
                 PaneZoomControls {
                     id: editorZoomControls
                     zoomController: root.zoomController

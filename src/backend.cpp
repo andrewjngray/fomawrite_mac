@@ -1723,23 +1723,18 @@ void Backend::setSourceAppearance(const QString &appearance) {
     }
 }
 
-// Tab stops and, while Show Formatting Marks is on, the spaces/tabs/paragraph-end marks. Only the
-// document's presentation changes: no text, revision, modified flag or undo step.
+// Tab stops. Show Formatting Marks is drawn by an overlay in Main.qml: Qt Quick's TextEdit ignores the
+// text option's ShowTabsAndSpaces / ShowLineAndParagraphSeparators flags.
 void Backend::applySourceTextOption() {
     if (!m_document) return;
     auto option = m_document->defaultTextOption();
     option.setTabStopDistance(QFontMetricsF(m_document->defaultFont()).horizontalAdvance(' ') * 4);
-    auto flags = option.flags();
-    const QTextOption::Flags marks = QTextOption::ShowTabsAndSpaces | QTextOption::ShowLineAndParagraphSeparators;
-    if (m_showFormattingMarks) flags |= marks; else flags &= ~marks;
-    option.setFlags(flags);
     m_document->setDefaultTextOption(option);
 }
 
 void Backend::setShowFormattingMarks(bool show) {
     if (m_showFormattingMarks == show) return;
     m_showFormattingMarks = show;
-    applySourceTextOption();
     emit showFormattingMarksChanged();
 }
 
@@ -1889,7 +1884,6 @@ void Backend::attachDocument(QObject *textDocument) {
     invalidatePublishingDocument();
     m_lastDocumentText = currentDocumentText();
     m_highlighter = new MarkdownHighlighter(m_document);
-    if (m_showFormattingMarks) applySourceTextOption();
     m_highlighter->setDarkMode(m_darkMode);
     m_highlighter->setShowMarkup(m_showMarkup);
     m_highlighter->setCodeStyle(m_sourceAppearance == "code");

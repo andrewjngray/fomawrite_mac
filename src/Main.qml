@@ -76,7 +76,7 @@ ApplicationWindow {
         var item = activeFocusItem;
         var keyboardChrome = item && (item.focusReason === Qt.TabFocusReason
             || item.focusReason === Qt.BacktabFocusReason || item.focusReason === Qt.ShortcutFocusReason)
-            && (isInside(item, topChrome) || isInside(item, documentFooter));
+            && (isInside(item, topChrome) || isInside(item, formatBar) || isInside(item, documentFooter));
         if (keyboardChrome) return;
         topChrome.keyboardReveal = false;
         documentFooter.keyboardReveal = false;
@@ -312,6 +312,24 @@ ApplicationWindow {
     readonly property bool canFormatLive: workspaceLayout.liveEditEnabled && liveEditorLoader.item !== null && liveFormattingOwned
     readonly property bool canFormatSource: sourceEditorVisible && sourceFormattingOwned
         && !editor.readOnly && !editor.inputMethodComposing
+    // The Format Bar is usable whenever an editing surface is on screen, not only while one has
+    // keyboard focus (opening a document from the Library leaves focus on its row).
+    readonly property bool formatSurfaceAvailable: (sourceEditorVisible && !editor.readOnly)
+        || (workspaceLayout.liveEditEnabled && liveEditorLoader.item !== null)
+    // A Format Bar click with no owner takes the visible surface at its current caret/selection
+    // (Live when Live is the editing mode, else Source); the command that follows then applies.
+    function claimFormattingSurface() {
+        if (canFormatSource || canFormatLive) return true;
+        if (workspaceLayout.liveEditEnabled) {
+            if (liveEditorLoader.item === null) return false;
+            liveFormattingOwned = true;
+            return true;
+        }
+        if (!sourceEditorVisible || editor.readOnly) return false;
+        sourceFormattingOwned = true;
+        return !editor.inputMethodComposing;
+    }
+    function focusFormatBar() { formatBar.focusFirstControl(); }
     function isSourceFormattingChrome(item) {
         var current = item;
         while (current) {
@@ -449,7 +467,7 @@ ApplicationWindow {
         // Pointer focus from a previous toolbar click must not pin the bars open.
         var keyboardFocus = activeFocusItem && (activeFocusItem.focusReason === Qt.TabFocusReason
             || activeFocusItem.focusReason === Qt.BacktabFocusReason || activeFocusItem.focusReason === Qt.ShortcutFocusReason);
-        topChrome.keyboardReveal = keyboardFocus && isInside(activeFocusItem, topChrome);
+        topChrome.keyboardReveal = keyboardFocus && (isInside(activeFocusItem, topChrome) || isInside(activeFocusItem, formatBar));
         documentFooter.keyboardReveal = keyboardFocus && isInside(activeFocusItem, documentFooter);
         updateWritingSurfaceFromFocus();
         updateSourceFormattingOwner();
@@ -2659,6 +2677,10 @@ ApplicationWindow {
             window: win
             settings: workspaceSettings
             blockStyle: win.currentBlockStyle
+            // Fades with the header's toolbar content (opacity only: nothing reflows).
+            opacity: topChrome.toolbarContentOpacity
+            enabled: opacity > 0
+            onRevealChrome: topChrome.pointerReveal = true
             // The pane's own colour: Omawrite and the other presets recolour the page.
             color: editorPane.color
             z: 5
@@ -2705,7 +2727,69 @@ ApplicationWindow {
             Timer {
                 id: codeDecorationsTimer
                 interval: 0
-                onTriggered: editorFlick.codeLines = backend.sourceLineDecorations(editorFlick.contentY - editor.y, editorFlick.contentY + editorFlick.height - editor.y)
+                onTriggered: {
+                    editorFlick.codeLines = backend.sourceLineDecorations(editorFlick.contentY - editor.y, editorFlick.contentY + editorFlick.height - editor.y);
+                    editorFlick.refreshFormattingMarks();
+                }
+            }
+            // Show Formatting Marks in Source: Qt Quick's TextEdit ignores QTextOption's show-spaces
+            // flags, so the marks are an overlay (like the code-block decorations above). Only the
+            // visible range is scanned; the text, selection and undo stack are never touched.
+            property var formattingMarks: []
+            readonly property bool formattingMarksOn: workspaceSettings.showFormattingMarks && !workspaceLayout.liveEditEnabled
+            readonly property color formattingMarkColor: win.omawriteSurface ? (win.darkMode ? "#4f525a" : "#aeb1b5") : win.mutedColor
+            onFormattingMarksOnChanged: codeDecorationsTimer.restart()
+            onFormattingMarkColorChanged: codeDecorationsTimer.restart()
+            onHeightChanged: if (formattingMarksOn) codeDecorationsTimer.restart()
+            function refreshFormattingMarks() {
+                if (!formattingMarksOn || !editor.visible) { if (formattingMarks.length) formattingMarks = []; return; }
+                var length = editor.length;
+                var first = Math.max(0, editor.positionAt(0, contentY - editor.y - 2));
+                var last = Math.min(length, editor.positionAt(editor.width, contentY + height - editor.y + 2));
+                // One extra character so a paragraph end exactly at the bottom edge is seen.
+                var end = Math.min(length, last + 1);
+                var text = editor.getText(first, end);
+                var space = codeMetrics.advanceWidth;
+                var marks = [];
+                for (var i = 0; i < text.length && marks.length < 4000; ++i) {
+                    var c = text.charCodeAt(i);
+                    if (c !== 32 && c !== 9 && c !== 10) continue;
+                    var position = first + i;
+                    if (position > last) break;
+                    var rect = editor.positionToRectangle(position);
+                    if (c === 32) marks.push({ x: rect.x, y: rect.y, w: space, h: rect.height, t: "\u00b7" });
+                    else if (c === 9) {
+                        var next = editor.positionToRectangle(position + 1);
+                        marks.push({ x: rect.x, y: rect.y, w: next.y === rect.y && next.x > rect.x ? next.x - rect.x : space * 4, h: rect.height, t: "\u2192" });
+                    } else marks.push({ x: rect.x, y: rect.y, w: space * 1.5, h: rect.height, t: "\u00b6", end: true });
+                }
+                // The last line has no newline: it still ends in a paragraph mark.
+                if (end === length && last === length) {
+                    var tail = editor.positionToRectangle(length);
+                    marks.push({ x: tail.x, y: tail.y, w: space * 1.5, h: tail.height, t: "\u00b6", end: true });
+                }
+                formattingMarks = marks;
+            }
+            Repeater {
+                id: marksRepeater
+                objectName: "sourceFormattingMarks"
+                model: editorFlick.formattingMarks.length
+                delegate: Text {
+                    required property int index
+                    readonly property var mark: editorFlick.formattingMarks[index]
+                    objectName: "sourceFormattingMark"
+                    z: 1
+                    x: editor.x + mark.x; y: editor.y + mark.y
+                    width: mark.w; height: mark.h
+                    horizontalAlignment: mark.end ? Text.AlignLeft : Text.AlignHCenter
+                    verticalAlignment: Text.AlignVCenter
+                    text: mark.t
+                    font.family: editor.font.family; font.pixelSize: editor.font.pixelSize
+                    color: editorFlick.formattingMarkColor
+                    textFormat: Text.PlainText
+                    renderType: Text.QtRendering
+                    Accessible.ignored: true
+                }
             }
             TextMetrics { id: codeMetrics; font: editor.font; text: " " }
             Repeater {
@@ -2976,6 +3060,7 @@ ApplicationWindow {
                 font.weight: Font.Normal
                 onFontChanged: Qt.callLater(function() { backend.setSourceAppearance(win.activeWritingAppearance); codeDecorationsTimer.restart(); })
                 onContentHeightChanged: codeDecorationsTimer.restart()
+                onWidthChanged: if (editorFlick.formattingMarksOn) codeDecorationsTimer.restart()
                 // Native rendering hints glyphs to the pixel grid, which is
                 // crispest at whole scale factors but misplaces and unevenly
                 // rasterizes glyphs at fractional ones (and goes stale when
