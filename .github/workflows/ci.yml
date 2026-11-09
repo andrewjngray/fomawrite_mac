@@ -73,6 +73,9 @@ jobs:
           QMAKE: ${{ env.QT_ROOT_DIR }}/bin/qmake
         run: ./bin/build
 
+      - name: Check external Codex icon
+        run: ./bin/check-codex-icon
+
       - name: Build and run tests (offscreen)
         shell: bash
         env:

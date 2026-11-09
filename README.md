@@ -26,6 +26,8 @@ open dist/Fomawrite.app
 
 `dist/Fomawrite.app` is the ordinary app. `dist/Fomawrite Dev.app` is the stable QA app; both come from the same source, but can differ until refreshed. The approved light icon is generated from `macos/FomawriteIcon.svg`; `macos/FomawriteRunningIcon.svg` supplies the first dark concept while the macOS app runs. Run `./bin/make-app-icon` (requires QtSvg and `iconutil`) to rebuild the committed light `.icns` and both runtime PNGs. They use bundle IDs `io.github.andrewjngray.fomawrite` and `io.github.andrewjngray.fomawrite.dev`. Bundles are locally ad-hoc signed, not notarized for public distribution. Do not replace either while it is running; close it normally and preserve unsaved work first.
 
+For Codex’s **Open with** menu, see [the Fomawrite handler setup](docs/codex-open-with.md). macOS builds expose the dark runtime icon as a standalone PNG for external apps.
+
 To verify the UI inside a specific local bundle, using disposable documents and settings:
 
 ```sh

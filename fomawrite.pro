@@ -33,6 +33,11 @@ macx {
     TARGET = Fomawrite
     QMAKE_INFO_PLIST = macos/Info.plist
     ICON = macos/Fomawrite.icns
+    # Expose the dark runtime icon to external consumers such as Codex.
+    # The .qrc copy remains for Fomawrite itself; browsers cannot read .icns.
+    codex_icon.files = $$PWD/macos/FomawriteRunningIcon.png
+    codex_icon.path = Contents/Resources
+    QMAKE_BUNDLE_DATA += codex_icon
     QMAKE_MACOSX_DEPLOYMENT_TARGET = 14.0
 } else {
     SOURCES += src/systemtheme.cpp

@@ -1,10 +1,10 @@
 # Fomawrite — status
 
-Updated 5 November 2026. This is the authoritative current-build record. Direction: [MISSION.md](MISSION.md). History: [CHANGELOG.md](CHANGELOG.md). Source map: [ARCHITECTURE.md](ARCHITECTURE.md).
+Updated 9 November 2026. This is the authoritative current-build record. Direction: [MISSION.md](MISSION.md). History: [CHANGELOG.md](CHANGELOG.md). Source map: [ARCHITECTURE.md](ARCHITECTURE.md).
 
 | Item | Current state |
 | --- | --- |
-| **Current review build** | **`0.3.0-dev52` / macOS `0.3.0 (156)`** |
+| **Current review build** | **`0.3.0-dev53` / macOS `0.3.0 (157)`** |
 | **Last completed cycle** | 156 — a new document takes the keyboard at its first line ([record](research/cycle-156/README.md)); 155 — toolbar formatting fixed in Live, Word-like Format Bar, formatting marks (¶ / ⌘8) in Live and Source, explorer "+ ▾" ([record](research/cycle-155/README.md)); 154 — Fomawrite as the default app for Markdown and plain text; the installer sets it ([record](research/cycle-154/README.md)); 153 — stability: revision-neutral spelling refresh, native Live keyboard/save/history checks, embedded editor/theme identity verification, editor CI, and reconciled documentation. [Evidence](research/cycle-153/README.md). |
 | **Repository** | [andrewjngray/fomawrite_mac](https://github.com/andrewjngray/fomawrite_mac), `master`; local checkout `/Users/andrewgray/repo/projects/fomawrite_mac`. The former `omawrite_mac` directory name is obsolete. |
 | **Local regression suite** | **299 passed, 0 failed, 0 skipped** (`./bin/test`, Qt 6.11.2, Apple Silicon); **321 editor tests passed**, TypeScript typecheck passed, editor assets rebuilt identically. |
@@ -42,3 +42,11 @@ Known limits: no Mermaid; images need a saved document; images and footnote refe
 Optional later work: smaller language bundle, memory profiling, remaining Backend extractions, a test/static-library split and an explicit publishing-preview state model. The Grammarly experiment was superseded by native checking plus Harper. Roam/Teams work belongs in its separate discussion, not this project's active backlog.
 
 Refresh bundles only with the app closed: `./bin/package-mac && ./bin/prepare-dev-app && ./bin/install-mac`. No public release or website PR was published in this cycle.
+
+## Cycle 157 packaging verification
+
+- App build and the new external-PNG regression check passed. The check fails
+  on the pre-change bundle, then passes with byte-identical dark artwork.
+- Full regression suite and packaging validation are running; results pending.
+- The installed app remains untouched. Its existing Codex icon configuration
+  was visually confirmed by Andrew. See [setup](docs/codex-open-with.md).
