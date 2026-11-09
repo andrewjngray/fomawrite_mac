@@ -1,0 +1,252 @@
+---
+import Layout from '../layouts/Layout.astro';
+import Nav from '../components/Nav.astro';
+import Footer from '../components/Footer.astro';
+---
+
+<Layout title="Changelog - Fomawrite" description="Development history and release notes for Fomawrite">
+  <Nav />
+  
+  <main>
+    <div class="container">
+      <header class="page-header">
+        <h1>Changelog</h1>
+        <p>Development history and release notes. Latest cycles first.</p>
+      </header>
+
+      <div class="changelog">
+        <section class="changelog-section">
+          <h2>0.3.0 Development Series</h2>
+          <p class="section-intro">Current focus: making Live editing good enough to be the daily editor</p>
+
+          <div class="changelog-item">
+            <div class="item-header">
+              <h3>Cycle 151</h3>
+              <span class="version">0.3.0-dev47 · Build 151 · Oct 12, 2026</span>
+            </div>
+            <p>Folder back/forward arrows in the middle pane and ⌘↑ for the enclosing folder there.</p>
+          </div>
+
+          <div class="changelog-item">
+            <div class="item-header">
+              <h3>Cycle 150</h3>
+              <span class="version">0.3.0-dev46 · Build 150 · Oct 12, 2026</span>
+            </div>
+            <p>The folder chooser opens inside the current folder (build 149 started it one level up).</p>
+          </div>
+
+          <div class="changelog-item">
+            <div class="item-header">
+              <h3>Cycle 149</h3>
+              <span class="version">0.3.0-dev45 · Build 149 · Oct 12, 2026</span>
+            </div>
+            <p>The folder chooser starts where the folder lives: opens in the folder that holds the current one, with that folder selected, instead of at the top of the disk.</p>
+          </div>
+
+          <div class="changelog-item">
+            <div class="item-header">
+              <h3>Cycle 148</h3>
+              <span class="version">0.3.0-dev44 · Build 148 · Oct 12, 2026</span>
+            </div>
+            <p>Getting from the open document to its folder: the top-bar document name shows the full path on hover and opens the file menu on right-click. New Explore Folder item makes the file's folder the middle pane's folder with the file selected.</p>
+          </div>
+
+          <div class="changelog-item">
+            <div class="item-header">
+              <h3>Cycle 147</h3>
+              <span class="version">0.3.0-dev43 · Build 147 · Oct 11, 2026</span>
+            </div>
+            <p>Harper in daily use: Live underlines long lists of misspellings (the host lints pages line by line). A suggestion in the Review pane removes its row at once and selects the next. The missing-theme-font notice is a one-time banner.</p>
+          </div>
+
+          <div class="changelog-item">
+            <div class="item-header">
+              <h3>Cycle 146</h3>
+              <span class="version">Build 146 · Oct 11, 2026</span>
+            </div>
+            <p>Keeping Harper current: Help → Check for Writing Checker Updates downloads the newest harper.js from npm. Weekly automatic checks (switchable). Help → Use Built-in Writing Checker rolls back.</p>
+          </div>
+
+          <div class="changelog-item">
+            <div class="item-header">
+              <h3>Cycle 145</h3>
+              <span class="version">0.3.0-dev41 · Build 145 · Oct 11, 2026</span>
+            </div>
+            <p>Harper: Automattic's offline grammar engine runs inside the editor page. Third category Style (grey). Edit → Writing Checker: Engine (Harper / macOS), Dialect (Australian, British, American, Canadian). Claude Like theme reworked to match the Claude Code output page.</p>
+          </div>
+
+          <div class="changelog-item">
+            <div class="item-header">
+              <h3>Cycle 144</h3>
+              <span class="version">0.3.0-dev40 · Build 144 · Oct 10, 2026</span>
+            </div>
+            <p>Grammar as you type and the Review pane: the shared checker gains grammar findings. Source draws them as blue underline with wash, Live as wavy blue underline. Modal Spelling and Grammar dialog is gone; new resizable Review pane lists every finding with sentence, category, message, suggestions.</p>
+          </div>
+
+          <div class="changelog-item">
+            <div class="item-header">
+              <h3>Cycle 143</h3>
+              <span class="version">0.3.0-dev39 · Build 143 · Oct 10, 2026</span>
+            </div>
+            <p>Spelling as you type in Source and Live: misspelled prose gets red underline from one shared system checker, skipping code, links, URLs, HTML, math, front matter. Right-click offers suggestions, Learn Spelling, Ignore Spelling.</p>
+          </div>
+
+          <div class="changelog-item">
+            <div class="item-header">
+              <h3>Cycle 134</h3>
+              <span class="version">0.3.0-dev30 · Build 134 · Oct 6-7, 2026</span>
+            </div>
+            <p><strong>The Live editor:</strong> CodeMirror 6 editor page hosted in the app's WebEngineView over QWebChannel. Byte-exact two-way mirror with the canonical document. Live mode (inline marks, images, tasks, rules, highlighted fences, table grids, KaTeX math). Source/Code appearances with focus and typewriter. Theme pass-through, scroll sync, cursor carry-over, Format/Undo/Find routed to the page. Image paste/drop saved beside the document. In-page link editor. 1 MiB document loads in ~55 ms.</p>
+          </div>
+
+          <div class="changelog-item">
+            <div class="item-header">
+              <h3>Cycle 133</h3>
+              <span class="version">0.3.0-dev29 · Build 133</span>
+            </div>
+            <p>Structure, CI and measured hot path: GitHub Actions CI with pinned Qt 6.11.3. Publishing extracted into Publisher behind PublishingSource. Mapper O(n²) fixed (100 KB line 4.1 s → 0.7 ms). 220 tests.</p>
+          </div>
+
+          <div class="changelog-item">
+            <div class="item-header">
+              <h3>Cycle 132</h3>
+              <span class="version">0.3.0-dev28 · Build 132</span>
+            </div>
+            <p>Publishing robustness: theme refresh compares catalog + selected CSS, memoized CSS and image cache, fingerprint cache key, shared Chromium profile, failures keep last output, renderer-crash handling. 212 tests.</p>
+          </div>
+
+          <div class="changelog-item">
+            <div class="item-header">
+              <h3>Cycle 131</h3>
+              <span class="version">0.3.0-dev27 · Build 131</span>
+            </div>
+            <p>Byte-exact persistence: raw-byte open with UTF-8 validation and UTF-16 BOM detection, lossy decodes block in-place Save, canonical text keeps NBSP/U+2028, CRLF/CR/BOM preserved, manual Save checks disk baseline. 208 tests.</p>
+          </div>
+        </section>
+
+        <section class="changelog-section">
+          <h2>Earlier Series</h2>
+          <p class="section-note">Full history in <a href="https://github.com/andrewjngray/fomawrite_mac/blob/master/CHANGELOG.md" target="_blank" rel="noopener noreferrer">CHANGELOG.md</a></p>
+          
+          <div class="changelog-item">
+            <div class="item-header">
+              <h3>0.2.x series</h3>
+              <span class="version">Cycles 60–89</span>
+            </div>
+            <p>Workspace redesign, Visual Edit baseline, Export hub with PDF/HTML and style gallery, authorship annotations, recovery and versions, native tabs and coordination, focus tools, rich Markdown extensions.</p>
+          </div>
+
+          <div class="changelog-item">
+            <div class="item-header">
+              <h3>Omawrite-era cycles</h3>
+              <span class="version">Cycles 14–59</span>
+            </div>
+            <p>Menu and workflow implementation: Format menu, Go menu locations, View chrome, Library/List navigation, Templates, Locations and Favorites, File operations, Search and tags, Command palette, Publishing preview, Markdown editing commands, Find/Replace.</p>
+          </div>
+
+          <div class="changelog-item">
+            <div class="item-header">
+              <h3>Foundation</h3>
+              <span class="version">Cycles 0–13</span>
+            </div>
+            <p>macOS foundation with native menus and dialogs, UTF-8 saving, explorer, editor, live preview, source markup, paragraph/typewriter focus, outline and statistics, organizer favorites and recents.</p>
+          </div>
+        </section>
+      </div>
+    </div>
+  </main>
+  
+  <Footer />
+</Layout>
+
+<style>
+  main {
+    min-height: calc(100vh - 64px);
+    padding: var(--spacing-2xl) 0;
+  }
+
+  .container {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 0 var(--spacing-md);
+  }
+
+  .page-header {
+    margin-bottom: var(--spacing-2xl);
+  }
+
+  .page-header h1 {
+    font-size: clamp(2.5rem, 5vw, 3.5rem);
+    margin-bottom: var(--spacing-xs);
+  }
+
+  .page-header p {
+    font-size: 1.125rem;
+    color: var(--color-text-muted);
+  }
+
+  .changelog {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-2xl);
+  }
+
+  .changelog-section h2 {
+    font-size: 1.75rem;
+    margin-bottom: var(--spacing-xs);
+    color: var(--color-text);
+  }
+
+  .section-intro,
+  .section-note {
+    font-size: 0.9375rem;
+    color: var(--color-text-muted);
+    margin-bottom: var(--spacing-lg);
+  }
+
+  .changelog-item {
+    padding: var(--spacing-lg);
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    margin-bottom: var(--spacing-md);
+    transition: all 0.2s ease;
+  }
+
+  .changelog-item:hover {
+    border-color: var(--color-accent);
+  }
+
+  .item-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: var(--spacing-xs);
+    flex-wrap: wrap;
+    gap: var(--spacing-xs);
+  }
+
+  .item-header h3 {
+    font-size: 1.125rem;
+    color: var(--color-text);
+  }
+
+  .version {
+    font-size: 0.875rem;
+    color: var(--color-text-dim);
+    font-family: ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Consolas, 'DejaVu Sans Mono', monospace;
+  }
+
+  .changelog-item p {
+    font-size: 0.9375rem;
+    color: var(--color-text-muted);
+    line-height: 1.6;
+  }
+
+  @media (max-width: 768px) {
+    .item-header {
+      flex-direction: column;
+      align-items: flex-start;
+    }
+  }
+</style>
