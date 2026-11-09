@@ -7,10 +7,10 @@ Updated 9 November 2026. This is the authoritative current-build record. Directi
 | **Current review build** | **`0.3.0-dev53` / macOS `0.3.0 (157)`** |
 | **Last completed cycle** | 156 — a new document takes the keyboard at its first line ([record](research/cycle-156/README.md)); 155 — toolbar formatting fixed in Live, Word-like Format Bar, formatting marks (¶ / ⌘8) in Live and Source, explorer "+ ▾" ([record](research/cycle-155/README.md)); 154 — Fomawrite as the default app for Markdown and plain text; the installer sets it ([record](research/cycle-154/README.md)); 153 — stability: revision-neutral spelling refresh, native Live keyboard/save/history checks, embedded editor/theme identity verification, editor CI, and reconciled documentation. [Evidence](research/cycle-153/README.md). |
 | **Repository** | [andrewjngray/fomawrite_mac](https://github.com/andrewjngray/fomawrite_mac), `master`; local checkout `/Users/andrewgray/repo/projects/fomawrite_mac`. The former `omawrite_mac` directory name is obsolete. |
-| **Local regression suite** | **299 passed, 0 failed, 0 skipped** (`./bin/test`, Qt 6.11.2, Apple Silicon); **321 editor tests passed**, TypeScript typecheck passed, editor assets rebuilt identically. |
+| **Local regression suite** | **323 passed, 0 failed, 0 skipped** (`./bin/test`, Qt 6.11.2, Apple Silicon); **321 editor tests passed**, TypeScript typecheck passed, editor assets rebuilt identically. |
 | **Native app acceptance** | Dev, distribution and installed build 153 all pass: 124 footer states, 5 daily-writing, 5 zoom, 7 editing, 3 pane-chrome, 5 editing-layout and 12 publishing-theme groups. Tests check actual Web/PDF pixels and current document identity. [Bundle identities](research/cycle-153/verified-builds.json). |
 | **Startup** | **Cold and restored passed**, two document windows, correct PDF content and visible page paint, normal quit. Separate instrumented startup binary from the same source. |
-| **Synchronized bundles** | `/Applications/Fomawrite.app`, `dist/Fomawrite.app`, `dist/Fomawrite Dev.app`, all build 155 (4 Nov). The native acceptance above was run on build 153; builds 154–155 were verified by the offscreen suites and reviewer screenshots. |
+| **Local bundles** | `build/Fomawrite.app` and `dist/Fomawrite.app` are build 157; distribution bundle signature and external PNG verified. `/Applications/Fomawrite.app` and `dist/Fomawrite Dev.app` remain build 156 and were not replaced. |
 | **CI** | [Workflow](.github/workflows/ci.yml): macOS Qt 6.11.3 build/test; independent Ubuntu Node 22.16.0 editor lockfile install, pinned Harper download, tests, typecheck, build, and committed-asset freshness check. [Latest runs](https://github.com/andrewjngray/fomawrite_mac/actions/workflows/ci.yml). |
 | **Review baseline** | [INDEPENDENT_REVIEW.md](INDEPENDENT_REVIEW.md), 6 October. Cycles 131–134 closed the listed correctness findings and established the current Live-editor direction. |
 
@@ -33,7 +33,7 @@ Earlier byte-preservation and preview robustness regressions remain in the full 
 
 ## Next steps
 
-1. Use build 156 for ordinary writing and record reproducible friction in [docs/live-friction.md](docs/live-friction.md), particularly physical selection/format/link interactions, rapid document changes, and quit/reopen.
+1. Use the installed build 156 for ordinary writing and record reproducible friction in [docs/live-friction.md](docs/live-friction.md), particularly physical selection/format/link interactions, rapid document changes, and quit/reopen.
 2. Keep both CI jobs green and require native current-document/paint checks before distributing preview or editor changes. `bin/test` regenerates tracked gallery images; review or restore only those generated images after a run.
 3. Prioritize demonstrated correctness and usability problems before adding features or restructuring the backend.
 
@@ -47,6 +47,10 @@ Refresh bundles only with the app closed: `./bin/package-mac && ./bin/prepare-de
 
 - App build and the new external-PNG regression check passed. The check fails
   on the pre-change bundle, then passes with byte-identical dark artwork.
-- Full regression suite and packaging validation are running; results pending.
+- Distribution packaging, strict deep signature verification and the icon check
+  passed on `dist/Fomawrite.app` (157). Full local regression suite passed: 323 tests, zero failures or skips.
+- [CI for the implementation commit](https://github.com/andrewjngray/fomawrite_mac/actions/runs/42710098152):
+  editor tests, typecheck and asset freshness passed; macOS job queued for a
+  runner with no steps started. Cycle 157 is not marked complete pending CI.
 - The installed app remains untouched. Its existing Codex icon configuration
   was visually confirmed by Andrew. See [setup](docs/codex-open-with.md).

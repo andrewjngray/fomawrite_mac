@@ -24,7 +24,13 @@ in use; no installed app is replaced while running.
   bundled file byte-for-byte with the dark runtime PNG, rejecting a missing
   file or the light Finder artwork. CI runs this check after its macOS build.
 - `./bin/build` passed.
-- Full regression-suite and packaging results are recorded in STATUS.md.
+- `./bin/test` passed: 323 tests, zero failures or skips. The initial sandboxed
+  run stopped at Qt WebEngine's denied Mach-port setup; the full run outside
+  that sandbox completed successfully.
+- `./bin/package-mac` passed. The distribution bundle passed the external icon
+  check and `codesign --verify --deep --strict`.
+- GitHub's editor tests, typecheck and committed-asset check passed. The macOS
+  job remains queued without a runner; full CI is pending. See STATUS.md.
 
 ## Limits
 
