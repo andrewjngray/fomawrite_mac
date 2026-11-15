@@ -1,0 +1,13 @@
+#!/usr/bin/env sh
+# Check the externally readable icon used by Codex custom file handlers.
+set -eu
+ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
+APP="${1:-$ROOT/build/Fomawrite.app}"
+ICON="$APP/Contents/Resources/FomawriteRunningIcon.png"
+[ -f "$ICON" ] || { echo "Missing Codex PNG icon: $ICON" >&2; exit 1; }
+# Exact equality also prevents accidentally shipping the light Finder icon.
+cmp "$ROOT/macos/FomawriteRunningIcon.png" "$ICON" || {
+    echo "Codex PNG differs from the dark runtime icon: $ICON" >&2
+    exit 1
+}
+printf 'Verified Codex PNG icon: %s\n' "$ICON"

@@ -4,6 +4,10 @@ One line per cycle, newest first. Each line links to the cycle's record under `r
 
 ## 0.3.0 development series (Cycles 97–)
 
+- **Mac build 157 merged into Windows (15 Nov)** — Mac cycle 157 shares its number with the Windows cycle below; its record is `research/cycle-157/README-mac.md`. It bundles a PNG icon for Codex's Open menu inside the macOS app only; Windows gains the matching version (`0.3.0-dev53`) and no behaviour change.
+
+- **157 (Mac)** — Include the dark runtime icon as an external PNG in macOS bundles for Codex’s Open menu; document the working handler and check the packaged artwork in CI. [Record](research/cycle-157/README-mac.md)
+
 - **Mac build 156 merged into Windows (5 Nov)** — Mac cycle 156 shares its number with the Windows cycle below; its record is `research/cycle-156/README-mac.md`. Windows gains the new-document focus fix: after "+" creates a document, the caret is in its first line in Source and Live.
 
 - **156 (Mac)** — A new document takes the keyboard (`0.3.0-dev52`, build 156, 5 Nov): after "+" creates a document, the caret is in its first line in Source and Live instead of on the "+" button; the built-in self-check clicks the Bold that is on screen now the Format Bar exists. [Record](research/cycle-156/README-mac.md)

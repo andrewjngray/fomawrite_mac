@@ -33,6 +33,9 @@ only updates. [Short instructions](../../START-HERE.md).
   "+" creates a document the caret is in its first line in Source and Live. Mac cycle 156's record
   is `research/cycle-156/README-mac.md`; the Mac 154–156 records are now committed (the cycle
   folder ignore rule had kept 154–155 out at the 4 Nov merge).
+- **Mac alignment (15 Nov):** Mac `master` `8ed84e4` (`0.3.0-dev53` / build 157) is merged. Its
+  change is a macOS-only bundled PNG icon for Codex's Open menu; the Windows app changes only its
+  version. Mac cycle 157's record is `research/cycle-157/README-mac.md`.
 - **Still open:** intermittent imported-theme atomic replacement failure cause,
   remaining clipboard/search and Print desktop checks, broader recovery/display/storage
   acceptance, physical x64 hardware, and installer/signing/distribution qualification.
