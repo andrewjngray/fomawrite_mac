@@ -50,7 +50,7 @@ The project repository is [andrewjngray/fomawrite_mac](https://github.com/andrew
 
 ## Attribution
 
-The upstream Omawrite code is copyright David Heinemeier Hansson and remains under the [MIT license](LICENSE). Bundled iA Writer Mono fonts are copyright Information Architects Inc., based on IBM Plex, and remain under the [SIL Open Font License](fonts/OFL.txt).
+Fomawrite is under the [MIT license](LICENSE): the upstream Omawrite code is copyright David Heinemeier Hansson, and Fomawrite's own work is copyright Andrew Gray. Qt is used under the LGPL v3 as separate, replaceable libraries; no GPL-only Qt module is bundled. [licenses/THIRD-PARTY-NOTICES.txt](licenses/THIRD-PARTY-NOTICES.txt) lists every bundled component and its licence, and app packaging copies all notices into the app (`bin/check-licenses` fails a package that lacks one). Bundled iA Writer Mono fonts are copyright Information Architects Inc., based on IBM Plex, and remain under the [SIL Open Font License](fonts/OFL.txt).
 
 Semantic publishing uses [MD4C 0.5.3](src/vendor/md4c/LICENSE.md), copyright Martin Mitáš, under the MIT license. Its notice is included in app bundles.
 

@@ -26,6 +26,10 @@ cp -RL "$QML_CORE" "$ROOT/dist/Fomawrite.app/Contents/Resources/qml/QtQml"
 xattr -cr "$ROOT/dist/Fomawrite.app"
 
 DYLD_FRAMEWORK_PATH="$("$QMAKE" -query QT_INSTALL_LIBS)" "$QT_BIN/macdeployqt" "$ROOT/dist/Fomawrite.app" -qmldir="$ROOT/src" -libpath="$("$QMAKE" -query QT_INSTALL_LIBS)" -no-codesign -no-strip
+rm -rf "$ROOT/dist/Fomawrite.app/Contents/Resources/licenses"
+# Drop Qt modules Fomawrite never imports (Virtual Keyboard is GPL-only), the
+# libraries only they used, and gather licence files for what remains.
+python3 "$ROOT/bin/tidy-mac-bundle.py" "$ROOT/dist/Fomawrite.app" "$ROOT/dist/Fomawrite.app/Contents/Resources/licenses"
 # macdeployqt rewrites frameworks for the main executable, but WebEngine's
 # nested helper also loads those frameworks. Give every Mach-O its own local
 # framework search path and use @rpath references in both loading contexts.
@@ -80,11 +84,24 @@ find "$PACKAGE_CONTENTS" -type f | while IFS= read -r binary; do
         echo "Non-portable bundled dependency remains: $binary" >&2; exit 1
     fi
 done
-mkdir -p "$ROOT/dist/Fomawrite.app/Contents/Resources/licenses"
-cp "$ROOT/LICENSE" "$ROOT/dist/Fomawrite.app/Contents/Resources/licenses/Upstream-Omawrite-MIT.txt"
-cp "$ROOT/fonts/OFL.txt" "$ROOT/dist/Fomawrite.app/Contents/Resources/licenses/Fonts-OFL.txt"
-cp "$ROOT/fonts/IBMPlexMono-OFL.txt" "$ROOT/dist/Fomawrite.app/Contents/Resources/licenses/IBM-Plex-Mono-OFL.txt"
-cp "$ROOT/src/vendor/md4c/LICENSE.md" "$ROOT/dist/Fomawrite.app/Contents/Resources/licenses/MD4C-MIT.txt"
-[ -f "$ROOT/src/editor/dist/harper/LICENSE" ] && cp "$ROOT/src/editor/dist/harper/LICENSE" "$ROOT/dist/Fomawrite.app/Contents/Resources/licenses/Harper-Apache-2.0.txt"
+LICENSES="$ROOT/dist/Fomawrite.app/Contents/Resources/licenses"
+mkdir -p "$LICENSES"
+cp "$ROOT/LICENSE" "$LICENSES/Fomawrite-MIT.txt"
+cp "$ROOT/fonts/OFL.txt" "$LICENSES/Fonts-OFL.txt"
+cp "$ROOT/fonts/IBMPlexMono-OFL.txt" "$LICENSES/IBM-Plex-Mono-OFL.txt"
+cp "$ROOT/src/vendor/md4c/LICENSE.md" "$LICENSES/MD4C-MIT.txt"
+cp "$ROOT/src/editor/dist/harper/LICENSE" "$LICENSES/Harper-Apache-2.0.txt"
+cp "$ROOT/src/editor/dist/THIRD-PARTY-NOTICES.txt" "$LICENSES/Editor-THIRD-PARTY-NOTICES.txt"
+cp "$ROOT/licenses/Qt-LGPL-3.0-only.txt" "$ROOT/licenses/Qt-GPL-3.0-only.txt" \
+   "$ROOT/licenses/Chromium-BSD-3-Clause.txt" "$ROOT/licenses/PDFium-BSD-3-Clause.txt" "$LICENSES/"
+{
+    cat "$ROOT/licenses/THIRD-PARTY-NOTICES.txt"
+    printf '\nmacOS build\n  Qt %s from Homebrew. Bundled Qt frameworks:\n' "$("$QMAKE" -query QT_VERSION)"
+    ls "$PACKAGE_FRAMEWORKS" | sed -n 's/\.framework$//p' | tr '\n' ' ' | fold -s -w 74 | sed 's/^/    /'
+    printf '\n  Other bundled libraries, with licence files in homebrew/:\n'
+    ls "$PACKAGE_FRAMEWORKS" | grep '\.dylib$' | tr '\n' ' ' | fold -s -w 74 | sed 's/^/    /'
+    printf '\n'
+} > "$LICENSES/THIRD-PARTY-NOTICES.txt"
+"$ROOT/bin/check-licenses" "$ROOT/dist/Fomawrite.app"
 codesign --force --deep --sign - "$ROOT/dist/Fomawrite.app"
 echo "Packaged $ROOT/dist/Fomawrite.app (local ad-hoc signature)"
