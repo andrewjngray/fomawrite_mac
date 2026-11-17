@@ -14,6 +14,11 @@ Larger concepts get their own document and only a pointer here.
 
 Things the Cycle 134–135 work surfaced that are plausible next cycles once the current measure ([MISSION.md](MISSION.md): is Live the daily editor?) is answered.
 
+### PDF reading, markup and page operations
+Yes [ ]  No [ ]  Maybe [x]
+
+18 November 2026 (Andrew): open PDFs in Fomawrite for review, with Preview-style highlights, underline, strikethrough and on-page notes saved as Markdown, and page rotate/reorder/delete/merge; PDF tools appear only while a PDF is open. Plan for review, nothing built: [docs/pdf-plan.md](docs/pdf-plan.md).
+
 ### Spell check in Live
 Yes [x]  No [ ]  Maybe [ ]
 
