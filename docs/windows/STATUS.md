@@ -36,6 +36,11 @@ only updates. [Short instructions](../../START-HERE.md).
 - **Mac alignment (15 Nov):** Mac `master` `8ed84e4` (`0.3.0-dev53` / build 157) is merged. Its
   change is a macOS-only bundled PNG icon for Codex's Open menu; the Windows app changes only its
   version. Mac cycle 157's record is `research/cycle-157/README-mac.md`.
+- **Licence notices (18 Nov):** Mac `master` `cb5a35e` (build 158) is merged. Windows packages
+  carry the shared notices from `licenses/` (Qt LGPL/GPL texts, Chromium, PDFium, the editor's
+  JavaScript notices), `Fomawrite-MIT.txt` with Andrew Gray's copyright, and
+  `THIRD-PARTY-NOTICES-Windows.txt`; `package-manifest.py` runs `bin/check-licenses` on the stage.
+  The earlier notice's `chrome://credits` claim was wrong (Qt WebEngine refuses that URL).
 - **Still open:** intermittent imported-theme atomic replacement failure cause,
   remaining clipboard/search and Print desktop checks, broader recovery/display/storage
   acceptance, physical x64 hardware, and installer/signing/distribution qualification.

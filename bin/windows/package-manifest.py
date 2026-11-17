@@ -11,6 +11,7 @@ import re
 import shutil
 import struct
 import subprocess
+import sys
 import xml.etree.ElementTree as ET
 import zipfile
 import build_identity
@@ -170,20 +171,25 @@ def main():
         raise SystemExit("App-local MSVC runtime missing")
     licenses = stage / "licenses"
     licenses.mkdir(exist_ok=True)
-    for source, name in [("LICENSE", "Upstream-Omawrite-MIT.txt"),
+    for source, name in [("LICENSE", "Fomawrite-MIT.txt"),
                          ("fonts/OFL.txt", "Fonts-OFL.txt"),
                          ("fonts/IBMPlexMono-OFL.txt", "IBM-Plex-Mono-OFL.txt"),
                          ("src/vendor/md4c/LICENSE.md", "MD4C-MIT.txt"),
                          ("src/editor/dist/harper/LICENSE", "Harper-Apache-2.0.txt"),
-                         ("windows/THIRD-PARTY-NOTICES.txt", "THIRD-PARTY-NOTICES.txt")]:
+                         ("src/editor/dist/THIRD-PARTY-NOTICES.txt", "Editor-THIRD-PARTY-NOTICES.txt"),
+                         ("licenses/THIRD-PARTY-NOTICES.txt", "THIRD-PARTY-NOTICES.txt"),
+                         ("licenses/Qt-LGPL-3.0-only.txt", "Qt-LGPL-3.0-only.txt"),
+                         ("licenses/Qt-GPL-3.0-only.txt", "Qt-GPL-3.0-only.txt"),
+                         ("licenses/Chromium-BSD-3-Clause.txt", "Chromium-BSD-3-Clause.txt"),
+                         ("licenses/PDFium-BSD-3-Clause.txt", "PDFium-BSD-3-Clause.txt"),
+                         ("windows/THIRD-PARTY-NOTICES.txt", "THIRD-PARTY-NOTICES-Windows.txt")]:
         shutil.copyfile(root / source, licenses / name)
-    for source in (root / "windows/licenses").glob("*.txt"):
-        shutil.copyfile(source, licenses / source.name)
-    # Some SDK distributions also supply generated Chromium credits outside the
-    # engine's built-in chrome://credits resource. Preserve them when supplied.
+    # Qt WebEngine does not serve chrome://credits; keep an SDK-supplied
+    # Chromium credits file when one exists.
     credits = list(args.qt_root.rglob("qtwebengine_licenses.html"))
     if credits:
         shutil.copyfile(credits[0], licenses / "QtWebEngine-Chromium-credits.html")
+    subprocess.run([sys.executable, str(root / "bin/check-licenses"), str(stage)], check=True)
     install = json.loads((args.qt_root / "fomawrite-qt-install.json").read_text())
     if install["architecture"] != args.architecture:
         raise SystemExit("Qt install architecture mismatch")

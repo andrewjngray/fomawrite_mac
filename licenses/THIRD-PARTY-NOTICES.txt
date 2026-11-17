@@ -1,0 +1,52 @@
+Fomawrite: licence and third-party notices
+
+Every file named below sits in this licenses folder unless a path says otherwise.
+
+Fomawrite
+  MIT licence: Fomawrite-MIT.txt. Fomawrite grew from Omawrite, copyright
+  David Heinemeier Hansson, also MIT. Source:
+  https://github.com/andrewjngray/fomawrite_mac
+
+Qt
+  Qt libraries and QML modules are used under the GNU Lesser General Public
+  License v3 (Qt-LGPL-3.0-only.txt, which incorporates Qt-GPL-3.0-only.txt).
+  They are unmodified and dynamically linked: each one is a separate library
+  in the application's Frameworks folder (macOS) or beside Fomawrite.exe
+  (Windows), and may be replaced with an ABI-compatible build of the same
+  Qt version. No Qt module that is GPL-only is bundled.
+  Qt source: https://download.qt.io/archive/qt/6.11/  and  https://code.qt.io/cgit/qt/
+  Qt's licensing summary: https://www.qt.io/licensing/open-source-lgpl-obligations
+  Third-party code inside Qt: https://doc.qt.io/qt-6/licenses-used-in-qt.html
+
+Qt WebEngine (Chromium)
+  Qt WebEngine contains Chromium, copyright The Chromium Authors, under the
+  BSD 3-Clause licence (Chromium-BSD-3-Clause.txt), and the third-party
+  components Chromium uses, each under its own licence. Qt lists them with
+  their licences at https://doc.qt.io/qt-6/qtwebengine-licensing.html
+  (Qt WebEngine does not serve Chromium's chrome://credits page).
+
+Qt PDF (PDFium)
+  Qt PDF contains PDFium, copyright The PDFium Authors, under the BSD
+  3-Clause licence with an Apache 2.0 appendix for some files
+  (PDFium-BSD-3-Clause.txt). Qt's list of its third-party components:
+  https://doc.qt.io/qt-6/qtpdf-licensing.html
+
+Live editor (JavaScript)
+  CodeMirror, Lezer, KaTeX and their dependencies, all MIT: each package's
+  version and full licence text is in Editor-THIRD-PARTY-NOTICES.txt.
+  Harper (grammar checking), Apache 2.0: Harper-Apache-2.0.txt.
+
+Markdown publishing
+  MD4C, copyright Martin Mitáš, MIT: MD4C-MIT.txt.
+
+Fonts
+  iA Writer Mono, copyright Information Architects Inc., based on IBM Plex,
+  SIL Open Font License 1.1: Fonts-OFL.txt.
+  IBM Plex Mono, SIL Open Font License 1.1: IBM-Plex-Mono-OFL.txt.
+  KaTeX's maths fonts are covered by KaTeX's MIT licence (see the editor list).
+
+Platform libraries
+  macOS: the libraries Homebrew's Qt depends on (ICU, OpenSSL, glib, FreeType,
+  HarfBuzz, image codecs and others) are bundled with their licence files in
+  the homebrew folder; see the macOS section below for the exact list.
+  Windows: see THIRD-PARTY-NOTICES-Windows.txt.

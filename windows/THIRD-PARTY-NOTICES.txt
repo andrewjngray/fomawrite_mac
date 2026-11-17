@@ -1,25 +1,26 @@
-Fomawrite internal Windows build
+Fomawrite for Windows: platform notices
 
-Fomawrite is derived from Omawrite (MIT). See Upstream-Omawrite-MIT.txt.
-Bundled fonts are under the SIL Open Font License; see the two OFL notices.
-MD4C is MIT licensed. Harper is Apache-2.0 licensed; see their bundled notices.
-Editor dependency metadata and source: https://github.com/andrewjngray/fomawrite_mac/tree/windows/port/src/editor
+Read THIRD-PARTY-NOTICES.txt first; it covers Fomawrite, Qt, Qt WebEngine
+(Chromium), Qt PDF (PDFium), the Live editor's JavaScript packages, Harper,
+MD4C and the fonts. This file adds what is specific to the Windows build.
 
-Qt 6.11.3 libraries are dynamically linked from the official open source SDK.
-Qt module source and notices: https://download.qt.io/archive/qt/6.11/6.11.3/
-Qt licensing information: https://www.qt.io/licensing/open-source-lgpl-obligations
-Qt source repository: https://code.qt.io/cgit/qt/
-The unmodified Qt libraries may be replaced with ABI-compatible libraries.
-Qt LGPL and GPL license texts accompany this distribution.
-Qt WebEngine includes Chromium. Its credits are embedded at chrome://credits;
-when the SDK supplies an external credits file, that file is also included as
-QtWebEngine-Chromium-credits.html. Other module notices are in Qt
-source under REUSE.toml, LICENSES/ and the relevant third-party directories.
+Qt 6.11.3 libraries come unmodified from the official open source SDK
+(https://download.qt.io/archive/qt/6.11/6.11.3/), dynamically linked as the
+Qt6*.dll files beside Fomawrite.exe, under the LGPL v3. They may be replaced
+with ABI-compatible builds of the same Qt version.
+
+Qt WebEngine does not serve Chromium's chrome://credits page. Qt lists the
+Chromium third-party components and their licences at
+https://doc.qt.io/qt-6/qtwebengine-licensing.html. When the Qt SDK supplies a
+generated credits file, it is included as QtWebEngine-Chromium-credits.html.
+
+dxcompiler.dll and dxil.dll are Microsoft's DirectX Shader Compiler, shipped
+with Qt for its Direct3D 12 backend, under Microsoft's redistribution terms.
+The Visual C++ runtime files are Microsoft redistributable components deployed
+app-locally from the selected compatible v14 runtime, under Microsoft's
+redistribution terms.
 
 The application and dependency versions, source commit, archive checksums,
 executable, embedded resources and deployed file hashes are in manifest.json.
-The Visual C++ runtime files are Microsoft redistributable components deployed
-app-locally from the selected compatible v14 runtime, under Microsoft's redistribution terms.
 
 This internal artifact is unsigned. It has not been qualified as a public release.
-The complete distribution licensing audit remains an acceptance gate.

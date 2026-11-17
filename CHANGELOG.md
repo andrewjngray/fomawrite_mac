@@ -4,6 +4,10 @@ One line per cycle, newest first. Each line links to the cycle's record under `r
 
 ## 0.3.0 development series (Cycles 97–)
 
+- **Mac build 158 merged into Windows (18 Nov): licence notices** — Mac cycle 158's record is `research/cycle-158/README-mac.md`. The Windows package now ships the shared notices (`licenses/THIRD-PARTY-NOTICES.txt`, Chromium and PDFium licences, the Live editor's JavaScript notices), `Fomawrite-MIT.txt` with Andrew Gray's copyright, and its Windows notice as `THIRD-PARTY-NOTICES-Windows.txt`, which no longer claims Chromium credits at `chrome://credits` (Qt WebEngine refuses that URL). `bin/check-licenses` runs on every Windows package.
+
+- **158 (Mac)** — Licence notices (`0.3.0-dev54`, build 158, 18 Nov): the Mac app no longer bundles 25 Qt libraries it never uses, including the GPL-only Qt Virtual Keyboard; the app now carries notices for Qt, Chromium, PDFium, every Live-editor JavaScript package and every bundled Homebrew library; LICENSE adds Andrew Gray's copyright; `bin/check-licenses` guards packaging. [Record](research/cycle-158/README-mac.md)
+
 - **Mac build 157 merged into Windows (15 Nov)** — Mac cycle 157 shares its number with the Windows cycle below; its record is `research/cycle-157/README-mac.md`. It bundles a PNG icon for Codex's Open menu inside the macOS app only; Windows gains the matching version (`0.3.0-dev53`) and no behaviour change.
 
 - **157 (Mac)** — Include the dark runtime icon as an external PNG in macOS bundles for Codex’s Open menu; document the working handler and check the packaged artwork in CI. [Record](research/cycle-157/README-mac.md)

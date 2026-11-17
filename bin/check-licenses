@@ -1,0 +1,37 @@
+#!/usr/bin/env python3
+"""Fail unless a packaged Fomawrite carries its licence notices and no GPL-only Qt module.
+
+Usage: check-licenses <Fomawrite.app | Windows Fomawrite folder>
+"""
+import sys
+from pathlib import Path
+
+REQUIRED = ["THIRD-PARTY-NOTICES.txt", "Fomawrite-MIT.txt", "Qt-LGPL-3.0-only.txt", "Qt-GPL-3.0-only.txt",
+            "Chromium-BSD-3-Clause.txt", "PDFium-BSD-3-Clause.txt", "Editor-THIRD-PARTY-NOTICES.txt",
+            "Harper-Apache-2.0.txt", "MD4C-MIT.txt", "Fonts-OFL.txt", "IBM-Plex-Mono-OFL.txt"]
+# Qt modules offered only under GPL-3.0 (or a commercial licence); Fomawrite uses none.
+GPL_ONLY = ["VirtualKeyboard", "HunspellInputMethod", "QuickTimeline", "Charts", "DataVisualization",
+            "Graphs", "Quick3D", "Lottie", "QuickEffectMaker"]
+
+bundle = Path(sys.argv[1])
+mac = bundle.suffix == ".app"
+licenses = bundle / ("Contents/Resources/licenses" if mac else "licenses")
+libraries = bundle / "Contents/Frameworks" if mac else bundle
+problems = [f"missing licenses/{name}" for name in REQUIRED if not (licenses / name).is_file()]
+if (licenses / "Fomawrite-MIT.txt").is_file() and "Andrew Gray" not in (licenses / "Fomawrite-MIT.txt").read_text():
+    problems.append("Fomawrite-MIT.txt lacks Andrew Gray's copyright line")
+editor = licenses / "Editor-THIRD-PARTY-NOTICES.txt"
+if editor.is_file() and not all(p in editor.read_text() for p in ("@codemirror/view", "katex", "@lezer/markdown")):
+    problems.append("Editor-THIRD-PARTY-NOTICES.txt does not list CodeMirror, Lezer and KaTeX")
+names = [p.name for p in libraries.iterdir()] if libraries.is_dir() else []
+names += [p.name for p in (bundle / ("Contents/PlugIns" if mac else "")).rglob("*") if p.is_file()] if mac else \
+         [p.name for p in bundle.rglob("*.dll")]
+for module in GPL_ONLY:
+    hits = sorted({n for n in names if f"Qt{module}" in n or f"Qt6{module}" in n or f"qt{module.lower()}" in n.lower()})
+    if hits:
+        problems.append(f"GPL-only Qt module {module} bundled: {', '.join(hits)}")
+if mac and any(n.endswith(".dylib") for n in names) and not any((licenses / "homebrew").glob("*")):
+    problems.append("bundled Homebrew libraries have no licence files in licenses/homebrew")
+if problems:
+    sys.exit("Licence check failed:\n  " + "\n  ".join(problems))
+print(f"Licence check passed: {bundle}")
