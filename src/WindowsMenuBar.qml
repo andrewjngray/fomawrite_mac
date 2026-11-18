@@ -29,7 +29,36 @@ MenuBar {
         restoreEditingFocus();
         action();
     }
-    Component.onCompleted: rememberEditingFocus(win.activeFocusItem)
+    // The editing focus (not the open menu) is in the PDF pane.
+    readonly property bool pdfOwnsEditing: !!win.pdfReader && !!win.editingFocusItem && win.isInside(win.editingFocusItem, win.pdfReader)
+    Component.onCompleted: {
+        rememberEditingFocus(win.activeFocusItem);
+        syncPdfMenu();
+    }
+    // The PDF menu is in the bar only in PDF mode (docs/pdf-plan.md §4.3, R8).
+    // A Quick Controls Menu has no "hidden in the bar" state, so the one menu
+    // declared below is inserted and taken at runtime (research/cycle-159,
+    // spike 3). takeMenu keeps the menu itself (removeMenu would destroy it)
+    // and deletes only its MenuBarItem, so rounds neither leak nor duplicate.
+    function pdfMenuIndex() {
+        for (var i = 0; i < count; ++i) if (menuAt(i) === pdfMenu) return i;
+        return -1;
+    }
+    function syncPdfMenu() {
+        var index = pdfMenuIndex();
+        if (win.pdfMode && index < 0) {
+            var at = count;
+            for (var i = 0; i < count; ++i) if (menuAt(i) === windowMenu) { at = i; break; }
+            insertMenu(at, pdfMenu);
+        } else if (!win.pdfMode && index >= 0) {
+            pdfMenu.close();
+            takeMenu(index);
+        }
+    }
+    Connections {
+        target: win
+        function onPdfModeChanged() { root.syncPdfMenu(); }
+    }
     component WorkspaceMenu: Menu {
         id: popup
         // A closing Material popup blocks WindowShortcut until its exit ends.
@@ -68,6 +97,26 @@ MenuBar {
     Shortcut { objectName: "windowsShortcutSpelling"; sequence: "Ctrl+:"; context: Qt.WindowShortcut; enabled: win.isWindows && workspaceCommands.isEnabled("spelling"); onActivated: root.dispatch(function() { workspaceCommands.run("spelling") }) }
     Shortcut { objectName: "windowsShortcutNextIssue"; sequence: "Ctrl+;"; context: Qt.WindowShortcut; enabled: win.isWindows && workspaceCommands.isEnabled("nextIssue"); onActivated: root.dispatch(function() { workspaceCommands.run("nextIssue") }) }
     Shortcut { objectName: "windowsShortcutPreviousIssue"; sequence: "Ctrl+Alt+;"; context: Qt.WindowShortcut; enabled: win.isWindows && workspaceCommands.isEnabled("previousIssue"); onActivated: root.dispatch(function() { workspaceCommands.run("previousIssue") }) }
+    // Held outside the bar's contents; syncPdfMenu places it before Window.
+    // No shortcuts: Ctrl+Alt is AltGr on many layouts, Ctrl+Shift+G is Find
+    // Previous and Ctrl+I is Italic. Zoom keys and Ctrl+F already route to the
+    // pane when it has focus (PdfReader.qml, win.openSearch).
+    property Menu pdfMenu: WorkspaceMenu {
+        objectName: "windowsPdfMenu"
+        title: "&PDF"
+        readonly property bool ready: win.pdfMode && !!win.pdfReader && win.pdfReader.ready
+        MenuItem { objectName: "windows_pdf_goToPage"; text: "Go to Page…"; enabled: root.pdfMenu.ready; onTriggered: root.dispatch(function() { win.pdfCommand("goToPage") }) }
+        MenuSeparator {}
+        MenuItem { objectName: "windows_pdf_zoomIn"; text: "Zoom In"; enabled: root.pdfMenu.ready && win.pdfReader.zoom < win.pdfReader.maximumZoom - 0.001; onTriggered: root.dispatch(function() { win.pdfCommand("zoomIn") }) }
+        MenuItem { objectName: "windows_pdf_zoomOut"; text: "Zoom Out"; enabled: root.pdfMenu.ready && win.pdfReader.zoom > win.pdfReader.minimumZoom + 0.001; onTriggered: root.dispatch(function() { win.pdfCommand("zoomOut") }) }
+        MenuItem { objectName: "windows_pdf_actualSize"; text: "Actual Size"; enabled: root.pdfMenu.ready; onTriggered: root.dispatch(function() { win.pdfCommand("actualSize") }) }
+        MenuItem { objectName: "windows_pdf_fitWidth"; text: "Zoom to Fit Width"; enabled: root.pdfMenu.ready; onTriggered: root.dispatch(function() { win.pdfCommand("fitWidth") }) }
+        MenuSeparator {}
+        MenuItem { objectName: "windows_pdf_thumbnails"; text: backend.pdf.thumbnailsVisible ? "Hide Thumbnails" : "Show Thumbnails"; enabled: win.pdfMode; onTriggered: root.dispatch(function() { win.pdfCommand("thumbnails") }) }
+        MenuItem { objectName: "windows_pdf_inspector"; text: "Show Inspector"; enabled: root.pdfMenu.ready; onTriggered: root.dispatch(function() { win.pdfCommand("inspector") }) }
+        MenuSeparator {}
+        MenuItem { objectName: "windows_pdf_find"; text: "Find in PDF…"; enabled: root.pdfMenu.ready; onTriggered: root.dispatch(function() { win.pdfCommand("find") }) }
+    }
     component RecentMenu: WorkspaceMenu {
         id: recents
         Instantiator {
@@ -137,7 +186,7 @@ MenuBar {
         MenuItem { text: "&Redo"; enabled: win.canFormatLive || win.editTarget.canRedo; onTriggered: root.dispatch(function() { win.performDocumentEdit(function() { win.redoEditing() }) }) }
         MenuSeparator {}
         MenuItem { text: "Cu&t"; enabled: win.canFormatLive || (win.sourceClipboardAllowed && !win.editTarget.readOnly && win.editTarget.selectedText.length > 0); onTriggered: root.dispatch(function() { if (win.canFormatLive) win.liveWebAction("Cut"); else if (win.editTarget === editor) { if (backend.copySelection(editor.selectionStart, editor.selectionEnd, "markdown")) win.performDocumentEdit(function() { editor.remove(editor.selectionStart, editor.selectionEnd); }); } else win.editTarget.cut() }) }
-        MenuItem { text: "&Copy"; enabled: win.canFormatLive || (win.sourceClipboardAllowed && win.editTarget.selectedText.length > 0); onTriggered: root.dispatch(function() { if (win.canFormatLive) win.liveWebAction("Copy"); else if (win.editTarget === editor) backend.copySelection(editor.selectionStart, editor.selectionEnd, "markdown"); else win.editTarget.copy() }) }
+        MenuItem { objectName: "windows_editCopy"; text: "&Copy"; enabled: root.pdfOwnsEditing ? win.pdfReader.selectionText.length > 0 : win.canFormatLive || (win.sourceClipboardAllowed && win.editTarget.selectedText.length > 0); onTriggered: root.dispatch(function() { if (win.pdfOwnsKeyboard) win.pdfReader.copySelection(); else if (win.canFormatLive) win.liveWebAction("Copy"); else if (win.editTarget === editor) backend.copySelection(editor.selectionStart, editor.selectionEnd, "markdown"); else win.editTarget.copy() }) }
         MenuItem { objectName: "windows_editCopyFormatted"; text: "Copy Formatted"; enabled: win.canFormatLive || (win.sourceClipboardAllowed && win.editTarget === editor && editor.selectedText.length > 0); onTriggered: root.dispatch(function() { if (win.canFormatLive) backend.liveCopySelection("formatted"); else backend.copySelection(editor.selectionStart, editor.selectionEnd, "formatted"); }) }
         MenuItem { objectName: "windows_editCopyHtml"; text: "Copy HTML"; enabled: win.canFormatLive || (win.sourceClipboardAllowed && win.editTarget === editor && editor.selectedText.length > 0); onTriggered: root.dispatch(function() { if (win.canFormatLive) backend.liveCopySelection("html"); else backend.copySelection(editor.selectionStart, editor.selectionEnd, "html"); }) }
         MenuItem { objectName: "windows_editCopyMarkdown"; text: "Copy Markdown"; enabled: win.canFormatLive || (win.sourceClipboardAllowed && win.editTarget === editor && editor.selectedText.length > 0); onTriggered: root.dispatch(function() { if (win.canFormatLive) backend.liveCopySelection("markdown"); else backend.copySelection(editor.selectionStart, editor.selectionEnd, "markdown"); }) }
@@ -448,6 +497,7 @@ MenuBar {
         Command { commandId: "fullscreen" }
     }
     WorkspaceMenu {
+        id: windowMenu
         objectName: "windowsWindowMenu"
         title: "Window"
         MenuItem { objectName: "windows_windowCenterAction"; text: "Center"; enabled: win.visibility === Window.Windowed; onTriggered: root.dispatch(function() { backend.nativeWindowAction("center") }) }

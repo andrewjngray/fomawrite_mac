@@ -308,6 +308,9 @@ private slots:
     void windowsClipboardSearchMenusPreserveFocusAndUndo();
     void windowsMenuWorkspaceActionsShareState_data();
     void windowsMenuWorkspaceActionsShareState();
+    void windowsPdfMenuIsPresentOnlyInPdfMode();
+    void windowsPdfMenuItemsDriveThePane();
+    void windowsPdfMenuCopyAndKeysRouteByFocus();
     void organizerHeaderButtonsStayClickable_data();
     void organizerHeaderButtonsStayClickable();
     void acceptanceProfileRejectsInvalidRoots();
@@ -6356,3 +6359,4 @@ int main(int argc, char **argv) {
 #include "cycle156-new-document-focus.inc"
 #include "cycle160-pdf-core.inc"
 #include "cycle161-pdf-pane.inc"
+#include "windows-pdf-menu.inc"
