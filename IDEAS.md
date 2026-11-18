@@ -17,7 +17,7 @@ Things the Cycle 134–135 work surfaced that are plausible next cycles once the
 ### PDF reading, markup and page operations
 Yes [x]  No [ ]  Maybe [ ]
 
-Yes, 19 November 2026 (Andrew): mission amended as proposed in the plan; notes file `Report.pdf.md`; notes open in the Markdown editor beside the PDF; the explorer shows one PDF row with a notes badge. Phase 0 (spikes) started.
+Yes, 19 November 2026 (Andrew): mission amended as proposed in the plan; notes file `Report.pdf.md`; notes open in the Markdown editor beside the PDF; the explorer shows one PDF row with a notes badge. Phase 0 complete (cycle 159); the programme in [docs/pdf-plan.md](docs/pdf-plan.md) is being built from cycle 160.
 
 18 November 2026 (Andrew): open PDFs in Fomawrite for review, with Preview-style highlights, underline, strikethrough and on-page notes saved as Markdown, and page rotate/reorder/delete/merge; PDF tools appear only while a PDF is open. Plan for review, nothing built: [docs/pdf-plan.md](docs/pdf-plan.md).
 

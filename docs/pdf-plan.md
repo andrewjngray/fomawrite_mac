@@ -1,19 +1,10 @@
-# PDF in Fomawrite: development plan (for review)
+# PDF in Fomawrite: development programme
 
-Status: **Phase 0 under way (19 November 2026); Andrew's decisions are in §8.** Nothing user-facing built yet. Drafted 18 November 2026 by Claude Opus 5.5 from Andrew Gray's requests in a working session, for review by a second model (Claude Fable 5.1) before any build cycle starts.
+Status: **approved and in build.** Phase 0 (decisions and spikes) is complete: [research/cycle-159/README.md](../research/cycle-159/README.md). This is version 2 of the plan: version 1 was drafted on 18 November 2026 (Claude Opus 5.5); it was reviewed against the code and the Phase 0 results and rewritten as this programme on 19 November 2026 (Claude Fable 5.2). The "Review" section says what changed and why.
 
-## How to use this document
+**What it is.** The plan for PDF reading, Preview-style markup (highlight, underline, strikethrough, notes on the page) saved as Markdown, and page operations (rotate, reorder, delete, merge) in Fomawrite, on Mac and Windows, with Markdown remaining where Andrew writes. It holds Andrew's requirements (§1), the design (§2–§4), the cycle-by-cycle programme with acceptance tests (§5), how the work is run and verified (§6) and the risks (§7).
 
-**What it is.** A proposal for adding PDF reading, lightweight markup (Preview-style highlights, underline, strikethrough, notes) and page operations (rotate, reorder, delete, merge) to Fomawrite, with Markdown remaining the place where Andrew writes. It sets out Andrew's requirements, what the code base already offers, the decisions that shape the work (each with options and a recommendation), a phased delivery plan and the tests each phase needs.
-
-**How it was produced.**
-1. Andrew's requests and answers, collected in one conversation on 15–18 November 2026 (summarised in §1, with his words quoted where they decide something), plus four screenshots of macOS Preview: its toolbar, the highlight colour menu (Yellow, Green, Blue, Pink, Purple, Underline, Strikethrough), the Markup toolbar, the Inspector and the **Tools → Annotate** menu.
-2. A survey of the repository at `master` `538e16f` (build 158): `src/PublishingPreview.qml`, `src/backend.*`, `src/filelibrary.cpp`, `src/Main.qml`, `src/NativeMenuBar.qml`, `src/FormatBar.qml`, `fomawrite.pro`, `MISSION.md`, `AGENTS.md`, `ARCHITECTURE.md`, `IDEAS.md`, and the Windows branch `windows/port`.
-3. Checks against the installed Qt 6.11 headers and QML modules (Qt PDF API, render flags, metadata fields), Homebrew package data (qpdf licence and version) and the licence work of Cycle 158.
-
-Statements are tagged **[verified]** when checked against code, headers or a run in this session, and **[assumption]** when they still need a spike. The reviewer should treat untagged design statements as proposals.
-
-**What the reviewer is asked to do.** See §10. In short: test every [assumption], challenge each decision in §4, look for gaps against Andrew's requirements and the mission, and return a revised plan (or a list of required changes) before any code is written.
+**How it is used.** Each cycle in §5 is built from a written brief derived from this document, reviewed, tested red/green, recorded under `research/cycle-NN/` and merged to `windows/port` at each phase end, per `AGENTS.md`. When a cycle changes the design, this document is updated in the same commit.
 
 ---
 
@@ -36,204 +27,140 @@ From the conversation (15–18 November 2026):
 
 Preview reference (from the screenshots), for scope: zoom out / actual size / zoom in; highlight tool with colour menu; Markup toolbar (text selection, rectangular selection, sketch, draw, shapes, text box, signature, page/text style, note); rotate; form/markup buttons; Inspector (file name, document type, PDF version, page count, page size, title, author, subject, producer, creator, creation and modification dates); search; **Tools → Annotate**: Highlight Text ⌃⌘H, Underline Text ⌃⌘U, Strike Through Text ⌃⌘S, Rectangle ⌃⌘R, Oval ⌃⌘O, Line ⌃⌘I, Arrow ⌃⌘A, Polygon, Star, Text ⌃⌘T, Speech Bubble, Mask, Loupe ⌃⌘L, Note ⌃⌘N, Signature; **Tools**: Add Bookmark ⌘D, Rotate Left ⌘L, Rotate Right ⌘R, Crop ⌘K, Redact, Show Inspector ⌘I.
 
-## 2. Mission fit
+## 2. Review of version 1 (19 November 2026)
 
-`MISSION.md` currently says: "A personal Markdown writing app for macOS in which plain `.md` files are the only truth", and that advancing the project means "not more features" until Live is good enough to be the daily editor. PDF work conflicts with both as written.
+Version 1's direction holds: Markdown sidecar as the store of markup, Qt PDF for viewing, qpdf for writing, PDF tools shown only with a PDF, phases that each ship. The review changed these points.
 
-Proposal (needs Andrew's yes before Phase 1; do not edit MISSION.md without it):
+| # | Version 1 | Now | Why |
+|---|---|---|---|
+| 1 | Page view built from Qt's `PdfPageImage` | Fomawrite's own page item, rendering with `QPdfDocument` | `PdfPageImage` cannot draw annotations already in a PDF and, in a list, retains every page shown: 1.7–2.2 GB after 300 pages on both platforms (cycle 159, spikes 1 and 5). |
+| 2 | PDF replaces the editor; a "PDF bar" replaces the Format Bar | The PDF takes the **publishing-preview pane's slot**; its tools are a toolbar on that pane; the editor shows the notes file | Andrew chose the Markdown editor beside the PDF. The editor then still needs the Format Bar, and `WorkspaceLayout` already has the three arrangements needed (editor only, split, preview only), so no new layout machinery. |
+| 3 | `Backend` left alone; a separate notes store was an option | `Backend`'s document **is** the notes file in PDF mode; `Backend::open` routes PDFs | Every way of opening a file (explorer, recents, links, Finder, session restore, back/forward) already ends in `Backend::open`; routing there makes PDFs work from all of them, and gives the notes save, undo, recovery and external-change handling unchanged. |
+| 4 | Markup anchored by page geometry (`quads=`) plus a PDF hash in YAML front matter | Text markup anchored by **page text index and length, verified by the quoted text**; note pins in PDF user space; no hash, no front matter | Geometry is derived from the text range at draw time (spike 2), so markers are short, survive re-rendering and export exactly; the quote detects and repairs a changed PDF item by item, which a whole-file hash cannot. A one-line HTML comment replaces front matter, so nothing shows in rendered Markdown. |
+| 5 | PDF menu inserted at runtime | Menu declared statically, `visible` bound to PDF mode | A native macOS menu inserted at runtime has no title (spike 3). |
+| 6 | Annotated export: qpdf or a second PDFium, to be decided | qpdf | Qt PDF draws a qpdf-written highlight (spike 4); export will also write simple appearance streams for other viewers. |
+| 7 | Explorer shows each PDF's page count | Kind label and notes badge only | Page count needs every PDF opened while listing a folder. |
+| 8 | Phase 1 ends at a read-only viewer | Phase 1 also shows the notes file beside the PDF as ordinary Markdown, with "Copy as Markdown Quote" | It falls out of points 2 and 3 and gives a usable review workflow before anchored markup exists. |
 
-> Fomawrite writes Markdown. It also opens PDFs so that writing about them happens in one place: reading, highlighting and noting a PDF produces Markdown beside it, never hidden state. Fomawrite changes a PDF's own bytes only when Andrew explicitly asks for a page operation or an annotated export, and always through an atomic save with the previous version kept for recovery.
+Unchanged: the mission amendment (approved, in `MISSION.md`), the sidecar name `Report.pdf.md`, the explorer badge, no forms/signatures/text editing/redaction, qpdf for page operations, Mac and Windows parity, MuPDF excluded (AGPL), Qt's LGPL QML viewer files not copied into the source.
 
-This keeps "the file is the truth": the notes are a Markdown file, and the PDF is touched only by explicit, reversible operations. `IDEAS.md` gets a pointer to this plan as a **Maybe** until Andrew decides (per `AGENTS.md`, a Maybe is not built).
+## 3. What exists today (verified)
 
-## 3. What exists today
+- Qt PDF is linked and shipped on both platforms (`QT += pdf pdfquick`); `src/PublishingPreview.qml` renders exported PDFs with `PdfPageImage`.
+- Qt PDF reads only: render (with an annotations flag), page sizes and labels, text and selections by point or by text index, links, bookmarks, passwords, eight metadata fields. The PDF version comes from the file header.
+- `Backend` (`src/backend.cpp`) owns one Markdown document per window: text, undo, save, recovery, external-change detection, recents and back/forward history. `Backend::open(url)` reads any local file as text. `src/main.cpp` owns windows and sessions (`focusExistingDocument`, restore).
+- `src/WorkspaceLayout.qml`: `layoutMode` 0 editor only, 1 editor + preview, 2 preview only. The preview pane is `PublishingPreview` in `src/Main.qml`.
+- `FileLibrary::isTextFile` admits `md`, `markdown`, `mdown`, `txt`, `text`; `macos/Info.plist` declares Markdown and plain text.
+- Menus: `src/NativeMenuBar.qml` (Mac, `Qt.labs.platform`), `src/WindowsMenuBar.qml` (branch `windows/port`, Quick Controls).
+- Licensing (cycle 158): MIT app; Qt under LGPL as separate libraries; `bin/check-licenses` guards packages; `bin/tidy-mac-bundle.py` gathers licence files for every bundled Homebrew library.
+- Spike results: [research/cycle-159/README.md](../research/cycle-159/README.md).
 
-- **Qt PDF is already linked and shipped on both platforms** [verified]: `fomawrite.pro` has `QT += pdf pdfquick`; the Mac bundle contains `QtPdf`/`QtPdfQuick`; the Windows package contains `Qt6Pdf.dll`/`Qt6PdfQuick.dll`. `src/PublishingPreview.qml` already renders exported PDFs with `PdfDocument`, `PdfPageImage` and `PdfLinkModel`; `src/backend.cpp` uses `QPdfDocument` and `QPdfSelection` for publishing checks.
-- **Qt PDF capabilities** [verified in Qt 6.11 headers and QML module]: page rendering (`QPdfDocument::render` with `QPdfDocumentRenderOptions`, including a `RenderFlag::Annotations` flag), page sizes and labels, text selection (`getSelection`, `getAllText`), search (`PdfSearchModel`), links (`PdfLinkModel`), bookmarks/outline (`QPdfBookmarkModel`), passwords, and eight metadata fields (Title, Subject, Author, Keywords, Producer, Creator, CreationDate, ModificationDate). Ready-made QML views: `PdfMultiPageView`, `PdfScrollablePageView`, `PdfPageView`.
-- **Qt PDF cannot write** [verified]: no API creates or changes annotations, pages or files. Any change to a PDF needs another library (§4.3).
-- **PDF version** is not exposed by Qt PDF [verified]; it can be read from the file header (`%PDF-1.x`).
-- **Licensing** [verified, Cycle 158]: Fomawrite is MIT (public repository). Qt is used under LGPL v3 as separate libraries; `bin/check-licenses` fails a package with a GPL-only Qt module or a missing notice. Qt's QML viewer files (`PdfMultiPageView.qml` etc.) are LGPL-3.0/GPL source: they may be *used* as Qt ships them, but **copying and modifying them into Fomawrite's MIT source would bring LGPL code into the repository**; a custom view should be written from the `PdfPageImage`/`PdfSelection`/`PdfSearchModel` building blocks, as `PublishingPreview.qml` already does.
-- **The app is built around one Markdown document per window** [verified]: `Backend` (`src/backend.cpp`, ~4,600 lines) owns one text document, its save/recovery/undo and history; `FileLibrary::isTextFile` admits only `md`, `markdown`, `mdown`, `txt`, `text`; open dialogs filter Markdown; `macos/Info.plist` declares Markdown and plain text only.
-- **Contextual UI precedent** [verified]: `src/FormatBar.qml` is a second toolbar row shown under the header; `src/NativeMenuBar.qml` (Mac) and `WindowsMenuBar.qml` (Windows branch) build the menus.
+## 4. Design
 
-## 4. Decisions
+### 4.1 Model
 
-Each decision lists options, a recommendation and why. The reviewer should challenge these first.
+- **PDF mode.** A window is in PDF mode when its `Backend` has a PDF open (`backend.pdf.active`). The PDF is shown in the preview pane's slot; the editor (Source or Live) shows the PDF's notes file. Layout modes keep their meaning: 0 notes only, 1 notes + PDF, 2 PDF only. Opening a PDF starts in PDF only when it has no notes file, and in split when it has one.
+- **`PdfSession`** (`src/pdfsession.{h,cpp}`, owned by `Backend`, exposed as `backend.pdf`): the one `QPdfDocument` for the window, its status (ready, password needed, error), metadata, page sizes and labels, text, selection geometry by point and by text index, search, links, outline, and the user-space/view-space mapping from spike 2. Everything Qt PDF returns is normalised here. No QML `PdfDocument` is used, so the file is loaded once.
+- **`PdfPage`** (`src/pdfpageitem.{h,cpp}`, a `QQuickItem`): draws one page at its own size times the screen's pixel ratio, with annotations, rendering off the GUI thread (`QPdfPageRenderer`, multithreaded mode) and showing a white page until the image arrives. Each item owns exactly one image, released with the item; nothing else caches pages.
+- **Opening.** `Backend::open(url)`: when `url` is a PDF, load it in `PdfSession`; if that fails, report and change nothing. Then the companion document: open `Report.pdf.md` if it exists, otherwise start an empty untitled document whose save target is `Report.pdf.md` (Save writes there without a dialog; nothing is written until Andrew saves or autosave does). Opening `Report.pdf.md` directly opens its PDF too when the PDF is beside it. Opening any other document closes the PDF. Recents, history, the explorer's current-file reveal and session restore record the **PDF's** URL in PDF mode. The existing unsaved-changes prompt runs before any of this, as for any open.
+- **Explorer.** PDFs are listed with a PDF icon and kind label; `X.pdf.md` is not listed when `X.pdf` is in the same folder, and the PDF row shows a notes badge instead.
+- **System integration.** macOS: `com.adobe.pdf` declared as Viewer, rank Alternate, so Fomawrite appears in Open With but is never the default; the installer's default-app step stays Markdown and plain text only. Windows: the portable build registers nothing.
 
-### 4.1 Where highlights and notes live
+### 4.2 The notes file (`Report.pdf.md`)
 
-| Option | For | Against |
-|---|---|---|
-| **A. Markdown sidecar beside the PDF** (recommended) | Meets R2, R5 directly; readable and editable by Andrew and AI tools; PDF untouched (mission); trivially diffable and syncable; no PDF-writing library needed for Phase 2 | Highlights are invisible to other PDF apps unless exported; anchors can break if the PDF itself changes |
-| B. Real PDF annotations inside the PDF (Preview's model) | Visible in Preview/Acrobat; shareable as one file | Rewrites the PDF on every markup (mission conflict); needs a writing library from day one; notes not in Markdown unless mirrored, which creates two truths |
-| C. Both, kept in sync | Best of both on paper | Two sources of truth; conflict resolution; highest complexity |
-
-**Recommendation: A, plus an explicit "Export annotated PDF…" in Phase 4** that writes the sidecar's markup into a *copy* of the PDF as real annotations for sharing. Existing annotations already in a PDF (for example from Preview) are displayed as part of the page (Phase 1 spike: [assumption] that `PdfPageImage` renders them, or that a custom image provider with `RenderFlag::Annotations` does) and can be imported into the sidecar later (Phase 4).
-
-### 4.2 Sidecar format
-
-Name: `Report.pdf` → `Report.pdf.md` in the same folder [proposal; alternative `Report.notes.md`]. Created only when the first highlight or note is made; never by merely opening a PDF.
-
-Requirements: valid, pleasant Markdown when read anywhere; each item carries enough anchor data to redraw it on the page; Andrew (or an AI) can edit the prose freely without breaking anchors; Fomawrite edits the file with minimal insertions/removals so every other byte is preserved (the existing "file is the truth" rule).
-
-Draft:
+Plain Markdown that reads well anywhere; Fomawrite's markers are HTML comments, invisible when rendered. Fomawrite changes the file only by inserting or removing the smallest text ranges, through the editor's own edit path, so every edit is one undo step and every other byte is preserved.
 
 ```markdown
----
-fomawrite-pdf-notes: 1
-pdf: Report.pdf
-pdf-sha256: 3e23ca8e…        # bytes the anchors were made against
-pages: 13
----
-
+<!-- fomawrite:pdf-notes 1 -->
 # Notes on Report.pdf
 
-## Page 1
+## [Page 1](Report.pdf#page=1)
 
-<!-- fomawrite:highlight id=h7f3 page=1 colour=yellow quads=312.4,700.1,402.9,700.1,312.4,688.0,402.9,688.0 -->
+<!-- fomawrite:pdf highlight page=1 colour=yellow text=120+22 -->
 > Booking Number: B55577
 
-[Page 1](Report.pdf#page=1). Check this matches the invoice.
+Check this matches the invoice.
 
-<!-- fomawrite:note id=n2a1 page=1 at=420.0,515.5 -->
-**Note** ([Page 1](Report.pdf#page=1)): Ask about the return date.
+<!-- fomawrite:pdf note page=1 at=420,515 -->
+Ask about the return date.
+
+## [Page 3](Report.pdf#page=3)
+
+<!-- fomawrite:pdf underline page=3 colour=red text=48+31 -->
+> subject to board approval
 ```
 
-- An item is the block from its `<!-- fomawrite:… -->` marker to the next marker or heading. The quote is the selected text at creation; the prose after it is Andrew's comment. HTML comments are invisible when the Markdown is rendered (Live, Preview, GitHub) and survive editing.
-- Kinds: `highlight` (colours yellow, green, blue, pink, purple, matching Preview), `underline`, `strike`, `note` (a point on the page), later `rect`, `oval`, `line`, `arrow`, `text`, `bubble`.
-- Coordinates: PDF user space in points, unrotated page, origin bottom-left, `quads` in the PDF `/QuadPoints` order, so export to real annotations (§4.1) is a direct mapping. [assumption: Qt PDF selection geometry is top-left origin in points; conversion needs a test per page rotation.]
-- Re-anchoring: if `pdf-sha256` no longer matches, Fomawrite tries to re-find each quote's text on its page (then nearby pages); items it cannot place are listed as "unplaced" in the notes panel, never deleted.
-- Page operations in Fomawrite (§4.4) rewrite `page=` values and `pdf-sha256` in the same save.
-- Deep links: `[x](Report.pdf#page=3)` in *any* Markdown document opens the PDF at that page (Source, Live and Preview).
+- First line: `<!-- fomawrite:pdf-notes 1 -->` (format version). The title and page headings are ordinary Markdown that Andrew may edit or delete; Fomawrite adds a page heading only when it inserts the first item for a page, keeping pages in order.
+- Marker grammar: `<!-- fomawrite:pdf KIND key=value … -->` on its own line. `KIND`: `highlight`, `underline`, `strike`, `note`; later `rect`, `oval`, `line`, `arrow`, `text`. Keys: `page` (1-based, as shown in the page link); `colour` (`yellow`, `green`, `blue`, `pink`, `purple` for highlights, any of those or `red` for underline and strike); `text=START+LENGTH` (character range in Qt PDF's text for that page); `at=X,Y` and `rect=X0,Y0,X1,Y1` (PDF user space, points, unrotated page, origin bottom-left). Unknown kinds and keys are kept and ignored.
+- An item is its marker plus the block that follows, up to the next marker, heading or end of file. For text markup the first block is a blockquote of the marked text; anything after it is Andrew's comment. For a note, the following text is the note.
+- **Drawing.** Overlays come from parsing the editor's current text, saved or not, so undo in the editor removes the highlight from the page. Text markup geometry comes from the text range (`PdfSession`); if the page's text at that range no longer equals the quote, the quote is searched for on the page and then on neighbouring pages; an item that cannot be placed is listed as "unplaced" in the PDF pane and left untouched in the file.
+- **Removing** a mark from the PDF pane deletes its marker and its unedited quote; Andrew's own comment text stays in the file as plain Markdown.
+- **Links.** `Report.pdf#page=3` in any Markdown document opens the PDF at that page (Source, Live and Preview); in the notes file it scrolls the PDF beside it.
 
-### 4.3 PDF engine
+### 4.3 The PDF pane (R3, R4, R8)
 
-Viewing stays on **Qt PDF** (already shipped, LGPL, both platforms). For writing (page operations in Phase 3, annotated export in Phase 4):
+All PDF tools live on the pane or in a PDF menu that exists only in PDF mode; the Markdown interface is otherwise unchanged, and the Format Bar keeps working on the notes editor (hidden in PDF-only layout, as it is today whenever the editor is hidden).
 
-| Option | Licence | For | Against |
+- **Toolbar** (pane header, Preview's order): thumbnails toggle · zoom out · actual size · zoom in · fit width · page indicator / go to page · highlighter with menu (Yellow, Green, Blue, Pink, Purple, Underline, Strikethrough) · note · rotate left / right (Phase 3) · Inspector · search. The highlighter works both ways, as in Preview: select text then click it, or toggle it on and every selection is marked.
+- **Reading:** continuous vertical scroll; pinch and ⌘+/⌘−/⌘0 zoom; Page Up/Down, Space, Home/End, arrow keys; text selection by drag, word by double-click; ⌘C copies; links (internal jump; external ask first); outline in the existing Outline pane; last page and zoom per PDF kept in app settings; reload when the file changes on disk; password prompt; clear message for a damaged file.
+- **Thumbnails** (left edge of the pane): page images with labels; click to go; Phase 3 adds multi-select, drag to reorder and a context menu.
+- **Inspector** (popover): file name, kind, PDF version, page count, page size (cm and inches), title, author, subject, keywords, producer, creator, created, modified, encrypted.
+- **Find:** ⌘F with the PDF pane focused searches the PDF (matches highlighted, next/previous, count), with the existing find bar's look.
+- **Copy as Markdown Quote:** `> selected text` and `[Page n](Report.pdf#page=n)` on the clipboard.
+- **Menu "PDF"** (declared statically, visible only in PDF mode, on both platforms): Highlight Text ⌃⌘H, Underline Text ⌃⌘U, Strike Through Text ⌃⌘S, Note ⌃⌘N, Copy as Markdown Quote, Go to Page…, Zoom items, Show Thumbnails, Show Inspector ⌘I (Italic's ⌘I applies only when the editor has focus), and from Phase 3 Rotate Left ⌘L, Rotate Right ⌘R, Delete Page, Insert Pages from File…, Export Selected Pages…. Windows uses Ctrl for ⌘ after a collision check on `windows/port`.
+- **View switch:** the footer's Single / Split / Preview read Notes / Split / PDF in PDF mode. The window title shows the PDF's name.
+
+### 4.4 Page operations (Phase 3, R6)
+
+- qpdf 12 (Apache-2.0) is the only library that writes PDFs, used from one file (`src/pdfeditor.{h,cpp}`). Mac: Homebrew `qpdf`, bundled by packaging with its licence files gathered by `bin/tidy-mac-bundle.py`. Windows: vcpkg with a pinned baseline, the DLLs deployed and noticed by `bin/windows/package-manifest.py`. `bin/check-licenses` requires the qpdf notice.
+- Rotate, delete, reorder and insert are **pending edits**: the page list and per-page rotation in `PdfSession` change at once (the view follows), with undo and redo, and the window shows unsaved changes. **Save** writes the new PDF to a temporary file with qpdf, verifies it opens with the expected page count, atomically replaces the original, keeps the previous bytes in Fomawrite's recovery store, reloads, and rewrites `page=` values and page headings in the notes in the same step. **Save As…** and **Export Selected Pages…** write new files.
+- Refused with a clear message: encrypted PDFs that qpdf cannot rewrite without the owner password; digitally signed PDFs unless Andrew confirms that the signature will be invalidated.
+- Merge: Insert Pages from File…, dropping a PDF from the explorer onto the thumbnails, and later Combine for several PDFs selected in the explorer.
+
+### 4.5 Phase 4 (each item needs Andrew's go)
+
+Shapes, text box and speech bubble stored in the notes; **Export Annotated PDF…** (the notes' marks written as real annotations with appearance streams into a copy, via qpdf); import of annotations already in a PDF into the notes; extract page text to Markdown. Not planned: forms, signatures, PDF text editing, redaction, crop, OCR.
+
+## 5. Programme
+
+Cycle numbers continue the Mac series. Each cycle follows `AGENTS.md`: code, red/green tests, `research/cycle-NN/README.md`, a CHANGELOG line, STATUS. Each phase ends with a merge to `windows/port`, Windows CI on x64 and ARM64, and installs on Mac and in the Windows VM for Andrew to try.
+
+| Cycle | Phase | Scope | Done when |
 |---|---|---|---|
-| **qpdf** (recommended for Phase 3) | Apache-2.0 [verified: Homebrew qpdf 12.4.2] | Mature, structure-preserving page operations (rotate via `/Rotate`, delete, reorder, merge, split, extract); C++ API; keeps everything else in the file intact; MIT-compatible | Writing markup annotations means building annotation dictionaries (and possibly appearance streams) by hand; Windows ARM64 build must be produced and pinned [assumption: available via vcpkg or a CI build] |
-| PDFium as a separate library (e.g. prebuilt `pdfium-binaries`) | BSD-3 / Apache-2.0 | Full annotation API (`fpdf_annot.h`) with appearance generation, plus page editing and saving; same engine Qt PDF uses | Second copy of PDFium beside Qt PDF's private one [assumption: no symbol clash on macOS two-level namespace or Windows DLLs]; large binary; pinning and updates |
-| PDFKit (macOS only) | Apple system framework | Exactly Preview's behaviour | No Windows (R10) |
-| MuPDF | AGPL-3.0 or commercial | Capable | Would put the whole app under AGPL; excluded |
+| 159 | 0 | Decisions, spikes, review (complete) | Record written |
+| 160 | 1 | **PDF core.** `PdfSession`; `PdfPage` item; `Backend::open` routing and the companion document; explorer lists PDFs and folds notes files into a badge; a test fixture builder (C++ port of the spike's generator: text at known positions, rotations, CropBox, annotations, password, damaged). No pane yet beyond a bare page list in the preview slot. | Tests: load/refuse/password; page count, sizes, labels, text; selection geometry on all rotations and CropBox equals the spike mapping; pixels show existing annotations; a 300-page list scroll keeps resident memory bounded (the spike's measure, with a generous ceiling); opening a PDF from an unsaved Markdown document prompts; companion rules (existing notes, untitled with save target, direct notes-file open, leaving PDF mode); recents/history hold the PDF; explorer rows and badge. Full suite green. |
+| 161 | 1 | **PDF pane.** `PdfReader.qml` in the preview slot: toolbar, zoom and fit, keyboard and trackpad navigation, selection and copy, links, find, thumbnails, Inspector, go to page, last page/zoom memory, reload on change, password and error states; Notes / Split / PDF switch; window title; static PDF menu (Mac). | QML tests for each control and state; mode switch leaves the Markdown interface exactly as before (Format Bar, menus, layout restored); search results and selection text match fixtures; native self-check gains a PDF group. |
+| 162 | 1 | **Links, integration, Windows.** `#page=n` links from Source, Live and Preview; Copy as Markdown Quote; outline pane; session restore of PDF windows; Open With on macOS; Windows menu bar entries and shortcut check; merge, Windows CI, installs. | Link and restore tests; Windows CI green on both architectures; Phase 1 installed on both machines. |
+| 163 | 2 | **Notes model and text markup.** `src/pdfnotes.{h,cpp}`: parse, insert, remove, recolour as minimal text edits; overlays for highlight (five colours), underline, strikethrough; highlighter tool, colour menu and shortcuts; marks removable and recolourable from the page; edits go through the editor's programmatic edit path in Source and Live as one undo step each. | Parser/writer round trips are byte-exact for untouched text; each operation is the minimal edit and one undo; overlays match the text range's geometry on every fixture rotation; undo in the editor removes the overlay; file created only on save. |
+| 164 | 2 | **Notes on the page and navigation.** Note pins (place, move, edit in the editor, popover on the page); click a mark to reveal its item in the editor and the reverse; marker chips in Live; re-anchoring by quote and the unplaced list; merge, Windows CI, installs. | Pin geometry on all rotations; move is one edit; re-anchoring fixtures (text shifted on the page, moved to another page, removed); Live shows chips, Source shows raw markers; Windows CI green. |
+| 165 | 3 | **qpdf and saving.** `pdfeditor` over qpdf; build, packaging and licence notices on Mac and Windows; pending-edit model with undo; atomic save with recovery copy; refusal paths; notes remapping. | Each operation verified through Qt PDF after save (count, order by text, orientation); undo after save restores the previous bytes exactly; a failed write leaves the original untouched; notes `page=` and headings remapped; `bin/check-licenses` passes with qpdf and fails without its notice; Windows packages contain the qpdf DLLs. |
+| 166 | 3 | **Page operations in the pane.** Thumbnail multi-select, drag reorder, context menu; rotate, delete, insert from file, drop a PDF from the explorer, export selected pages; menu items and shortcuts; merge, Windows CI, installs. | QML tests per operation and for unsaved-changes prompts; Windows CI green; Phase 3 installed. |
+| 167+ | 4 | Per §4.5, after Andrew's decision on each item. | |
 
-Recommendation: **qpdf for page operations; decide the annotated-export engine (qpdf dictionaries vs PDFium) in the Phase 4 spike.** Every addition goes through `licenses/` and `bin/check-licenses`.
+Follow-up outside the phases: move `PublishingPreview.qml` off `PdfPageImage` to the `PdfPage` item (the retention found in spike 5 probably explains the earlier 450 MB question).
 
-### 4.4 How page operations save
+## 6. How the work is run and verified
 
-Preview changes pages in place on save. Proposal:
-- Rotate, delete, reorder and insert/merge are **pending edits** shown immediately in the viewer (rotation and order are view state until saved), with undo/redo.
-- **Save** writes a new PDF with qpdf to a temporary file and atomically replaces the original; the previous bytes go into Fomawrite's recovery store so the change can be undone after saving. The unsaved-changes prompt covers pending page edits. **Save As…** and **Export Selected Pages…** write new files.
-- The sidecar's `page=` anchors and `pdf-sha256` are rewritten in the same save (one map from old to new page indices; rotation does not move user-space coordinates).
-- Merge: **Insert Pages from File…**, dragging a PDF from the explorer onto the thumbnails, and (later) **Combine** on several PDFs selected in the explorer.
-
-### 4.5 PDF mode in the interface (R8)
-
-When the active document is a PDF, the window enters **PDF mode**; leaving it restores the Markdown interface exactly.
-
-- **Editor area:** a continuous, scrollable page view built from `PdfPageImage` (not a modified copy of Qt's LGPL `PdfMultiPageView`, §3) with an overlay layer for highlights, underlines, strikes and note pins.
-- **PDF bar** in place of the Format Bar (same slot): zoom out · actual size · zoom in · fit width; highlighter with the colour menu (Yellow, Green, Blue, Pink, Purple, Underline, Strikethrough) as in Preview; Note; rotate left/right; thumbnails toggle; Inspector (i); search. Markdown formatting controls are hidden, not disabled.
-- **Menus:** a **PDF** menu (or Preview's **Tools → Annotate** arrangement) exists only in PDF mode, holding Highlight Text, Underline Text, Strike Through Text, Note, Rotate Left/Right, Delete Page, Insert Pages from File…, Export Selected Pages…, Show Inspector, Show Thumbnails. Markdown-only menus (Format, Insert…) are hidden or disabled in PDF mode. [assumption: `Qt.labs.platform` native menus can be inserted/removed at runtime on macOS; the Windows Quick menu bar can toggle visibility.]
-- **Shortcuts:** use Preview's. [verified against the QML key sequences on `master`, where Qt's "Ctrl" is ⌘ and "Meta" is ⌃ on macOS] ⌃⌘H/U/S/N (markup and note), ⌘L/⌘R (rotate) and ⌘D are unused; ⌘I is Italic in Markdown, so it can mean Inspector only in PDF mode; ⌃⌘F is already full screen. Windows uses Ctrl for ⌘ and needs its own check on `windows/port` (Ctrl+H, Ctrl+R and others are common there).
-- **Thumbnails sidebar** (Preview's page sidebar): page images with labels; select, multi-select, drag to reorder, context menu (rotate, delete, insert, export).
-- **Inspector:** file name, type, PDF version (from the header), page count, page size (cm/in), the eight metadata fields, encrypted yes/no.
-- **Notes panel:** the sidecar, listed by page; clicking an item scrolls the PDF to it; clicking a highlight on the page selects its item.
-- **Find:** ⌘F uses `PdfSearchModel` in PDF mode, with the existing find bar's look.
-- **Copy as quote:** with text selected, "Copy as Markdown Quote" puts `> text` plus `[Page n](Report.pdf#page=n)` on the clipboard (for pasting into any document or an AI tool).
-
-### 4.6 Document model in the app
-
-`Backend` is one Markdown document per window and should not be bent into a PDF model.
-
-Recommendation: a new C++ `PdfSession` (one per window, separate from `Backend`) that owns the `QPdfDocument`, pending page edits, the save path and the sidecar anchor model; `Main.qml` gains `documentKind: "markdown" | "pdf"`. Opening a PDF goes through the existing pending-action flow (unsaved prompt for the current Markdown), joins recent files and back/forward history, and appears in the window title.
-
-Open question for review (**the most important architectural choice**): should the notes panel *be the existing Markdown editor* bound to the sidecar? That is, in PDF mode `Backend`'s document is `Report.pdf.md` (created on the first annotation), shown in Source/Live in the side pane, so save, undo, recovery, external-change detection and AI-friendly editing all come for free, and creating a highlight inserts a block into that document as one undoable edit. The alternative is a separate, simpler notes store with its own save path. This plan leans to reusing the editor; the reviewer should test it against `Backend`'s assumptions (one document, window title, recovery keys, Live/Source switching).
-
-### 4.7 Explorer
-
-- PDFs are listed beside Markdown (page count where Markdown shows its first line; a PDF icon). `FileLibrary::isTextFile` stays for text, with a separate `isPdfFile` [proposal].
-- `Report.pdf.md` sidecars are shown under or beside their PDF (a "notes" badge on the PDF row) rather than as unrelated documents [proposal; reviewer to consider simply listing them].
-- Fomawrite is offered in "Open With" for PDFs (`macos/Info.plist` role Viewer, rank Alternate) but never made the default PDF app (the installer's default-app step for Markdown stays as is).
-
-### 4.8 Windows
-
-Every phase lands on Mac `master` and is merged into `windows/port`, built and tested by Windows CI (x64 and ARM64) before the phase is complete. qpdf must be pinned with checksums like the Qt archives (`windows/qt-6.11.3.json`) and built or fetched for both architectures [assumption].
-
-## 5. Phases
-
-Each phase is one or more cycles under `AGENTS.md` (code, red/green tests, record, CHANGELOG line, STATUS). Estimates are cycle counts, not dates.
-
-### Phase 0: decisions and spikes (1 cycle, no user-facing change)
-- Andrew decides §2 (mission text), §4.1, §4.2 file name, §4.6 notes model.
-- Spikes, each with a short written result in `research/`:
-  1. `PdfPageImage` / `QPdfDocument::render` shows existing annotations (Preview-made highlight and note) on Mac and Windows.
-  2. Selection geometry and coordinate conversion to PDF user space for pages rotated 0/90/180/270 and with a non-zero CropBox.
-  3. Runtime insertion/removal of a native **PDF** menu on macOS; visibility on Windows.
-  4. qpdf: build and link on Mac (Homebrew) and Windows x64/ARM64 (vcpkg or CI), licence notice, `bin/check-licenses` update; rotate/delete/reorder/merge round trip on fixtures, verified by page text via Qt PDF.
-  5. Memory and speed on a 300-page scanned PDF and a 50 MB PDF (lazy page images, cache limits).
-
-### Phase 1: open and read (1–2 cycles)
-- Open PDFs from the explorer, File → Open, drag and drop, Finder/Explorer Open With; recent files and history.
-- PDF mode shell: page view, PDF bar (zoom, fit, page indicator, go to page), thumbnails (read-only), Inspector, ⌘F search, text selection and copy, links (external links confirm first), outline in the existing Outline pane, last page remembered in app settings, reload on external change, password prompt, clear error for damaged files.
-- Markdown deep links `#page=n`.
-- Tests: fixture PDFs (generated in-test with `QPdfWriter` for exact text, plus small committed fixtures: rotated pages, password, existing Preview annotations, damaged file); open/close/switch with an unsaved Markdown document; mode switch restores the Format Bar and menus; search hits; copy text; link activation; deep link to page; native self-check (`src/documentviewcheck.cpp`) gains a PDF-open group.
-
-### Phase 2: highlights, underline, strikethrough and notes in Markdown (2–3 cycles)
-- Highlighter tool with Preview's colour menu, underline, strikethrough, note pins; overlays drawn from the sidecar; notes panel; Copy as Markdown Quote; sidecar created on first markup; re-anchoring and "unplaced" list; delete and recolour.
-- Tests: sidecar round trip is byte-exact for untouched content; creating, recolouring and deleting items are minimal edits with one undo each; anchors redraw at the same page geometry after reopen; re-anchoring after a PDF change; Live/Source rendering of the sidecar hides markers; deep links from the sidecar open the right page.
-
-### Phase 3: page operations (2 cycles)
-- Rotate left/right (selected pages), delete, reorder by dragging thumbnails, insert pages from another PDF, export selected pages; pending edits with undo; atomic save with recovery copy; sidecar anchor remapping.
-- Tests: each operation verified by page count, page order (page text) and `/Rotate` via Qt PDF after save; sidecar `page=` remap; undo after save restores the exact previous bytes; failure mid-save leaves the original untouched.
-
-### Phase 4: more markup and sharing (2+ cycles, each item decided separately)
-- Shapes (rectangle, oval, line, arrow), text box, speech bubble, all stored in the sidecar.
-- **Export annotated PDF…** writes the sidecar's markup as real annotations into a copy (engine decided by spike).
-- Import existing PDF annotations into the sidecar.
-- Extract page text to a new Markdown document.
-
-### Not planned (R7)
-Form filling, signatures, editing PDF text, redaction (a real redaction must remove content, not cover it, and is a security feature in its own right), crop, OCR. The sidecar format, the qpdf writer and `PdfSession` keep the door open to text editing later without committing to it.
-
-## 6. Testing and verification approach
-
-- Red/green per `AGENTS.md`: each behavioural test is shown failing on the previous code.
-- Model tests (C++, offscreen): sidecar parser/writer, anchor maths, page-operation results checked through Qt PDF.
-- QML tests (offscreen): PDF mode switching, bar and menu visibility, tool actions.
-- Native checks: the packaged app's `--check-document-views` gains PDF groups; headless runs need Qt's offscreen platform plug-in added to a scratch copy (the packaged app ships only `cocoa`, see `research/cycle-158/README.md`).
-- Windows CI runs the same Qt tests and the deployed self-check on x64 and ARM64.
-- Fixture PDFs are small, generated or committed sample documents; no private PDFs (the Preview screenshots in this conversation show a private itinerary and are not committed).
+- **Who does what.** Each cycle is implemented from a written brief by a development model (Claude Opus 5.5 subagents); design, briefs, review of every diff, the red/green check, records and release steps are done by the reviewing model (Claude Fable 5.2). Andrew decides scope and tries each phase.
+- **Tests.** C++ model tests (offscreen) for `PdfSession`, the notes model and `pdfeditor`; QML tests (offscreen) for the pane and mode switching; the packaged app's `--check-document-views` gains PDF groups, run headless from a scratch copy with the offscreen plug-in (cycle 158) and on Windows CI's desktop. Every behavioural test is shown failing on the previous code. Fixtures are generated in tests or are small committed samples; no private PDFs.
+- **Evidence.** The full Mac suite locally (GitHub's macOS job has not been getting a runner; see STATUS), the editor tests on GitHub, and Windows CI on x64 and ARM64 for every merge.
+- **Markdown must not regress.** The full suite runs on every cycle; PDF code paths are inert unless a PDF is open.
 
 ## 7. Risks
 
-1. **Scope creep against the mission** (§2): mitigated by phases with explicit go/no-go and the "Maybe" gate.
-2. **`Backend` coupling** (§4.6): PDF mode must not regress Markdown save, recovery or Live; every phase runs the full suite.
-3. **Anchors drifting** when PDFs are replaced by newer versions: re-anchoring by quote text, "unplaced" list, never silent loss.
-4. **Large PDFs and memory**: page images must be lazy and bounded (the open "450 MB memory" question from earlier work applies).
-5. **Writing PDFs safely**: qpdf preserves structure, but encrypted, signed or malformed PDFs need refusal paths (a signed PDF's signature is invalidated by any change; warn first).
-6. **Licensing**: qpdf (Apache-2.0) is fine; any PDFium copy must be added to notices; MuPDF stays excluded; Qt's LGPL QML views are used unmodified or not at all.
-7. **Windows ARM64 dependencies** for qpdf.
-8. **Native menus changing at runtime** on macOS (spike 3).
+1. **`Backend` coupling.** Routing PDFs through `Backend::open` and giving an untitled document a save target touch persistence code. Mitigation: cycle 160 is that change alone with its own tests, before any interface work.
+2. **Programmatic edits in Live.** Marks must be inserted through the same host-to-editor path the Review pane and formatting use, or Live and the host diverge. Cycle 163 starts by identifying and testing that path.
+3. **Text-index stability.** Qt PDF's page text could differ across Qt versions; the quote check and re-anchoring cover it, and a test pins the indices for the fixtures.
+4. **Large or slow PDFs.** Rendering is off the GUI thread with one image per visible page; the memory test stays in the suite.
+5. **Writing PDFs.** Atomic replace, verification before replace, recovery copy, refusal for encrypted and signed files.
+6. **Windows dependencies.** qpdf through vcpkg is proven on both architectures (4 minutes a build); pin the vcpkg baseline and cache it in CI.
+7. **Scope.** Phase 4 items need separate decisions; nothing outside §4 is built.
 
 ## 8. Andrew's decisions (19 November 2026)
 
-1. Mission amendment in §2: **approved as written** (now in `MISSION.md`).
-2. Sidecar name: **`Report.pdf.md`**.
-3. Notes beside the PDF: **the existing Markdown editor (Source/Live) on the sidecar**, the §4.6 recommendation, with pins on the page as well.
-4. Explorer: **one row per PDF with a notes badge**; the sidecar opens with its PDF.
+1. Mission amendment: **approved as written** (in `MISSION.md`).
+2. Notes file name: **`Report.pdf.md`**.
+3. Notes beside the PDF: **the existing Markdown editor (Source/Live) on the notes file**, with pins on the page as well.
+4. Explorer: **one row per PDF with a notes badge**.
 5. Export annotated PDF: not yet decided; stays in Phase 4.
-
-## 9. Out of scope for this plan
-
-Cloud sync, collaboration, OCR, PDF creation other than the existing Markdown export, e-signatures, forms.
-
-## 10. Instructions for the reviewer
-
-You are reviewing a plan, not code. Do not start building.
-
-1. Read, in order: `MISSION.md`, `AGENTS.md`, `ARCHITECTURE.md`, `STATUS.md`, then this file. Skim `src/PublishingPreview.qml`, `src/backend.h`, `src/Main.qml` (document and pending-action flow), `src/FormatBar.qml`, `src/NativeMenuBar.qml`, `src/filelibrary.cpp`, `fomawrite.pro`, and on branch `windows/port` `src/WindowsMenuBar.qml` and `bin/windows/`.
-2. Check every **[verified]** statement you can and every **[assumption]**; say which you confirmed, refuted or could not test.
-3. Challenge §4 decision by decision. The highest-value questions: Is a Markdown sidecar the right primary store (4.1)? Is the sidecar format robust to Andrew and AI tools editing it (4.2)? Is reusing the Markdown editor for the notes pane sound given `Backend` (4.6)? Is qpdf the right writer, and what about annotated export (4.3)? Does PDF mode (4.5) meet R8 without destabilising the Markdown interface?
-4. Check the plan against R1–R10: anything missing, mis-scoped or over-built?
-5. Check the phases: is Phase 1 small enough to ship and use? Are the tests sufficient and red/green-able? Is anything ordered wrongly?
-6. Return: (a) a list of required changes with reasons, (b) optional improvements, (c) answers or recommendations for §8, and (d) either a revised version of this document or precise edits to it. Keep Fomawrite's rules: small verifiable cycles, the file is the truth, Mac and Windows parity, MIT-compatible licences.
+6. Review the plan, make it a complete programme, then build it, using development models for implementation (19 November).
