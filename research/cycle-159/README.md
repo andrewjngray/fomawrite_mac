@@ -22,7 +22,7 @@ Limits: the Windows "provider" variants are invalid (the spike passed a Windows 
 1. Fomawrite renders pages in its own item (`QPdfDocument::render` with annotations, one image per live delegate); it does not use `PdfPageImage` or `Image` for pages. `PublishingPreview.qml` uses `PdfPageImage` today and probably has the same retention (the earlier "450 MB" question); fixing that is listed in the plan as follow-up, not part of the PDF phases.
 2. The PDF menu is declared statically and shown only in PDF mode.
 3. qpdf is the one writing library, for page operations and later for the annotated export.
-4. Text markup is anchored by page text index plus the quoted text (geometry is derived at draw time), which the geometry result makes safe; note pins are stored in PDF user space using the mapping above.
+4. Text markup is anchored by page text index plus the quoted text (geometry is derived at draw time), which the geometry result makes safe; note pins are stored in page view points (Qt PDF exposes neither a page's rotation nor its CropBox, so that is the space Fomawrite can measure); the mapping above is used when qpdf is available, for rotation and export.
 
 ## Review
 The plan was reviewed against the code and these results and rewritten as a cycle-by-cycle development programme ([docs/pdf-plan.md](../../docs/pdf-plan.md), "Review" section lists what changed and why).
