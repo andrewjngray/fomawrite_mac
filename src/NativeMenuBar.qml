@@ -88,7 +88,7 @@ Platform.MenuBar {
         Platform.MenuItem { objectName: "editRedo"; text: "Redo"; enabled: win.canFormatLive || win.editTarget.canRedo; onTriggered: win.performDocumentEdit(function() { win.redoEditing(); }) }
         Platform.MenuSeparator {}
         Platform.MenuItem { text: "Cut"; enabled: win.canFormatLive || (win.sourceClipboardAllowed && !win.editTarget.readOnly && win.editTarget.selectedText.length > 0); onTriggered: { if (win.canFormatLive) win.liveWebAction("Cut"); else if (win.editTarget === editor) { backend.copySelection(editor.selectionStart, editor.selectionEnd, "markdown"); win.performDocumentEdit(function() { editor.remove(editor.selectionStart, editor.selectionEnd); }); } else win.editTarget.cut(); } }
-        Platform.MenuItem { text: "Copy"; enabled: win.canFormatLive || (win.sourceClipboardAllowed && win.editTarget.selectedText.length > 0); onTriggered: { if (win.canFormatLive) win.liveWebAction("Copy"); else if (win.editTarget === editor) backend.copySelection(editor.selectionStart, editor.selectionEnd, "markdown"); else win.editTarget.copy(); } }
+        Platform.MenuItem { objectName: "editCopy"; text: "Copy"; enabled: (win.pdfOwnsKeyboard && win.pdfReader.selectionText.length > 0) || win.canFormatLive || (win.sourceClipboardAllowed && win.editTarget.selectedText.length > 0); onTriggered: { if (win.pdfOwnsKeyboard) win.pdfReader.copySelection(); else if (win.canFormatLive) win.liveWebAction("Copy"); else if (win.editTarget === editor) backend.copySelection(editor.selectionStart, editor.selectionEnd, "markdown"); else win.editTarget.copy(); } }
         Platform.MenuItem { objectName: "editCopyFormatted"; text: "Copy Formatted"; enabled: win.canFormatLive || (win.sourceClipboardAllowed && win.editTarget === editor && editor.selectedText.length > 0); onTriggered: { if (win.canFormatLive) backend.liveCopySelection("formatted"); else backend.copySelection(editor.selectionStart, editor.selectionEnd, "formatted"); } }
         Platform.MenuItem { objectName: "editCopyHtml"; text: "Copy HTML"; enabled: win.canFormatLive || (win.sourceClipboardAllowed && win.editTarget === editor && editor.selectedText.length > 0); onTriggered: { if (win.canFormatLive) backend.liveCopySelection("html"); else backend.copySelection(editor.selectionStart, editor.selectionEnd, "html"); } }
         Platform.MenuItem { objectName: "editCopyMarkdown"; text: "Copy Markdown"; enabled: win.canFormatLive || (win.sourceClipboardAllowed && win.editTarget === editor && editor.selectedText.length > 0); onTriggered: { if (win.canFormatLive) backend.liveCopySelection("markdown"); else backend.copySelection(editor.selectionStart, editor.selectionEnd, "markdown"); } }
@@ -411,6 +411,25 @@ Platform.MenuBar {
         }
         Platform.MenuSeparator {}
         // AppKit supplies the native Full Screen item automatically.
+    }
+    // Declared here and shown only in PDF mode: a native menu inserted at
+    // runtime appears without its title (research/cycle-159, spike 3).
+    Platform.Menu {
+        objectName: "nativePdfMenu"
+        title: "PDF"
+        visible: win.pdfMode
+        enabled: win.pdfMode
+        Platform.MenuItem { objectName: "pdfMenuGoToPage"; text: "Go to Page…"; shortcut: "Ctrl+Alt+G"; enabled: win.pdfMode && !!win.pdfReader && win.pdfReader.ready; onTriggered: win.pdfCommand("goToPage") }
+        Platform.MenuSeparator {}
+        Platform.MenuItem { objectName: "pdfMenuZoomIn"; text: "Zoom In"; enabled: win.pdfMode && !!win.pdfReader && win.pdfReader.ready && win.pdfReader.zoom < win.pdfReader.maximumZoom - 0.001; onTriggered: win.pdfCommand("zoomIn") }
+        Platform.MenuItem { objectName: "pdfMenuZoomOut"; text: "Zoom Out"; enabled: win.pdfMode && !!win.pdfReader && win.pdfReader.ready && win.pdfReader.zoom > win.pdfReader.minimumZoom + 0.001; onTriggered: win.pdfCommand("zoomOut") }
+        Platform.MenuItem { objectName: "pdfMenuActualSize"; text: "Actual Size"; enabled: win.pdfMode && !!win.pdfReader && win.pdfReader.ready; onTriggered: win.pdfCommand("actualSize") }
+        Platform.MenuItem { objectName: "pdfMenuFitWidth"; text: "Zoom to Fit Width"; enabled: win.pdfMode && !!win.pdfReader && win.pdfReader.ready; onTriggered: win.pdfCommand("fitWidth") }
+        Platform.MenuSeparator {}
+        Platform.MenuItem { objectName: "pdfMenuThumbnails"; text: backend.pdf.thumbnailsVisible ? "Hide Thumbnails" : "Show Thumbnails"; enabled: win.pdfMode; onTriggered: win.pdfCommand("thumbnails") }
+        Platform.MenuItem { objectName: "pdfMenuInspector"; text: "Show Inspector"; shortcut: "Ctrl+Alt+I"; enabled: win.pdfMode && !!win.pdfReader && win.pdfReader.ready; onTriggered: win.pdfCommand("inspector") }
+        Platform.MenuSeparator {}
+        Platform.MenuItem { objectName: "pdfMenuFind"; text: "Find in PDF…"; enabled: win.pdfMode && !!win.pdfReader && win.pdfReader.ready; onTriggered: win.pdfCommand("find") }
     }
     Platform.Menu {
         title: "Window"

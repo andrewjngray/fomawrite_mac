@@ -21,6 +21,11 @@ Item {
     // Full native path of the open document ("" while untitled); the identity tooltip and
     // the right-click document menu are built from it.
     property string documentPath: backend.filePath
+    // PDF mode (Cycle 161): the preview slot holds the PDF, which carries its own
+    // toolbar; the publishing zoom, export and appearance controls step aside.
+    property bool pdfMode: false
+    property string pdfName: ""
+    readonly property string previewModeName: pdfMode ? "PDF" : "Preview"
     readonly property bool fullPreview: !editorPane.visible && previewPane.visible
     property bool keyboardReveal: false
     // Edge entry reveals until the next editing or scrolling gesture.
@@ -57,9 +62,9 @@ Item {
     component PreviewDocumentIdentity: Item {
         id: identity
         required property string identityPrefix
-        readonly property string displayName: root.documentName.length > 0 ? root.documentName : "Untitled.md"
+        readonly property string displayName: root.pdfMode ? root.pdfName : root.documentName.length > 0 ? root.documentName : "Untitled.md"
         readonly property string accessibleTitle: displayName + (root.documentModified ? " — Edited" : "")
-        readonly property string tooltipText: (root.documentPath.length > 0 ? root.documentPath : displayName) + (root.documentModified ? " — Edited" : "")
+        readonly property string tooltipText: (root.documentPath.length > 0 && !root.pdfMode ? root.documentPath : displayName) + (root.documentModified ? " — Edited" : "")
         objectName: identityPrefix + "Identity"
         implicitWidth: identityRow.implicitWidth
         implicitHeight: 20
@@ -82,7 +87,7 @@ Item {
             TapHandler {
                 objectName: identity.identityPrefix + "MenuTap"
                 acceptedButtons: Qt.RightButton
-                enabled: root.documentPath.length > 0
+                enabled: root.documentPath.length > 0 && !root.pdfMode
                 onTapped: (eventPoint) => root.documentMenuRequested(identity, eventPoint.position)
             }
             LineIcon {
@@ -268,7 +273,7 @@ Item {
             Label {
                 objectName: "fullPreviewHeaderModeLabel"
                 visible: root.fullPreview && root.toolbarContentVisible && root.writingControlsWidth >= 380
-                text: "Preview"
+                text: root.previewModeName
                 font.pixelSize: 13
                 color: backend.palette.muted
                 opacity: root.toolbarContentOpacity
@@ -298,11 +303,12 @@ Item {
                 ToolbarButton { id: sourceFormatButton; property bool sourceFormattingControl: true; objectName: "compactFormatButton"; visible: !root.fullPreview && !root.writingClusterExpanded && root.formattingClusterShown; iconName: "format"; hint: "Formatting"; enabled: trailing.formattingAllowed; onClicked: root.actionRequested("format", this) }
                 PaneZoomControls {
                     id: editorZoomControls
+                    visible: !(root.fullPreview && root.pdfMode)
                     zoomController: root.zoomController
                     pane: root.editorPane.visible ? "source" : "preview"
                 }
-                ToolbarButton { objectName: "workspaceAppearanceButton"; visible: !root.fullPreview || root.writingControlsWidth >= 540; text: "Aa"; hint: "Writing appearance"; onClicked: root.actionRequested("appearance", this) }
-                ToolbarButton { objectName: "exportHubButton"; visible: root.writingControlsWidth >= (root.fullPreview ? 540 : 450); iconName: "export"; hint: "Export and share"; onClicked: root.actionRequested("export", this) }
+                ToolbarButton { objectName: "workspaceAppearanceButton"; visible: (!root.fullPreview || root.writingControlsWidth >= 540) && !(root.fullPreview && root.pdfMode); text: "Aa"; hint: "Writing appearance"; onClicked: root.actionRequested("appearance", this) }
+                ToolbarButton { objectName: "exportHubButton"; visible: root.writingControlsWidth >= (root.fullPreview ? 540 : 450) && !(root.fullPreview && root.pdfMode); iconName: "export"; hint: "Export and share"; onClicked: root.actionRequested("export", this) }
             }
             ToolbarButton {
                 id: workspaceButton
@@ -330,7 +336,7 @@ Item {
             Label {
                 objectName: "previewHeaderModeLabel"
                 visible: splitPreviewHeader.width >= 500
-                text: "Preview"
+                text: root.previewModeName
                 color: backend.palette.muted
                 font.pixelSize: 13
             }
@@ -342,12 +348,13 @@ Item {
             }
             PaneZoomControls {
                 id: publishingZoomControls
+                visible: !root.pdfMode
                 zoomController: root.zoomController
                 pane: "preview"
                 controlsActive: root.editorPane.visible && root.previewPane.visible
             }
-            ToolbarButton { objectName: "previewHeaderExportButton"; visible: splitPreviewHeader.width >= 640; iconName: "export"; hint: "Export and share"; onClicked: root.actionRequested("export", this) }
-            ToolbarButton { objectName: "previewHeaderCloseButton"; iconName: "close"; hint: "Hide preview"; onClicked: root.actionRequested("hidePreview", this) }
+            ToolbarButton { objectName: "previewHeaderExportButton"; visible: splitPreviewHeader.width >= 640 && !root.pdfMode; iconName: "export"; hint: "Export and share"; onClicked: root.actionRequested("export", this) }
+            ToolbarButton { objectName: "previewHeaderCloseButton"; iconName: "close"; hint: root.pdfMode ? "Hide PDF" : "Hide preview"; onClicked: root.actionRequested("hidePreview", this) }
         }
     }
     Rectangle { anchors.bottom: parent.bottom; width: parent.width; height: 1; color: backend.palette.border }

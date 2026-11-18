@@ -22,7 +22,8 @@ ApplicationWindow {
     visible: true
     font.family: isMac || isWindows ? Qt.application.font.family : "Helvetica Neue"
     font.pixelSize: 13
-    title: (backend.modified ? "* " : "") + backend.fileName + " - Fomawrite"
+    // In PDF mode the window is named after the PDF; "*" still means unsaved notes.
+    title: (backend.modified ? "* " : "") + (backend.pdf.active ? backend.pdf.fileName : backend.fileName) + " - Fomawrite"
 
     readonly property bool isMac: Qt.platform.os === "osx"
     readonly property bool isWindows: Qt.platform.os === "windows"
@@ -424,6 +425,10 @@ ApplicationWindow {
             else { editor.forceActiveFocus(Qt.TabFocusReason); editorFlick.ensureCursorVisible(); }
             return;
         }
+        if (region === "preview" && pdfMode && pdfReaderSlot.visible && pdfReaderSlot.item) {
+            pdfReaderSlot.item.focusPages();
+            return;
+        }
         if (region === "preview" && previewPane.visible) {
             // Read-only Preview has no per-pane footer to receive tab focus.
             // Enter the visible writing surface explicitly in both modes.
@@ -449,13 +454,13 @@ ApplicationWindow {
         if (organizerSlot.visible) regions.push("organizer");
         if (filesSlot.visible) regions.push("files");
         if (editorPane.visible) regions.push("source");
-        if (previewPane.visible) regions.push("preview");
+        if (previewSlotItem.visible) regions.push("preview");
         if (reviewSlot.visible) regions.push("review");
         regions.push("toolbar");
         var current = isInside(activeFocusItem, organizerPane) ? "organizer"
             : isInside(activeFocusItem, libraryPane) ? "files"
             : isInside(activeFocusItem, editorPane) ? "source"
-            : isInside(activeFocusItem, previewPane) ? "preview"
+            : isInside(activeFocusItem, previewSlotItem) ? "preview"
             : isInside(activeFocusItem, reviewPane) ? "review" : "toolbar";
         var index = regions.indexOf(current);
         focusWorkspaceRegion(regions[(index + (reverse ? regions.length - 1 : 1)) % regions.length]);
@@ -545,6 +550,27 @@ ApplicationWindow {
     // notes; leaving PDF mode restores the arrangement chosen before it.
     readonly property bool pdfMode: backend.pdf.active
     readonly property Item previewSlotItem: pdfMode && pdfReaderSlot.item ? pdfReaderSlot : previewPane
+    readonly property var pdfReader: pdfMode ? pdfReaderSlot.item : null
+    // Keyboard focus is in the PDF pane (its pages, toolbar or find bar).
+    readonly property bool pdfOwnsKeyboard: !!pdfReader && !!activeFocusItem && isInside(activeFocusItem, pdfReader)
+    readonly property bool pdfFindOpen: !!pdfReader && pdfReader.findOpen
+    // The PDF menu and toolbar commands. A command that needs the pane shows it first.
+    function pdfCommand(command) {
+        if (!pdfReader) return;
+        if (workspaceLayout.effectiveLayoutMode === 0 && command !== "thumbnails")
+            setDocumentView(workspaceLayout.availableWidth >= 800 ? 1 : 2);
+        var reader = pdfReader;
+        switch (command) {
+        case "goToPage": Qt.callLater(reader.focusPageField); break;
+        case "zoomIn": reader.zoomIn(); break;
+        case "zoomOut": reader.zoomOut(); break;
+        case "actualSize": reader.actualSize(); break;
+        case "fitWidth": reader.fitWidth(); break;
+        case "thumbnails": reader.toggleThumbnails(); break;
+        case "inspector": Qt.callLater(reader.showInspector); break;
+        case "find": Qt.callLater(reader.openFind, false); break;
+        }
+    }
     property var layoutBeforePdf: null
     Connections {
         target: backend.pdf
@@ -999,7 +1025,9 @@ ApplicationWindow {
         organizerSlot: organizerSlot
         filesSlot: filesSlot
         editorPane: editorPane
-        previewPane: previewPane
+        previewPane: win.previewSlotItem
+        pdfMode: win.pdfMode
+        pdfName: backend.pdf.fileName
         onDocumentMenuRequested: function(anchor, position) {
             if (backend.fileUrl.toString() === "") return;
             documentContextMenu.showFor(anchor, {url: backend.fileUrl, name: backend.fileName, directory: false, available: true}, false, position);
@@ -1917,6 +1945,8 @@ ApplicationWindow {
     readonly property bool sourceClipboardAllowed: !lifecycleInputBlocked && (sourceEditorVisible || editTarget !== editor)
 
     function openSearch(withReplace, useSelection) {
+        // With the PDF pane focused, or the PDF alone on screen, Find searches the PDF.
+        if (pdfReader && previewSlotItem.visible && (pdfOwnsKeyboard || !editorPane.visible)) { pdfReader.openFind(useSelection); return; }
         // In Live, Find/Replace is the editor page's own search panel.
         if (workspaceLayout.liveEditEnabled && liveEditorLoader.item) { backend.editorBridge.runCommand(withReplace ? "replace" : "find"); return; }
         cancelDocumentViewportTransition();
@@ -1967,6 +1997,7 @@ ApplicationWindow {
     }
 
     function moveSearch(direction) {
+        if (pdfFindOpen && (!searchOpen || pdfOwnsKeyboard)) { pdfReader.moveFind(direction); return; }
         if (searchMatches.length === 0)
             return;
         searchMatchIndex = (searchMatchIndex + direction + searchMatches.length)
@@ -2077,14 +2108,14 @@ ApplicationWindow {
 
     Shortcut {
         sequence: "Ctrl+Shift+G"
-        enabled: win.searchOpen
+        enabled: win.searchOpen || win.pdfFindOpen
         onActivated: win.moveSearch(-1)
     }
 
     Shortcut {
         sequence: "Ctrl+G"
         context: Qt.WindowShortcut
-        enabled: win.searchOpen
+        enabled: win.searchOpen || win.pdfFindOpen
         onActivated: win.moveSearch(1)
     }
 
@@ -3721,6 +3752,7 @@ ApplicationWindow {
                 session: backend.pdf
                 bottomInset: documentFooter.height
                 darkMode: win.darkMode
+                onOpenUrlRequested: function(link) { backend.openExternalUrl(link); }
             }
         }
         // Spelling and Grammar sits right of the document. The footer spans the
@@ -3828,6 +3860,7 @@ ApplicationWindow {
         width: parent.width - x
         z: 2
         layoutMode: workspaceLayout.effectiveLayoutMode
+        pdfMode: win.pdfMode
         liveEditing: workspaceLayout.liveEditEnabled
         canSplit: workspaceLayout.availableWidth >= 800
         sourcePaneWidth: editorPane.visible ? editorPane.width : 0

@@ -1,8 +1,11 @@
 #include "pdfsession.h"
 
+#include <QClipboard>
 #include <QDateTime>
+#include <QElapsedTimer>
 #include <QFile>
 #include <QFileInfo>
+#include <QGuiApplication>
 #include <QPdfBookmarkModel>
 #include <QPdfDocument>
 #include <QPdfLink>
@@ -10,6 +13,7 @@
 #include <QPdfPageRenderer>
 #include <QPdfSelection>
 #include <QRegularExpression>
+#include <QSettings>
 #include <cmath>
 #include <functional>
 
@@ -24,6 +28,9 @@ QString loadErrorText(QPdfDocument::Error error, const QString &name) {
     }
 }
 
+const QString RememberedViewsKey = QStringLiteral("pdf/rememberedViews");
+const QString ThumbnailsKey = QStringLiteral("pdf/thumbnailsVisible");
+
 QVariantList normalisedRects(const QList<QPolygonF> &polygons) {
     QVariantList rects;
     for (const QPolygonF &polygon : polygons) rects.append(polygon.boundingRect().normalized());
@@ -35,6 +42,9 @@ PdfSession::PdfSession(QObject *parent) : QObject(parent) {
     m_reloadTimer.setSingleShot(true);
     m_reloadTimer.setInterval(300);
     connect(&m_reloadTimer, &QTimer::timeout, this, &PdfSession::reloadFromDisk);
+    m_searchTimer.setSingleShot(true);
+    m_searchTimer.setInterval(0);
+    connect(&m_searchTimer, &QTimer::timeout, this, &PdfSession::searchSlice);
     connect(&m_watcher, &QFileSystemWatcher::fileChanged, this, [this] { m_reloadTimer.start(); });
     // Atomic replacement drops the file from the watcher; the folder notices it
     // coming back (and notes files appearing beside it).
@@ -126,7 +136,9 @@ bool PdfSession::unlock(const QString &password) {
 void PdfSession::adopt(std::unique_ptr<QPdfDocument> document, const QUrl &url, const QString &password, const QString &state) {
     const bool sameFile = m_url == url;
     const bool wasActive = active();
+    const bool wasLocked = m_state == QLatin1String("password");
     m_reloadTimer.stop();
+    resetSearch();
     m_renderer.reset(); // a pending render never touches the document it replaces
     m_document = std::move(document);
     if (m_document) {
@@ -142,9 +154,17 @@ void PdfSession::adopt(std::unique_ptr<QPdfDocument> document, const QUrl &url, 
     m_errorText.clear();
     readInfo();
     watch();
+    m_largestPageSize = QSizeF();
+    for (int page = 0; page < pageCount(); ++page) {
+        const QSizeF size = m_document->pagePointSize(page);
+        m_largestPageSize = QSizeF(qMax(m_largestPageSize.width(), size.width()), qMax(m_largestPageSize.height(), size.height()));
+    }
     const bool notesBefore = m_notesExist;
     m_notesExist = QFileInfo(notesUrl().toLocalFile()).isFile();
-    m_requestedPage = sameFile ? qBound(0, m_requestedPage, qMax(0, pageCount() - 1)) : 0;
+    // A newly opened (or newly unlocked) PDF returns to where it was last read;
+    // a #page=N link sets the requested page after this.
+    const int wanted = sameFile && !wasLocked ? m_requestedPage : rememberedView(url).value(QStringLiteral("page"), 0).toInt();
+    m_requestedPage = qBound(0, wanted, qMax(0, pageCount() - 1));
     ++m_revision;
     if (!sameFile) emit urlChanged();
     emit stateChanged();
@@ -158,6 +178,7 @@ void PdfSession::close() {
     if (!active() && m_state == QLatin1String("none")) return;
     const bool wasActive = active();
     m_reloadTimer.stop();
+    resetSearch();
     const QStringList watched = m_watcher.files() + m_watcher.directories();
     if (!watched.isEmpty()) m_watcher.removePaths(watched);
     m_renderer.reset();
@@ -166,6 +187,7 @@ void PdfSession::close() {
     m_characterBoxes.clear();
     m_password.clear();
     m_info.clear();
+    m_largestPageSize = QSizeF();
     m_url.clear();
     m_requestedPage = 0;
     const bool notesBefore = m_notesExist;
@@ -241,6 +263,7 @@ void PdfSession::reloadFromDisk() {
         return;
     }
     // Keep the open document drawable? Its file is gone or rewritten, so say so.
+    resetSearch();
     m_renderer.reset();
     m_document.reset();
     m_pageText.clear();
@@ -276,11 +299,43 @@ QString PdfSession::pageText(int page) const {
     return it.value();
 }
 
-QVariantMap PdfSession::selectionMap(const QPdfSelection &selection) const {
+QVariantMap PdfSession::selectionMap(int page, const QPdfSelection &selection) const {
     if (!selection.isValid()) return {};
+    const int length = selection.endIndex() - selection.startIndex();
     return {{QStringLiteral("text"), selection.text()}, {QStringLiteral("start"), selection.startIndex()},
-            {QStringLiteral("length"), selection.endIndex() - selection.startIndex()},
-            {QStringLiteral("rects"), normalisedRects(selection.bounds())}};
+            {QStringLiteral("length"), length}, {QStringLiteral("rects"), lineRects(page, selection.startIndex(), length)}};
+}
+
+// One rectangle per line of the page's text. Some producers (Qt's own
+// QPdfWriter among them) place every glyph on its own, and Qt PDF then returns
+// a box per glyph; a line's boxes are joined when they lie on one line, across
+// or (on a turned page) down it, and kept apart otherwise.
+QVariantList PdfSession::lineRects(int page, int start, int length) const {
+    QVariantList rects;
+    const QString text = pageText(page);
+    const int end = qMin(int(text.size()), start + length);
+    for (int from = start; from < end;) {
+        int to = from;
+        while (to < end && text.at(to) != QLatin1Char('\n') && text.at(to) != QLatin1Char('\r')) ++to;
+        if (to > from) {
+            const QList<QPolygonF> polygons = m_document->getSelectionAtIndex(page, from, to - from).bounds();
+            QRectF united;
+            qreal tallest = 0, widest = 0;
+            for (const QPolygonF &polygon : polygons) {
+                const QRectF box = polygon.boundingRect().normalized();
+                united |= box;
+                tallest = qMax(tallest, box.height());
+                widest = qMax(widest, box.width());
+            }
+            if (polygons.size() == 1 || united.height() <= 1.5 * tallest || united.width() <= 1.5 * widest) {
+                if (!united.isEmpty()) rects.append(united);
+            } else {
+                rects += normalisedRects(polygons);
+            }
+        }
+        from = to + 1;
+    }
+    return rects;
 }
 
 // Qt's getSelection(page, from, to) drops the last character on pages with
@@ -321,12 +376,12 @@ QVariantMap PdfSession::selectionBetween(int page, QPointF from, QPointF to) con
     if (!ready() || page < 0 || page >= m_document->pageCount()) return {};
     const int first = characterNear(page, from), last = characterNear(page, to);
     if (first < 0 || last < 0) return {};
-    return selectionMap(m_document->getSelectionAtIndex(page, qMin(first, last), qAbs(last - first) + 1));
+    return selectionMap(page, m_document->getSelectionAtIndex(page, qMin(first, last), qAbs(last - first) + 1));
 }
 
 QVariantMap PdfSession::selectionAt(int page, int start, int length) const {
     if (!ready() || page < 0 || page >= m_document->pageCount() || start < 0 || length <= 0) return {};
-    return selectionMap(m_document->getSelectionAtIndex(page, start, length));
+    return selectionMap(page, m_document->getSelectionAtIndex(page, start, length));
 }
 
 QVariantMap PdfSession::wordAt(int page, QPointF point) const {
@@ -341,24 +396,69 @@ QVariantMap PdfSession::wordAt(int page, QPointF point) const {
     int start = hit, end = hit + 1;
     while (inWord(start - 1)) --start;
     while (inWord(end)) ++end;
-    return selectionMap(m_document->getSelectionAtIndex(page, start, end - start));
+    return selectionMap(page, m_document->getSelectionAtIndex(page, start, end - start));
+}
+
+QVariantList PdfSession::pageMatches(int page, const QString &query, int limit) const {
+    QVariantList results;
+    const QString text = pageText(page);
+    for (qsizetype at = text.indexOf(query, 0, Qt::CaseInsensitive); at >= 0 && results.size() < limit;
+         at = text.indexOf(query, at + query.size(), Qt::CaseInsensitive)) {
+        const qsizetype from = qMax<qsizetype>(0, at - 30);
+        results.append(QVariantMap{{QStringLiteral("page"), page}, {QStringLiteral("start"), int(at)},
+            {QStringLiteral("length"), int(query.size())},
+            {QStringLiteral("rects"), lineRects(page, int(at), int(query.size()))},
+            {QStringLiteral("context"), text.mid(from, at - from + query.size() + 30).simplified()}});
+    }
+    return results;
 }
 
 QVariantList PdfSession::search(const QString &query) const {
     QVariantList results;
     if (!ready() || query.isEmpty()) return results;
-    for (int page = 0; page < m_document->pageCount() && results.size() < SearchLimit; ++page) {
-        const QString text = pageText(page);
-        for (qsizetype at = text.indexOf(query, 0, Qt::CaseInsensitive); at >= 0 && results.size() < SearchLimit;
-             at = text.indexOf(query, at + query.size(), Qt::CaseInsensitive)) {
-            const qsizetype from = qMax<qsizetype>(0, at - 30);
-            results.append(QVariantMap{{QStringLiteral("page"), page}, {QStringLiteral("start"), int(at)},
-                {QStringLiteral("length"), int(query.size())},
-                {QStringLiteral("rects"), normalisedRects(m_document->getSelectionAtIndex(page, int(at), int(query.size())).bounds())},
-                {QStringLiteral("context"), text.mid(from, at - from + query.size() + 30).simplified()}});
-        }
-    }
+    for (int page = 0; page < m_document->pageCount() && results.size() < SearchLimit; ++page)
+        results += pageMatches(page, query, SearchLimit - int(results.size()));
     return results;
+}
+
+void PdfSession::startSearch(const QString &query) {
+    const bool hadResults = !m_searchResults.isEmpty() || !m_searchQuery.isEmpty();
+    m_searchTimer.stop();
+    m_searchQuery = query;
+    m_searchResults.clear();
+    m_searchPage = 0;
+    const bool searching = ready() && !query.isEmpty();
+    if (hadResults || searching) emit searchResultsChanged();
+    if (m_searching != searching) { m_searching = searching; emit searchingChanged(); }
+    if (searching) searchSlice();
+}
+
+// Text extraction and match geometry cost about half a millisecond a page on
+// dense text, so pages are taken about 12 ms at a time.
+void PdfSession::searchSlice() {
+    if (!m_searching) return;
+    if (!ready()) { resetSearch(); return; }
+    QElapsedTimer clock;
+    clock.start();
+    const int before = int(m_searchResults.size());
+    while (m_searchPage < m_document->pageCount() && m_searchResults.size() < SearchLimit && clock.elapsed() < 12)
+        m_searchResults += pageMatches(m_searchPage++, m_searchQuery, SearchLimit - int(m_searchResults.size()));
+    const bool done = m_searchPage >= m_document->pageCount() || m_searchResults.size() >= SearchLimit;
+    if (m_searchResults.size() != before) emit searchResultsChanged();
+    if (done) { m_searching = false; emit searchingChanged(); }
+    else m_searchTimer.start();
+}
+
+void PdfSession::clearSearch() { startSearch(QString()); }
+
+void PdfSession::resetSearch() {
+    m_searchTimer.stop();
+    const bool hadResults = !m_searchResults.isEmpty() || !m_searchQuery.isEmpty();
+    m_searchQuery.clear();
+    m_searchResults.clear();
+    m_searchPage = 0;
+    if (hadResults) emit searchResultsChanged();
+    if (m_searching) { m_searching = false; emit searchingChanged(); }
 }
 
 QVariantList PdfSession::links(int page) const {
@@ -397,4 +497,54 @@ QVariantList PdfSession::outline() const {
     };
     walk(QModelIndex());
     return result;
+}
+
+void PdfSession::copyText(const QString &text) const {
+    if (auto *clipboard = QGuiApplication::clipboard()) clipboard->setText(text);
+}
+
+bool PdfSession::thumbnailsVisible() const { return QSettings().value(ThumbnailsKey, false).toBool(); }
+
+void PdfSession::setThumbnailsVisible(bool visible) {
+    if (visible == thumbnailsVisible()) return;
+    QSettings().setValue(ThumbnailsKey, visible);
+    emit thumbnailsVisibleChanged();
+}
+
+void PdfSession::noteRenderRequest() {
+    ++m_renderRequestCount;
+    emit renderRequestCountChanged();
+}
+
+QString PdfSession::viewKey(const QUrl &url) {
+    QUrl target = url;
+    target.setFragment(QString());
+    if (!target.isLocalFile()) return {};
+    const QFileInfo file(target.toLocalFile());
+    const QString canonical = file.canonicalFilePath();
+    return canonical.isEmpty() ? file.absoluteFilePath() : canonical;
+}
+
+QVariantMap PdfSession::rememberedView(const QUrl &url) const {
+    const QString key = viewKey(url.isEmpty() ? m_url : url);
+    if (key.isEmpty()) return {};
+    for (const QVariant &value : QSettings().value(RememberedViewsKey).toList()) {
+        const QVariantMap view = value.toMap();
+        if (view.value(QStringLiteral("path")).toString() == key) return view;
+    }
+    return {};
+}
+
+void PdfSession::rememberView(const QUrl &url, int page, const QString &mode, qreal zoom) {
+    const QString key = viewKey(url);
+    if (key.isEmpty() || page < 0) return;
+    QSettings settings;
+    QVariantList views = settings.value(RememberedViewsKey).toList();
+    const QVariantMap view{{QStringLiteral("path"), key}, {QStringLiteral("page"), page},
+                           {QStringLiteral("mode"), mode}, {QStringLiteral("zoom"), zoom}};
+    if (!views.isEmpty() && views.constFirst().toMap() == view) return;
+    views.removeIf([&](const QVariant &value) { return value.toMap().value(QStringLiteral("path")).toString() == key; });
+    views.prepend(view);
+    while (views.size() > RememberedViewLimit) views.removeLast();
+    settings.setValue(RememberedViewsKey, views);
 }
