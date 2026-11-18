@@ -1,0 +1,13 @@
+{
+    "S3_nativeMenus": {
+        "afterAdd": "pdfspike,File,QtWindowMenu(hidden),Format,NSMenuItem,Help(hidden)",
+        "afterRemove": "pdfspike,File,QtWindowMenu(hidden),Format,Help(hidden)",
+        "formatHidden": "pdfspike,File,QtWindowMenu(hidden),Format(hidden),NSMenuItem,Help(hidden)",
+        "formatShown": "pdfspike,File,QtWindowMenu(hidden),Format,NSMenuItem,Help(hidden)",
+        "initial": "pdfspike,File,QtWindowMenu(hidden),Format,Help(hidden)"
+    },
+    "cpu": "arm64",
+    "os": "macOS Golden Gate (27.2.1)",
+    "platform": "cocoa",
+    "qtVersion": "6.11.2"
+}

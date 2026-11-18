@@ -1,0 +1,21 @@
+{
+    "S5_performance": {
+        "paintedPageItem": {
+            "delegatesAlive": 3,
+            "imagesAlive": 4,
+            "maxRssMB": 58.25,
+            "ms": 4212,
+            "platform": "offscreen",
+            "rssAfterGcMB": 58.3125,
+            "rssAfterMallocReliefMB": 58.3125,
+            "rssEndMB": 58.25,
+            "rssStartMB": 29.40625,
+            "waitPerStepMs": 15
+        },
+        "peakRssProcessMB": 58.390625
+    },
+    "cpu": "arm64",
+    "os": "macOS Golden Gate (27.2.1)",
+    "platform": "offscreen",
+    "qtVersion": "6.11.2"
+}

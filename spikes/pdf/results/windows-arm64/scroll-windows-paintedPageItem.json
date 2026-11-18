@@ -1,0 +1,21 @@
+{
+    "S5_performance": {
+        "paintedPageItem": {
+            "delegatesAlive": 3,
+            "imagesAlive": 4,
+            "maxRssMB": 96.7265625,
+            "ms": 4433,
+            "platform": "windows",
+            "rssAfterGcMB": 92.33203125,
+            "rssAfterMallocReliefMB": 92.33203125,
+            "rssEndMB": 92.625,
+            "rssStartMB": 41.56640625,
+            "waitPerStepMs": 15
+        },
+        "peakRssProcessMB": 96.7265625
+    },
+    "cpu": "arm64",
+    "os": "Windows 11 Version 25H2",
+    "platform": "windows",
+    "qtVersion": "6.11.3"
+}

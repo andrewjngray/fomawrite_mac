@@ -1,0 +1,21 @@
+{
+    "S5_performance": {
+        "peakRssProcessMB": 54.703125,
+        "provider_reuseItems": {
+            "delegatesAlive": 4,
+            "imagesAlive": 4,
+            "maxRssMB": 54.703125,
+            "ms": 4232,
+            "platform": "windows",
+            "rssAfterGcMB": 54.23828125,
+            "rssAfterMallocReliefMB": 54.23828125,
+            "rssEndMB": 54.49609375,
+            "rssStartMB": 41.796875,
+            "waitPerStepMs": 15
+        }
+    },
+    "cpu": "arm64",
+    "os": "Windows 11 Version 25H2",
+    "platform": "windows",
+    "qtVersion": "6.11.3"
+}

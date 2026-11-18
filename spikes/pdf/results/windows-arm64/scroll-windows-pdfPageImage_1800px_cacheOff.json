@@ -1,0 +1,21 @@
+{
+    "S5_performance": {
+        "pdfPageImage_1800px_cacheOff": {
+            "delegatesAlive": 3,
+            "imagesAlive": 4,
+            "maxRssMB": 2137.1328125,
+            "ms": 4250,
+            "platform": "windows",
+            "rssAfterGcMB": 2138.2421875,
+            "rssAfterMallocReliefMB": 2138.2421875,
+            "rssEndMB": 2149.33984375,
+            "rssStartMB": 60.36328125,
+            "waitPerStepMs": 15
+        },
+        "peakRssProcessMB": 2153.125
+    },
+    "cpu": "arm64",
+    "os": "Windows 11 Version 25H2",
+    "platform": "windows",
+    "qtVersion": "6.11.3"
+}

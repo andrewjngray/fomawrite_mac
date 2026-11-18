@@ -1,0 +1,21 @@
+{
+    "S5_performance": {
+        "paintedPageItem": {
+            "delegatesAlive": 3,
+            "imagesAlive": 4,
+            "maxRssMB": 78.87890625,
+            "ms": 4275,
+            "platform": "windows",
+            "rssAfterGcMB": 78.9375,
+            "rssAfterMallocReliefMB": 78.9375,
+            "rssEndMB": 78.87890625,
+            "rssStartMB": 34.3125,
+            "waitPerStepMs": 15
+        },
+        "peakRssProcessMB": 82.87890625
+    },
+    "cpu": "x86_64",
+    "os": "Windows Server 2022 Version 21H2",
+    "platform": "windows",
+    "qtVersion": "6.11.3"
+}

@@ -1,0 +1,21 @@
+{
+    "S5_performance": {
+        "peakRssProcessMB": 30.140625,
+        "provider_reuseItems": {
+            "delegatesAlive": 4,
+            "imagesAlive": 4,
+            "maxRssMB": 30.05859375,
+            "ms": 4214,
+            "platform": "offscreen",
+            "rssAfterGcMB": 30.125,
+            "rssAfterMallocReliefMB": 30.125,
+            "rssEndMB": 30.05859375,
+            "rssStartMB": 25.296875,
+            "waitPerStepMs": 15
+        }
+    },
+    "cpu": "x86_64",
+    "os": "Windows Server 2022 Version 21H2",
+    "platform": "offscreen",
+    "qtVersion": "6.11.3"
+}

@@ -1,0 +1,21 @@
+{
+    "S5_performance": {
+        "pdfPageImage_1800px_cacheOff": {
+            "delegatesAlive": 3,
+            "imagesAlive": 4,
+            "maxRssMB": 2226.4375,
+            "ms": 4308,
+            "platform": "windows",
+            "rssAfterGcMB": 2242.55859375,
+            "rssAfterMallocReliefMB": 2242.5625,
+            "rssEndMB": 2242.49609375,
+            "rssStartMB": 52.67578125,
+            "waitPerStepMs": 15
+        },
+        "peakRssProcessMB": 2242.7890625
+    },
+    "cpu": "x86_64",
+    "os": "Windows Server 2022 Version 21H2",
+    "platform": "windows",
+    "qtVersion": "6.11.3"
+}

@@ -1,0 +1,2 @@
+qpdf:arm64-windows                                12.4.2              A content-preserving PDF document transformer
+qpdf vcpkg build minutes: 4; import library: qpdf.lib
