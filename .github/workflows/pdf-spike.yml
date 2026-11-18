@@ -1,0 +1,50 @@
+name: PDF Phase 0 spike
+
+# Throwaway experiments for docs/pdf-plan.md Phase 0 (branch spike/pdf-phase0
+# only): qpdf via vcpkg on Windows x64 and ARM64, Qt PDF rendering,
+# geometry, Quick menus and page-view memory. No app is built or shipped.
+on:
+  push:
+    branches: [spike/pdf-phase0]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  spike:
+    name: PDF spike ${{ matrix.architecture }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - architecture: arm64
+            runner: windows-11-vs2026-arm
+          - architecture: x64
+            runner: windows-2022
+    defaults:
+      run:
+        shell: pwsh
+    env:
+      QT_ROOT_DIR: C:/Qt/6.11.3-${{ matrix.architecture }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install pinned Qt SDK with PDF
+        run: |
+          python bin/windows/install-qt.py --architecture ${{ matrix.architecture }} --output "$env:QT_ROOT_DIR"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Build qpdf and the spike, run all spikes
+        run: ./spikes/pdf/run-windows.ps1 -Architecture ${{ matrix.architecture }}
+      - name: Upload spike results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pdf-spike-${{ matrix.architecture }}
+          path: build/pdf-spike/${{ matrix.architecture }}/
+          if-no-files-found: ignore
+          retention-days: 14
