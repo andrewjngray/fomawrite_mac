@@ -1,6 +1,6 @@
 # PDF in Fomawrite: development plan (for review)
 
-Status: **plan only, nothing built.** Drafted 18 November 2026 by Claude Opus 5.5 from Andrew Gray's requests in a working session, for review by a second model (Claude Fable 5.1) before any build cycle starts.
+Status: **Phase 0 under way (19 November 2026); Andrew's decisions are in §8.** Nothing user-facing built yet. Drafted 18 November 2026 by Claude Opus 5.5 from Andrew Gray's requests in a working session, for review by a second model (Claude Fable 5.1) before any build cycle starts.
 
 ## How to use this document
 
@@ -215,13 +215,13 @@ Form filling, signatures, editing PDF text, redaction (a real redaction must rem
 7. **Windows ARM64 dependencies** for qpdf.
 8. **Native menus changing at runtime** on macOS (spike 3).
 
-## 8. Open questions for Andrew
+## 8. Andrew's decisions (19 November 2026)
 
-1. Approve the mission amendment in §2?
-2. Sidecar name: `Report.pdf.md` or `Report.notes.md`?
-3. Should notes appear in a side panel beside the PDF (recommended) or only as pins on the page?
-4. When a PDF in the explorer has notes, show the sidecar as its own row, or only as a badge on the PDF?
-5. Is "Export annotated PDF" (sharing highlights with people who use Preview or Acrobat) wanted soon, or only later?
+1. Mission amendment in §2: **approved as written** (now in `MISSION.md`).
+2. Sidecar name: **`Report.pdf.md`**.
+3. Notes beside the PDF: **the existing Markdown editor (Source/Live) on the sidecar**, the §4.6 recommendation, with pins on the page as well.
+4. Explorer: **one row per PDF with a notes badge**; the sidecar opens with its PDF.
+5. Export annotated PDF: not yet decided; stays in Phase 4.
 
 ## 9. Out of scope for this plan
 
