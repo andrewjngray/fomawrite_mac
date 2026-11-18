@@ -495,6 +495,28 @@ ApplicationWindow {
         }
     }
     readonly property var workspacePaneState: workspaceLayout.saveState()
+    // PDF mode (Cycle 160): the PDF takes the preview pane's slot and the editor
+    // shows its notes. Opening a PDF starts in PDF only, or split when it has
+    // notes; leaving PDF mode restores the arrangement chosen before it.
+    readonly property bool pdfMode: backend.pdf.active
+    readonly property Item previewSlotItem: pdfMode && pdfReaderSlot.item ? pdfReaderSlot : previewPane
+    property var layoutBeforePdf: null
+    Connections {
+        target: backend.pdf
+        function onOpened() {
+            if (!win.layoutBeforePdf)
+                win.layoutBeforePdf = { layoutMode: workspaceLayout.layoutMode, lastEditingLayoutMode: workspaceLayout.lastEditingLayoutMode };
+            if (win.searchOpen) win.closeSearch(false);
+            workspaceLayout.layoutMode = backend.pdf.notesExist ? 1 : 2;
+        }
+        function onActiveChanged() {
+            if (backend.pdf.active || !win.layoutBeforePdf) return;
+            var before = win.layoutBeforePdf;
+            win.layoutBeforePdf = null;
+            workspaceLayout.layoutMode = before.layoutMode;
+            workspaceLayout.lastEditingLayoutMode = before.lastEditingLayoutMode;
+        }
+    }
     // The approved presentation is adopted once, including checkpointed windows.
     // Future launches restore each window's subsequently chosen layout as usual.
     readonly property bool adoptReferenceWorkspace: typeof referenceWorkspaceUpgrade !== "undefined" && referenceWorkspaceUpgrade
@@ -583,7 +605,7 @@ ApplicationWindow {
     function equalizeDocumentPanes() {
         if (workspaceLayout.effectiveLayoutMode !== 1) return;
         beginDocumentViewportTransition(true);
-        var total = editorPane.width + previewPane.width;
+        var total = editorPane.width + previewSlotItem.width;
         workspaceLayout.updateWidth("preview", Math.max(320, Math.min(total / 2, total - 480)));
     }
     // Layout and editing choice are independent. Preview-only is a reading
@@ -1614,6 +1636,8 @@ ApplicationWindow {
 
     function navigateDocumentFragment(fragment) {
         if (fragment === "") return false;
+        var pdfPage = /^page=(\d+)$/.exec(fragment);
+        if (backend.pdf.active && pdfPage) { backend.pdf.requestedPage = Number(pdfPage[1]) - 1; return true; }
         var decoded;
         try { decoded = decodeURIComponent(fragment); }
         catch (error) {
@@ -1645,7 +1669,8 @@ ApplicationWindow {
         var opened = backend.open(target);
         if (opened) {
             navigationDrawer.close();
-            if (fragment !== "") navigateDocumentFragment(fragment);
+            // #page=N on a PDF was applied by backend.open.
+            if (fragment !== "" && !backend.pdf.active) navigateDocumentFragment(fragment);
         }
         return opened;
     }
@@ -1682,7 +1707,8 @@ ApplicationWindow {
         if (parts.fragment !== "" && (parts.url === "" || parts.url === String(backend.fileUrl)))
             return navigateDocumentFragment(parts.fragment);
         backend.rememberCursor(editor.cursorPosition);
-        if (!backend.modified) {
+        // The PDF on screen (or its notes): only its requested page changes.
+        if (!backend.modified || (backend.pdf.active && (parts.url === String(backend.pdf.url) || parts.url === String(backend.pdf.notesUrl)))) {
             return openDocumentTarget(parts.url, parts.fragment);
         }
         pendingOpenUrl = parts.url;
@@ -2606,14 +2632,14 @@ ApplicationWindow {
         property var resizeStart: null
         onResizingChanged: {
             if (resizing) {
-                resizeStart = { organizer: organizerSlot.width, files: filesSlot.width, preview: previewPane.width, review: reviewSlot.width };
+                resizeStart = { organizer: organizerSlot.width, files: filesSlot.width, preview: win.previewSlotItem.width, review: reviewSlot.width };
             } else if (resizeStart) {
-                var actual = { organizer: organizerSlot.width, files: filesSlot.width, preview: previewPane.width, review: reviewSlot.width };
+                var actual = { organizer: organizerSlot.width, files: filesSlot.width, preview: win.previewSlotItem.width, review: reviewSlot.width };
                 if (organizerSlot.visible && Math.abs(actual.organizer - resizeStart.organizer) > 1)
                     workspaceLayout.updateWidth("organizer", actual.organizer);
                 if (filesSlot.visible && Math.abs(actual.files - resizeStart.files) > 1)
                     workspaceLayout.updateWidth("files", actual.files);
-                if (previewPane.visible && editorPane.visible && Math.abs(actual.preview - resizeStart.preview) > 1)
+                if (win.previewSlotItem.visible && editorPane.visible && Math.abs(actual.preview - resizeStart.preview) > 1)
                     workspaceLayout.updateWidth("preview", actual.preview);
                 if (reviewSlot.visible && Math.abs(actual.review - resizeStart.review) > 1)
                     workspaceLayout.updateWidth("review", actual.review);
@@ -2622,6 +2648,7 @@ ApplicationWindow {
                 organizerSlot.SplitView.preferredWidth = Qt.binding(function() { return workspaceLayout.effectiveOrganizerWidth; });
                 filesSlot.SplitView.preferredWidth = Qt.binding(function() { return workspaceLayout.effectiveFileWidth; });
                 previewPane.SplitView.preferredWidth = Qt.binding(function() { return workspaceLayout.effectivePreviewWidth; });
+                pdfReaderSlot.SplitView.preferredWidth = Qt.binding(function() { return workspaceLayout.effectivePreviewWidth; });
                 reviewSlot.SplitView.preferredWidth = Qt.binding(function() { return workspaceLayout.effectiveReviewWidth; });
             }
         }
@@ -2633,7 +2660,7 @@ ApplicationWindow {
         orientation: Qt.Horizontal
         handle: Rectangle {
             id: workspaceDivider
-            readonly property bool documentDivider: editorPane.visible && previewPane.visible
+            readonly property bool documentDivider: editorPane.visible && win.previewSlotItem.visible
                 && Math.abs(x - (editorPane.x + editorPane.width)) <= 2
             objectName: documentDivider ? "documentSplitDivider" : "workspaceDivider"
             implicitWidth: 1
@@ -2654,7 +2681,7 @@ ApplicationWindow {
                 anchors.fill: parent
                 commands: workspaceCommands
                 library: backend.library
-                currentFile: backend.fileUrl
+                currentFile: backend.displayedFileUrl
                 darkMode: win.darkMode
                 onSearchRequested: function(query, contents, folder) { backend.library.rootFolder=folder; quickQuery.text=query; quickContents.checked=contents; navigationDrawer.close(); quickOpenDialog.open(); }
                 onOpenRequested: function(file) { win.requestOpen(file); }
@@ -2672,7 +2699,7 @@ ApplicationWindow {
                 anchors.fill: parent
                 commands: workspaceCommands
                 library: backend.library
-                currentFile: backend.fileUrl
+                currentFile: backend.displayedFileUrl
                 darkMode: win.darkMode
                 onCreateRequested: function(name, inNewWindow) { win.requestCreateDocument(name, inNewWindow); }
                 onOpenRequested: function(file) { win.requestOpen(file); }
@@ -3503,7 +3530,8 @@ ApplicationWindow {
             markdown: editor.text
             documentBaseUrl: backend.documentBaseUrl
             darkMode: win.darkMode
-            visible: workspaceLayout.effectiveLayoutMode !== 0
+            // Hidden in PDF mode, where it neither renders nor refreshes.
+            visible: workspaceLayout.effectiveLayoutMode !== 0 && !win.pdfMode
             SplitView.fillWidth: workspaceLayout.effectiveLayoutMode === 2
             SplitView.preferredWidth: workspaceLayout.effectivePreviewWidth
             SplitView.minimumWidth: 320
@@ -3521,6 +3549,21 @@ ApplicationWindow {
                     win.requestOpen(resolved);
                 else
                     backend.openExternalUrl(resolved);
+            }
+        }
+        // The PDF in PDF mode; nothing is created otherwise.
+        Loader {
+            id: pdfReaderSlot
+            objectName: "pdfReaderSlot"
+            active: win.pdfMode
+            visible: active && workspaceLayout.effectiveLayoutMode !== 0
+            SplitView.fillWidth: workspaceLayout.effectiveLayoutMode === 2
+            SplitView.preferredWidth: workspaceLayout.effectivePreviewWidth
+            SplitView.minimumWidth: 320
+            sourceComponent: PdfReader {
+                session: backend.pdf
+                bottomInset: documentFooter.height
+                darkMode: win.darkMode
             }
         }
         // Spelling and Grammar sits right of the document. The footer spans the
@@ -3552,7 +3595,7 @@ ApplicationWindow {
     MouseArea {
         id: documentDividerGestures
         objectName: "documentDividerGestures"
-        visible: editorPane.visible && previewPane.visible
+        visible: editorPane.visible && win.previewSlotItem.visible
         x: workspaceSplit.x + editorPane.x + editorPane.width - 4
         y: workspaceSplit.y
         width: 9
@@ -3574,7 +3617,7 @@ ApplicationWindow {
         }
         onPressed: function(mouse) {
             pressSceneX = mapToItem(win.contentItem, mouse.x, mouse.y).x;
-            pressPreviewWidth = previewPane.width;
+            pressPreviewWidth = win.previewSlotItem.width;
             balanceOnRelease = false;
             win.beginDocumentViewportTransition(true);
             readingAnchors = { source: win.documentViewportTransition.sourceAnchor,
@@ -3583,9 +3626,9 @@ ApplicationWindow {
         onPositionChanged: function(mouse) {
             if (!pressed || balanceOnRelease || !readingAnchors) return;
             var delta = mapToItem(win.contentItem, mouse.x, mouse.y).x - pressSceneX;
-            var total = editorPane.width + previewPane.width;
+            var total = editorPane.width + win.previewSlotItem.width;
             var next = Math.max(320, Math.min(total - 480, pressPreviewWidth - delta));
-            if (Math.abs(next - previewPane.width) < 0.5) return;
+            if (Math.abs(next - win.previewSlotItem.width) < 0.5) return;
             preserveReadingPosition();
             workspaceLayout.updateWidth("preview", next);
         }
@@ -3623,7 +3666,7 @@ ApplicationWindow {
         activityHidden: workspaceSettings.autoHideChrome && win.documentChromeHidden
         menuOpen: win.documentChromeMenuOpen
         objectName: "documentFooter"
-        x: editorPane.visible ? editorPane.x : previewPane.x
+        x: editorPane.visible ? editorPane.x : win.previewSlotItem.x
         anchors.bottom: parent.bottom
         width: parent.width - x
         z: 2
@@ -3631,7 +3674,7 @@ ApplicationWindow {
         liveEditing: workspaceLayout.liveEditEnabled
         canSplit: workspaceLayout.availableWidth >= 800
         sourcePaneWidth: editorPane.visible ? editorPane.width : 0
-        previewPaneStart: previewPane.visible ? previewPane.x - x : width
+        previewPaneStart: win.previewSlotItem.visible ? win.previewSlotItem.x - x : width
         writingAppearance: workspaceLayout.liveEditEnabled ? backend.publishingThemeName : win.codeAppearance ? "Code" : win.activeWritingAppearance === "editorial" ? "Editorial" : win.activeWritingAppearance === "book" ? "Book" : win.activeWritingAppearance === "omawrite" ? "Omawrite" : "Manuscript"
         previewTemplate: backend.publishingThemeName
         statusText: backend.status

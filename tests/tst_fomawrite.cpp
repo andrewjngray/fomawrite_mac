@@ -205,6 +205,18 @@ private slots:
     void libraryNewMenuListsTheNewAndViewItemsInOrder();
     void libraryPlusCreatesADocumentAndNewFolderOpensTheFolderDialog();
     void libraryPlusPutsTheCaretInTheNewDocument();
+    void pdfSessionLoadsRefusesAndUnlocks();
+    void pdfSessionReportsPageSizesLabelsAndText();
+    void pdfSessionSelectionGeometryMatchesTheSpikeMapping();
+    void pdfSessionReadsLinksAndOutline();
+    void pdfPageDrawsTheAnnotationsInTheFile();
+    void pdfPageListScrollKeepsMemoryBounded();
+    void pdfOpenEntersPdfModeWithANotesCompanion();
+    void pdfOpenFailuresHistoryAndRecentsUseThePdf();
+    void pdfNotesStillOpenWhenTheirPdfCannotBeRead();
+    void pdfOpenFromAModifiedDocumentAsksFirst();
+    void pdfExplorerListsPdfsAndFoldsNotesIntoABadge();
+    void pdfExplorerRowOpensThePdfAndTheWindowShowsIt();
     void libraryNewMenuItemsAreDisabledWithoutAFolder();
     void harperBridgeAnswersLintRequestsFromTheHost();
     void harperEngineCachesDedupesAndMapsKinds();
@@ -5369,3 +5381,4 @@ int main(int argc, char **argv) {
 #include "cycle155-ui-fixes.inc"
 #include "cycle155-editing-fixes.inc"
 #include "cycle156-new-document-focus.inc"
+#include "cycle160-pdf-core.inc"

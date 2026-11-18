@@ -23,6 +23,7 @@
 #include "spellcheck.h"
 #include "harperengine.h"
 #include "harperupdater.h"
+#include "pdfsession.h"
 
 class MarkdownHighlighter;
 class QTextDocument;
@@ -49,6 +50,11 @@ class Backend : public QObject, public PublishingSource {
     Q_PROPERTY(QObject *library READ library CONSTANT)
     Q_PROPERTY(QObject *publisher READ publisher CONSTANT)
     Q_PROPERTY(QObject *editorBridge READ editorBridge CONSTANT)
+    // The window's PDF (PDF mode while backend.pdf.active): the document is then its notes file.
+    Q_PROPERTY(QObject *pdf READ pdf CONSTANT)
+    // The file the window shows: the PDF in PDF mode, otherwise the document.
+    // Recents, history, the explorer's highlight and window ownership use it.
+    Q_PROPERTY(QUrl displayedFileUrl READ displayedFileUrl NOTIFY fileUrlChanged)
     Q_PROPERTY(QUrl documentBaseUrl READ documentBaseUrl NOTIFY fileUrlChanged)
     Q_PROPERTY(QUrl fileUrl READ fileUrl NOTIFY fileUrlChanged)
     Q_PROPERTY(QString publishingDocumentIdentity READ publishingDocumentIdentity NOTIFY publishingDocumentIdentityChanged)
@@ -85,6 +91,14 @@ public:
     QObject *library() { return &m_library; }
     QObject *publisher() { return m_publisher.get(); }
     EditorBridge *editorBridge() { return m_editorBridge.get(); }
+    PdfSession *pdf() { return &m_pdf; }
+    QUrl displayedFileUrl() const;
+    // Whether this window shows `canonicalPath`: its document, or in PDF mode
+    // the PDF or its notes file.
+    bool ownsDocument(const QString &canonicalPath) const;
+    // Where Save writes without a dialog while the document is still untitled:
+    // the notes file of the PDF beside it (empty otherwise).
+    QUrl saveTarget() const { return m_saveTarget; }
     SpellCheck *spellCheck() { return &m_spellCheck; }
     HarperUpdater *harperUpdater() { return &m_harperUpdater; }
     // Whether the weekly Harper update check runs (Main.qml starts it ten seconds after the
@@ -348,6 +362,14 @@ signals:
     void externalChangeDetected(bool deleted, bool locallyModified);
 
 private:
+    PdfSession m_pdf;
+    QUrl m_saveTarget;
+    bool openPdf(const QUrl &url, bool *pdfUnreadable = nullptr);
+    void closePdf();
+    bool readDocumentFile(const QUrl &documentUrl, QByteArray *contents);
+    void adoptDocument(const QUrl &documentUrl, const QByteArray &contents, const QUrl &shownUrl);
+    void startCompanionDocument(const QUrl &pdfUrl);
+    void recordOpened(const QUrl &shownUrl);
     QList<QPair<QUrl, int>> m_history;
     int m_historyIndex = -1;
     bool m_navigatingHistory = false;

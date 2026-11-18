@@ -188,8 +188,10 @@ Rectangle {
                 id: entry
                 objectName: "libraryEntry"
                 required property var modelData
+                readonly property bool pdf: !!modelData.pdf
                 readonly property bool documentCard: !modelData.directory && displaySettings.showExcerpts
-                readonly property var summary: documentCard ? root.library.documentSummary(modelData.url) : ({})
+                // A PDF is never read for a summary; its row shows its kind instead.
+                readonly property var summary: documentCard && !pdf ? root.library.documentSummary(modelData.url) : ({})
                 width: Math.max(0, fileList.width - (fileScrollBar.size < 1 ? 12 : 0))
                 height: Math.max(30, rowContent.implicitHeight + topPadding + bottomPadding)
                 topPadding: documentCard ? 6 : 0
@@ -203,7 +205,7 @@ Rectangle {
                 highlighted: !modelData.directory && modelData.url.toString() === (root.exploredFile.toString() !== "" ? root.exploredFile : root.currentFile).toString()
                 Accessible.name: modelData.name
                 Accessible.selected: highlighted
-                Accessible.description: modelData.directory ? "Folder" : modelData.name
+                Accessible.description: modelData.directory ? "Folder" : pdf ? (modelData.hasNotes ? "PDF with notes" : "PDF") : modelData.name
                 onClicked: {
                     if (modelData.directory) root.library.toggleFolder(modelData.url)
                     else root.openRequested(modelData.url)
@@ -251,6 +253,35 @@ Rectangle {
                                 Layout.minimumWidth: 0
                             }
                             Label {
+                                objectName: "libraryEntryKind"
+                                visible: entry.pdf
+                                text: "PDF"
+                                textFormat: Text.PlainText
+                                font.family: Qt.application.font.family
+                                font.pixelSize: 10
+                                font.weight: Font.DemiBold
+                                color: backend.palette.muted
+                            }
+                            Rectangle {
+                                objectName: "libraryEntryNotesBadge"
+                                visible: entry.pdf && !!entry.modelData.hasNotes
+                                Accessible.name: "Has notes"
+                                implicitWidth: notesBadgeText.implicitWidth + 8
+                                implicitHeight: notesBadgeText.implicitHeight + 2
+                                radius: height / 2
+                                color: "transparent"
+                                border.width: 1
+                                border.color: backend.palette.muted
+                                Label {
+                                    id: notesBadgeText
+                                    anchors.centerIn: parent
+                                    text: "notes"
+                                    font.family: Qt.application.font.family
+                                    font.pixelSize: 9
+                                    color: backend.palette.muted
+                                }
+                            }
+                            Label {
                                 objectName: "libraryEntryDate"
                                 textFormat: Text.PlainText
                                 visible: !entry.modelData.directory && displaySettings.dateMode !== 0
@@ -273,7 +304,7 @@ Rectangle {
                         Label {
                             objectName: "libraryEntryExcerpt"
                             textFormat: Text.PlainText
-                            visible: entry.documentCard
+                            visible: entry.documentCard && !entry.pdf
                             text: entry.summary.excerpt || "Empty document"
                             elide: Text.ElideRight
                             wrapMode: Text.Wrap

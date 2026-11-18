@@ -49,3 +49,9 @@ QT += webenginecore pdf
 HEADERS += ../src/typorabase.h ../src/publishingthemes.h ../src/publishinghtml.h ../src/publishingpdf.h ../src/publisher.h ../src/macbridge.h ../src/editorbridge.h
 QT += webchannel
 SOURCES += ../src/typorabase.cpp ../src/publishingthemes.cpp ../src/publishinghtml.cpp ../src/publishingpdf.cpp ../src/publisher.cpp ../src/editorbridge.cpp ../src/vendor/md4c/md4c.c
+
+# PDF reading (Cycle 160)
+SOURCES += ../src/pdfsession.cpp ../src/pdfpageitem.cpp
+HEADERS += ../src/pdfsession.h ../src/pdfpageitem.h
+HEADERS += pdffixtures.h
+win32: LIBS += -lpsapi

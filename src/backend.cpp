@@ -329,7 +329,9 @@ QVariantMap Backend::libraryItemInfo(const QUrl &url) const {
     return {{"name", info.fileName()}, {"url", url}, {"path", info.absoluteFilePath()},
         {"directory", info.isDir()}, {"available", true}, {"favorite", favorite},
         {"bytes", info.size()}, {"modified", info.lastModified().toString(Qt::ISODate)},
-        {"created", info.birthTime().toString(Qt::ISODate)}, {"writable", info.isWritable()}};
+        {"created", info.birthTime().toString(Qt::ISODate)}, {"writable", info.isWritable()},
+        {"pdf", !info.isDir() && FileLibrary::isPdfFile(info.fileName())},
+        {"hasNotes", !info.isDir() && FileLibrary::isPdfFile(info.fileName()) && QFileInfo(info.absoluteFilePath() + ".md").isFile()}};
 }
 
 bool Backend::libraryItemAction(const QUrl &url, const QString &action, const QString &argument) {
@@ -359,6 +361,12 @@ bool Backend::libraryItemAction(const QUrl &url, const QString &action, const QS
         if (dirtyOwners > 1) return fail("This document has unsaved edits in multiple views. Use the menu in the view you want to act on.");
     }
     if (action == "favorite") { m_library.toggleFavorite(url); return true; }
+    // A PDF is never read as text, and its notes file would have to move with
+    // it: rename, duplicate, trash and the text actions wait for a later cycle.
+    static const QStringList textOnly{"rename", "duplicate", "trash", "exportHtml", "exportPdf", "print",
+                                      "printSource", "printPreview", "copyMarkdown", "copyText", "copyHtml"};
+    if (!info.isDir() && FileLibrary::isPdfFile(info.fileName()) && textOnly.contains(action))
+        return fail("That action is not available for PDFs.");
     if (action == "reveal") {
         if (!m_library.showInFileManager(url)) return fail("Could not show this item in the file manager.");
         return true;
@@ -491,8 +499,8 @@ QVariantMap Backend::resolveOpenPath(const QString &input) const {
     const QFileInfo info(path);
     if (!info.exists()) return error(QStringLiteral("That file or folder does not exist."));
     if (!info.isReadable()) return error(QStringLiteral("That file or folder is not readable."));
-    if (!info.isDir() && (!info.isFile() || !FileLibrary::isTextFile(path)))
-        return error(QStringLiteral("Choose a folder or a Markdown/text file (.md, .markdown, .mdown, .txt, .text)."));
+    if (!info.isDir() && (!info.isFile() || !(FileLibrary::isTextFile(path) || FileLibrary::isPdfFile(path))))
+        return error(QStringLiteral("Choose a folder, a Markdown/text file (.md, .markdown, .mdown, .txt, .text) or a PDF."));
     return {{"url", QUrl::fromLocalFile(info.canonicalFilePath())}, {"folder", info.isDir()}};
 }
 
@@ -764,7 +772,9 @@ QString Backend::bundledHelp(const QString &page) const {
 }
 
 QUrl Backend::documentBaseUrl() const {
-    const QString path = m_fileUrl.isLocalFile() ? QFileInfo(m_fileUrl.toLocalFile()).absolutePath()
+    // An untitled notes document resolves links (Report.pdf#page=3) beside its PDF.
+    const QUrl located = m_fileUrl.isLocalFile() ? m_fileUrl : m_saveTarget;
+    const QString path = located.isLocalFile() ? QFileInfo(located.toLocalFile()).absolutePath()
         : m_library.rootFolder().toLocalFile();
     return path.isEmpty() ? QUrl() : QUrl::fromLocalFile(path + QDir::separator());
 }
@@ -782,6 +792,8 @@ QString Backend::filePath() const {
 }
 
 QString Backend::fileName() const {
+    if ((!m_fileUrl.isValid() || m_fileUrl.isEmpty()) && m_saveTarget.isLocalFile())
+        return QFileInfo(m_saveTarget.toLocalFile()).fileName();
     if (!m_fileUrl.isValid() || m_fileUrl.isEmpty())
         return QStringLiteral("Untitled.md");
 
@@ -2086,9 +2098,31 @@ QByteArray Backend::encodeDocumentText(const QString &text) const {
     return bytes;
 }
 
+QUrl Backend::displayedFileUrl() const {
+    return m_pdf.active() ? m_pdf.url() : m_fileUrl;
+}
+
+bool Backend::ownsDocument(const QString &canonicalPath) const {
+    if (canonicalPath.isEmpty()) return false;
+    const auto canonical = [](const QUrl &url) { return QFileInfo(url.toLocalFile()).canonicalFilePath(); };
+    if (canonical(m_fileUrl) == canonicalPath) return true;
+    return m_pdf.active() && (canonical(m_pdf.url()) == canonicalPath || canonical(m_pdf.notesUrl()) == canonicalPath);
+}
+
 bool Backend::open(const QUrl &url) {
     QUrl documentUrl = url;
     documentUrl.setFragment(QString());
+    if (documentUrl.isLocalFile()) {
+        if (PdfSession::isPdfPath(documentUrl.toLocalFile())) return openPdf(url);
+        // A notes file opened directly brings its PDF along when the PDF is beside it.
+        const QString path = documentUrl.toLocalFile();
+        if (path.endsWith(QStringLiteral(".pdf.md"), Qt::CaseInsensitive) && QFileInfo(path.chopped(3)).isFile()) {
+            bool pdfUnreadable = false;
+            if (openPdf(QUrl::fromLocalFile(path.chopped(3)), &pdfUnreadable)) return true;
+            // Notes whose PDF cannot be loaded are still a Markdown document.
+            if (!pdfUnreadable) return false;
+        }
+    }
     const QString canonical = QFileInfo(documentUrl.toLocalFile()).canonicalFilePath();
     const bool sameDocument = !canonical.isEmpty() && canonical == QFileInfo(m_fileUrl.toLocalFile()).canonicalFilePath();
     if (!sameDocument && focusExistingDocument && focusExistingDocument(url)) return false;
@@ -2096,21 +2130,36 @@ bool Backend::open(const QUrl &url) {
         setStatus(QStringLiteral("Only local files can be opened."));
         return false;
     }
+    QByteArray contents;
+    if (!readDocumentFile(documentUrl, &contents)) return false;
+    // Any other document ends PDF mode (a reload of the notes file stays in it).
+    const bool keepPdf = m_pdf.active() && sameDocument;
+    if (!keepPdf) closePdf();
+    adoptDocument(documentUrl, contents, keepPdf ? m_pdf.url() : documentUrl);
+    return true;
+}
 
+// Raw bytes: QIODevice::Text would strip every '\r', collapsing CR-only
+// files to one line and making CRLF files never match the disk.
+bool Backend::readDocumentFile(const QUrl &documentUrl, QByteArray *contents) {
     const QString targetName = QFileInfo(documentUrl.toLocalFile()).fileName();
-    // Read raw bytes: QIODevice::Text would strip every '\r', collapsing
-    // CR-only files to one line and making CRLF files never match the disk.
     QFile file(documentUrl.toLocalFile());
     if (!file.open(QIODevice::ReadOnly)) {
         setStatus(QStringLiteral("Could not open %1.").arg(targetName));
         return false;
     }
-
-    const QByteArray contents = file.readAll();
+    *contents = file.readAll();
     if (file.error() != QFileDevice::NoError) {
         setStatus(QStringLiteral("Could not finish reading the document."));
         return false;
     }
+    return true;
+}
+
+// Makes the read bytes the window's document. `shownUrl` is what recents,
+// history and the explorer record: the document, or the PDF in PDF mode.
+void Backend::adoptDocument(const QUrl &documentUrl, const QByteArray &contents, const QUrl &shownUrl) {
+    const QString canonical = QFileInfo(documentUrl.toLocalFile()).canonicalFilePath();
     QString text;
     const bool lossless = decodeDocumentBytes(contents, &text);
     loadDocumentText(text);
@@ -2125,31 +2174,94 @@ bool Backend::open(const QUrl &url) {
             candidate->m_requiresViewConflictCheck = true;
         }
     }
+    m_saveTarget.clear();
     setFileUrl(documentUrl);
     loadAuthorship(documentUrl);
-    m_library.recordRecentFile(documentUrl);
-    if (m_library.rootFolder().isEmpty())
-        m_library.setRootFolder(QUrl::fromLocalFile(QFileInfo(documentUrl.toLocalFile()).absolutePath()));
-    m_library.revealFile(documentUrl);
     watchCurrentFile();
     setModified(false);
+    const QString shownName = shownUrl == documentUrl ? fileName() : QFileInfo(shownUrl.toLocalFile()).fileName();
     if (!lossless)
         setStatus(QStringLiteral("Opened %1 — not valid UTF-8, so it cannot be saved in place. Use Save As to write a UTF-8 copy.").arg(fileName()));
     else if (m_mixedLineEndings)
         setStatus(QStringLiteral("Opened %1 — mixed line endings; saving will use the file's dominant style.").arg(fileName()));
     else
-        setStatus(QStringLiteral("Opened %1").arg(fileName()));
-    if (!m_navigatingHistory && (m_historyIndex < 0 || m_history[m_historyIndex].first != documentUrl)) {
+        setStatus(QStringLiteral("Opened %1").arg(shownName));
+    recordOpened(shownUrl);
+}
+
+void Backend::recordOpened(const QUrl &shownUrl) {
+    m_library.recordRecentFile(shownUrl);
+    if (m_library.rootFolder().isEmpty())
+        m_library.setRootFolder(QUrl::fromLocalFile(QFileInfo(shownUrl.toLocalFile()).absolutePath()));
+    m_library.revealFile(shownUrl);
+    if (!m_navigatingHistory && (m_historyIndex < 0 || m_history[m_historyIndex].first != shownUrl)) {
         while (m_history.size() > m_historyIndex + 1) m_history.removeLast();
-        m_history.append({documentUrl, 0});
+        m_history.append({shownUrl, 0});
         m_historyIndex = m_history.size() - 1;
         emit historyChanged();
     }
+}
+
+// PDF mode: the PDF is loaded in m_pdf and the document becomes its notes
+// file (Report.pdf.md), or an untitled document whose Save writes there.
+// Nothing changes when the PDF (or an existing notes file) cannot be read.
+bool Backend::openPdf(const QUrl &url, bool *pdfUnreadable) {
+    QUrl pdfUrl = url;
+    pdfUrl.setFragment(QString());
+    const QString canonical = QFileInfo(pdfUrl.toLocalFile()).canonicalFilePath();
+    const QUrl notesUrl = PdfSession::notesUrlFor(pdfUrl);
+    const bool samePdf = m_pdf.active() && !canonical.isEmpty()
+        && canonical == QFileInfo(m_pdf.url().toLocalFile()).canonicalFilePath();
+    const bool notesExist = QFileInfo(notesUrl.toLocalFile()).isFile();
+    if (!samePdf && focusExistingDocument
+            && (focusExistingDocument(url) || (notesExist && focusExistingDocument(notesUrl)))) return false;
+    static const QRegularExpression pageFragment(QStringLiteral("^page=(\\d+)$"));
+    const auto pageMatch = pageFragment.match(url.fragment());
+    if (samePdf) {
+        if (pageMatch.hasMatch()) m_pdf.setRequestedPage(pageMatch.captured(1).toInt() - 1);
+        recordOpened(m_pdf.url());
+        return true;
+    }
+    QByteArray notes;
+    if (notesExist && !readDocumentFile(notesUrl, &notes)) return false;
+    if (!m_pdf.load(pdfUrl)) {
+        setStatus(m_pdf.lastError());
+        if (pdfUnreadable) *pdfUnreadable = true;
+        return false;
+    }
+    if (notesExist) adoptDocument(notesUrl, notes, m_pdf.url());
+    else startCompanionDocument(m_pdf.url());
+    if (pageMatch.hasMatch()) m_pdf.setRequestedPage(pageMatch.captured(1).toInt() - 1);
+    emit fileUrlChanged(); // displayedFileUrl
     return true;
 }
 
+// As newDocument, but history stays and Save writes the PDF's notes file.
+void Backend::startCompanionDocument(const QUrl &pdfUrl) {
+    loadDocumentText(QString());
+    clearRecovery();
+    setFileUrl(QUrl());
+    m_lastKnownFileContents.clear();
+    m_hasKnownFileContents = false;
+    m_requiresViewConflictCheck = false;
+    resetPersistenceState();
+    m_saveTarget = PdfSession::notesUrlFor(pdfUrl);
+    watchCurrentFile();
+    setModified(false);
+    setStatus(QStringLiteral("Opened %1").arg(QFileInfo(pdfUrl.toLocalFile()).fileName()));
+    recordOpened(pdfUrl);
+    emit fileUrlChanged(); // fileName and documentBaseUrl follow the save target
+}
+
+void Backend::closePdf() {
+    m_saveTarget.clear();
+    if (!m_pdf.active()) return;
+    m_pdf.close();
+    emit fileUrlChanged();
+}
+
 void Backend::rememberCursor(int position) {
-    if (m_historyIndex >= 0 && m_history[m_historyIndex].first == m_fileUrl)
+    if (m_historyIndex >= 0 && m_history[m_historyIndex].first == displayedFileUrl())
         m_history[m_historyIndex].second = qMax(0, position);
 }
 
@@ -2218,6 +2330,13 @@ QUrl Backend::sourceLinkAt(int position) const {
 
 void Backend::save() {
     if (!m_fileUrl.isValid() || m_fileUrl.isEmpty()) {
+        // A PDF's untitled notes go to Report.pdf.md, unless a file of that name
+        // has appeared since: then the dialog asks rather than replacing it.
+        if (m_saveTarget.isLocalFile() && !QFileInfo::exists(m_saveTarget.toLocalFile())) {
+            const QUrl target = m_saveTarget; // saveTo clears m_saveTarget
+            saveTo(target);
+            return;
+        }
         saveAsDialog();
         return;
     }
@@ -2242,8 +2361,11 @@ void Backend::discardRecovery() {
 }
 
 void Backend::reloadFromDisk() {
-    if (m_fileUrl.isLocalFile())
-        open(m_fileUrl);
+    if (!m_fileUrl.isLocalFile()) return;
+    // Straight to the text path: in PDF mode open() on the notes file would
+    // only bring the (already open) PDF forward.
+    QByteArray contents;
+    if (readDocumentFile(m_fileUrl, &contents)) adoptDocument(m_fileUrl, contents, displayedFileUrl());
 }
 
 void Backend::keepExternalVersion() {
@@ -2284,6 +2406,7 @@ void Backend::printDocument(bool plain) {
 void Backend::newWindow() { emit newWindowRequested(QUrl()); }
 
 void Backend::newDocument() {
+    closePdf();
     m_history.clear();
     m_historyIndex = -1;
     emit historyChanged();
@@ -2465,7 +2588,7 @@ bool Backend::moveDocument(const QUrl &folder) {
 bool Backend::openInNewTab(const QUrl &url) {
     const QFileInfo info(url.toLocalFile());
     if (!url.isLocalFile() || !info.isFile() || !info.isReadable()
-            || !FileLibrary::isTextFile(info.fileName())) {
+            || !(FileLibrary::isTextFile(info.fileName()) || FileLibrary::isPdfFile(info.fileName()))) {
         setStatus(QStringLiteral("Choose an available, readable Markdown or text file."));
         return false;
     }
@@ -2484,7 +2607,7 @@ bool Backend::openInNewTab(const QUrl &url) {
 bool Backend::openInNewWindow(const QUrl &url) {
     const QFileInfo info(url.toLocalFile());
     if (!url.isLocalFile() || !info.isFile() || !info.isReadable()
-            || !FileLibrary::isTextFile(info.fileName())) {
+            || !(FileLibrary::isTextFile(info.fileName()) || FileLibrary::isPdfFile(info.fileName()))) {
         setStatus(QStringLiteral("The file is no longer available."));
         return false;
     }
@@ -2689,6 +2812,7 @@ void Backend::loadDocumentText(const QString &text) {
 }
 
 void Backend::setFileUrl(const QUrl &url) {
+    if (!url.isEmpty()) m_saveTarget.clear();
     if (m_fileUrl == url)
         return;
 
@@ -2820,7 +2944,12 @@ void Backend::saveTo(const QUrl &url, bool protectExternalChanges) {
     m_hasKnownFileContents = true;
     m_lossyDecode = false; // What is on disk is now exactly what we hold.
     setFileUrl(url);
-    m_library.recordRecentFile(url);
+    // The notes file belongs to the PDF in PDF mode; saving anywhere else leaves it.
+    const bool notesFile = m_pdf.active() && QFileInfo(url.toLocalFile()).canonicalFilePath()
+        == QFileInfo(m_pdf.notesUrl().toLocalFile()).canonicalFilePath();
+    if (m_pdf.active() && !notesFile) closePdf();
+    if (notesFile) m_pdf.refreshNotesExist();
+    m_library.recordRecentFile(notesFile ? m_pdf.url() : url);
     watchCurrentFile();
     QSettings().setValue(lastSaveDirectorySetting,
                          QFileInfo(url.toLocalFile()).absolutePath());
@@ -3051,6 +3180,8 @@ void Backend::watchOmarchyTheme() {
 QUrl Backend::suggestedSaveUrl() const {
     if (m_fileUrl.isLocalFile())
         return m_fileUrl;
+    if (m_saveTarget.isLocalFile())
+        return m_saveTarget;
 
     const QString savedDirectory = QSettings().value(lastSaveDirectorySetting).toString();
     const QDir directory = savedDirectory.isEmpty() || !QDir(savedDirectory).exists()
@@ -4130,6 +4261,12 @@ bool Backend::restoreVersion(const QUrl &url) {
 }
 void Backend::autosave() {
     if (m_requiresExplicitSave) { setStatus("Autosave paused: review the restored version and Save explicitly."); return; }
+    // A PDF's untitled notes are autosaved to their file, never over one that appeared meanwhile.
+    if (m_modified && m_fileUrl.isEmpty() && m_saveTarget.isLocalFile() && !QFileInfo::exists(m_saveTarget.toLocalFile())) {
+        const QUrl target = m_saveTarget; // saveTo clears m_saveTarget
+        saveTo(target);
+        return;
+    }
     if (!m_modified || !m_fileUrl.isLocalFile() || !m_hasKnownFileContents) return;
     QFile current(m_fileUrl.toLocalFile());
     if (!current.open(QIODevice::ReadOnly) || current.readAll() != m_lastKnownFileContents || current.error() != QFile::NoError) {

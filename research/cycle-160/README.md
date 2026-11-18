@@ -1,0 +1,31 @@
+# Cycle 160 — PDF core: session, page item, routing and the explorer
+
+Build 160 (`0.3.0-dev55`), 19 November 2026. First build cycle of the PDF programme ([docs/pdf-plan.md](../../docs/pdf-plan.md), §4.1 and the row "160" in §5). Implemented from a written brief by a development model (Claude Opus 5.5), reviewed and verified by Claude Fable 5.2. Not installed: Phase 1 is installed when cycle 162 completes.
+
+## What it does
+Opening a PDF (explorer, File → Open, recents, links, back/forward) now shows its pages in the preview pane's place, with existing annotations drawn. The editor holds the PDF's notes: `Report.pdf.md` if it exists, otherwise an untitled document that Save writes there. There is no toolbar, search, selection UI or menu yet (cycle 161).
+
+## What changed
+| Area | Change |
+|---|---|
+| `src/pdfsession.h/.cpp` (new) | `PdfSession`, owned by `Backend` as `backend.pdf`: one `QPdfDocument` per window; states none / ready / password / error; metadata for the Inspector (PDF version from the header); page sizes, labels and text; selections by text index, between two points and by word; search; links; outline; `requestedPage`; reload on disk change. All rectangles are normalised and in page view points. A failed load never disturbs a PDF already open. |
+| `src/pdfpageitem.h/.cpp` (new) | QML `PdfPage`: draws one page with the annotations in the file, rendered off the GUI thread by the session's `QPdfPageRenderer`; white until the image arrives; one texture per item, freed with it; stale results ignored; resize debounced. No `PdfPageImage`, `Image` or image provider (cycle 159, spike 5). |
+| `src/backend.h/.cpp` | `Backend::open` routes `.pdf` to `openPdf`; `X.pdf.md` opens `X.pdf` when it is beside it. The old body of `open` is split into `readDocumentFile`, `adoptDocument` and `recordOpened` and reused. The companion document is the notes file or an untitled document with a save target (`save()` and autosave write `X.pdf.md` without a dialog, never over a file that appeared meanwhile). Recents, history and the explorer's current file hold the PDF (`displayedFileUrl`); `ownsDocument` makes a window own both the PDF and its notes; `documentBaseUrl` for untitled notes is the PDF's folder; `#page=N` sets the requested page; any other document, `newDocument()` or Save As elsewhere leaves PDF mode. |
+| `src/filelibrary.h/.cpp`, `LibraryPane.qml`, `LibraryContextMenu.qml` | PDFs are listed with a "PDF" kind label; `X.pdf.md` is folded into a notes badge on its PDF's row; PDFs are never read as text (no excerpts, tags or content search). On PDF rows Duplicate, Rename, Move to Trash, Export, Print and the text copies are hidden or refused; Open, Open in New Tab/Window, Show in Finder, Favorite and Copy Path work. |
+| `src/PdfReader.qml` (new), `src/Main.qml` | A bare scrolling page list in the preview slot while a PDF is open (`PublishingPreview` hidden and idle). Layout: PDF only without notes, split with notes; leaving PDF mode restores the previous arrangement. The window's open flow does not prompt when the target is the PDF already shown. |
+| `src/main.cpp` | Other-window detection uses `ownsDocument`. |
+
+## Review findings (fixed before commit)
+1. A notes file beside a PDF that cannot be loaded (damaged, for example) could not be opened at all, because opening it routed to the PDF and failed. It now opens as plain Markdown (`pdfNotesStillOpenWhenTheirPdfCannotBeRead`, red on the brief's implementation: `open` returned false).
+
+Qt findings the implementation works around: `QPdfDocument::getSelection(page, from, to)` drops the last character on pages rotated 90° or 270°, so point selections are matched to per-character boxes and taken by text index; `QPdfLink::isValid()` is false for web links, so links are kept when they have rectangles and a page or URL.
+
+## Verification
+- `./bin/test`: **335 passed, 0 failed, 0 skipped** (323 before; 12 new in `tests/cycle160-pdf-core.inc`, fixtures built by `tests/pdffixtures.h`, a C++ port of the spike generator, plus `tests/fixtures/password.pdf`, 1.4 KB, made with `qpdf --encrypt`). `./bin/build` passes.
+- New tests: session load/refuse/unlock and Inspector fields; page sizes (rotations, CropBox 512×642), labels, text; selection geometry on every rotation and the CropBox page against the spike mapping, word and point selection, search; links and outline; a rendered `PdfPage` shows the file's highlight; **memory: scrolling 300 pages grows resident memory by about 7–15 MB** (ceiling 400 MB; the spike's `PdfPageImage` held 1.7 GB); routing (companion rules, save target, nothing written before Save, `#page=N`, failures change nothing, recents and history hold the PDF); the unsaved-changes prompt before a PDF opens; explorer rows, badge and no text reads; the window shows the reader and restores the Markdown layout.
+- Red/green checked by the reviewer: without the notes fallback `pdfNotesStillOpenWhenTheirPdfCannotBeRead` fails; without the annotations flag `pdfPageDrawsTheAnnotationsInTheFile` fails (yellow fraction 0). By the implementer: reverting the explorer listing fails both explorer tests; removing the PDF branches from `Backend::open` fails the three routing tests (the old code "opened" a damaged PDF as text). The explorer's no-text-read assertions also pass on the old code and are guards, not red/green evidence.
+
+## Open, for the cycles named
+- **161:** toolbar, zoom, selection, find, thumbnails, Inspector, password prompt, PDF menu, window title (the title still shows `X.pdf.md`); delay page render requests during fast scrolling (Qt's renderer cannot cancel queued pages); add `PdfReader.qml` to the embedded-QML identity lists (`src/documentviewcheck.cpp`, `bin/check-document-views`).
+- **162:** session restore (a PDF window with saved notes restores through its notes file; one with untitled notes is not restored, and the PDF-mode layout is what gets saved); crash recovery of untitled notes loses the PDF and save target; multi-window conflict checks compare only the notes file; links to PDFs from Source, Live and Preview; Rename / Move / Trash for a PDF with its notes; Open With.
+- Search and per-character boxes are computed on the GUI thread; fine for the fixtures, to be measured on large documents in 161.

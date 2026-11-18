@@ -88,6 +88,8 @@ public:
     Q_INVOKABLE void removeSearch(int index);
     static QStringList tagsIn(const QString &markdown);
     static bool isTextFile(const QString &path);
+    // Listed beside Markdown, but never read: no excerpts, tags or content search.
+    static bool isPdfFile(const QString &path);
 
 signals:
     void locationRejected(const QUrl &url, const QString &message, bool canFavorite);

@@ -268,6 +268,10 @@ bool FileLibrary::isTextFile(const QString &path) {
         || suffix == "txt" || suffix == "text";
 }
 
+bool FileLibrary::isPdfFile(const QString &path) {
+    return QFileInfo(path).suffix().compare(QLatin1String("pdf"), Qt::CaseInsensitive) == 0;
+}
+
 void FileLibrary::setError(const QString &error) {
     if (m_error == error) return;
     m_error = error;
@@ -366,7 +370,11 @@ void FileLibrary::appendDirectory(const QString &path, int depth, QStringList &w
         // Application bundles are not writing folders. Directory symlinks are
         // excluded to avoid loops and accidentally walking outside the library.
         if (directory && (info.isSymLink() || info.suffix() == "app")) continue;
-        if (!directory && !isTextFile(info.fileName())) continue;
+        const bool pdf = !directory && isPdfFile(info.fileName());
+        if (!directory && !pdf && !isTextFile(info.fileName())) continue;
+        // A PDF's notes (Report.pdf.md) show as the PDF row's badge, not as a row.
+        if (!directory && !pdf && info.fileName().endsWith(QStringLiteral(".pdf.md"), Qt::CaseInsensitive)
+            && QFileInfo(info.absoluteFilePath().chopped(3)).isFile()) continue;
         if (!directory && !m_filter.isEmpty()
             && !info.fileName().contains(m_filter, Qt::CaseInsensitive)) continue;
         const QString childPath = info.absoluteFilePath();
@@ -378,7 +386,8 @@ void FileLibrary::appendDirectory(const QString &path, int depth, QStringList &w
             {"modified", info.lastModified().toString("d MMM")},
             {"modifiedLabel", libraryDateLabel(info.lastModified())},
             {"createdLabel", libraryDateLabel(created)},
-            {"created", created.isValid() ? created.toString("d MMM") : QStringLiteral("Unavailable")}});
+            {"created", created.isValid() ? created.toString("d MMM") : QStringLiteral("Unavailable")},
+            {"pdf", pdf}, {"hasNotes", pdf && QFileInfo(childPath + QStringLiteral(".md")).isFile()}});
         if (expanded) appendDirectory(childPath, depth + 1, watched);
     }
 }
@@ -463,7 +472,7 @@ void FileLibrary::revealFile(const QUrl &url) {
 
 int FileLibrary::showFile(const QUrl &url) {
     const QFileInfo info(url.toLocalFile());
-    if (!url.isLocalFile() || !info.isFile() || !isTextFile(info.fileName())) {
+    if (!url.isLocalFile() || !info.isFile() || !(isTextFile(info.fileName()) || isPdfFile(info.fileName()))) {
         setError(QStringLiteral("This document is no longer available in the library."));
         return -1;
     }
@@ -488,8 +497,8 @@ int FileLibrary::exploreFolder(const QUrl &file) {
         setError(QStringLiteral("This document is no longer available."));
         return -1;
     }
-    if (!isTextFile(info.fileName())) {
-        setError(QStringLiteral("The library lists only Markdown and text files, so it cannot show this file."));
+    if (!isTextFile(info.fileName()) && !isPdfFile(info.fileName())) {
+        setError(QStringLiteral("The library lists only Markdown and text files (and PDFs), so it cannot show this file."));
         return -1;
     }
     if (info.fileName().startsWith(QLatin1Char('.'))) {

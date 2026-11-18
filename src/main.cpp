@@ -151,7 +151,7 @@ int main(int argc, char *argv[]) {
     app.setOrganizationName(QStringLiteral("AndrewGray"));
     app.setOrganizationDomain(QStringLiteral("andrewjngray.github.io"));
     app.setApplicationDisplayName(QStringLiteral("Fomawrite"));
-    app.setApplicationVersion(QStringLiteral("0.3.0-dev54"));
+    app.setApplicationVersion(QStringLiteral("0.3.0-dev55"));
     const int documentCheck = app.arguments().indexOf(QStringLiteral("--check-document-views"));
     if (documentCheck >= 0) {
         const QString destination = app.arguments().value(documentCheck + 1);
@@ -297,7 +297,7 @@ int main(int argc, char *argv[]) {
         if (path.isEmpty()) return false;
         for (const auto &session : sessions) {
             if (session->backend && session->backend != except && session->window
-                && QFileInfo(session->backend->fileUrl().toLocalFile()).canonicalFilePath() == path) {
+                && session->backend->ownsDocument(path)) {
                 if (session->window->windowState() == Qt::WindowMinimized) session->window->showNormal();
                 session->window->raise(); session->window->requestActivate();
                 if (!url.fragment().isEmpty())

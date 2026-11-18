@@ -1,0 +1,400 @@
+#include "pdfsession.h"
+
+#include <QDateTime>
+#include <QFile>
+#include <QFileInfo>
+#include <QPdfBookmarkModel>
+#include <QPdfDocument>
+#include <QPdfLink>
+#include <QPdfLinkModel>
+#include <QPdfPageRenderer>
+#include <QPdfSelection>
+#include <QRegularExpression>
+#include <cmath>
+#include <functional>
+
+namespace {
+QString loadErrorText(QPdfDocument::Error error, const QString &name) {
+    switch (error) {
+    case QPdfDocument::Error::FileNotFound: return QStringLiteral("%1 could not be found.").arg(name);
+    case QPdfDocument::Error::InvalidFileFormat: return QStringLiteral("%1 is damaged or is not a PDF.").arg(name);
+    case QPdfDocument::Error::IncorrectPassword: return QStringLiteral("The password for %1 is not correct.").arg(name);
+    case QPdfDocument::Error::UnsupportedSecurityScheme: return QStringLiteral("%1 uses a kind of encryption Fomawrite cannot open.").arg(name);
+    default: return QStringLiteral("%1 could not be opened as a PDF.").arg(name);
+    }
+}
+
+QVariantList normalisedRects(const QList<QPolygonF> &polygons) {
+    QVariantList rects;
+    for (const QPolygonF &polygon : polygons) rects.append(polygon.boundingRect().normalized());
+    return rects;
+}
+}
+
+PdfSession::PdfSession(QObject *parent) : QObject(parent) {
+    m_reloadTimer.setSingleShot(true);
+    m_reloadTimer.setInterval(300);
+    connect(&m_reloadTimer, &QTimer::timeout, this, &PdfSession::reloadFromDisk);
+    connect(&m_watcher, &QFileSystemWatcher::fileChanged, this, [this] { m_reloadTimer.start(); });
+    // Atomic replacement drops the file from the watcher; the folder notices it
+    // coming back (and notes files appearing beside it).
+    connect(&m_watcher, &QFileSystemWatcher::directoryChanged, this, [this] {
+        refreshNotesExist();
+        const QString path = m_url.toLocalFile();
+        if (!path.isEmpty() && QFileInfo::exists(path) && !m_watcher.files().contains(path)) m_reloadTimer.start();
+    });
+}
+
+PdfSession::~PdfSession() {
+    m_renderer.reset(); // before the document it renders
+}
+
+bool PdfSession::isPdfPath(const QString &path) {
+    return QFileInfo(path).suffix().compare(QLatin1String("pdf"), Qt::CaseInsensitive) == 0;
+}
+
+QUrl PdfSession::notesUrlFor(const QUrl &pdfUrl) {
+    if (!pdfUrl.isLocalFile()) return {};
+    return QUrl::fromLocalFile(pdfUrl.toLocalFile() + QStringLiteral(".md"));
+}
+
+QString PdfSession::fileName() const {
+    return m_url.isLocalFile() ? QFileInfo(m_url.toLocalFile()).fileName() : QString();
+}
+
+int PdfSession::pageCount() const { return ready() ? m_document->pageCount() : 0; }
+
+bool PdfSession::ready() const {
+    return m_document && m_state == QLatin1String("ready") && m_document->status() == QPdfDocument::Status::Ready;
+}
+
+void PdfSession::setRequestedPage(int page) {
+    m_requestedPage = qBound(0, page, qMax(0, pageCount() - 1));
+    emit requestedPageChanged();
+}
+
+void PdfSession::setState(const QString &state, const QString &error) {
+    if (m_state == state && m_errorText == error) return;
+    m_state = state;
+    m_errorText = error;
+    emit stateChanged();
+}
+
+bool PdfSession::load(const QUrl &url, const QString &password) {
+    QUrl target = url;
+    target.setFragment(QString());
+    const QFileInfo file(target.toLocalFile());
+    const QString name = file.fileName().isEmpty() ? QStringLiteral("The PDF") : file.fileName();
+    const auto fail = [&](const QString &message) {
+        m_lastError = message;
+        if (!active()) setState(QStringLiteral("error"), message);
+        return false;
+    };
+    if (!target.isLocalFile()) return fail(QStringLiteral("Only local PDF files can be opened."));
+    if (!file.isFile()) return fail(QStringLiteral("%1 could not be found.").arg(name));
+    target = QUrl::fromLocalFile(file.absoluteFilePath());
+    auto document = std::make_unique<QPdfDocument>();
+    if (!password.isEmpty()) document->setPassword(password);
+    const QPdfDocument::Error error = document->load(file.absoluteFilePath());
+    if (error == QPdfDocument::Error::None && document->status() == QPdfDocument::Status::Ready) {
+        m_lastError.clear();
+        adopt(std::move(document), target, password, QStringLiteral("ready"));
+        return true;
+    }
+    if (error == QPdfDocument::Error::IncorrectPassword && password.isEmpty()) {
+        m_lastError.clear();
+        adopt(nullptr, target, QString(), QStringLiteral("password"));
+        return true;
+    }
+    return fail(loadErrorText(error, name));
+}
+
+bool PdfSession::unlock(const QString &password) {
+    if (m_state != QLatin1String("password") || !m_url.isLocalFile()) return false;
+    auto document = std::make_unique<QPdfDocument>();
+    document->setPassword(password);
+    const QPdfDocument::Error error = document->load(m_url.toLocalFile());
+    if (error != QPdfDocument::Error::None || document->status() != QPdfDocument::Status::Ready) {
+        m_lastError = loadErrorText(error, fileName());
+        return false;
+    }
+    m_lastError.clear();
+    adopt(std::move(document), m_url, password, QStringLiteral("ready"));
+    return true;
+}
+
+void PdfSession::adopt(std::unique_ptr<QPdfDocument> document, const QUrl &url, const QString &password, const QString &state) {
+    const bool sameFile = m_url == url;
+    const bool wasActive = active();
+    m_reloadTimer.stop();
+    m_renderer.reset(); // a pending render never touches the document it replaces
+    m_document = std::move(document);
+    if (m_document) {
+        m_renderer = std::make_unique<QPdfPageRenderer>();
+        m_renderer->setRenderMode(QPdfPageRenderer::RenderMode::MultiThreaded);
+        m_renderer->setDocument(m_document.get());
+    }
+    m_pageText.clear();
+    m_characterBoxes.clear();
+    m_password = password;
+    m_url = url;
+    m_state = state; // announced below, after the document is in place
+    m_errorText.clear();
+    readInfo();
+    watch();
+    const bool notesBefore = m_notesExist;
+    m_notesExist = QFileInfo(notesUrl().toLocalFile()).isFile();
+    m_requestedPage = sameFile ? qBound(0, m_requestedPage, qMax(0, pageCount() - 1)) : 0;
+    ++m_revision;
+    if (!sameFile) emit urlChanged();
+    emit stateChanged();
+    if (notesBefore != m_notesExist) emit notesExistChanged();
+    emit revisionChanged();
+    if (!wasActive) emit activeChanged();
+    if (!sameFile) emit opened();
+}
+
+void PdfSession::close() {
+    if (!active() && m_state == QLatin1String("none")) return;
+    const bool wasActive = active();
+    m_reloadTimer.stop();
+    const QStringList watched = m_watcher.files() + m_watcher.directories();
+    if (!watched.isEmpty()) m_watcher.removePaths(watched);
+    m_renderer.reset();
+    m_document.reset();
+    m_pageText.clear();
+    m_characterBoxes.clear();
+    m_password.clear();
+    m_info.clear();
+    m_url.clear();
+    m_requestedPage = 0;
+    const bool notesBefore = m_notesExist;
+    m_notesExist = false;
+    ++m_revision;
+    setState(QStringLiteral("none"));
+    emit urlChanged();
+    if (notesBefore) emit notesExistChanged();
+    emit revisionChanged();
+    if (wasActive) emit activeChanged();
+}
+
+void PdfSession::readInfo() {
+    m_info.clear();
+    const QString path = m_url.toLocalFile();
+    QFile file(path);
+    QString version;
+    bool encrypted = !m_password.isEmpty() || m_state == QLatin1String("password");
+    if (file.open(QIODevice::ReadOnly)) {
+        static const QRegularExpression header(QStringLiteral("%PDF-(\\d+\\.\\d+)"));
+        const auto match = header.match(QString::fromLatin1(file.read(1024)));
+        if (match.hasMatch()) version = match.captured(1);
+        // A file encrypted with an empty user password opens without one; its
+        // trailer (in the last few kilobytes) still names the /Encrypt dictionary.
+        if (!encrypted && file.size() > 0) {
+            file.seek(qMax<qint64>(0, file.size() - 65536));
+            encrypted = file.read(65536).contains("/Encrypt");
+        }
+    }
+    m_info = QVariantMap{{QStringLiteral("fileName"), fileName()}, {QStringLiteral("pdfVersion"), version},
+                         {QStringLiteral("pageCount"), pageCount()}, {QStringLiteral("encrypted"), encrypted}};
+    const QList<QPair<QString, QPdfDocument::MetaDataField>> fields = {
+        {QStringLiteral("title"), QPdfDocument::MetaDataField::Title},
+        {QStringLiteral("author"), QPdfDocument::MetaDataField::Author},
+        {QStringLiteral("subject"), QPdfDocument::MetaDataField::Subject},
+        {QStringLiteral("keywords"), QPdfDocument::MetaDataField::Keywords},
+        {QStringLiteral("producer"), QPdfDocument::MetaDataField::Producer},
+        {QStringLiteral("creator"), QPdfDocument::MetaDataField::Creator},
+        {QStringLiteral("created"), QPdfDocument::MetaDataField::CreationDate},
+        {QStringLiteral("modified"), QPdfDocument::MetaDataField::ModificationDate}};
+    for (const auto &field : fields) {
+        const QVariant value = ready() ? m_document->metaData(field.second) : QVariant();
+        m_info.insert(field.first, value.metaType().id() == QMetaType::QDateTime
+            ? (value.toDateTime().isValid() ? value.toDateTime().toString(Qt::ISODate) : QString())
+            : value.toString());
+    }
+}
+
+void PdfSession::watch() {
+    const QStringList watched = m_watcher.files() + m_watcher.directories();
+    if (!watched.isEmpty()) m_watcher.removePaths(watched);
+    const QString path = m_url.toLocalFile();
+    if (path.isEmpty()) return;
+    if (QFileInfo::exists(path)) m_watcher.addPath(path);
+    const QString folder = QFileInfo(path).absolutePath();
+    if (QFileInfo(folder).isDir()) m_watcher.addPath(folder);
+}
+
+void PdfSession::reloadFromDisk() {
+    if (!active()) return;
+    const QString path = m_url.toLocalFile();
+    if (!QFileInfo::exists(path)) {
+        setState(QStringLiteral("error"), QStringLiteral("%1 is no longer available.").arg(fileName()));
+        watch();
+        return;
+    }
+    if (m_state == QLatin1String("password")) { watch(); return; }
+    auto document = std::make_unique<QPdfDocument>();
+    if (!m_password.isEmpty()) document->setPassword(m_password);
+    const QPdfDocument::Error error = document->load(path);
+    if (error == QPdfDocument::Error::None && document->status() == QPdfDocument::Status::Ready) {
+        adopt(std::move(document), m_url, m_password, QStringLiteral("ready"));
+        return;
+    }
+    // Keep the open document drawable? Its file is gone or rewritten, so say so.
+    m_renderer.reset();
+    m_document.reset();
+    m_pageText.clear();
+    m_characterBoxes.clear();
+    ++m_revision;
+    setState(QStringLiteral("error"), loadErrorText(error, fileName()));
+    emit revisionChanged();
+    watch();
+}
+
+void PdfSession::refreshNotesExist() {
+    const bool exists = active() && QFileInfo(notesUrl().toLocalFile()).isFile();
+    if (exists == m_notesExist) return;
+    m_notesExist = exists;
+    emit notesExistChanged();
+}
+
+QSizeF PdfSession::pageSize(int page) const {
+    if (!ready() || page < 0 || page >= m_document->pageCount()) return {};
+    return m_document->pagePointSize(page);
+}
+
+QString PdfSession::pageLabel(int page) const {
+    if (!ready() || page < 0 || page >= m_document->pageCount()) return {};
+    const QString label = m_document->pageLabel(page);
+    return label.isEmpty() ? QString::number(page + 1) : label;
+}
+
+QString PdfSession::pageText(int page) const {
+    if (!ready() || page < 0 || page >= m_document->pageCount()) return {};
+    auto it = m_pageText.constFind(page);
+    if (it == m_pageText.cend()) it = m_pageText.insert(page, m_document->getAllText(page).text());
+    return it.value();
+}
+
+QVariantMap PdfSession::selectionMap(const QPdfSelection &selection) const {
+    if (!selection.isValid()) return {};
+    return {{QStringLiteral("text"), selection.text()}, {QStringLiteral("start"), selection.startIndex()},
+            {QStringLiteral("length"), selection.endIndex() - selection.startIndex()},
+            {QStringLiteral("rects"), normalisedRects(selection.bounds())}};
+}
+
+// Qt's getSelection(page, from, to) drops the last character on pages with
+// /Rotate 90 or 270, so points are matched to characters here, by their boxes.
+const QList<QRectF> &PdfSession::characterBoxes(int page) const {
+    auto it = m_characterBoxes.find(page);
+    if (it != m_characterBoxes.end()) return it.value();
+    QList<QRectF> boxes;
+    const QString text = pageText(page);
+    boxes.reserve(text.size());
+    for (int i = 0; i < text.size(); ++i) {
+        QRectF box;
+        if (!text.at(i).isSpace())
+            for (const QPolygonF &polygon : m_document->getSelectionAtIndex(page, i, 1).bounds()) box |= polygon.boundingRect().normalized();
+        boxes.append(box);
+    }
+    return m_characterBoxes.insert(page, boxes).value();
+}
+
+// The character under `point`, else the nearest one within half an inch; -1 if none.
+int PdfSession::characterNear(int page, QPointF point) const {
+    const QList<QRectF> &boxes = characterBoxes(page);
+    int nearest = -1;
+    qreal best = 36;
+    for (int i = 0; i < boxes.size(); ++i) {
+        const QRectF &box = boxes.at(i);
+        if (box.isEmpty()) continue;
+        if (box.contains(point)) return i;
+        const qreal dx = qMax<qreal>(0, qMax(box.left() - point.x(), point.x() - box.right()));
+        const qreal dy = qMax<qreal>(0, qMax(box.top() - point.y(), point.y() - box.bottom()));
+        const qreal distance = std::hypot(dx, dy);
+        if (distance < best) { best = distance; nearest = i; }
+    }
+    return nearest;
+}
+
+QVariantMap PdfSession::selectionBetween(int page, QPointF from, QPointF to) const {
+    if (!ready() || page < 0 || page >= m_document->pageCount()) return {};
+    const int first = characterNear(page, from), last = characterNear(page, to);
+    if (first < 0 || last < 0) return {};
+    return selectionMap(m_document->getSelectionAtIndex(page, qMin(first, last), qAbs(last - first) + 1));
+}
+
+QVariantMap PdfSession::selectionAt(int page, int start, int length) const {
+    if (!ready() || page < 0 || page >= m_document->pageCount() || start < 0 || length <= 0) return {};
+    return selectionMap(m_document->getSelectionAtIndex(page, start, length));
+}
+
+QVariantMap PdfSession::wordAt(int page, QPointF point) const {
+    if (!ready() || page < 0 || page >= m_document->pageCount()) return {};
+    const QString text = pageText(page);
+    const QList<QRectF> &boxes = characterBoxes(page);
+    int hit = -1;
+    for (int i = 0; i < boxes.size() && hit < 0; ++i)
+        if (!boxes.at(i).isEmpty() && boxes.at(i).adjusted(-1, -1, 1, 1).contains(point)) hit = i;
+    const auto inWord = [&](int i) { return i >= 0 && i < text.size() && (text.at(i).isLetterOrNumber() || text.at(i) == QLatin1Char('_')); };
+    if (!inWord(hit)) return {};
+    int start = hit, end = hit + 1;
+    while (inWord(start - 1)) --start;
+    while (inWord(end)) ++end;
+    return selectionMap(m_document->getSelectionAtIndex(page, start, end - start));
+}
+
+QVariantList PdfSession::search(const QString &query) const {
+    QVariantList results;
+    if (!ready() || query.isEmpty()) return results;
+    for (int page = 0; page < m_document->pageCount() && results.size() < SearchLimit; ++page) {
+        const QString text = pageText(page);
+        for (qsizetype at = text.indexOf(query, 0, Qt::CaseInsensitive); at >= 0 && results.size() < SearchLimit;
+             at = text.indexOf(query, at + query.size(), Qt::CaseInsensitive)) {
+            const qsizetype from = qMax<qsizetype>(0, at - 30);
+            results.append(QVariantMap{{QStringLiteral("page"), page}, {QStringLiteral("start"), int(at)},
+                {QStringLiteral("length"), int(query.size())},
+                {QStringLiteral("rects"), normalisedRects(m_document->getSelectionAtIndex(page, int(at), int(query.size())).bounds())},
+                {QStringLiteral("context"), text.mid(from, at - from + query.size() + 30).simplified()}});
+        }
+    }
+    return results;
+}
+
+QVariantList PdfSession::links(int page) const {
+    QVariantList result;
+    if (!ready() || page < 0 || page >= m_document->pageCount()) return result;
+    QPdfLinkModel model;
+    model.setDocument(m_document.get());
+    model.setPage(page);
+    for (int row = 0; row < model.rowCount(QModelIndex()); ++row) {
+        const QPdfLink link = model.data(model.index(row), int(QPdfLinkModel::Role::Link)).value<QPdfLink>();
+        // QPdfLink::isValid() is false for web links (they have no page).
+        if (link.rectangles().isEmpty() || (link.page() < 0 && link.url().isEmpty())) continue;
+        QRectF united;
+        QVariantList rects;
+        for (const QRectF &rect : link.rectangles()) { rects.append(rect.normalized()); united |= rect.normalized(); }
+        result.append(QVariantMap{{QStringLiteral("rect"), united}, {QStringLiteral("rects"), rects},
+            {QStringLiteral("page"), link.url().isEmpty() ? link.page() : -1},
+            {QStringLiteral("location"), link.location()}, {QStringLiteral("url"), link.url()}});
+    }
+    return result;
+}
+
+QVariantList PdfSession::outline() const {
+    QVariantList result;
+    if (!ready()) return result;
+    QPdfBookmarkModel model;
+    model.setDocument(m_document.get());
+    const std::function<void(const QModelIndex &)> walk = [&](const QModelIndex &parent) {
+        for (int row = 0; row < model.rowCount(parent); ++row) {
+            const QModelIndex index = model.index(row, 0, parent);
+            result.append(QVariantMap{{QStringLiteral("title"), model.data(index, int(QPdfBookmarkModel::Role::Title)).toString()},
+                {QStringLiteral("level"), model.data(index, int(QPdfBookmarkModel::Role::Level)).toInt()},
+                {QStringLiteral("page"), model.data(index, int(QPdfBookmarkModel::Role::Page)).toInt()}});
+            walk(index);
+        }
+    };
+    walk(QModelIndex());
+    return result;
+}
