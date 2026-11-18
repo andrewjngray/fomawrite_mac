@@ -152,6 +152,15 @@ Item {
                 c.arc(12,12,4,0,Math.PI*2)
                 for (let a=0;a<8;a++) { const t=a*Math.PI/4; line(12+Math.cos(t)*8,12+Math.sin(t)*8,12+Math.cos(t)*10,12+Math.sin(t)*10) }
                 break
+            case "thumbnails":
+                c.roundedRect(2.5,4,19,16,2.5,2.5); line(9.5,4,9.5,20)
+                c.rect(4.5,6.5,3,4); c.rect(4.5,13.5,3,4); break
+            case "fit-width":
+                line(3,4,3,20); line(21,4,21,20); line(7,12,17,12)
+                c.moveTo(10,9); c.lineTo(7,12); c.lineTo(10,15); c.moveTo(14,9); c.lineTo(17,12); c.lineTo(14,15); break
+            case "info":
+                c.arc(12,12,9,0,Math.PI*2); line(12,11,12,17)
+                c.moveTo(12.9,7.5); c.arc(12,7.5,0.9,0,Math.PI*2); break
             case "refresh":
                 c.arc(12,12,8,Math.PI*0.15,Math.PI*1.85); c.moveTo(20,3); c.lineTo(20,9); c.lineTo(14,9); break
             }

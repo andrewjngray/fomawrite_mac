@@ -1,6 +1,7 @@
 #include "documentviewcheck.h"
 
 #include "backend.h"
+#include "pdfsession.h"
 #include "publishingthemes.h"
 #include "systemtheme.h"
 
@@ -33,7 +34,9 @@
 #include <QTextLayout>
 #include <QQuickStyle>
 #include <QQuickWindow>
+#include <QPainter>
 #include <QPdfDocument>
+#include <QPdfWriter>
 #include <QSaveFile>
 #include <QSettings>
 #include <QStandardPaths>
@@ -248,6 +251,7 @@ int runDocumentViewCheck(QApplication &app, const QString &outputDirectory) {
     QJsonArray paneChromeChecks;
     QJsonArray editingLayoutChecks;
     QJsonArray publishingThemeChecks;
+    QJsonArray pdfChecks;
     QJsonArray paneZoomReadings;
     QJsonArray paneZoomDividerEvents;
     QJsonArray screenshots;
@@ -276,6 +280,7 @@ int runDocumentViewCheck(QApplication &app, const QString &outputDirectory) {
         report.insert("paneChromeChecks", paneChromeChecks);
         report.insert("editingLayoutChecks", editingLayoutChecks);
         report.insert("publishingThemeChecks", publishingThemeChecks);
+        report.insert("pdfChecks", pdfChecks);
         report.insert("paneZoomReadings", paneZoomReadings);
         report.insert("paneZoomDividerEvents", paneZoomDividerEvents);
         report.insert("screenshots", screenshots);
@@ -289,7 +294,7 @@ int runDocumentViewCheck(QApplication &app, const QString &outputDirectory) {
             return 2;
         }
         qInfo().noquote() << "Document view check:" << (failures.isEmpty() ? "PASS" : "FAIL")
-                          << scenarios.size() << "footer states," << dailyWritingChecks.size() << "daily-writing checks," << paneZoomChecks.size() << "pane-zoom checks," << editorAcceptanceChecks.size() << "editor acceptance checks," << publishingThemeChecks.size() << "publishing theme checks; report:" << file.fileName();
+                          << scenarios.size() << "footer states," << dailyWritingChecks.size() << "daily-writing checks," << paneZoomChecks.size() << "pane-zoom checks," << editorAcceptanceChecks.size() << "editor acceptance checks," << publishingThemeChecks.size() << "publishing theme checks," << pdfChecks.size() << "PDF checks; report:" << file.fileName();
         for (const QString &failure : failures) qWarning().noquote() << failure;
         return failures.isEmpty() ? 0 : 1;
     };
@@ -299,6 +304,8 @@ int runDocumentViewCheck(QApplication &app, const QString &outputDirectory) {
             QStringLiteral("WorkspaceLayout.qml"), QStringLiteral("WorkspaceCommands.qml"), QStringLiteral("AboutDialog.qml"),
             QStringLiteral("DocumentFindBar.qml"), QStringLiteral("DocumentOutline.qml"),
             QStringLiteral("PaneZoomState.qml"), QStringLiteral("PaneZoomControls.qml"), QStringLiteral("WorkspaceHeader.qml"), QStringLiteral("LinkEditor.qml"), QStringLiteral("LinkSyntax.js"), QStringLiteral("ExportHub.qml"), QStringLiteral("SquareDialogButton.qml"),
+            QStringLiteral("PdfReader.qml"), QStringLiteral("PdfToolbar.qml"), QStringLiteral("PdfFindBar.qml"),
+            QStringLiteral("PdfThumbnails.qml"), QStringLiteral("PdfInspector.qml"),
             QStringLiteral("editor/index.html"), QStringLiteral("editor/editor.css"), QStringLiteral("editor/blocks.css"),
             QStringLiteral("editor/dist/editor.js"), QStringLiteral("themes/claude-like.css"), QStringLiteral("themes/omawrite.css")}) {
         const QString hash = fileHash(":/" + name);
@@ -1307,6 +1314,7 @@ int runDocumentViewCheck(QApplication &app, const QString &outputDirectory) {
             "Publishing format selection changed canonical source or dirty state");
     });
 #include "publishingthemeacceptancecheck.inc"
+#include "pdfacceptancecheck.inc"
     editingLayoutCheck("document-chrome-input-hover-and-always-visible-setting", [&] {
         settings->setProperty("autoHideChrome", true);
         auto *header = child("topChrome");

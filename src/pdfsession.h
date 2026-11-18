@@ -36,6 +36,17 @@ class PdfSession : public QObject {
     Q_PROPERTY(int revision READ revision NOTIFY revisionChanged)
     // The page a view should scroll to (0-based); set by #page=N (1-based) links.
     Q_PROPERTY(int requestedPage READ requestedPage WRITE setRequestedPage NOTIFY requestedPageChanged)
+    // The widest page width and the tallest page height, in points.
+    Q_PROPERTY(QSizeF largestPageSize READ largestPageSize NOTIFY revisionChanged)
+    // Find in the PDF (Cycle 161): startSearch fills searchResults page by page
+    // on the event loop, so a long document never blocks the window.
+    Q_PROPERTY(QVariantList searchResults READ searchResults NOTIFY searchResultsChanged)
+    Q_PROPERTY(QString searchQuery READ searchQuery NOTIFY searchResultsChanged)
+    Q_PROPERTY(bool searching READ searching NOTIFY searchingChanged)
+    // The thumbnails column beside the pages (app setting).
+    Q_PROPERTY(bool thumbnailsVisible READ thumbnailsVisible WRITE setThumbnailsVisible NOTIFY thumbnailsVisibleChanged)
+    // How many page renders PdfPage items have asked for (tests and diagnostics).
+    Q_PROPERTY(int renderRequestCount READ renderRequestCount NOTIFY renderRequestCountChanged)
 public:
     explicit PdfSession(QObject *parent = nullptr);
     ~PdfSession() override;
@@ -58,6 +69,14 @@ public:
     void setRequestedPage(int page);
     // Why the last load or unlock failed (also set when the previous PDF was kept).
     QString lastError() const { return m_lastError; }
+    QSizeF largestPageSize() const { return m_largestPageSize; }
+    QVariantList searchResults() const { return m_searchResults; }
+    QString searchQuery() const { return m_searchQuery; }
+    bool searching() const { return m_searching; }
+    bool thumbnailsVisible() const;
+    void setThumbnailsVisible(bool visible);
+    int renderRequestCount() const { return m_renderRequestCount; }
+    void noteRenderRequest();
 
     // Loads `url`. On failure a PDF that was already open stays open and
     // unchanged; with nothing open the state becomes "error". A file that
@@ -74,13 +93,23 @@ public:
     Q_INVOKABLE QVariantMap wordAt(int page, QPointF point) const;
     // Case-insensitive; [{page, start, length, rects, context}], at most SearchLimit.
     Q_INVOKABLE QVariantList search(const QString &query) const;
+    // Replaces searchResults with the matches for `query`, found in slices.
+    Q_INVOKABLE void startSearch(const QString &query);
+    Q_INVOKABLE void clearSearch();
     // [{rect, page, location, url}]: page is -1 for a URL link.
     Q_INVOKABLE QVariantList links(int page) const;
     // [{title, level, page}] in document order.
     Q_INVOKABLE QVariantList outline() const;
     Q_INVOKABLE void refreshNotesExist();
+    Q_INVOKABLE void copyText(const QString &text) const;
+    // The last page (0-based), zoom mode ("fit" or "fixed") and zoom (1 = 100%)
+    // a PDF was read at, by canonical path; {} when it has none. The newest
+    // RememberedViewLimit PDFs are kept. Opening a PDF requests its remembered page.
+    Q_INVOKABLE QVariantMap rememberedView(const QUrl &url = QUrl()) const;
+    Q_INVOKABLE void rememberView(const QUrl &url, int page, const QString &mode, qreal zoom);
 
     static constexpr int SearchLimit = 1000;
+    static constexpr int RememberedViewLimit = 200;
 
     QPdfDocument *document() const { return m_document.get(); }
     // Shared by every PdfPage of this session; replaced on each load.
@@ -93,17 +122,26 @@ signals:
     void notesExistChanged();
     void revisionChanged();
     void requestedPageChanged();
+    void searchResultsChanged();
+    void searchingChanged();
+    void thumbnailsVisibleChanged();
+    void renderRequestCountChanged();
     // A different PDF was opened (not a reload of the same file).
     void opened();
 
 private:
     bool ready() const;
-    QVariantMap selectionMap(const QPdfSelection &selection) const;
+    QVariantMap selectionMap(int page, const QPdfSelection &selection) const;
+    QVariantList lineRects(int page, int start, int length) const;
     void setState(const QString &state, const QString &error = QString());
     void adopt(std::unique_ptr<QPdfDocument> document, const QUrl &url, const QString &password, const QString &state);
     void readInfo();
     void watch();
     void reloadFromDisk();
+    QVariantList pageMatches(int page, const QString &query, int limit) const;
+    void searchSlice();
+    void resetSearch();
+    static QString viewKey(const QUrl &url);
     std::unique_ptr<QPdfDocument> m_document;
     std::unique_ptr<QPdfPageRenderer> m_renderer;
     QUrl m_url;
@@ -115,6 +153,13 @@ private:
     QVariantMap m_info;
     int m_revision = 0;
     int m_requestedPage = 0;
+    QSizeF m_largestPageSize;
+    QString m_searchQuery;
+    QVariantList m_searchResults;
+    int m_searchPage = 0;
+    bool m_searching = false;
+    QTimer m_searchTimer;
+    int m_renderRequestCount = 0;
     mutable QHash<int, QString> m_pageText;
     // Each character's box (view points) by page, for hit-testing points.
     const QList<QRectF> &characterBoxes(int page) const;

@@ -66,6 +66,10 @@
         <file>NativeMenuBar.qml</file>
         <file>PublishingPreview.qml</file>
         <file>PdfReader.qml</file>
+        <file>PdfToolbar.qml</file>
+        <file>PdfFindBar.qml</file>
+        <file>PdfThumbnails.qml</file>
+        <file>PdfInspector.qml</file>
         <file>ExportHub.qml</file>
         <file>StyleGallery.qml</file>
         <file alias="Main.qml">Main.qml</file>

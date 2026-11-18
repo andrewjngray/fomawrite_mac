@@ -6,6 +6,9 @@ import QtQuick.Controls
 WorkspaceFooter {
     id: root
     property int layoutMode: 0
+    // PDF mode (Cycle 161): the views read Notes / Split / PDF and the
+    // publishing-only controls (Web / PDF output, Output Style) step aside.
+    property bool pdfMode: false
     property bool liveEditing: false
     property bool canSplit: true
     property string publishingFormat: "web"
@@ -40,8 +43,8 @@ WorkspaceFooter {
     readonly property real sourceToolsEnd: editingControls.x - 8
     readonly property real appearanceRoom: Math.max(0, sourceToolsEnd - 12)
     readonly property real templateRoom: Math.max(0, publishingControls.x - previewPaneStart - 20)
-    readonly property real statusStart: (layoutMode === 2 ? templateButton.x + templateButton.width
-                                                                      : appearanceButton.x + appearanceButton.width) + 12
+    readonly property real statusStart: layoutMode === 2 && pdfMode ? previewPaneStart + 12
+        : (layoutMode === 2 ? templateButton.x + templateButton.width : appearanceButton.x + appearanceButton.width) + 12
     readonly property real statusEnd: layoutMode === 2 ? publishingControls.x - 8 : sourceToolsEnd
     readonly property real statusWidth: Math.max(0, statusEnd - statusStart)
     readonly property bool statusVisible: statusLabel.visible
@@ -85,7 +88,7 @@ WorkspaceFooter {
         enabled: root.chromeVisible
         id: templateButton
         objectName: "previewTemplateButton"
-        visible: root.hasPreview && root.previewPaneStart >= 0 && root.templateRoom >= 34
+        visible: root.hasPreview && !root.pdfMode && root.previewPaneStart >= 0 && root.templateRoom >= 34
         x: root.previewPaneStart + 12; anchors.verticalCenter: parent.verticalCenter
         width: Math.min(160, root.templateRoom)
         text: width >= 110 ? "Output Style" : "Aa"
@@ -149,7 +152,7 @@ WorkspaceFooter {
     ToolbarGroup {
         id: publishingControls
         objectName: "documentPublishingControls"
-        visible: root.hasPreview
+        visible: root.hasPreview && !root.pdfMode
         x: layoutControls.x - width - 8
         anchors.verticalCenter: parent.verticalCenter
         Accessible.role: Accessible.Grouping
@@ -185,7 +188,8 @@ WorkspaceFooter {
         FooterButton {
             enabled: root.chromeVisible
             objectName: "singleModeButton"
-            text: "Single"; hint: "Single — show the chosen editor alone"
+            text: root.pdfMode ? "Notes" : "Single"
+            hint: root.pdfMode ? "Notes — show the PDF's notes alone" : "Single — show the chosen editor alone"
             leftPadding: 4; rightPadding: 4
             grouped: true; width: 48
             checked: root.layoutMode === 0
@@ -195,7 +199,8 @@ WorkspaceFooter {
         FooterButton {
             objectName: "previewSplitButton"
             text: "Split"
-            hint: root.canSplit ? "Split — show the chosen editor beside output Preview" : "Widen the window to use Split layout"
+            hint: !root.canSplit ? "Widen the window to use Split layout"
+                : root.pdfMode ? "Split — show the notes beside the PDF" : "Split — show the chosen editor beside output Preview"
             leftPadding: 4; rightPadding: 4
             grouped: true; width: 38
             enabled: root.chromeVisible && root.canSplit
@@ -208,8 +213,8 @@ WorkspaceFooter {
         FooterButton {
             enabled: root.chromeVisible
             objectName: "previewOnlyButton"
-            text: "Preview"
-            hint: "Preview — read the published output on its own"
+            text: root.pdfMode ? "PDF" : "Preview"
+            hint: root.pdfMode ? "PDF — read the PDF on its own" : "Preview — read the published output on its own"
             leftPadding: 4; rightPadding: 4
             grouped: true; width: 58
             checked: root.layoutMode === 2

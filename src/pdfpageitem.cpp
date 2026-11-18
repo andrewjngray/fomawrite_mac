@@ -8,6 +8,7 @@
 #include <QSGImageNode>
 #include <QSGRectangleNode>
 #include <QtQml/qqml.h>
+#include <cmath>
 
 // Registered as the application object is created, so the app, the test
 // binary and the in-bundle view checks all know the type before Main.qml loads.
@@ -34,10 +35,10 @@ void PdfPageItem::setSession(QObject *session) {
     if (pdf == m_session) return;
     disconnect(m_revisionConnection);
     m_session = pdf;
-    if (pdf) m_revisionConnection = connect(pdf, &PdfSession::revisionChanged, this, [this] { scheduleRender(0); });
+    if (pdf) m_revisionConnection = connect(pdf, &PdfSession::revisionChanged, this, [this] { scheduleRender(RequestDelay); });
     clearImage();
     emit sessionChanged();
-    scheduleRender(0);
+    scheduleRender(RequestDelay);
 }
 
 void PdfPageItem::setPage(int page) {
@@ -45,7 +46,14 @@ void PdfPageItem::setPage(int page) {
     m_page = page;
     clearImage();
     emit pageChanged();
-    scheduleRender(0);
+    scheduleRender(RequestDelay);
+}
+
+void PdfPageItem::setWanted(bool wanted) {
+    if (wanted == m_wanted) return;
+    m_wanted = wanted;
+    emit wantedChanged();
+    scheduleRender(RequestDelay);
 }
 
 void PdfPageItem::setRendered(bool rendered) {
@@ -61,11 +69,17 @@ PdfPageItem::Key PdfPageItem::currentKey() const {
     key.page = m_page;
     const qreal ratio = window() ? window()->effectiveDevicePixelRatio() : 1.0;
     key.pixels = QSize(qRound(width() * ratio), qRound(height() * ratio));
+    const qint64 pixels = qint64(key.pixels.width()) * key.pixels.height();
+    if (pixels > MaximumPixels) {
+        const qreal shrink = std::sqrt(qreal(MaximumPixels) / pixels);
+        key.pixels = QSize(qMax(1, int(key.pixels.width() * shrink)), qMax(1, int(key.pixels.height() * shrink)));
+    }
     return key;
 }
 
 void PdfPageItem::scheduleRender(int delay) {
-    m_renderTimer.start(delay);
+    if (m_wanted) m_renderTimer.start(delay);
+    else m_renderTimer.stop();
 }
 
 void PdfPageItem::clearImage() {
@@ -79,7 +93,7 @@ void PdfPageItem::clearImage() {
 }
 
 void PdfPageItem::requestRender() {
-    if (!window() || !isVisible()) return;
+    if (!window() || !isVisible() || !m_wanted) return;
     QPdfPageRenderer *renderer = m_session ? m_session->renderer() : nullptr;
     if (!renderer || m_page < 0 || m_page >= m_session->pageCount()) {
         if (m_shown.page >= 0) clearImage();
@@ -93,6 +107,7 @@ void PdfPageItem::requestRender() {
         m_rendererConnection = connect(renderer, &QPdfPageRenderer::pageRendered, this, &PdfPageItem::pageRendered);
     }
     m_pending = key;
+    m_session->noteRenderRequest();
     QPdfDocumentRenderOptions options;
     options.setRenderFlags(QPdfDocumentRenderOptions::RenderFlag::Annotations);
     m_requestId = renderer->requestPage(key.page, key.pixels, options);
@@ -107,7 +122,7 @@ void PdfPageItem::pageRendered(int, QSize, const QImage &image, const QPdfDocume
     setRendered(!image.isNull());
     update();
     // A resize while this was rendering asks again for the size shown now.
-    if (!(currentKey() == m_shown)) scheduleRender(0);
+    if (!(currentKey() == m_shown)) scheduleRender(RequestDelay);
 }
 
 void PdfPageItem::geometryChange(const QRectF &newGeometry, const QRectF &oldGeometry) {
@@ -115,7 +130,7 @@ void PdfPageItem::geometryChange(const QRectF &newGeometry, const QRectF &oldGeo
     if (newGeometry.size() == oldGeometry.size()) return;
     update();
     // A live resize asks once it settles; the current image stretches meanwhile.
-    scheduleRender(m_shown.page >= 0 ? 120 : 0);
+    scheduleRender(m_shown.page >= 0 ? 120 : RequestDelay);
 }
 
 void PdfPageItem::itemChange(ItemChange change, const ItemChangeData &value) {
@@ -125,9 +140,9 @@ void PdfPageItem::itemChange(ItemChange change, const ItemChangeData &value) {
         m_shown = Key();
         m_pending = Key();
         setRendered(false);
-        if (value.window) scheduleRender(0);
+        if (value.window) scheduleRender(RequestDelay);
     } else if (change == ItemVisibleHasChanged || change == ItemDevicePixelRatioHasChanged) {
-        scheduleRender(0);
+        scheduleRender(RequestDelay);
     }
 }
 

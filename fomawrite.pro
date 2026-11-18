@@ -68,7 +68,7 @@ SOURCES += src/typorabase.cpp src/publishingthemes.cpp src/publishinghtml.cpp sr
 
 DISTFILES += src/publishingthemeacceptancecheck.inc src/vendor/md4c/LICENSE.md
 
-DISTFILES += src/publishingfolderacceptancecheck.inc
+DISTFILES += src/publishingfolderacceptancecheck.inc src/pdfacceptancecheck.inc
 
 # PDF reading (Cycle 160)
 SOURCES += src/pdfsession.cpp src/pdfpageitem.cpp
