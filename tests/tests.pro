@@ -66,3 +66,8 @@ macx {
     QT += dbus
     SOURCES += ../src/systemtheme.cpp
 }
+# PDF reading (Cycle 160)
+SOURCES += ../src/pdfsession.cpp ../src/pdfpageitem.cpp
+HEADERS += ../src/pdfsession.h ../src/pdfpageitem.h
+HEADERS += pdffixtures.h
+win32: LIBS += -lpsapi

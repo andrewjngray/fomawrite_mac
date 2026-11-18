@@ -16,6 +16,9 @@ CompactMenu {
     property bool location: false
     property string pending: ""
     readonly property bool folder: !!target.directory
+    // PDF rows: open, reveal and copy the path; nothing that reads the file as
+    // text, and no rename, duplicate or trash until notes can move with them.
+    readonly property bool pdf: !!target.pdf
     height: Math.min(implicitHeight, (Overlay.overlay ? Overlay.overlay.height : 900) - 24)
     function showFor(item, entry, isLocation, point) {
         target = backend.libraryItemInfo(entry.url);
@@ -49,7 +52,7 @@ CompactMenu {
         } else if (action === "info") {
             messageDialog.title = "Get Info";
             message.text = target.name + "\n\n" + target.path + "\n\nKind: " + (folder ? "Folder" : "Document")
-                + (folder ? "" : "\nSize: " + target.bytes + " bytes") + "\nCreated: " + target.created + "\nModified: " + target.modified
+                + (folder ? "" : "\nSize: " + target.bytes + " bytes") + (pdf ? "\nType: PDF" + (target.hasNotes ? " (with notes)" : "") : "") + "\nCreated: " + target.created + "\nModified: " + target.modified
                 + "\nWritable: " + (target.writable ? "Yes" : "No");
             messageDialog.open();
         } else if (action === "trash") trashDialog.open();
@@ -71,16 +74,16 @@ CompactMenu {
     MenuSeparator {}
     CompactMenuItem { text: "Get Info"; visible: !menu.location; height: visible ? implicitHeight : 0; enabled: !!menu.target.available; onTriggered: menu.later("info") }
     CompactMenuItem { text: menu.target.favorite ? "Remove Favorite" : "Favorite"; visible: !menu.location; height: visible ? implicitHeight : 0; enabled: !!menu.target.available; onTriggered: menu.later("favorite") }
-    CompactMenuItem { text: "Duplicate…"; visible: !menu.location; height: visible ? implicitHeight : 0; enabled: !!menu.target.available; onTriggered: menu.later("duplicate") }
-    CompactMenuItem { text: "Rename…"; visible: !menu.location; height: visible ? implicitHeight : 0; enabled: !!menu.target.available; onTriggered: menu.later("rename") }
-    CompactMenuItem { text: "Move to Trash…"; visible: !menu.location; height: visible ? implicitHeight : 0; enabled: !!menu.target.available; onTriggered: menu.later("trash") }
+    CompactMenuItem { text: "Duplicate…"; visible: !menu.location && !menu.pdf; height: visible ? implicitHeight : 0; enabled: !!menu.target.available; onTriggered: menu.later("duplicate") }
+    CompactMenuItem { text: "Rename…"; visible: !menu.location && !menu.pdf; height: visible ? implicitHeight : 0; enabled: !!menu.target.available; onTriggered: menu.later("rename") }
+    CompactMenuItem { text: "Move to Trash…"; visible: !menu.location && !menu.pdf; height: visible ? implicitHeight : 0; enabled: !!menu.target.available; onTriggered: menu.later("trash") }
     MenuSeparator { visible: !menu.location; height: visible ? implicitHeight : 0 }
     CompactMenuItem { text: Qt.platform.os === "osx" ? "Show in Finder" : "Show in File Manager"; enabled: !!menu.target.available; onTriggered: menu.later("reveal") }
     MenuSeparator {}
     CompactMenuItem { text: "Share…"; visible: !menu.location && Qt.platform.os === "osx"; height: visible ? implicitHeight : 0; enabled: !!menu.target.available; onTriggered: menu.later("share") }
-    CompactMenuItem { text: "Export…"; visible: !menu.location && !menu.folder; height: visible ? implicitHeight : 0; enabled: !!menu.target.available; onTriggered: menu.later("export") }
+    CompactMenuItem { text: "Export…"; visible: !menu.location && !menu.folder && !menu.pdf; height: visible ? implicitHeight : 0; enabled: !!menu.target.available; onTriggered: menu.later("export") }
     CompactMenu {
-        title: "Print"; property bool contextAllowed: !menu.location && !menu.folder; enabled: !!menu.target.available
+        title: "Print"; property bool contextAllowed: !menu.location && !menu.folder && !menu.pdf; enabled: !!menu.target.available
         CompactMenuItem { text: "Print Rendered Document…"; onTriggered: menu.later("print") }
         CompactMenuItem { text: "Print Markdown Source…"; onTriggered: menu.later("printSource") }
         CompactMenuItem { text: "Paginated Preview…"; onTriggered: menu.later("printPreview") }
@@ -88,9 +91,9 @@ CompactMenu {
     CompactMenu {
         title: "Copy"; property bool contextAllowed: !menu.location && !menu.folder
         CompactMenuItem { text: "Path"; onTriggered: menu.library.copyPath(menu.target.url) }
-        CompactMenuItem { text: "Markdown"; enabled: !!menu.target.available; onTriggered: menu.later("copyMarkdown") }
-        CompactMenuItem { text: "Plain Text"; enabled: !!menu.target.available; onTriggered: menu.later("copyText") }
-        CompactMenuItem { text: "HTML"; enabled: !!menu.target.available; onTriggered: menu.later("copyHtml") }
+        CompactMenuItem { text: "Markdown"; enabled: !!menu.target.available && !menu.pdf; onTriggered: menu.later("copyMarkdown") }
+        CompactMenuItem { text: "Plain Text"; enabled: !!menu.target.available && !menu.pdf; onTriggered: menu.later("copyText") }
+        CompactMenuItem { text: "HTML"; enabled: !!menu.target.available && !menu.pdf; onTriggered: menu.later("copyHtml") }
     }
     CompactMenuItem { text: "Copy Library Path"; visible: menu.location || menu.folder; height: visible ? implicitHeight : 0; onTriggered: menu.library.copyPath(menu.target.url) }
     MenuSeparator { visible: !menu.location; height: visible ? implicitHeight : 0 }

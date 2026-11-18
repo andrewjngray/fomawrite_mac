@@ -4,6 +4,11 @@ One line per cycle, newest first. Each line links to the cycle's record under `r
 
 ## 0.3.0 development series (Cycles 97–)
 
+- **Mac cycles 159–160 merged into Windows (19 Nov): PDF core** — Mac records are `research/cycle-159/README-mac.md` and `research/cycle-160/README-mac.md`; the programme is `docs/pdf-plan.md`. Windows gains PDF opening: pages (with existing annotations) in the preview pane's place, the notes file in the editor, PDFs in the explorer. No toolbar or Windows menu entries yet (cycles 161–162).
+
+- **160 (Mac)** — PDF core (`0.3.0-dev55`, build 160, 19 Nov): session, page item, `Backend::open` routing, explorer listing and notes badge. [Record](research/cycle-160/README-mac.md)
+- **159 (Mac)** — PDF plan Phase 0 (19 Nov, no build): decisions, spikes on Mac and Windows, reviewed programme. [Record](research/cycle-159/README-mac.md)
+
 - **Mac build 158 merged into Windows (18 Nov): licence notices** — Mac cycle 158's record is `research/cycle-158/README-mac.md`. The Windows package now ships the shared notices (`licenses/THIRD-PARTY-NOTICES.txt`, Chromium and PDFium licences, the Live editor's JavaScript notices), `Fomawrite-MIT.txt` with Andrew Gray's copyright, and its Windows notice as `THIRD-PARTY-NOTICES-Windows.txt`, which no longer claims Chromium credits at `chrome://credits` (Qt WebEngine refuses that URL). `bin/check-licenses` runs on every Windows package.
 
 - **158 (Mac)** — Licence notices (`0.3.0-dev54`, build 158, 18 Nov): the Mac app no longer bundles 25 Qt libraries it never uses, including the GPL-only Qt Virtual Keyboard; the app now carries notices for Qt, Chromium, PDFium, every Live-editor JavaScript package and every bundled Homebrew library; LICENSE adds Andrew Gray's copyright; `bin/check-licenses` guards packaging. [Record](research/cycle-158/README-mac.md)

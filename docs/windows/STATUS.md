@@ -41,6 +41,10 @@ only updates. [Short instructions](../../START-HERE.md).
   JavaScript notices), `Fomawrite-MIT.txt` with Andrew Gray's copyright, and
   `THIRD-PARTY-NOTICES-Windows.txt`; `package-manifest.py` runs `bin/check-licenses` on the stage.
   The earlier notice's `chrome://credits` claim was wrong (Qt WebEngine refuses that URL).
+- **PDF programme (19 Nov):** Mac `master` `73212bf` (cycles 159–160, build 160) is merged: PDF core
+  (session, page item, `Backend::open` routing, explorer). Programme: `docs/pdf-plan.md`; Mac records
+  are `README-mac.md` in `research/cycle-159` and `research/cycle-160`. Windows menu entries for PDF
+  come with Mac cycle 162.
 - **Still open:** intermittent imported-theme atomic replacement failure cause,
   remaining clipboard/search and Print desktop checks, broader recovery/display/storage
   acceptance, physical x64 hardware, and installer/signing/distribution qualification.
