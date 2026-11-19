@@ -7,7 +7,7 @@
 #include <QFile>
 #include <QFileInfo>
 #include <QPdfDocument>
-#include <QTemporaryFile>
+#include <QUuid>
 #ifdef Q_OS_WIN
 #ifndef NOMINMAX
 #define NOMINMAX
@@ -24,6 +24,19 @@
 namespace PdfFiles {
 
 namespace {
+// A file beside the target that is removed with this object unless released.
+class TemporaryFile : public QFile {
+public:
+    using QFile::QFile;
+    ~TemporaryFile() override {
+        if (isOpen()) close();
+        if (m_remove) QFile::remove(fileName());
+    }
+    void keep() { m_remove = false; }
+private:
+    bool m_remove = true;
+};
+
 QString keyFor(const QString &pdfPath) {
     const QFileInfo info(pdfPath);
     QString key = info.exists() ? info.canonicalFilePath() : info.absoluteFilePath();
@@ -144,8 +157,11 @@ QString writeVerified(const Options &o) {
     if (o.requirePrevious && previous != o.previous) return changed;
 
     // The temporary file is removed with this object unless the replace succeeds.
-    QTemporaryFile temporary(target.absoluteDir().filePath(QStringLiteral(".fomawrite-XXXXXX.tmp")));
-    if (!temporary.open())
+    // A plain QFile, not QTemporaryFile: on Windows the temporary must be certainly closed
+    // (no handle without share-delete) before it can be renamed over the original.
+    TemporaryFile temporary(target.absoluteDir().filePath(
+        QStringLiteral(".fomawrite-%1.tmp").arg(QUuid::createUuid().toString(QUuid::Id128).left(12))));
+    if (!temporary.open(QIODevice::WriteOnly | QIODevice::NewOnly))
         return QStringLiteral("Could not create a temporary file next to %1; is the folder writable? Nothing was saved.").arg(name);
     const QString writeError = QStringLiteral("Could not write the new %1 (the disk may be full). The original is unchanged.").arg(name);
     if (o.failAt == QLatin1String("write")) { temporary.write(o.bytes.left(o.bytes.size() / 2)); return writeError; }
@@ -187,7 +203,7 @@ QString writeVerified(const Options &o) {
         return QStringLiteral("Could not replace %1 (is it open in another program?%2). The original is unchanged.")
             .arg(name, systemError.isEmpty() ? QString() : QStringLiteral(" %1").arg(systemError));
     }
-    temporary.setAutoRemove(false);
+    temporary.keep();
     return QString();
 }
 

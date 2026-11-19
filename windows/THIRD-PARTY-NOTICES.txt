@@ -24,7 +24,7 @@ qpdf (page editing) comes from vcpkg (commit pinned in windows/vcpkg-baseline.tx
 built dynamically for the package's architecture, as qpdf*.dll beside
 Fomawrite.exe, with the DLLs it loads that Windows does not provide:
   qpdf, Apache License 2.0 (licenses/qpdf-Apache-2.0.txt).
-  zlib1.dll, zlib licence (licenses/zlib-copyright.txt, vcpkg's copy).
+  z.dll (named zlib1.dll in some builds), zlib licence (licenses/zlib-copyright.txt, vcpkg's copy).
   jpeg62.dll, libjpeg-turbo: BSD-3-Clause, IJG and zlib terms
   (licenses/libjpeg-turbo-copyright.txt, vcpkg's copy).
 qpdf is built with its own cryptography, so no OpenSSL DLL is shipped. The exact
