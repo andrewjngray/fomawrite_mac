@@ -10,6 +10,7 @@ import { blocksExtension } from "./blocks";
 import { tablesExtension } from "./tables";
 import { mathExtension } from "./math";
 import { extrasExtension } from "./extras";
+import { pdfChipsExtension } from "./pdfchips";
 import { imagesExtension } from "./images";
 import { linksExtension, openLinkPanel } from "./links";
 import { spellingExtension } from "./spelling";
@@ -74,6 +75,7 @@ async function main() {
     tablesExtension(),
     mathExtension(),
     extrasExtension(),
+    pdfChipsExtension(),
     imagesExtension(bridge),
     linksExtension(),
     spellingExtension(bridge),

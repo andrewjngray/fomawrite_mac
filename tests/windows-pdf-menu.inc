@@ -343,6 +343,26 @@ void FomawriteTest::windowsPdfMenuCopiesAMarkdownQuote() {
 // Highlight Text, Underline Text and Strike Through Text (Mac cycle 163) on the
 // Windows PDF menu: present, disabled without a selection, enabled with one,
 // and Highlight stores a mark in the notes. No shortcuts for them.
+void FomawriteTest::windowsPdfMenuArmsTheNoteTool() {
+    Cycle103SettingsSnapshot settings;
+    Cycle160Fixtures f; QVERIFY(f.make());
+    WindowsPdfMenuFixture m; QVERIFY(m.start(f));
+    auto &p = m.p;
+    QVERIFY(m.openPdf(f.url("geometry.pdf")));
+    QTRY_VERIFY(p.page(0));
+    auto *item = m.item("note"); QVERIFY(item);
+    QCOMPARE(item->objectName(), QStringLiteral("windows_pdf_note"));
+    QCOMPARE(item->property("text").toString(), QStringLiteral("Note"));
+    QVERIFY(item->property("shortcut").toString().isEmpty() || !item->property("shortcut").isValid());
+    QTRY_VERIFY(item->property("enabled").toBool());
+    QVERIFY(!p.reader->property("noteTool").toBool());
+    QVERIFY(QMetaObject::invokeMethod(item, "triggered"));
+    QTRY_VERIFY(p.reader->property("noteTool").toBool());
+    QVERIFY(QMetaObject::invokeMethod(item, "triggered")); // the command toggles
+    QTRY_VERIFY(!p.reader->property("noteTool").toBool());
+    p.w.backend.discardRecovery();
+}
+
 void FomawriteTest::windowsPdfMenuMarksTheSelection() {
     Cycle103SettingsSnapshot settings;
     QSettings().remove("pdf/markupTool");

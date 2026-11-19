@@ -112,6 +112,7 @@ MenuBar {
         MenuItem { objectName: "windows_pdf_highlight"; text: "Highlight Text"; enabled: root.pdfHasSelection; onTriggered: root.dispatch(function() { win.pdfCommand("highlight") }) }
         MenuItem { objectName: "windows_pdf_underline"; text: "Underline Text"; enabled: root.pdfHasSelection; onTriggered: root.dispatch(function() { win.pdfCommand("underline") }) }
         MenuItem { objectName: "windows_pdf_strike"; text: "Strike Through Text"; enabled: root.pdfHasSelection; onTriggered: root.dispatch(function() { win.pdfCommand("strike") }) }
+        MenuItem { objectName: "windows_pdf_note"; text: "Note"; enabled: root.pdfMenu.ready; onTriggered: root.dispatch(function() { win.pdfCommand("note") }) }
         MenuSeparator {}
         MenuItem { objectName: "windows_pdf_copyQuote"; text: "Copy as Markdown Quote"; enabled: root.pdfHasSelection; onTriggered: root.dispatch(function() { win.pdfCommand("copyQuote") }) }
         MenuSeparator {}

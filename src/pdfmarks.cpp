@@ -2,6 +2,7 @@
 #include "pdfsession.h"
 
 #include <QSettings>
+#include <cmath>
 
 namespace {
 const QString ToolKey = QStringLiteral("pdf/markupTool");
@@ -56,6 +57,27 @@ QVariantList PdfMarks::rects(int page, int start, int length) const {
     return found;
 }
 
+bool PdfMarks::applyEdit(const PdfNotes::Edit &edit) {
+    emit editStarting();
+    return m_apply(edit);
+}
+
+// A note's text as plain text for the page's popover: its lines trimmed, blank lines kept, cut at 800 characters.
+static QString noteText(const QString &text, const PdfNotes::Item &item) {
+    if (!item.hasBody) return {};
+    QStringList lines;
+    for (const QString &line : text.mid(item.bodyStart, item.contentEnd - item.bodyStart).split(QLatin1Char('\n')))
+        lines.append(line.trimmed());
+    QString plain = lines.join(QLatin1Char('\n'));
+    if (plain.size() > 800) plain = plain.left(800).trimmed() + QChar(0x2026);
+    return plain;
+}
+
+QPoint PdfMarks::clampedPoint(int page, double x, double y) const {
+    const QSizeF size = m_session->pageSize(page);
+    return {int(qBound(0.0, std::round(x), std::floor(size.width()))), int(qBound(0.0, std::round(y), std::floor(size.height())))};
+}
+
 PdfMarks::Current PdfMarks::current() const {
     Current now;
     now.text = m_text();
@@ -81,6 +103,25 @@ void PdfMarks::refresh() {
             const PdfNotes::Placement &placement = now.placements.at(i);
             const int page = (placement.placed ? placement.page : item.page) - 1;
             const int direction = placement.placed ? m_session->textDirection(page) : 0;
+            if (item.kind == QLatin1String("note")) {
+                // A note whose page does not exist, or whose at= lies outside its page, is unplaced.
+                bool valid = item.hasAt && item.page >= 1 && item.page <= m_session->pageCount();
+                if (valid) {
+                    const QSizeF size = m_session->pageSize(item.page - 1);
+                    valid = item.atX >= 0 && item.atY >= 0 && item.atX <= size.width() && item.atY <= size.height();
+                }
+                const QPoint at = valid ? QPoint(item.atX, item.atY) : QPoint();
+                items.append(QVariantMap{
+                    {QStringLiteral("index"), i},
+                    {QStringLiteral("kind"), item.kind},
+                    {QStringLiteral("page"), item.page - 1},
+                    {QStringLiteral("x"), at.x()},
+                    {QStringLiteral("y"), at.y()},
+                    {QStringLiteral("placed"), valid},
+                    {QStringLiteral("text"), noteText(now.text, item)},
+                    {QStringLiteral("marker"), now.text.mid(item.markerStart, item.markerEnd - item.markerStart)}});
+                continue;
+            }
             items.append(QVariantMap{
                 {QStringLiteral("index"), i},
                 {QStringLiteral("kind"), item.kind},
@@ -127,7 +168,7 @@ QString PdfMarks::mark(const QString &kind, const QString &colour, int page, int
         if (now.document.items.at(i).kind == kind && placement.placed && placement.page == page + 1
                 && placement.start == start && placement.length == length) {
             const PdfNotes::Edit edit = PdfNotes::removeMark(now.text, now.document.items.at(i), text.mid(start, length));
-            if (edit.isEmpty() || !m_apply(edit)) return {};
+            if (edit.isEmpty() || !applyEdit(edit)) return {};
             refresh();
             return QStringLiteral("removed");
         }
@@ -140,7 +181,7 @@ QString PdfMarks::mark(const QString &kind, const QString &colour, int page, int
     mark.length = length;
     mark.text = text.mid(start, length);
     const PdfNotes::Edit edit = PdfNotes::insertMark(now.text, mark, m_session->fileName(), m_session->pageLabel(page));
-    if (edit.isEmpty() || !m_apply(edit)) return {};
+    if (edit.isEmpty() || !applyEdit(edit)) return {};
     refresh();
     return QStringLiteral("added");
 }
@@ -153,7 +194,7 @@ bool PdfMarks::removeMark(int index) {
     const PdfNotes::Placement &placement = now.placements.at(i);
     const QString written = placement.placed ? pageText(placement.page).mid(placement.start, placement.length) : QString();
     const PdfNotes::Edit edit = PdfNotes::removeMark(now.text, now.document.items.at(i), written);
-    if (edit.isEmpty() || !m_apply(edit)) return false;
+    if (edit.isEmpty() || !applyEdit(edit)) return false;
     refresh();
     return true;
 }
@@ -166,7 +207,52 @@ bool PdfMarks::recolourMark(int index, const QString &colour) {
     const PdfNotes::Item &item = now.document.items.at(i);
     if (item.kind == QLatin1String("highlight") && !PdfNotes::highlightColours().contains(colour)) return false;
     const PdfNotes::Edit edit = PdfNotes::recolourMark(now.text, item, colour);
-    if (edit.isEmpty() || !m_apply(edit)) return false;
+    if (edit.isEmpty() || !applyEdit(edit)) return false;
     refresh();
     return true;
+}
+
+int PdfMarks::placeNote(int page, double x, double y) {
+    if (!ready() || page < 0 || page >= m_session->pageCount()) return -1;
+    const QPoint at = clampedPoint(page, x, y);
+    PdfNotes::Note note;
+    note.page = page + 1;
+    note.x = at.x();
+    note.y = at.y();
+    const PdfNotes::NoteInsert insert = PdfNotes::insertNote(m_text(), note, m_session->fileName(), m_session->pageLabel(page));
+    if (insert.edit.isEmpty() || !applyEdit(insert.edit)) return -1;
+    refresh();
+    return insert.caret;
+}
+
+bool PdfMarks::moveNote(int index, double x, double y) {
+    if (!ready()) return false;
+    const Current now = current();
+    const int i = currentIndex(now, index);
+    if (i < 0) return false;
+    const PdfNotes::Item &item = now.document.items.at(i);
+    if (item.kind != QLatin1String("note") || item.page < 1 || item.page > m_session->pageCount()) return false;
+    const QPoint at = clampedPoint(item.page - 1, x, y);
+    const PdfNotes::Edit edit = PdfNotes::moveNote(now.text, item, at.x(), at.y());
+    if (edit.isEmpty() || !applyEdit(edit)) return false;
+    refresh();
+    return true;
+}
+
+int PdfMarks::bodyPosition(int index) {
+    if (!ready()) return -1;
+    const Current now = current();
+    const int i = currentIndex(now, index);
+    return i < 0 ? -1 : now.document.items.at(i).bodyStart;
+}
+
+QVariantMap PdfMarks::itemAt(int position) {
+    if (!ready() || position < 0) return {};
+    const Current now = current();
+    for (int i = 0; i < now.document.items.size(); ++i) {
+        const PdfNotes::Item &item = now.document.items.at(i);
+        if (position < item.markerStart || position > item.contentEnd) continue;
+        return {{QStringLiteral("index"), i}, {QStringLiteral("marker"), now.text.mid(item.markerStart, item.markerEnd - item.markerStart)}};
+    }
+    return {};
 }

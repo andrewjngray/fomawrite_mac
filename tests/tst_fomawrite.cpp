@@ -302,6 +302,18 @@ private slots:
     void pdfHighlighterPenMenuAndMarkingMode();
     void pdfMarkupMenuItemsAndPageContextMenu();
     void pdfMarkingInPdfOnlyLayoutKeepsLayoutAndFocus();
+    void pdfNotesNoteMarkerRoundTrip();
+    void pdfNotePlacedByClickIsOneUndoStepInSource();
+    void pdfNotePlacedByClickIsOneUndoStepInLive();
+    void pdfNotePinLandsWhereClickedOnEveryRotation();
+    void pdfNotePopoverMoveAndRemove();
+    void pdfClickOnMarkOrPinShowsItsItemInTheNotes();
+    void pdfCaretIntoAnItemShowsItOnThePage();
+    void pdfDragSelectingFromAHighlightStillSelects();
+    void pdfNoteToolButtonMenuItemAndShortcut();
+    void pdfReanchoredMarksAreDrawnAtTheQuoteAndRemovable();
+    void pdfUnplacedItemsAreNotDrawnAndAreListed();
+    void pdfClickingAnUnplacedRowRevealsItInTheNotes();
     void libraryNewMenuItemsAreDisabledWithoutAFolder();
     void harperBridgeAnswersLintRequestsFromTheHost();
     void harperEngineCachesDedupesAndMapsKinds();
@@ -339,6 +351,7 @@ private slots:
     void windowsPdfMenuCopyAndKeysRouteByFocus();
     void windowsPdfMenuCopiesAMarkdownQuote();
     void windowsPdfMenuMarksTheSelection();
+    void windowsPdfMenuArmsTheNoteTool();
     void organizerHeaderButtonsStayClickable_data();
     void organizerHeaderButtonsStayClickable();
     void acceptanceProfileRejectsInvalidRoots();
@@ -6389,4 +6402,6 @@ int main(int argc, char **argv) {
 #include "cycle161-pdf-pane.inc"
 #include "cycle162-pdf-integration.inc"
 #include "cycle163-pdf-markup.inc"
+#include "cycle164-pdf-notes.inc"
+#include "cycle164-pdf-anchoring.inc"
 #include "windows-pdf-menu.inc"

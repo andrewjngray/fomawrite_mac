@@ -3,6 +3,7 @@
 #include <QPair>
 #include <QRegularExpression>
 #include <algorithm>
+#include <limits>
 
 namespace PdfNotes {
 
@@ -246,6 +247,12 @@ Document parse(const QString &text) {
                 item.start = match.captured(1).toInt();
                 item.length = match.captured(2).toInt();
             }
+            static const QRegularExpression atPattern(QStringLiteral("^(-?\\d{1,9}),(-?\\d{1,9})$"));
+            if (const auto match = atPattern.match(item.value(QStringLiteral("at"))); match.hasMatch()) {
+                item.hasAt = true;
+                item.atX = match.captured(1).toInt();
+                item.atY = match.captured(2).toInt();
+            }
             if (!document.items.isEmpty() && document.items.last().end == text.size()) document.items.last().end = line.start;
             document.items.append(item);
             continue;
@@ -283,6 +290,14 @@ Document parse(const QString &text) {
     int lineIndex = 0;
     for (Item &item : document.items) {
         while (lineIndex < lines.size() && lines.at(lineIndex).start < item.markerLineEnd) ++lineIndex;
+        // The body: from the first non-blank line after the marker to the last non-blank character.
+        item.bodyStart = item.markerLineEnd;
+        item.contentEnd = item.markerLineEnd;
+        for (int b = lineIndex; b < lines.size() && lines.at(b).start < item.end; ++b) {
+            if (lines.at(b).kind == LineKind::Blank) continue;
+            if (!item.hasBody) { item.hasBody = true; item.bodyStart = lines.at(b).start; }
+            item.contentEnd = lines.at(b).end;
+        }
         if (!isTextMarkup(item.kind)) continue;
         int i = lineIndex;
         while (i < lines.size() && lines.at(i).start < item.end && lines.at(i).kind == LineKind::Blank) ++i;
@@ -301,6 +316,7 @@ Document parse(const QString &text) {
             item.quote = quoted.join(QLatin1Char('\n'));
             item.quoteStart = quoteStart;
             item.quoteEnd = quoteEnd;
+            item.bodyStart = quoteStart;
         }
     }
     return document;
@@ -356,35 +372,36 @@ QString pageHeading(const QString &fileName, int page, const QString &label) {
 
 QString normalised(const QString &text) { return text.simplified(); }
 
-Edit insertMark(const QString &text, const Mark &mark, const QString &pdfFileName, const QString &pageLabel) {
-    const QString quote = quoteBlock(mark.text);
-    if (!isTextMarkup(mark.kind) || mark.page < 1 || mark.start < 0 || mark.length <= 0 || quote.isEmpty()) return {};
-    const QString eol = eolOf(text);
-    QString quoteLines = quote;
-    quoteLines.replace(QLatin1Char('\n'), eol);
-    const QString block = markerLine(mark) + eol + quoteLines + eol;
-    const QString heading = pageHeading(pdfFileName, mark.page, pageLabel);
-    if (text.isEmpty())
-        return {{0, 0, headerLine() + eol + QStringLiteral("# Notes on ") + pdfFileName + eol + eol + heading + eol + eol + block}};
-
+namespace {
+// Adds `block` (complete lines, ending in a line break) as an item of `page`:
+// in the page's section before the first item whose text start is later than
+// `order` (a note passes INT_MAX and goes after every item), or under a new
+// page heading placed in ascending page order.
+Edit insertItem(const QString &text, int page, int order, const QString &block, const QString &pdfFileName,
+                const QString &pageLabel, const QString &eol) {
+    const QString heading = pageHeading(pdfFileName, page, pageLabel);
+    if (text.isEmpty()) {
+        const QString lead = headerLine() + eol + QStringLiteral("# Notes on ") + pdfFileName + eol + eol + heading + eol + eol;
+        return {{0, 0, lead + block}};
+    }
     const Document document = parse(text);
     int position = -1;
     QString body;
     const Section *section = nullptr;
     for (const Section &candidate : document.sections)
-        if (candidate.page == mark.page) { section = &candidate; break; }
+        if (candidate.page == page) { section = &candidate; break; }
     if (section) {
         body = block;
         position = section->end;
         for (const Item &item : document.items) {
-            if (item.markerStart < section->headingLineEnd || item.markerStart >= section->end || item.page != mark.page) continue;
-            if (item.start > mark.start) { position = item.markerStart; break; }
+            if (item.markerStart < section->headingLineEnd || item.markerStart >= section->end || item.page != page) continue;
+            if (item.start > order) { position = item.markerStart; break; }
         }
     } else {
         body = heading + eol + eol + block;
         int lastEnd = -1;
         for (const Section &candidate : document.sections) {
-            if (position < 0 && candidate.page > mark.page) position = candidate.headingStart;
+            if (position < 0 && candidate.page > page) position = candidate.headingStart;
             lastEnd = qMax(lastEnd, candidate.end);
         }
         if (position < 0) position = lastEnd >= 0 ? lastEnd : int(text.size());
@@ -398,6 +415,46 @@ Edit insertMark(const QString &text, const Mark &mark, const QString &pdfFileNam
     }
     return {{0, 0, header}, change};
 }
+}
+
+Edit insertMark(const QString &text, const Mark &mark, const QString &pdfFileName, const QString &pageLabel) {
+    const QString quote = quoteBlock(mark.text);
+    if (!isTextMarkup(mark.kind) || mark.page < 1 || mark.start < 0 || mark.length <= 0 || quote.isEmpty()) return {};
+    const QString eol = eolOf(text);
+    QString quoteLines = quote;
+    quoteLines.replace(QLatin1Char('\n'), eol);
+    return insertItem(text, mark.page, mark.start, markerLine(mark) + eol + quoteLines + eol, pdfFileName, pageLabel, eol);
+}
+
+QString noteMarkerLine(const Note &note) {
+    return QStringLiteral("<!-- fomawrite:pdf note page=%1 at=%2,%3 -->").arg(note.page).arg(note.x).arg(note.y);
+}
+
+NoteInsert insertNote(const QString &text, const Note &note, const QString &pdfFileName, const QString &pageLabel) {
+    if (note.page < 1) return {};
+    const QString eol = eolOf(text);
+    const QString marker = noteMarkerLine(note);
+    NoteInsert result;
+    result.edit = insertItem(text, note.page, std::numeric_limits<int>::max(), marker + eol + eol, pdfFileName, pageLabel, eol);
+    int delta = 0;
+    for (const Change &change : std::as_const(result.edit)) {
+        const int at = int(change.inserted.indexOf(marker));
+        if (at >= 0) { result.caret = change.position + delta + at + int(marker.size() + eol.size()); break; }
+        delta += int(change.inserted.size()) - change.removed;
+    }
+    return result;
+}
+
+Edit moveNote(const QString &text, const Item &item, int x, int y) {
+    if (item.markerEnd > text.size()) return {};
+    const QString value = QStringLiteral("%1,%2").arg(x).arg(y);
+    for (const Key &key : item.keys) {
+        if (key.name != QLatin1String("at")) continue;
+        if (key.value == value) return {};
+        return {{key.valueStart, key.valueEnd - key.valueStart, value}};
+    }
+    return {{item.keysEnd, 0, QStringLiteral(" at=") + value}};
+}
 
 Edit removeMark(const QString &text, const Item &item, const QString &writtenQuote) {
     const int length = int(text.size());
@@ -406,12 +463,22 @@ Edit removeMark(const QString &text, const Item &item, const QString &writtenQuo
     if (!stillAMarker.match(text.mid(item.markerStart, item.markerEnd - item.markerStart)).hasMatch()) return {};
     const QString eol = eolOf(text);
     const Document document = parse(text);
-    const bool whole = isTextMarkup(item.kind) && item.hasQuote && item.quoteEnd <= length
-        && !normalised(writtenQuote).isEmpty() && normalised(item.quote) == normalised(writtenQuote);
-    QPair<int, int> range{item.markerStart, item.markerLineEnd};
+    const bool isNote = item.kind == QLatin1String("note");
+    // After the marker's line and the one blank line that may follow it.
+    int afterBlank = item.markerLineEnd;
+    if (isNote && item.markerLineEnd < length) {
+        const int nl = int(text.indexOf(QLatin1Char('\n'), item.markerLineEnd));
+        const QStringView line = QStringView(text).mid(item.markerLineEnd, nl < 0 ? length - item.markerLineEnd : nl - item.markerLineEnd);
+        if (isBlank(line)) afterBlank = nl < 0 ? length : nl + 1;
+    }
+    // A note's own text is the writer's: only an empty note goes whole.
+    const bool whole = isNote ? !item.hasBody
+        : isTextMarkup(item.kind) && item.hasQuote && item.quoteEnd <= length
+            && !normalised(writtenQuote).isEmpty() && normalised(item.quote) == normalised(writtenQuote);
+    QPair<int, int> range{item.markerStart, isNote ? afterBlank : item.markerLineEnd};
     if (whole) {
         int from = item.markerStart;
-        const int to = item.quoteEnd;
+        const int to = isNote ? afterBlank : item.quoteEnd;
         for (const Section &section : document.sections) {
             if (section.headingLineEnd > item.markerStart || item.markerStart >= section.end || section.page != item.page) continue;
             if (isGeneratedHeading(section.heading, item.page)

@@ -4,6 +4,10 @@ One line per cycle, newest first. Each line links to the cycle's record under `r
 
 ## 0.3.0 development series (Cycles 97–)
 
+- **Mac cycle 164 merged into Windows (19 Nov): notes on the page** — Mac record `research/cycle-164/README-mac.md`. Note pins, page and notes navigation, the unplaced list and marker chips in Live come with the merge; the Windows PDF menu gains Note (no keyboard shortcut: the Mac's Ctrl+Cmd chord would be Ctrl+Alt, which is AltGr on many layouts), with a menu test.
+
+- **164 (Mac)** — Notes on the page (`0.3.0-dev59`, build 164). [Record](research/cycle-164/README-mac.md)
+
 - **Mac cycle 163 merged into Windows (19 Nov): highlights, underline and strikethrough in the PDF notes** — Mac record `research/cycle-163/README-mac.md`. The notes model (`pdfnotes`), the marks and the toolbar pen come with the merge; the Windows PDF menu gains Highlight Text, Underline Text and Strike Through Text (no keyboard shortcuts: Ctrl+Alt is AltGr on many layouts), with a menu test.
 
 - **163 (Mac)** — Highlights, underline and strikethrough stored in the notes (`0.3.0-dev58`, build 163). [Record](research/cycle-163/README-mac.md)

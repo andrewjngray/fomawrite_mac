@@ -146,6 +146,8 @@ Item {
             case "code": c.moveTo(8,7); c.lineTo(3,12); c.lineTo(8,17); c.moveTo(16,7); c.lineTo(21,12); c.lineTo(16,17); line(14,5,10,19); break
             case "highlight":
                 c.moveTo(15,4); c.lineTo(20,9); c.lineTo(11,18); c.lineTo(6,13); c.closePath(); line(6,13,4,19); line(4,19,11,18); line(13,21.5,21,21.5); break
+            case "note":
+                c.roundedRect(4,4,16,16,2.5,2.5); line(8,10,16,10); line(8,14,13,14); break
             case "clear-format": line(4,5,14,5); line(9,5,9,16); line(6,16,12,16); line(14,14,20,20); line(20,14,14,20); break
             case "chevrons-right": c.moveTo(5,6); c.lineTo(11,12); c.lineTo(5,18); c.moveTo(12,6); c.lineTo(18,12); c.lineTo(12,18); break
             case "appearance":

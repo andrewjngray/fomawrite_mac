@@ -579,6 +579,7 @@ ApplicationWindow {
         var reader = pdfReader;
         switch (command) {
         case "copyQuote": reader.copyMarkdownQuote(); break;
+        case "note": reader.armNote(); break;
         case "highlight": reader.markSelection("highlight", reader.markColour); break;
         case "underline": reader.markSelection("underline"); break;
         case "strike": reader.markSelection("strike"); break;
@@ -591,6 +592,71 @@ ApplicationWindow {
         case "inspector": Qt.callLater(reader.showInspector); break;
         case "find": Qt.callLater(reader.openFind, false); break;
         }
+    }
+    // Notes and page follow each other (Cycle 164). A click on a mark or pin
+    // puts the notes' caret at the start of its item (the PDF-only layout only
+    // selects); the caret moving into a different item shows it on the page.
+    // The window's own moves and edits are quiet for a moment, so the two
+    // directions never answer each other, and typing inside one item does nothing.
+    property string pdfCaretMarker: ""
+    property double pdfNavQuietUntil: 0
+    function quietPdfNavigation() { pdfNavQuietUntil = Date.now() + 600; }
+    function pdfCaretMoved(position) {
+        if (!pdfMode || !pdfReader || !backend.pdfMarks) return;
+        var found = backend.pdfMarks.itemAt(position);
+        var marker = found.marker !== undefined ? found.marker : "";
+        if (Date.now() < pdfNavQuietUntil) { pdfCaretMarker = marker; return; }
+        if (marker === pdfCaretMarker) return;
+        pdfCaretMarker = marker;
+        if (marker !== "" && pdfReaderSlot.visible && workspaceLayout.effectiveLayoutMode !== 0) pdfReader.revealItem(marker);
+    }
+    // Puts the notes' caret at `position`; `focus` also gives the notes the keyboard.
+    function placeNotesCaret(position, focus, attempt) {
+        if (position < 0 || !editorPane.visible) return;
+        quietPdfNavigation();
+        if (workspaceLayout.liveEditEnabled) {
+            if (!liveEditorLoader.item) { // the page is still being created: try again shortly
+                if ((attempt || 0) < 40) Qt.callLater(function() { win.placeNotesCaret(position, focus, (attempt || 0) + 1); });
+                return;
+            }
+            backend.editorBridge.placeCursor(position);
+            backend.editorBridge.noteCaretMovedByUser(); // the writer asked for this move
+            if (focus) liveEditorLoader.item.focusLive();
+            return;
+        }
+        if (focus) { win.setEditingMode(false); win.lastWritingSurface = "source"; }
+        editor.cursorPosition = position;
+        if (focus) editor.forceActiveFocus();
+        pdfCaretScrollTries = 0;
+        pdfCaretScrollTimer.restart();
+    }
+    // Scrolls the notes to the caret once a layout change in progress (PDF only -> Split) has finished.
+    property int pdfCaretScrollTries: 0
+    Timer {
+        id: pdfCaretScrollTimer
+        interval: 40
+        repeat: true
+        onTriggered: {
+            if (win.changingDocumentView && ++win.pdfCaretScrollTries < 40) return;
+            stop();
+            editorFlick.ensureCursorVisible();
+        }
+    }
+    function revealPdfItemInNotes(index) {
+        if (!backend.pdfMarks || workspaceLayout.effectiveLayoutMode === 2) return;
+        placeNotesCaret(backend.pdfMarks.bodyPosition(index), false);
+    }
+    Connections {
+        target: editor
+        function onCursorPositionChanged() { if (!workspaceLayout.liveEditEnabled && editorPane.visible) win.pdfCaretMoved(editor.cursorPosition); }
+    }
+    Connections {
+        target: backend.editorBridge
+        function onCursorMoved(anchor, head) { if (workspaceLayout.liveEditEnabled && editorPane.visible) win.pdfCaretMoved(head); }
+    }
+    Connections {
+        target: backend.pdfMarks
+        function onEditStarting() { win.quietPdfNavigation(); }
     }
     // The PDF pane is hidden in the Notes layout: show it beside the notes (or alone when narrow).
     function revealPdfPane() {
@@ -607,7 +673,7 @@ ApplicationWindow {
     }
     Connections {
         target: backend.pdf
-        function onOpened() { win.adoptPdfLayout(backend.pdf.notesExist); }
+        function onOpened() { win.adoptPdfLayout(backend.pdf.notesExist); win.quietPdfNavigation(); }
         function onActiveChanged() {
             if (backend.pdf.active || !win.layoutBeforePdf) return;
             var before = win.layoutBeforePdf;
@@ -3804,6 +3870,10 @@ ApplicationWindow {
                 bottomInset: documentFooter.height
                 darkMode: win.darkMode
                 onOpenUrlRequested: function(link) { backend.openExternalUrl(link); }
+                // A note is placed in the notes, which are shown first (Split) when the PDF is alone.
+                onEditorNeeded: { if (workspaceLayout.effectiveLayoutMode === 2) win.setDocumentView(1); }
+                onNoteEditRequested: function(caret) { win.placeNotesCaret(caret, true); }
+                onRevealInNotesRequested: function(index) { win.revealPdfItemInNotes(index); }
             }
         }
         // Spelling and Grammar sits right of the document. The footer spans the

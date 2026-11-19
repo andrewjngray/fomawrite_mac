@@ -2,7 +2,7 @@ import QtQuick
 import QtQuick.Controls
 
 // The PDF pane's toolbar, in Preview's order: thumbnails · zoom out, actual
-// size, zoom in · fit width · page · highlighter · Inspector · find. Narrow
+// size, zoom in · fit width · page · highlighter · note · Inspector · find. Narrow
 // panes fold actual size, then fit width, then thumbnails, then the Inspector
 // into a "more" menu, and last the "of N" beside the page field.
 Rectangle {
@@ -10,6 +10,7 @@ Rectangle {
     objectName: "pdfToolbar"
     required property var reader
     readonly property bool controlsEnabled: reader.ready
+    readonly property int unplacedCount: reader.unplacedItems.length
     readonly property Item inspectorAnchor: plan.inspector ? inspectorButton : overflowButton
     function focusPageField() {
         if (!pageField.enabled) return;
@@ -24,7 +25,8 @@ Rectangle {
     readonly property var foldOrder: ["actual", "fit", "thumbnails", "inspector", "count"]
     readonly property var foldWidths: ({ actual: 54, fit: 34 + spacing, thumbnails: 34 + spacing, inspector: 34 + spacing,
                                          count: pageCountLabel.implicitWidth + pageCluster.spacing })
-    readonly property real baseWidth: 2 * sideMargin + 66 + spacing + pageField.width + spacing + highlighter.implicitWidth + 12 + 34
+    readonly property real baseWidth: 2 * sideMargin + 66 + spacing + pageField.width + spacing + highlighter.implicitWidth + spacing + 34 + 12 + 34
+        + (unplacedCount > 0 ? unplacedButton.implicitWidth + spacing : 0)
     readonly property var plan: {
         var shown = { actual: true, fit: true, thumbnails: true, inspector: true, count: true };
         var folded = false;
@@ -196,6 +198,16 @@ Rectangle {
                 onClicked: highlighterMenu.popup(highlighter, 0, highlighter.height + 4)
             }
         }
+        // The note tool (Cycle 164): arm it, then click the page to pin a note there.
+        ToolbarButton {
+            objectName: "pdfNote"
+            iconName: "note"
+            hint: bar.reader.noteTool ? "Cancel note" : "Add a note to the page"
+            checked: bar.reader.noteTool
+            enabled: bar.controlsEnabled && !!bar.reader.marks
+            focusPolicy: Qt.TabFocus
+            onClicked: bar.reader.armNote()
+        }
     }
 
     CompactMenu {
@@ -219,6 +231,17 @@ Rectangle {
         anchors.rightMargin: bar.sideMargin
         anchors.verticalCenter: parent.verticalCenter
         spacing: bar.spacing
+        // Items in the notes that cannot be placed on the page (Cycle 164).
+        ToolbarButton {
+            id: unplacedButton
+            objectName: "pdfUnplacedButton"
+            visible: bar.unplacedCount > 0
+            text: bar.unplacedCount + " unplaced"
+            hint: "Notes that cannot be placed on the page"
+            enabled: bar.controlsEnabled
+            focusPolicy: Qt.TabFocus
+            onClicked: bar.reader.showUnplaced(unplacedButton)
+        }
         ToolbarButton {
             id: inspectorButton
             objectName: "pdfInspectorButton"
