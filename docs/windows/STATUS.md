@@ -7,8 +7,9 @@ Double-click **[Launch.cmd](../../Launch.cmd)** in the Windows repo root. On the
 starts Parallels Windows 11 if needed, and opens the Windows app. **[Update.command](../../Update.command)**
 only updates. [Short instructions](../../START-HERE.md).
 
-- **Current downloaded packages:** `0.3.0-dev49`, commit `78b9d9c2540d44fc3fa73ae4a6e0a4ccc284d08b`,
-  ARM64 and x64, from successful full Windows CI run `39845554167`.
+- **Current downloaded packages:** `0.3.0-dev60` (build 165), commit `7b11ce730824`,
+  ARM64 and x64, from successful full Windows CI run `44506354001`. The ARM64 package is
+  installed in the Parallels VM (20 November) and running.
   `dist/windows-testing/current.json` is the local selected-build record; both
   manifests and every packaged file were verified. The previous b056 packages remain available.
 - **Fresh launcher verification:** 19 Windows PowerShell 5.1 checks plus 22 updater/Mac-orchestration tests;
@@ -56,6 +57,10 @@ only updates. [Short instructions](../../START-HERE.md).
   and Strike Through Text (`windows_pdf_highlight`, `_underline`, `_strike`), enabled with a PDF
   selection and with no keyboard shortcuts (Ctrl+Alt is AltGr on many layouts); the toolbar
   pen and the page's context menu come with the merge. Menu test: `windowsPdfMenuMarksTheSelection`.
+- **Build 165 installed in the VM (20 Nov):** ARM64 `7b11ce7`, staged by `launch-current.ps1`
+  from a checksum-verified copy served over the Parallels network (no shared folders), licence check
+  passed, saved workspace carried over. Mac `master` `16e8606` (qpdf C flags; Windows-safe replace
+  ported to the Mac) and `0184707` (programme summary) are not merged yet; they come with cycle 166.
 - **Still open:** intermittent imported-theme atomic replacement failure cause,
   remaining clipboard/search and Print desktop checks, broader recovery/display/storage
   acceptance, physical x64 hardware, and installer/signing/distribution qualification.
