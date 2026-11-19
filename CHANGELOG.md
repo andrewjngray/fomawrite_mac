@@ -5,6 +5,7 @@ One line per cycle, newest first. Each line links to the cycle's record under `r
 ## 0.3.0 development series (Cycles 97–)
 
 - **Mac cycle 165 merged into Windows (19 Nov): page edits with qpdf** — Mac record `research/cycle-165/README-mac.md`. `PdfEditor` (qpdf 12), safe PDF saving (`pdffiles`, with a `MoveFileExW` replace on Windows) and pending page edits come with the merge; no interface yet. The Windows build now gets qpdf from vcpkg (pinned baseline, binary cache) and the package ships qpdf's DLLs with their licence notices.
+  Windows record: vcpkg commit `9eec002df1cd109f8f104cd966a763daf9751489` (tag 2026.10.16, qpdf 12.4.2) pinned in `windows/vcpkg-baseline.txt`; built by `bin/windows/vcpkg-qpdf.ps1`; binary cache key `vcpkg-qpdf-<arch>-<hash of the baseline file and script>`. DLLs added: `qpdf30.dll` (Apache-2.0), `z.dll` (zlib), `jpeg62.dll` (libjpeg-turbo, BSD-3-Clause/IJG/zlib); no OpenSSL. Package grew about 1.1 MB zipped (x64 168.7 to 169.9 MB, ARM64 157.9 to 159.0 MB). `PdfFiles` on Windows writes its temporary with a plain `QFile` (a `QTemporaryFile` blocked `MoveFileExW`: error 32). CI: Windows run 44506354001, green on x64 and ARM64 with the launch and update checks (the cache was saved by this run; a cache hit is not yet observed).
 
 - **165 (Mac)** — Page edits with qpdf and safe saving; no interface yet (`0.3.0-dev60`, build 165). [Record](research/cycle-165/README-mac.md)
 
