@@ -4,6 +4,7 @@
 
 #include <QHash>
 #include <QObject>
+#include <QPoint>
 #include <QStringList>
 #include <QTimer>
 #include <QVariantList>
@@ -47,6 +48,18 @@ public:
     // `index` is an items entry's index.
     Q_INVOKABLE bool removeMark(int index);
     Q_INVOKABLE bool recolourMark(int index, const QString &colour);
+    // Note pins (Cycle 164). Places a note at (x, y) in page view points (page
+    // 0-based, clamped to the page) after the page's existing items: one edit
+    // with the marker and an empty text line. Returns the caret position for
+    // the note's text in the edited text, or -1.
+    Q_INVOKABLE int placeNote(int page, double x, double y);
+    // Rewrites only the note's at= value (one edit); `index` is an items entry's index.
+    Q_INVOKABLE bool moveNote(int index, double x, double y);
+    // Where the item's body starts in the current text (the caret goes there), or -1.
+    Q_INVOKABLE int bodyPosition(int index);
+    // The item whose marker or block holds `position` in the current text:
+    // {index, marker}, or an empty map. The marker line identifies the item in `items`.
+    Q_INVOKABLE QVariantMap itemAt(int position);
     // Re-reads the notes now (otherwise shortly after the text changes).
     Q_INVOKABLE void refresh();
     void scheduleRefresh();
@@ -55,6 +68,9 @@ public:
 
 signals:
     void itemsChanged();
+    // Emitted just before the notes are edited by marking, removing, moving and
+    // so on, so the window can tell its own edits from the writer's.
+    void editStarting();
     void toolChanged();
 
 private:
@@ -68,6 +84,8 @@ private:
     QString pageText(int page) const; // 1-based; empty when there is no such page
     QVariantList rects(int page, int start, int length) const;
     bool ready() const;
+    bool applyEdit(const PdfNotes::Edit &edit);
+    QPoint clampedPoint(int page, double x, double y) const;
 
     PdfSession *m_session;
     TextSource m_text;

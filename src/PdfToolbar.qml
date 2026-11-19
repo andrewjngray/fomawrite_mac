@@ -2,7 +2,7 @@ import QtQuick
 import QtQuick.Controls
 
 // The PDF pane's toolbar, in Preview's order: thumbnails · zoom out, actual
-// size, zoom in · fit width · page · highlighter · Inspector · find. Narrow
+// size, zoom in · fit width · page · highlighter · note · Inspector · find. Narrow
 // panes fold actual size, then fit width, then thumbnails, then the Inspector
 // into a "more" menu, and last the "of N" beside the page field.
 Rectangle {
@@ -24,7 +24,7 @@ Rectangle {
     readonly property var foldOrder: ["actual", "fit", "thumbnails", "inspector", "count"]
     readonly property var foldWidths: ({ actual: 54, fit: 34 + spacing, thumbnails: 34 + spacing, inspector: 34 + spacing,
                                          count: pageCountLabel.implicitWidth + pageCluster.spacing })
-    readonly property real baseWidth: 2 * sideMargin + 66 + spacing + pageField.width + spacing + highlighter.implicitWidth + 12 + 34
+    readonly property real baseWidth: 2 * sideMargin + 66 + spacing + pageField.width + spacing + highlighter.implicitWidth + spacing + 34 + 12 + 34
     readonly property var plan: {
         var shown = { actual: true, fit: true, thumbnails: true, inspector: true, count: true };
         var folded = false;
@@ -195,6 +195,16 @@ Rectangle {
                 enabled: bar.controlsEnabled && !!bar.reader.marks
                 onClicked: highlighterMenu.popup(highlighter, 0, highlighter.height + 4)
             }
+        }
+        // The note tool (Cycle 164): arm it, then click the page to pin a note there.
+        ToolbarButton {
+            objectName: "pdfNote"
+            iconName: "note"
+            hint: bar.reader.noteTool ? "Cancel note" : "Add a note to the page"
+            checked: bar.reader.noteTool
+            enabled: bar.controlsEnabled && !!bar.reader.marks
+            focusPolicy: Qt.TabFocus
+            onClicked: bar.reader.armNote()
         }
     }
 

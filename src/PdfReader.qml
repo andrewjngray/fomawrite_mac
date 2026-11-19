@@ -24,6 +24,13 @@ Rectangle {
     readonly property int revision: session ? session.revision : 0
     readonly property size largestPage: session && revision >= 0 && session.largestPageSize.width > 0 ? session.largestPageSize : Qt.size(612, 792)
     signal openUrlRequested(url link)
+    // Note pins and navigation (Cycle 164). The window shows the notes before a
+    // note is placed (editorNeeded), then puts the caret where the note's text
+    // goes (noteEditRequested); a click on a mark or pin asks the window to
+    // show its item in the notes (revealInNotesRequested, an items index).
+    signal editorNeeded()
+    signal noteEditRequested(int caret)
+    signal revealInNotesRequested(int index)
     color: darkMode ? "#2a2c30" : "#e4e4e2"
 
     // Zoom. 100% ("actual size") draws one PDF point as 4/3 logical pixels (96 dpi).
@@ -71,8 +78,113 @@ Rectangle {
         }
         return byPage;
     }
+    // Note pins: placed notes by page, drawn at a fixed size at any zoom.
+    readonly property real pinSize: 22
+    property bool noteTool: false          // armed: the next click on a page places a note
+    property string selectedNoteMarker: "" // the selected pin's marker line
+    property var dragNote: null            // {index, page, x, y} while a pin is dragged
+    property int flashIndex: -1            // the item flashed after the notes asked to show it
+    readonly property var notesByPage: {
+        var byPage = ({});
+        var items = marks ? marks.items : [];
+        for (var i = 0; i < items.length; ++i) {
+            var item = items[i];
+            if (item.kind !== "note" || !item.placed) continue;
+            (byPage[item.page] || (byPage[item.page] = [])).push(item);
+        }
+        return byPage;
+    }
+    readonly property var selectedPin: {
+        var items = marks ? marks.items : [];
+        if (selectedNoteMarker === "") return null;
+        for (var i = 0; i < items.length; ++i)
+            if (items[i].kind === "note" && items[i].marker === selectedNoteMarker) return items[i];
+        return null;
+    }
+    function armNote() {
+        if (!ready || !marks) return;
+        noteTool = !noteTool;
+        if (noteTool) { markingMode = false; clearSelection(); selectedNoteMarker = ""; }
+    }
+    // The pin under a point of a page (points), or null.
+    function pinAt(page, point) {
+        var list = notesByPage[page] || [];
+        var half = pinSize / 2 / Math.max(0.01, pageScale);
+        for (var i = list.length - 1; i >= 0; --i)
+            if (Math.abs(point.x - list[i].x) <= half && Math.abs(point.y - list[i].y) <= half) return list[i];
+        return null;
+    }
+    function placeNoteAt(page, point) {
+        noteTool = false;
+        if (!marks) return false;
+        editorNeeded();
+        var caret = marks.placeNote(page, point.x, point.y);
+        if (caret < 0) return false;
+        noteEditRequested(caret);
+        return true;
+    }
+    function selectPin(pin) { selectedNoteMarker = pin ? pin.marker : ""; }
+    function removeSelectedPin() {
+        var pin = selectedPin;
+        if (!pin || !marks) return false;
+        selectedNoteMarker = "";
+        return marks.removeMark(pin.index);
+    }
+    function itemForMarker(marker) {
+        var items = marks ? marks.items : [];
+        for (var i = 0; i < items.length; ++i) if (items[i].marker === marker) return items[i];
+        return null;
+    }
+    // The part of the page an item occupies, in points.
+    function itemArea(item) {
+        if (item.kind === "note") {
+            var half = pinSize / 2 / Math.max(0.01, pageScale);
+            return Qt.rect(item.x - half, item.y - half, 2 * half, 2 * half);
+        }
+        var left = Infinity, top = Infinity, right = -Infinity, bottom = -Infinity;
+        for (var r = 0; r < item.rects.length; ++r) {
+            var shape = markShape("highlight", item.rects[r], item.direction);
+            left = Math.min(left, shape.x); top = Math.min(top, shape.y);
+            right = Math.max(right, shape.x + shape.width); bottom = Math.max(bottom, shape.y + shape.height);
+        }
+        return right < left ? Qt.rect(0, 0, 0, 0) : Qt.rect(left, top, right - left, bottom - top);
+    }
+    // Scrolls just enough to show `area` (points) of a page; nothing when it is already fully in view.
+    function showArea(page, area) {
+        var delegate = pages.itemAtIndex(page);
+        if (!delegate) {
+            pages.positionViewAtIndex(page, ListView.Beginning);
+            delegate = pages.itemAtIndex(page);
+        }
+        if (!delegate) return;
+        var margin = 24;
+        var top = delegate.y + area.y * pageScale, bottom = top + area.height * pageScale;
+        var left = delegate.pageX + area.x * pageScale, right = left + area.width * pageScale;
+        var y = pages.contentY, x = pages.contentX;
+        if (top < y || bottom > y + pages.height)
+            y = (top < y || bottom - top + 2 * margin > pages.height) ? top - margin : bottom + margin - pages.height;
+        if (left < x || right > x + pages.width)
+            x = (left < x || right - left + 2 * margin > pages.width) ? left - margin : right + margin - pages.width;
+        y = clampY(y); x = clampX(x);
+        if (y === pages.contentY && x === pages.contentX) return;
+        pages.cancelFlick();
+        pages.contentX = x;
+        pages.contentY = y;
+    }
+    // The notes moved into the item with this marker line: show it and flash it.
+    function revealItem(marker) {
+        if (!ready || !marks) return false;
+        var item = itemForMarker(marker);
+        if (!item) { marks.refresh(); item = itemForMarker(marker); }
+        if (!item || !item.placed || item.page < 0 || item.page >= pageCount) return false;
+        showArea(item.page, itemArea(item));
+        flashIndex = item.index;
+        flashTimer.restart();
+        return true;
+    }
+    Timer { id: flashTimer; interval: 1100; onTriggered: root.flashIndex = -1 }
     function colourValue(name) { return markColours[name] || markColours.yellow; }
-    function markVerb(kind) { return kind === "underline" ? "Underline" : kind === "strike" ? "Strikethrough" : "Highlight"; }
+    function markVerb(kind) { return kind === "note" ? "Note" : kind === "underline" ? "Underline" : kind === "strike" ? "Strikethrough" : "Highlight"; }
     // Where a mark is drawn, in page points, around one line's glyph-tight
     // box (baseline to cap height) and along the text's direction: a
     // highlight padded to the line's height as Preview draws it, an
@@ -118,6 +230,7 @@ Rectangle {
     function markWithTool() { return markSelection(markTool, markColour); }
     // The toolbar's pen: marks a selection, or turns marking mode on or off.
     function usePen() {
+        noteTool = false;
         if (selectionText !== "") { markingMode = false; markWithTool(); return; }
         markingMode = !markingMode;
     }
@@ -485,8 +598,14 @@ Rectangle {
         case Qt.Key_Left: scrollBy(-40, 0); break;
         case Qt.Key_Home: pages.contentY = clampY(pages.originY); break;
         case Qt.Key_End: pages.contentY = clampY(pages.originY + pages.contentHeight); break;
+        case Qt.Key_Delete:
+        case Qt.Key_Backspace:
+            if (!removeSelectedPin()) return;
+            break;
         case Qt.Key_Escape:
-            if (selectionText !== "") clearSelection();
+            if (noteTool) noteTool = false;
+            else if (selectedNoteMarker !== "") selectedNoteMarker = "";
+            else if (selectionText !== "") clearSelection();
             else if (markingMode) markingMode = false;
             else return;
             break;
@@ -608,6 +727,77 @@ Rectangle {
                         radius: modelData.kind === "highlight" ? 2 : 0
                         color: root.colourValue(modelData.colour)
                         opacity: modelData.kind === "highlight" ? root.highlightOpacity : 1
+                        Rectangle {
+                            objectName: "pdfMarkFlash"
+                            visible: root.flashIndex === modelData.index
+                            anchors.fill: parent
+                            anchors.margins: -3
+                            radius: 4
+                            color: "transparent"
+                            border.width: 2
+                            border.color: backend.palette.focus
+                        }
+                    }
+                }
+                Repeater {
+                    model: root.notesByPage[pageSlot.index] || []
+                    Item {
+                        id: pin
+                        required property var modelData
+                        readonly property bool dragged: !!root.dragNote && root.dragNote.index === modelData.index
+                        readonly property bool selected: !!root.selectedPin && root.selectedPin.index === modelData.index
+                        readonly property real pinX: (dragged ? root.dragNote.x : modelData.x) * root.pageScale
+                        readonly property real pinY: (dragged ? root.dragNote.y : modelData.y) * root.pageScale
+                        objectName: "pdfNotePin"
+                        x: pinX - root.pinSize / 2
+                        y: pinY - root.pinSize / 2
+                        width: root.pinSize
+                        height: root.pinSize
+                        // The page is always white, so the pin keeps one colour set in light and dark windows.
+                        Rectangle {
+                            anchors.fill: parent
+                            radius: 5
+                            color: "#ffd60a"
+                            border.width: pin.selected ? 2 : 1
+                            border.color: pin.selected ? backend.palette.focus : "#b58900"
+                        }
+                        LineIcon { anchors.centerIn: parent; width: 14; height: 14; name: "note"; ink: "#5c4a00"; strokeWidth: 2 }
+                        Rectangle {
+                            objectName: "pdfNoteFlash"
+                            visible: root.flashIndex === pin.modelData.index
+                            anchors.fill: parent
+                            anchors.margins: -4
+                            radius: 8
+                            color: "transparent"
+                            border.width: 2
+                            border.color: backend.palette.focus
+                        }
+                        Rectangle {
+                            id: popover
+                            objectName: "pdfNotePopover"
+                            visible: pin.selected && !pin.dragged
+                            z: 10
+                            x: pin.x + root.pinSize + 6 + width > page.width ? -width - 6 : root.pinSize + 6
+                            y: 0
+                            width: Math.min(240, Math.max(120, page.width - 16))
+                            height: noteLabel.implicitHeight + 16
+                            radius: 8
+                            color: backend.palette.popover || backend.palette.panel
+                            border.color: backend.palette.border
+                            Text {
+                                id: noteLabel
+                                objectName: "pdfNoteText"
+                                x: 8; y: 8
+                                width: parent.width - 16
+                                wrapMode: Text.Wrap
+                                maximumLineCount: 10
+                                elide: Text.ElideRight
+                                text: pin.modelData.text !== "" ? pin.modelData.text : "Empty note. Type it in the notes."
+                                color: pin.modelData.text !== "" ? backend.palette.text : backend.palette.muted
+                                font.family: Qt.application.font.family
+                                font.pixelSize: 13
+                            }
+                        }
                     }
                 }
                 Repeater {
@@ -651,27 +841,59 @@ Rectangle {
                 property bool dragging: false
                 property bool wordClick: false
                 property var hoverLink: null
-                cursorShape: hoverLink ? Qt.PointingHandCursor : Qt.IBeamCursor
+                property var pressPin: null
+                cursorShape: root.noteTool ? Qt.CrossCursor : hoverLink ? Qt.PointingHandCursor : Qt.IBeamCursor
                 function toPoints(mouse) { return Qt.point(mouse.x / root.pageScale, mouse.y / root.pageScale); }
                 onPressed: function(mouse) {
                     root.focusPages();
                     pressPoint = toPoints(mouse);
                     dragging = false;
                     wordClick = false;
+                    pressPin = root.noteTool ? null : root.pinAt(pageSlot.index, pressPoint);
                 }
                 onPositionChanged: function(mouse) {
                     var point = toPoints(mouse);
                     if (!pressed) { hoverLink = root.linkAt(pageSlot.links, point); return; }
                     if (!dragging && Math.hypot(point.x - pressPoint.x, point.y - pressPoint.y) * root.pageScale < 3) return;
                     dragging = true;
+                    if (root.noteTool) return;
+                    if (pressPin) {
+                        // Dragging a pin: it follows the pointer, kept on its page.
+                        root.dragNote = { index: pressPin.index, page: pageSlot.index,
+                            x: Math.max(0, Math.min(pageSlot.points.width, pressPin.x + point.x - pressPoint.x)),
+                            y: Math.max(0, Math.min(pageSlot.points.height, pressPin.y + point.y - pressPoint.y)) };
+                        return;
+                    }
                     root.setSelection(pageSlot.index, root.session.selectionBetween(pageSlot.index, pressPoint, point));
                 }
                 onReleased: function(mouse) {
+                    var released = toPoints(mouse);
+                    if (root.noteTool) { root.clearSelection(); root.placeNoteAt(pageSlot.index, released); return; }
+                    if (pressPin) {
+                        var pin = pressPin;
+                        pressPin = null;
+                        if (dragging && root.dragNote) {
+                            var moved = root.dragNote;
+                            root.dragNote = null;
+                            if (root.marks.moveNote(pin.index, moved.x, moved.y)) {
+                                var after = root.marks.items[pin.index];
+                                if (after && after.kind === "note") root.selectedNoteMarker = after.marker;
+                            }
+                        } else {
+                            root.clearSelection();
+                            root.selectPin(pin);
+                            root.revealInNotesRequested(pin.index);
+                        }
+                        return;
+                    }
                     if (dragging && root.markingMode) root.markWithTool();
                     if (dragging || wordClick) return;
-                    var link = root.linkAt(pageSlot.links, toPoints(mouse));
-                    if (link) { root.clearSelection(); root.followLink(link); }
-                    else root.clearSelection();
+                    var link = root.linkAt(pageSlot.links, released);
+                    if (link) { root.clearSelection(); root.selectedNoteMarker = ""; root.followLink(link); return; }
+                    root.clearSelection();
+                    root.selectedNoteMarker = "";
+                    var mark = root.markAt(pageSlot.index, released);
+                    if (mark) root.revealInNotesRequested(mark.index);
                 }
                 onDoubleClicked: function(mouse) {
                     wordClick = true;
@@ -683,7 +905,7 @@ Rectangle {
                 // the Menu key); the selection is kept, as in Preview.
                 ContextMenu.onRequested: function(position) {
                     var point = Qt.point(position.x / root.pageScale, position.y / root.pageScale);
-                    root.showPageMenu(pageMouse, position, root.linkAt(pageSlot.links, point), root.markAt(pageSlot.index, point));
+                    root.showPageMenu(pageMouse, position, root.linkAt(pageSlot.links, point), root.pinAt(pageSlot.index, point) || root.markAt(pageSlot.index, point));
                 }
             }
         }

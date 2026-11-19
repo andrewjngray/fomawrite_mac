@@ -60,6 +60,12 @@ struct Item {
     int quoteStart = -1;   // the blockquote's lines; quoteEnd is after the last line break
     int quoteEnd = -1;
     int end = 0;           // the item ends at the next marker, heading or the end of the text
+    bool hasAt = false;    // at=X,Y (integers, page view points) is present and valid
+    int atX = 0;
+    int atY = 0;
+    int bodyStart = 0;     // the quote's start, else the first non-blank line after the marker, else markerLineEnd
+    int contentEnd = 0;    // after the last non-blank character of the item (at least markerLineEnd)
+    bool hasBody = false;  // there is text after the marker (for a note: the note's text)
     QString value(const QString &name) const;
 };
 
@@ -126,6 +132,25 @@ Edit insertMark(const QString &text, const Mark &mark, const QString &pdfFileNam
 Edit removeMark(const QString &text, const Item &item, const QString &writtenQuote);
 // The edit that sets the item's colour= value (adding the key when absent).
 Edit recolourMark(const QString &text, const Item &item, const QString &colour);
+
+// A note pinned on the page (Cycle 164): "<!-- fomawrite:pdf note page=N at=X,Y -->"
+// on its own line, then the note's text. X,Y are integers in page view points.
+struct Note {
+    int page = 1; // 1-based
+    int x = 0;
+    int y = 0;
+};
+QString noteMarkerLine(const Note &note);
+struct NoteInsert {
+    Edit edit;
+    int caret = -1; // in the edited text: the line after the marker, where the note's text goes
+};
+// The edit that adds a note after the existing items of its page (page heading
+// created and ordered as for marks): the marker and an empty text line.
+NoteInsert insertNote(const QString &text, const Note &note, const QString &pdfFileName, const QString &pageLabel);
+// The edit that sets the note's at= value (adding the key when absent); only
+// those bytes change.
+Edit moveNote(const QString &text, const Item &item, int x, int y);
 
 struct Placement {
     bool placed = false;

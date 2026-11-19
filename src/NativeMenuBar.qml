@@ -423,6 +423,7 @@ Platform.MenuBar {
         Platform.MenuItem { objectName: "pdfMenuHighlight"; text: "Highlight Text"; shortcut: "Meta+Ctrl+H"; enabled: win.pdfMode && !!win.pdfReader && win.pdfReader.selectionText.length > 0; onTriggered: win.pdfCommand("highlight") }
         Platform.MenuItem { objectName: "pdfMenuUnderline"; text: "Underline Text"; shortcut: "Meta+Ctrl+U"; enabled: win.pdfMode && !!win.pdfReader && win.pdfReader.selectionText.length > 0; onTriggered: win.pdfCommand("underline") }
         Platform.MenuItem { objectName: "pdfMenuStrike"; text: "Strike Through Text"; shortcut: "Meta+Ctrl+S"; enabled: win.pdfMode && !!win.pdfReader && win.pdfReader.selectionText.length > 0; onTriggered: win.pdfCommand("strike") }
+        Platform.MenuItem { objectName: "pdfMenuNote"; text: "Note"; shortcut: "Meta+Ctrl+N"; enabled: win.pdfMode && !!win.pdfReader && win.pdfReader.ready; onTriggered: win.pdfCommand("note") }
         Platform.MenuSeparator {}
         Platform.MenuItem { objectName: "pdfMenuCopyQuote"; text: "Copy as Markdown Quote"; shortcut: "Ctrl+Shift+C"; enabled: win.pdfMode && !!win.pdfReader && win.pdfReader.selectionText.length > 0; onTriggered: win.pdfCommand("copyQuote") }
         Platform.MenuSeparator {}
