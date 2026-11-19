@@ -33,10 +33,10 @@ Platform.MenuBar {
         Platform.MenuItem { objectName: "fileClose"; text: "Close"; onTriggered: win.close() }
         Platform.MenuSeparator {}
         Platform.MenuItem { objectName: "fileSave"; text: "Save"; onTriggered: backend.save() }
-        Platform.MenuItem { objectName: "fileDuplicate"; text: "Duplicate…"; enabled: backend.fileUrl.toString() !== ""; onTriggered: fileNameDialog.showFor(false) }
-        Platform.MenuItem { objectName: "fileRename"; text: "Rename…"; enabled: backend.fileUrl.toString() !== ""; onTriggered: fileNameDialog.showFor(true) }
+        Platform.MenuItem { objectName: "fileDuplicate"; text: "Duplicate…"; enabled: backend.fileUrl.toString() !== "" && !win.pdfMode; onTriggered: fileNameDialog.showFor(false) }
+        Platform.MenuItem { objectName: "fileRename"; text: "Rename…"; enabled: backend.fileUrl.toString() !== "" || win.pdfMode; onTriggered: fileNameDialog.showFor(true) }
         Platform.MenuItem {
-            objectName: "fileMove"; text: "Move To…"; enabled: backend.fileUrl.toString() !== ""
+            objectName: "fileMove"; text: "Move To…"; enabled: backend.fileUrl.toString() !== "" || win.pdfMode
             onTriggered: { moveFolderDialog.currentFolder = backend.documentBaseUrl; moveFolderDialog.open(); }
         }
         Platform.Menu {
@@ -46,7 +46,7 @@ Platform.MenuBar {
             Platform.MenuItem { objectName: "fileRestoreVersion"; text: "Restore Version in Editor…"; enabled: backend.fileUrl.toString() !== ""; onTriggered: { versionsDialog.items = backend.versions(); versionsDialog.open(); } }
         }
         Platform.MenuSeparator {}
-        Platform.MenuItem { objectName: "fileRevealFinder"; text: "Show in Finder"; enabled: backend.fileUrl.toString() !== ""; onTriggered: backend.showInFinder() }
+        Platform.MenuItem { objectName: "fileRevealFinder"; text: "Show in Finder"; enabled: backend.displayedFileUrl.toString() !== ""; onTriggered: backend.showInFinder() }
         Platform.MenuItem { objectName: "fileRevealLibrary"; text: "Show in Library"; enabled: backend.fileUrl.toString() !== ""; onTriggered: win.showCurrentFileInLibrary() }
         Platform.MenuSeparator {}
         Platform.Menu {
@@ -419,6 +419,8 @@ Platform.MenuBar {
         title: "PDF"
         visible: win.pdfMode
         enabled: win.pdfMode
+        Platform.MenuItem { objectName: "pdfMenuCopyQuote"; text: "Copy as Markdown Quote"; shortcut: "Ctrl+Shift+C"; enabled: win.pdfMode && !!win.pdfReader && win.pdfReader.selectionText.length > 0; onTriggered: win.pdfCommand("copyQuote") }
+        Platform.MenuSeparator {}
         Platform.MenuItem { objectName: "pdfMenuGoToPage"; text: "Go to Page…"; shortcut: "Ctrl+Alt+G"; enabled: win.pdfMode && !!win.pdfReader && win.pdfReader.ready; onTriggered: win.pdfCommand("goToPage") }
         Platform.MenuSeparator {}
         Platform.MenuItem { objectName: "pdfMenuZoomIn"; text: "Zoom In"; enabled: win.pdfMode && !!win.pdfReader && win.pdfReader.ready && win.pdfReader.zoom < win.pdfReader.maximumZoom - 0.001; onTriggered: win.pdfCommand("zoomIn") }
@@ -478,7 +480,7 @@ Platform.MenuBar {
         Platform.MenuItem { objectName: "goLibraryForward"; text: "Forward in Library"; enabled: backend.library.canGoForward; onTriggered: backend.library.navigateHistory(1) }
         Platform.MenuItem { objectName: "goEnclosingFolder"; text: "Enclosing Folder"; enabled: backend.library.rootFolder.toString() !== ""; onTriggered: backend.library.enclosingFolder() }
         Platform.MenuSeparator {}
-        Platform.MenuItem { objectName: "goOpenLink"; text: "Open Link"; enabled: backend.sourceLinkAt(editor.cursorPosition).toString() !== ""; onTriggered: win.openSourceLink() }
+        Platform.MenuItem { objectName: "goOpenLink"; text: "Open Link"; enabled: backend.sourceLinkAt(win.linkCaretPosition).toString() !== ""; onTriggered: win.openSourceLink() }
         Platform.MenuItem { objectName: "goQuickSearch"; text: "Quick Search…"; enabled: backend.library.rootFolder.toString() !== ""; onTriggered: win.openQuickSearchState("", false, backend.library.rootFolder, false) }
         Platform.MenuItem { objectName: "goCommandPalette"; text: "Command Palette…"; shortcut: "Ctrl+Shift+P"; onTriggered: commandPalette.open() }
         Platform.MenuSeparator {}

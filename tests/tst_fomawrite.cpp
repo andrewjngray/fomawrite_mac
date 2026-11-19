@@ -214,6 +214,7 @@ private slots:
     void pdfOpenEntersPdfModeWithANotesCompanion();
     void pdfOpenFailuresHistoryAndRecentsUseThePdf();
     void pdfNotesStillOpenWhenTheirPdfCannotBeRead();
+    void pdfSessionDoesNotHoldTheFileOpen();
     void pdfOpenFromAModifiedDocumentAsksFirst();
     void pdfExplorerListsPdfsAndFoldsNotesIntoABadge();
     void pdfExplorerRowOpensThePdfAndTheWindowShowsIt();
@@ -228,6 +229,16 @@ private slots:
     void pdfPaneRemembersPageAndZoomPerPdf();
     void pdfPaneDefersRendersDuringFastScroll();
     void pdfModeFooterTitleAndMenusRestoreMarkdown();
+    void pdfLinksOpenFromSourceAndPreview();
+    void pdfLinkInTheNotesScrollsThePdfBesideThem();
+    void pdfLinkFromLiveOpensThePdf();
+    void pdfCopyAsMarkdownQuoteAndThePageMenu();
+    void pdfContentsSidebarSwitchesNavigatesAndMarksTheSection();
+    void pdfWindowCheckpointRestoresPdfModeAndKeepsTheMarkdownLayout();
+    void pdfRecoveryReopensUnsavedNotesWithTheirPdf();
+    void pdfWindowsOwnBothThePdfAndItsNotes();
+    void pdfRenameMoveAndTrashCarryTheNotes();
+    void pdfOpensFromTheOpenDialogDropsAndOpenWith();
     void libraryNewMenuItemsAreDisabledWithoutAFolder();
     void harperBridgeAnswersLintRequestsFromTheHost();
     void harperEngineCachesDedupesAndMapsKinds();
@@ -5394,3 +5405,4 @@ int main(int argc, char **argv) {
 #include "cycle156-new-document-focus.inc"
 #include "cycle160-pdf-core.inc"
 #include "cycle161-pdf-pane.inc"
+#include "cycle162-pdf-integration.inc"

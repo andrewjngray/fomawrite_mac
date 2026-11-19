@@ -66,6 +66,23 @@ Rectangle {
     }
     readonly property bool thumbnailsShown: session ? session.thumbnailsVisible : false
 
+    // The table of contents (the PDF's outline): [{title, level, page}].
+    readonly property var outlineEntries: session && ready && revision >= 0 ? session.outline() : []
+    readonly property bool hasOutline: outlineEntries.length > 0
+    // The sidebar shows Contents only when there is an outline to show.
+    readonly property string sidebarView: hasOutline && session && session.sidebarView === "contents" ? "contents" : "thumbnails"
+    function showSidebarView(view) { if (session) session.sidebarView = view; }
+    // The entry of the section the current page is in: the one starting
+    // nearest before (or on) it, the later entry when several start there.
+    readonly property int currentOutlineIndex: {
+        var best = -1, bestPage = -1;
+        for (var i = 0; i < outlineEntries.length; ++i) {
+            var page = outlineEntries[i].page;
+            if (page >= 0 && page <= currentPage && page >= bestPage) { best = i; bestPage = page; }
+        }
+        return best;
+    }
+
     function clampY(y) { return Math.max(pages.originY, Math.min(pages.originY + Math.max(0, pages.contentHeight - pages.height), y)); }
     function clampX(x) { return Math.max(0, Math.min(Math.max(0, pages.contentWidth - pages.width), x)); }
 
@@ -207,6 +224,27 @@ Rectangle {
         session.copyText(selectionText);
         return true;
     }
+    // "> text", a blank line and [Page N](File.pdf#page=N) (PdfSession::markdownQuote).
+    function copyMarkdownQuote() {
+        if (selectionText === "" || !session) return false;
+        return session.copyMarkdownQuote(selectionPage, selectionText);
+    }
+    function copyLinkAddress(link) {
+        if (!link || !session) return false;
+        var address = link.page >= 0 ? session.pageLinkAddress(link.page) : String(link.url);
+        if (address === "") return false;
+        session.copyText(address);
+        return true;
+    }
+    // The page's context menu: at `point` (in `item`), over `link` when there is one.
+    // Opened after the click's own events (the menu is anchored to the reader,
+    // which outlives the page delegate).
+    function showPageMenu(item, point, link) {
+        var at = item.mapToItem(root, point.x, point.y);
+        menuTimer.link = link;
+        menuTimer.at = at;
+        menuTimer.restart();
+    }
 
     // Links: rects in points; page -1 for a web address.
     function linkAt(links, point) {
@@ -305,6 +343,13 @@ Rectangle {
     Timer { id: adoptTimer; interval: 0; onTriggered: root.adoptDocument() }
     Timer { id: requestTimer; interval: 0; onTriggered: root.showRequestedPage() }
     Timer { id: findTimer; interval: 0; onTriggered: root.runFind() }
+    Timer {
+        id: menuTimer
+        property var link: null
+        property point at
+        interval: 0
+        onTriggered: { pageMenu.link = link; pageMenu.popup(root, at.x, at.y); }
+    }
     function adoptDocument() {
         if (!session || !ready || String(session.url) === String(shownUrl)) return;
         shownUrl = session.url;
@@ -320,6 +365,12 @@ Rectangle {
     }
     Connections {
         target: root.session
+        // Renamed or moved with its notes: the same document, so the view stays where it is.
+        function onRelocated(from) {
+            if (String(from) !== String(root.shownUrl)) return;
+            root.shownUrl = root.session.url;
+            if (root.lastView) root.lastView.url = root.shownUrl;
+        }
         function onUrlChanged() { root.rememberNow(); }
         function onRequestedPageChanged() { root.showRequestedPage(); }
         function onRevisionChanged() {
@@ -372,7 +423,7 @@ Rectangle {
         anchors.bottom: parent.bottom
         anchors.bottomMargin: root.bottomInset
         anchors.left: parent.left
-        width: visible ? 140 : 0
+        width: visible ? (root.hasOutline ? 180 : 140) : 0
     }
 
     ListView {
@@ -523,6 +574,11 @@ Rectangle {
                     root.setSelection(pageSlot.index, root.session.wordAt(pageSlot.index, toPoints(mouse)));
                 }
                 onExited: hoverLink = null
+                // The platform's context-menu gesture (right-click, Control-click,
+                // the Menu key); the selection is kept, as in Preview.
+                ContextMenu.onRequested: function(position) {
+                    root.showPageMenu(pageMouse, position, root.linkAt(pageSlot.links, Qt.point(position.x / root.pageScale, position.y / root.pageScale)));
+                }
             }
         }
     }
@@ -614,6 +670,33 @@ Rectangle {
     PdfInspector {
         id: inspector
         reader: root
+    }
+
+    CompactMenu {
+        id: pageMenu
+        objectName: "pdfPageMenu"
+        property var link: null
+        readonly property string findLabel: {
+            var text = root.selectionText.replace(/\s+/g, " ").trim();
+            return text.length > 24 ? text.slice(0, 24).trim() + "…" : text;
+        }
+        CompactMenuItem { objectName: "pdfContextCopy"; text: "Copy"; enabled: root.selectionText !== ""; onTriggered: { pageMenu.close(); root.copySelection(); } }
+        CompactMenuItem { objectName: "pdfContextCopyQuote"; text: "Copy as Markdown Quote"; enabled: root.selectionText !== ""; onTriggered: { pageMenu.close(); root.copyMarkdownQuote(); } }
+        CompactMenuItem {
+            objectName: "pdfContextFind"
+            text: "Find “" + pageMenu.findLabel + "” in PDF"
+            visible: root.selectionText !== ""
+            height: visible ? implicitHeight : 0
+            onTriggered: { pageMenu.close(); root.openFind(true); }
+        }
+        MenuSeparator { visible: !!pageMenu.link; height: visible ? implicitHeight : 0 }
+        CompactMenuItem {
+            objectName: "pdfContextCopyLink"
+            text: "Copy Link Address"
+            visible: !!pageMenu.link
+            height: visible ? implicitHeight : 0
+            onTriggered: { pageMenu.close(); root.copyLinkAddress(pageMenu.link); }
+        }
     }
 
     // A web address in the PDF opens only after the reader agrees.

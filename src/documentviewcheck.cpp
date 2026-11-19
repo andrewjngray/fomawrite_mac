@@ -305,7 +305,7 @@ int runDocumentViewCheck(QApplication &app, const QString &outputDirectory) {
             QStringLiteral("DocumentFindBar.qml"), QStringLiteral("DocumentOutline.qml"),
             QStringLiteral("PaneZoomState.qml"), QStringLiteral("PaneZoomControls.qml"), QStringLiteral("WorkspaceHeader.qml"), QStringLiteral("LinkEditor.qml"), QStringLiteral("LinkSyntax.js"), QStringLiteral("ExportHub.qml"), QStringLiteral("SquareDialogButton.qml"),
             QStringLiteral("PdfReader.qml"), QStringLiteral("PdfToolbar.qml"), QStringLiteral("PdfFindBar.qml"),
-            QStringLiteral("PdfThumbnails.qml"), QStringLiteral("PdfInspector.qml"),
+            QStringLiteral("PdfThumbnails.qml"), QStringLiteral("PdfContents.qml"), QStringLiteral("PdfInspector.qml"),
             QStringLiteral("editor/index.html"), QStringLiteral("editor/editor.css"), QStringLiteral("editor/blocks.css"),
             QStringLiteral("editor/dist/editor.js"), QStringLiteral("themes/claude-like.css"), QStringLiteral("themes/omawrite.css")}) {
         const QString hash = fileHash(":/" + name);

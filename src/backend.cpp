@@ -313,6 +313,56 @@ private:
     bool created = false;
 };
 
+// A PDF and its notes file (X.pdf.md) move as one: the notes follow the PDF to
+// `destination` + ".md" with their authorship sidecar; if they cannot, the PDF
+// is put back, so a pair is never left half moved.
+static bool movePdfWithNotes(const QString &pdf, const QString &destination, QString *error) {
+    const QString notes = pdf + QStringLiteral(".md");
+    const QString notesDestination = destination + QStringLiteral(".md");
+    const bool hasNotes = QFileInfo(notes).isFile();
+    for (const QString &target : {destination, notesDestination}) {
+        if (QFileInfo::exists(target) || QFileInfo(target).isSymLink()) {
+            *error = QStringLiteral("That name is already in use (the PDF or its notes file). Choose another name.");
+            return false;
+        }
+    }
+    StagedAuthorship metadata;
+    if (hasNotes && !metadata.prepare(QUrl::fromLocalFile(notes), QUrl::fromLocalFile(notesDestination))) {
+        *error = QStringLiteral("Could not preserve the notes' authorship metadata. Nothing was changed.");
+        return false;
+    }
+    if (!QFile(pdf).rename(destination)) {
+        *error = QStringLiteral("Could not move the PDF. Check the name and folder permissions. Nothing was changed.");
+        return false;
+    }
+    if (hasNotes && !QFile(notes).rename(notesDestination)) {
+        *error = QFile(destination).rename(pdf)
+            ? QStringLiteral("Could not move the notes file, so the PDF was put back. Nothing was changed.")
+            : QStringLiteral("Could not move the notes file, and the PDF could not be put back: it is now %1.").arg(QDir::toNativeSeparators(destination));
+        return false;
+    }
+    if (hasNotes) metadata.finish(true);
+    return true;
+}
+
+static bool trashPdfWithNotes(const QString &pdf, QString *error) {
+    const QString notes = pdf + QStringLiteral(".md");
+    QString trashed;
+    if (!QFile::moveToTrash(pdf, &trashed)) {
+        *error = QStringLiteral("Could not move this item to Trash. Nothing was permanently deleted.");
+        return false;
+    }
+    if (QFileInfo(notes).isFile() && !QFile::moveToTrash(notes)) {
+        *error = !trashed.isEmpty() && QFile(trashed).rename(pdf)
+            ? QStringLiteral("Could not move the notes file to Trash, so the PDF was put back. Nothing was moved.")
+            : QStringLiteral("Could not move the notes file to Trash; the PDF is in the Trash. Restore it with Finder.");
+        return false;
+    }
+    const QString metadata = authorshipPath(QUrl::fromLocalFile(notes));
+    if (QFileInfo::exists(metadata)) QFile::moveToTrash(metadata);
+    return true;
+}
+
 // Context operations always resolve the clicked path, never the active editor by accident.
 static QSet<Backend *> liveBackends;
 static bool pathWithin(const QString &path, const QString &folder) {
@@ -342,14 +392,22 @@ bool Backend::libraryItemAction(const QUrl &url, const QString &action, const QS
     const QString path = info.canonicalFilePath();
     if (info.isDir() && QDir(path).isRoot() && (action == "rename" || action == "trash" || action == "duplicate"))
         return fail("A filesystem root cannot be renamed, duplicated or moved to Trash.");
+    const bool pdfItem = !info.isDir() && FileLibrary::isPdfFile(info.fileName());
     Backend *owner = nullptr;
     QList<Backend *> owners;
     for (auto *candidate : liveBackends) {
         const QString openPath = QFileInfo(candidate->fileUrl().toLocalFile()).canonicalFilePath();
-        if (openPath == path) owners.append(candidate);
+        const QString shownPath = QFileInfo(candidate->displayedFileUrl().toLocalFile()).canonicalFilePath();
+        // A PDF window owns both the PDF and its notes file.
+        const bool owns = candidate->ownsDocument(path);
+        if (owns) owners.append(candidate);
         if (info.isDir() && (action == "rename" || action == "trash" || action == "duplicate")
-            && !openPath.isEmpty() && pathWithin(openPath, path))
+            && ((!openPath.isEmpty() && pathWithin(openPath, path)) || (!shownPath.isEmpty() && pathWithin(shownPath, path))))
             return fail("Close documents inside this folder before renaming, duplicating or moving it to Trash.");
+        // Notes open on their own (their PDF could not be read) would be moved from under that window.
+        if (pdfItem && !owns && (action == "rename" || action == "trash") && !openPath.isEmpty()
+                && openPath == path + QStringLiteral(".md"))
+            return fail("Close this PDF's notes file before renaming the PDF or moving it to Trash.");
     }
     if (owners.size() > 1 && (action == "rename" || action == "trash"))
         return fail("Close the other views of this document before renaming it or moving it to Trash.");
@@ -361,11 +419,10 @@ bool Backend::libraryItemAction(const QUrl &url, const QString &action, const QS
         if (dirtyOwners > 1) return fail("This document has unsaved edits in multiple views. Use the menu in the view you want to act on.");
     }
     if (action == "favorite") { m_library.toggleFavorite(url); return true; }
-    // A PDF is never read as text, and its notes file would have to move with
-    // it: rename, duplicate, trash and the text actions wait for a later cycle.
-    static const QStringList textOnly{"rename", "duplicate", "trash", "exportHtml", "exportPdf", "print",
+    // A PDF is never read as text. Rename and Trash move its notes file with it.
+    static const QStringList textOnly{"duplicate", "exportHtml", "exportPdf", "print",
                                       "printSource", "printPreview", "copyMarkdown", "copyText", "copyHtml"};
-    if (!info.isDir() && FileLibrary::isPdfFile(info.fileName()) && textOnly.contains(action))
+    if (pdfItem && textOnly.contains(action))
         return fail("That action is not available for PDFs.");
     if (action == "reveal") {
         if (!m_library.showInFileManager(url)) return fail("Could not show this item in the file manager.");
@@ -383,6 +440,18 @@ bool Backend::libraryItemAction(const QUrl &url, const QString &action, const QS
     }
     if (action == "trash") {
         if (owner && owner->modified()) return fail("Save or close this document before moving it to Trash. Unsaved edits are unchanged.");
+        if (pdfItem) {
+            const QString key = PdfSession::viewKey(url);
+            const bool hadNotes = QFileInfo(path + QStringLiteral(".md")).isFile();
+            QString error;
+            if (!trashPdfWithNotes(path, &error)) return fail(error);
+            if (owner) owner->leaveTrashedPdf();
+            PdfSession::forgetRememberedView(key);
+            for (auto *candidate : liveBackends) candidate->m_library.refresh();
+            setStatus(hadNotes ? "Moved the PDF and its notes to Trash. Restore them with Finder if needed."
+                               : "Moved to Trash. Restore it with Finder if needed.");
+            return true;
+        }
         QString trashedPath;
         if (!QFile::moveToTrash(path, &trashedPath)) return fail("Could not move this item to Trash. Nothing was permanently deleted.");
         // Keep a clean open document as an untitled draft; Save must choose a new path.
@@ -405,6 +474,19 @@ bool Backend::libraryItemAction(const QUrl &url, const QString &action, const QS
             if (!file.open(QIODevice::WriteOnly | QIODevice::NewOnly)) return fail("Could not create the file.");
         } else if (action == "newFolder") {
             if (!QDir(parent).mkdir(argument)) return fail("Could not create the folder.");
+        } else if (pdfItem) {
+            // Only rename reaches here for a PDF (duplicate is refused above).
+            if (!FileLibrary::isPdfFile(argument)) return fail("Use a filename ending in .pdf.");
+            if (owner) {
+                const bool ok = owner->renameDocument(argument);
+                setStatus(owner->status());
+                if (!ok) return false;
+            } else {
+                const QString key = PdfSession::viewKey(url);
+                QString error;
+                if (!movePdfWithNotes(path, destination, &error)) return fail(error);
+                PdfSession::moveRememberedView(key, QUrl::fromLocalFile(destination));
+            }
         } else if (!info.isDir()) {
             if (!FileLibrary::isTextFile(argument)) return fail("Use a Markdown or .txt filename.");
             if (owner) {
@@ -2109,6 +2191,13 @@ bool Backend::ownsDocument(const QString &canonicalPath) const {
     return m_pdf.active() && (canonical(m_pdf.url()) == canonicalPath || canonical(m_pdf.notesUrl()) == canonicalPath);
 }
 
+bool Backend::showsPdf(const QUrl &url) const {
+    if (!m_pdf.active() || !url.isLocalFile()) return false;
+    const QString path = QFileInfo(url.toLocalFile()).canonicalFilePath();
+    const auto canonical = [](const QUrl &value) { return QFileInfo(value.toLocalFile()).canonicalFilePath(); };
+    return !path.isEmpty() && (path == canonical(m_pdf.url()) || path == canonical(m_pdf.notesUrl()));
+}
+
 bool Backend::open(const QUrl &url) {
     QUrl documentUrl = url;
     documentUrl.setFragment(QString());
@@ -2168,8 +2257,7 @@ void Backend::adoptDocument(const QUrl &documentUrl, const QByteArray &contents,
     m_hasKnownFileContents = true;
     m_requiresViewConflictCheck = false;
     for (auto *candidate : liveBackends) {
-        if (candidate != this && !canonical.isEmpty()
-                && canonical == QFileInfo(candidate->fileUrl().toLocalFile()).canonicalFilePath()) {
+        if (candidate != this && candidate->ownsDocument(canonical)) {
             m_requiresViewConflictCheck = true;
             candidate->m_requiresViewConflictCheck = true;
         }
@@ -2258,6 +2346,62 @@ void Backend::closePdf() {
     if (!m_pdf.active()) return;
     m_pdf.close();
     emit fileUrlChanged();
+}
+
+// The window's PDF went to the Trash with its notes: as for a trashed Markdown
+// document, the notes text stays in the window as an untitled draft.
+void Backend::leaveTrashedPdf() {
+    const bool titledNotes = !m_fileUrl.isEmpty();
+    closePdf();
+    if (!titledNotes) return;
+    setFileUrl(QUrl());
+    setModified(true);
+    writeRecovery();
+}
+
+// Rename and Move To… in PDF mode: the PDF and its notes move together (one
+// operation, see movePdfWithNotes) and the window follows, staying in PDF mode
+// with its unsaved notes; recents, history and the remembered view follow too.
+bool Backend::relocatePdf(const QString &destination, const QString &done) {
+    const QString pdf = QFileInfo(m_pdf.url().toLocalFile()).canonicalFilePath();
+    if (pdf.isEmpty()) {
+        setStatus(QStringLiteral("The PDF is no longer available."));
+        return false;
+    }
+    const bool titledNotes = m_fileUrl.isLocalFile();
+    if (titledNotes) {
+        QFile notes(m_fileUrl.toLocalFile());
+        if (!notes.open(QIODevice::ReadOnly) || !m_hasKnownFileContents || notes.readAll() != m_lastKnownFileContents) {
+            setStatus(QStringLiteral("The notes file changed on disk. Resolve the external change first."));
+            return false;
+        }
+    }
+    const QString key = PdfSession::viewKey(m_pdf.url());
+    const QString shownBefore = m_pdf.url().toLocalFile();
+    QString error;
+    if (!movePdfWithNotes(pdf, destination, &error)) {
+        setStatus(error);
+        return false;
+    }
+    const QUrl oldUrl = QUrl::fromLocalFile(pdf);
+    const QUrl newUrl = QUrl::fromLocalFile(QFileInfo(destination).canonicalFilePath());
+    const bool followed = m_pdf.relocate(newUrl);
+    if (!followed) closePdf();
+    if (titledNotes) setFileUrl(PdfSession::notesUrlFor(newUrl));
+    else if (followed) m_saveTarget = PdfSession::notesUrlFor(m_pdf.url());
+    emit fileUrlChanged(); // displayedFileUrl, and fileName for untitled notes
+    PdfSession::moveRememberedView(key, newUrl);
+    for (auto &entry : m_history)
+        if (entry.first.toLocalFile() == shownBefore || entry.first.toLocalFile() == pdf) entry.first = followed ? m_pdf.url() : newUrl;
+    for (auto *candidate : liveBackends) {
+        candidate->m_library.relocatedPath(oldUrl, newUrl);
+        candidate->m_library.refresh();
+    }
+    if (m_modified) writeRecovery();
+    else clearRecovery();
+    setStatus(done + (m_modified ? QStringLiteral(" — unsaved notes retained") : QString())
+              + (followed ? QString() : QStringLiteral(" — the PDF could not be reopened")));
+    return true;
 }
 
 void Backend::rememberCursor(int position) {
@@ -2468,6 +2612,16 @@ bool Backend::duplicateDocument(const QString &name) {
 }
 
 bool Backend::renameDocument(const QString &name) {
+    if (m_pdf.active()) {
+        const QFileInfo pdf(m_pdf.url().toLocalFile());
+        if (name.isEmpty() || name != name.trimmed() || name == "." || name == ".." || name.contains('/') || name.contains('\\')
+                || name.contains(QChar::Null) || name.contains('\n') || name.contains('\r') || !FileLibrary::isPdfFile(name)) {
+            setStatus(QStringLiteral("Enter a filename ending in .pdf, without slashes or surrounding spaces."));
+            return false;
+        }
+        if (name == pdf.fileName()) return true;
+        return relocatePdf(pdf.absoluteDir().filePath(name), QStringLiteral("Renamed to %1").arg(name));
+    }
     const QFileInfo original(m_fileUrl.toLocalFile());
     if (!m_document || !m_fileUrl.isLocalFile() || !original.isFile() || original.isSymLink()) {
         setStatus(QStringLiteral("Save to an available regular file before renaming."));
@@ -2515,6 +2669,20 @@ bool Backend::renameDocument(const QString &name) {
 }
 
 bool Backend::moveDocument(const QUrl &folder) {
+    if (m_pdf.active()) {
+        const QFileInfo pdf(m_pdf.url().toLocalFile());
+        const QFileInfo directory(folder.toLocalFile());
+        if (!folder.isLocalFile() || !directory.isDir()) {
+            setStatus(QStringLiteral("Choose an existing local destination folder."));
+            return false;
+        }
+        const QString destination = QDir(directory.canonicalFilePath()).filePath(pdf.fileName());
+        if (destination == pdf.canonicalFilePath()) {
+            setStatus(QStringLiteral("The PDF is already in that folder."));
+            return true;
+        }
+        return relocatePdf(destination, QStringLiteral("Moved to %1").arg(directory.fileName()));
+    }
     const QFileInfo original(m_fileUrl.toLocalFile());
     if (!m_document || !m_fileUrl.isLocalFile() || !original.isFile() || original.isSymLink()) {
         setStatus(QStringLiteral("Save to an available regular file before moving."));
@@ -2593,7 +2761,7 @@ bool Backend::openInNewTab(const QUrl &url) {
         return false;
     }
     for (auto *candidate : liveBackends) {
-        if (candidate->modified() && QFileInfo(candidate->fileUrl().toLocalFile()).canonicalFilePath() == info.canonicalFilePath()) {
+        if (candidate->modified() && candidate->ownsDocument(info.canonicalFilePath())) {
             setStatus(QStringLiteral("Save this document's unsaved changes before opening another view."));
             return false;
         }
@@ -2612,7 +2780,7 @@ bool Backend::openInNewWindow(const QUrl &url) {
         return false;
     }
     for (auto *candidate : liveBackends) {
-        if (candidate->modified() && QFileInfo(candidate->fileUrl().toLocalFile()).canonicalFilePath() == info.canonicalFilePath()) {
+        if (candidate->modified() && candidate->ownsDocument(info.canonicalFilePath())) {
             setStatus(QStringLiteral("Save this document's unsaved changes before opening another view."));
             return false;
         }
@@ -2624,15 +2792,17 @@ bool Backend::openInNewWindow(const QUrl &url) {
 }
 
 bool Backend::showInFinder() {
-    if (!m_fileUrl.isLocalFile() || !QFileInfo(m_fileUrl.toLocalFile()).isFile()) {
+    // In PDF mode the file on show is the PDF, whether or not its notes are saved.
+    const QUrl target = displayedFileUrl();
+    if (!target.isLocalFile() || !QFileInfo(target.toLocalFile()).isFile()) {
         setStatus(QStringLiteral("Save the document to an available local file first."));
         return false;
     }
 #ifdef Q_OS_MACOS
     const bool shown = QProcess::startDetached(QStringLiteral("/usr/bin/open"),
-                                              {QStringLiteral("-R"), m_fileUrl.toLocalFile()});
+                                              {QStringLiteral("-R"), target.toLocalFile()});
 #else
-    const bool shown = QDesktopServices::openUrl(QUrl::fromLocalFile(QFileInfo(m_fileUrl.toLocalFile()).absolutePath()));
+    const bool shown = QDesktopServices::openUrl(QUrl::fromLocalFile(QFileInfo(target.toLocalFile()).absolutePath()));
 #endif
     if (!shown) setStatus(QStringLiteral("Could not reveal the document."));
     return shown;
@@ -2984,7 +3154,7 @@ void Backend::writeRecovery() {
     QSaveFile file(path);
     if (!file.open(QIODevice::WriteOnly))
         return;
-    const QJsonObject recovery{{QStringLiteral("fileUrl"), m_fileUrl.toString()},
+    QJsonObject recovery{{QStringLiteral("fileUrl"), m_fileUrl.toString()},
                                {QStringLiteral("text"), currentDocumentText()}, {QStringLiteral("authorship"), authorshipData()},
                                {"requiresExplicitSave", m_requiresExplicitSave},
                                {"lineEnding", int(m_lineEnding)},
@@ -2992,6 +3162,8 @@ void Backend::writeRecovery() {
                                {"lossyDecode", m_lossyDecode},
                                {"knownDiskContents", m_hasKnownFileContents},
                                {"diskContents", QString::fromLatin1(m_lastKnownFileContents.toBase64())}};
+    // A PDF's notes are recovered with their PDF; older readers ignore the key.
+    if (m_pdf.active()) recovery.insert(QStringLiteral("pdfUrl"), m_pdf.url().toString());
     file.setPermissions(QFileDevice::ReadOwner | QFileDevice::WriteOwner);
     file.write(QJsonDocument(recovery).toJson(QJsonDocument::Compact));
     file.commit();
@@ -3020,8 +3192,20 @@ void Backend::restoreRecovery() {
     m_hadByteOrderMark = recovery.value("byteOrderMark").toBool(false);
     m_lossyDecode = recovery.value("lossyDecode").toBool(false);
     setFileUrl(recoveredUrl);
+    // Modified before the PDF opens, so the window shows the notes beside it.
     setModified(true);
+    // Snapshots without the key (before Cycle 162) still bring a titled notes
+    // file's PDF along, as open() does.
+    QUrl pdfUrl(recovery.value(QStringLiteral("pdfUrl")).toString());
+    if (pdfUrl.isEmpty() && recoveredUrl.isLocalFile()
+            && recoveredUrl.toLocalFile().endsWith(QStringLiteral(".pdf.md"), Qt::CaseInsensitive))
+        pdfUrl = QUrl::fromLocalFile(recoveredUrl.toLocalFile().chopped(3));
+    if (pdfUrl.isLocalFile() && QFileInfo(pdfUrl.toLocalFile()).isFile() && m_pdf.load(pdfUrl)) {
+        if (m_fileUrl.isEmpty()) m_saveTarget = PdfSession::notesUrlFor(m_pdf.url());
+        emit fileUrlChanged(); // displayedFileUrl, fileName and documentBaseUrl
+    }
     setStatus(QStringLiteral("Recovered unsaved changes"));
+    emit documentRecovered();
 }
 
 void Backend::clearRecovery() {

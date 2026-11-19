@@ -69,6 +69,7 @@
         <file>PdfToolbar.qml</file>
         <file>PdfFindBar.qml</file>
         <file>PdfThumbnails.qml</file>
+        <file>PdfContents.qml</file>
         <file>PdfInspector.qml</file>
         <file>ExportHub.qml</file>
         <file>StyleGallery.qml</file>

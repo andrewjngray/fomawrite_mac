@@ -155,6 +155,11 @@ Item {
             case "thumbnails":
                 c.roundedRect(2.5,4,19,16,2.5,2.5); line(9.5,4,9.5,20)
                 c.rect(4.5,6.5,3,4); c.rect(4.5,13.5,3,4); break
+            case "pages":
+                // Two stacked pages: unlike the framed sidebar icons beside it in the window.
+                c.roundedRect(4,7,11.5,14,1.5,1.5); line(7.5,10.5,12,10.5); line(7.5,13.5,12,13.5); line(7.5,16.5,10.5,16.5)
+                c.moveTo(8.5,7); c.lineTo(8.5,4.5); c.quadraticCurveTo(8.5,3,10,3); c.lineTo(18.5,3)
+                c.quadraticCurveTo(20,3,20,4.5); c.lineTo(20,15.5); c.quadraticCurveTo(20,17,18.5,17); c.lineTo(15.5,17); break
             case "fit-width":
                 line(3,4,3,20); line(21,4,21,20); line(7,12,17,12)
                 c.moveTo(10,9); c.lineTo(7,12); c.lineTo(10,15); c.moveTo(14,9); c.lineTo(17,12); c.lineTo(14,15); break

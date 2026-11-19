@@ -46,7 +46,7 @@ Rectangle {
         ToolbarButton {
             objectName: "pdfThumbnailsToggle"
             visible: bar.plan.thumbnails
-            iconName: "thumbnails"
+            iconName: "pages"
             hint: bar.reader.thumbnailsShown ? "Hide thumbnails" : "Show thumbnails"
             checked: bar.reader.thumbnailsShown
             enabled: bar.controlsEnabled

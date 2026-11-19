@@ -16,8 +16,8 @@ CompactMenu {
     property bool location: false
     property string pending: ""
     readonly property bool folder: !!target.directory
-    // PDF rows: open, reveal and copy the path; nothing that reads the file as
-    // text, and no rename, duplicate or trash until notes can move with them.
+    // PDF rows: open, reveal, copy the path, and rename or trash the PDF with
+    // its notes file; nothing that reads the file as text, and no duplicate.
     readonly property bool pdf: !!target.pdf
     height: Math.min(implicitHeight, (Overlay.overlay ? Overlay.overlay.height : 900) - 24)
     function showFor(item, entry, isLocation, point) {
@@ -75,8 +75,8 @@ CompactMenu {
     CompactMenuItem { text: "Get Info"; visible: !menu.location; height: visible ? implicitHeight : 0; enabled: !!menu.target.available; onTriggered: menu.later("info") }
     CompactMenuItem { text: menu.target.favorite ? "Remove Favorite" : "Favorite"; visible: !menu.location; height: visible ? implicitHeight : 0; enabled: !!menu.target.available; onTriggered: menu.later("favorite") }
     CompactMenuItem { text: "Duplicate…"; visible: !menu.location && !menu.pdf; height: visible ? implicitHeight : 0; enabled: !!menu.target.available; onTriggered: menu.later("duplicate") }
-    CompactMenuItem { text: "Rename…"; visible: !menu.location && !menu.pdf; height: visible ? implicitHeight : 0; enabled: !!menu.target.available; onTriggered: menu.later("rename") }
-    CompactMenuItem { text: "Move to Trash…"; visible: !menu.location && !menu.pdf; height: visible ? implicitHeight : 0; enabled: !!menu.target.available; onTriggered: menu.later("trash") }
+    CompactMenuItem { text: "Rename…"; visible: !menu.location; height: visible ? implicitHeight : 0; enabled: !!menu.target.available; onTriggered: menu.later("rename") }
+    CompactMenuItem { text: "Move to Trash…"; visible: !menu.location; height: visible ? implicitHeight : 0; enabled: !!menu.target.available; onTriggered: menu.later("trash") }
     MenuSeparator { visible: !menu.location; height: visible ? implicitHeight : 0 }
     CompactMenuItem { text: Qt.platform.os === "osx" ? "Show in Finder" : "Show in File Manager"; enabled: !!menu.target.available; onTriggered: menu.later("reveal") }
     MenuSeparator {}
@@ -160,7 +160,7 @@ CompactMenu {
         objectName: "libraryTrashDialog"
         parent: Overlay.overlay; anchors.centerIn: parent; modal: true; width: 380
         title: "Move to Trash?"; standardButtons: Dialog.Ok | Dialog.Cancel
-        Label { width: parent.width; wrapMode: Text.Wrap; text: "Move “" + menu.target.name + "”" + (menu.folder ? " and its contents" : "") + " to Trash? You can restore it using Finder."; textFormat: Text.PlainText }
+        Label { objectName: "libraryTrashMessage"; width: parent.width; wrapMode: Text.Wrap; text: "Move “" + menu.target.name + "”" + (menu.folder ? " and its contents" : menu.target.hasNotes ? " and its notes" : "") + " to Trash? You can restore " + (menu.target.hasNotes ? "them" : "it") + " using Finder."; textFormat: Text.PlainText }
         onAccepted: menu.run("trash")
     }
     Dialog {
