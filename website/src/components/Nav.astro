@@ -1,0 +1,92 @@
+---
+const currentPath = Astro.url.pathname;
+const isActive = (path: string) => currentPath === path || currentPath.startsWith(path + '/');
+---
+
+<nav>
+  <div class="nav-container">
+    <a href="/" class="logo">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M4 6h16M4 12h16M4 18h16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+      </svg>
+      <span>Fomawrite</span>
+    </a>
+    
+    <div class="nav-links">
+      <a href="/changelog" class:list={['nav-link', { active: isActive('/changelog') }]}>Changelog</a>
+      <a href="/docs" class:list={['nav-link', { active: isActive('/docs') }]}>Docs</a>
+      <a href="/about" class:list={['nav-link', { active: isActive('/about') }]}>About</a>
+      <a href="https://github.com/andrewjngray/fomawrite_mac" class="nav-link" target="_blank" rel="noopener noreferrer">GitHub</a>
+    </div>
+  </div>
+</nav>
+
+<style>
+  nav {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background: rgba(10, 10, 10, 0.8);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .nav-container {
+    max-width: var(--max-width);
+    margin: 0 auto;
+    padding: var(--spacing-sm) var(--spacing-md);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-weight: 600;
+    font-size: 1.125rem;
+    color: var(--color-text);
+    text-decoration: none;
+  }
+
+  .logo svg {
+    width: 24px;
+    height: 24px;
+  }
+
+  .nav-links {
+    display: flex;
+    gap: var(--spacing-md);
+    align-items: center;
+  }
+
+  .nav-link {
+    color: var(--color-text-muted);
+    font-size: 0.9375rem;
+    padding: 0.25rem 0;
+    border-bottom: 2px solid transparent;
+    transition: all 0.2s ease;
+  }
+
+  .nav-link:hover {
+    color: var(--color-text);
+  }
+
+  .nav-link.active {
+    color: var(--color-text);
+    border-bottom-color: var(--color-accent);
+  }
+
+  @media (max-width: 768px) {
+    .nav-container {
+      flex-direction: column;
+      gap: var(--spacing-sm);
+      padding: var(--spacing-sm);
+    }
+
+    .nav-links {
+      gap: var(--spacing-sm);
+    }
+  }
+</style>
