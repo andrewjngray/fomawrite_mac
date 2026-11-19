@@ -313,7 +313,7 @@ class QpdfPackagingTests(unittest.TestCase):
         return stage
 
     def test_qpdf_with_its_notices_passes(self):
-        stage = self.stage(["qpdf30.dll", "zlib1.dll", "jpeg62.dll"],
+        stage = self.stage(["qpdf30.dll", "z.dll", "jpeg62.dll"],
                            ["qpdf-Apache-2.0.txt", "zlib-copyright.txt", "libjpeg-turbo-copyright.txt"])
         packaging.check_vcpkg_notices(stage)
 

@@ -145,7 +145,7 @@ def deploy_runtime(stage, architecture):
 # the others are vcpkg's recorded copyright files. An unknown DLL is an error,
 # so a new dependency cannot ship without a decision about its notice.
 VCPKG_PORTS = [(r"qpdf\d*\.dll", "qpdf", "qpdf-Apache-2.0.txt"),
-               (r"zlib1\.dll", "zlib", "zlib-copyright.txt"),
+               (r"(?:zlib1|z)\.dll", "zlib", "zlib-copyright.txt"),
                (r"(?:jpeg\d+|turbojpeg)\.dll", "libjpeg-turbo", "libjpeg-turbo-copyright.txt"),
                (r"spng\.dll", "libspng", "libspng-copyright.txt")]
 
