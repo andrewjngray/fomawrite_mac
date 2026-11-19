@@ -8,7 +8,7 @@
 - **It is not the end of the build cycle.** Phase 3 (page editing) is only half done. Cycle 165 built the engine (qpdf, unsaved page edits, safe saving, notes renumbering) but **no buttons or menus**: nothing in it is reachable by the user until cycle 166.
 - Three small loose ends from 165 are listed in §5.
 
-## 2. What Fomawrite can do now (installed: build 164 on the Mac and in the Windows VM)
+## 2. What Fomawrite can do now (installed: build 165 on the Mac and in the Windows VM, 20 November)
 
 - Open a PDF in its own pane, beside a Markdown notes file `Report.pdf.md` (Notes / Split / PDF layouts).
 - Read: zoom, fit, thumbnails, table of contents, find, go to page, links, Inspector, copy as a Markdown quote, `Report.pdf#page=3` links from any document.
@@ -29,8 +29,8 @@
 | 161 | 161 | PDF pane: toolbar, zoom, find, thumbnails, Inspector, PDF menu | `c07177d` | merged | Mac + VM |
 | 162 | 162 | Links, contents tab, restore, rename/move/trash with notes, Open With; Windows PDF menu | `4657596` | `a1ddef6`, `cdf47c3` | Mac + VM |
 | 163 | 163 | Notes model; highlight, underline, strikethrough | `279d72e`, `8283065` | `1d21369` | Mac + VM |
-| 164 | 164 | Note pins, page↔notes navigation, unplaced list, Live chips | `1d2626c`, `85be127`, `546e2a6` | `ad900b3` (+ Note in Windows menu) | **Mac + VM (current)** |
-| 165 | 165 | qpdf page edits, unsaved edits with undo, safe save, notes renumbered at save, export | `543d534`…`24dca0b`, `16e8606` | `9f1de06`, `f7e8a1c`, `7b11ce7`, `2a43400` | not installed (no visible change) |
+| 164 | 164 | Note pins, page↔notes navigation, unplaced list, Live chips | `1d2626c`, `85be127`, `546e2a6` | `ad900b3` (+ Note in Windows menu) | Mac + VM |
+| 165 | 165 | qpdf page edits, unsaved edits with undo, safe save, notes renumbered at save, export | `543d534`…`24dca0b`, `16e8606` | `9f1de06`, `f7e8a1c`, `7b11ce7`, `2a43400` | **Mac (`0184707`) + VM (`7b11ce7`), 20 Nov (current)** |
 
 ### Evidence at the end of each cycle
 
@@ -38,7 +38,7 @@
 |---|---|---|---|---|
 | 163 | 372 / 0 | 328 | green, run 44440728575 | not run (no machine) |
 | 164 | 384 / 0 | 334 | green, run 44461009397 | green on `546e2a6`, run 44467581434 |
-| 165 | 416 / 0 (at `24dca0b`) | 334 | green, run 44506354001 | **unproven** on `16e8606` (no machine, twice) |
+| 165 | 416 / 0 (at `24dca0b`; again at `0184707` on 20 Nov) | 334 | green, run 44506354001 | **unproven** on `16e8606` (no machine, twice) |
 
 Every behavioural test was shown failing with the guarded code disabled (red/green), recorded per cycle.
 
@@ -65,7 +65,7 @@ All of the repository records above are committed and pushed on both branches.
 
 ## 5. Loose ends from cycle 165
 
-1. **GitHub's macOS job has not run on `16e8606`.** It failed for real on the previous settings (qpdf's C++ flag reaching the one C file); `16e8606` fixes that and builds here, but GitHub found no machine twice. It will be proven by the next push that gets a runner.
+1. **GitHub's macOS job has not run on `16e8606`.** It failed for real on the previous settings (qpdf's C++ flag reaching the one C file); `16e8606` fixes that and builds here, but GitHub found no machine twice. It will be proven by the next push that gets a runner. On 20 November the full Mac suite passed here on `0184707` (which includes `16e8606`): 416 / 0, and that build is installed.
 2. **`windows/port` lacks `16e8606`'s build-file fix** (`fomawrite.pro`, `tests/tests.pro`). It arrives with the cycle 166 merge; the two `.pro` files differ between branches, so that merge needs care (keep `QPDF_PREFIX` for Windows, pkg-config split for Mac).
 3. **vcpkg cache hit not yet observed** on Windows CI; `bin/windows/build.ps1` now needs `QPDF_PREFIX` for any local Windows build.
 
