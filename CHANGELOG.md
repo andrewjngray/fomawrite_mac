@@ -4,6 +4,11 @@ One line per cycle, newest first. Each line links to the cycle's record under `r
 
 ## 0.3.0 development series (Cycles 97–)
 
+- **Mac cycles 161–162 merged into Windows (19 Nov): PDF Phase 1 complete** — the PDF pane and its integration (Mac records `research/cycle-161/README-mac.md`, `research/cycle-162/README-mac.md`). Windows-specific: a **PDF** menu that is in the menu bar only while a PDF is open (inserted before Window, taken out on leaving), with the Mac menu's items; Copy as Markdown Quote on Ctrl+Shift+C; Edit → Copy copies the PDF selection when the PDF pane has focus; no Ctrl+Alt shortcuts (AltGr). The PDF is read into memory, so Windows can rename, move and replace it while it is shown.
+
+- **162 (Mac)** — PDF links and integration; Phase 1 complete (`0.3.0-dev57`, build 162). [Record](research/cycle-162/README-mac.md)
+- **161 (Mac)** — The PDF pane (`0.3.0-dev56`, build 161). [Record](research/cycle-161/README-mac.md)
+
 - **Mac cycles 159–160 merged into Windows (19 Nov): PDF core** — Mac records are `research/cycle-159/README-mac.md` and `research/cycle-160/README-mac.md`; the programme is `docs/pdf-plan.md`. Windows gains PDF opening: pages (with existing annotations) in the preview pane's place, the notes file in the editor, PDFs in the explorer. No toolbar or Windows menu entries yet (cycles 161–162).
 
 - **160 (Mac)** — PDF core (`0.3.0-dev55`, build 160, 19 Nov): session, page item, `Backend::open` routing, explorer listing and notes badge. [Record](research/cycle-160/README-mac.md)

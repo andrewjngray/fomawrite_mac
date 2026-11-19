@@ -99,6 +99,8 @@ public:
     // Whether this window shows `canonicalPath`: its document, or in PDF mode
     // the PDF or its notes file.
     bool ownsDocument(const QString &canonicalPath) const;
+    // In PDF mode: whether `url` (fragment aside) is this window's PDF or its notes file.
+    Q_INVOKABLE bool showsPdf(const QUrl &url) const;
     // Where Save writes without a dialog while the document is still untitled:
     // the notes file of the PDF beside it (empty otherwise).
     QUrl saveTarget() const { return m_saveTarget; }
@@ -345,6 +347,8 @@ signals:
     void saveFailed();
     void historyChanged();
     void documentLoaded();
+    // Unsaved changes were recovered from a snapshot (with their PDF, in PDF mode).
+    void documentRecovered();
     void fileUrlChanged();
     void modifiedChanged();
     void showFormattingMarksChanged();
@@ -379,6 +383,8 @@ private:
     QUrl m_saveTarget;
     bool openPdf(const QUrl &url, bool *pdfUnreadable = nullptr);
     void closePdf();
+    void leaveTrashedPdf();
+    bool relocatePdf(const QString &destination, const QString &done);
     bool readDocumentFile(const QUrl &documentUrl, QByteArray *contents);
     void adoptDocument(const QUrl &documentUrl, const QByteArray &contents, const QUrl &shownUrl);
     void startCompanionDocument(const QUrl &pdfUrl);

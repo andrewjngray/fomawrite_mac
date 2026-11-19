@@ -544,7 +544,18 @@ ApplicationWindow {
             Qt.callLater(win.rescueHiddenWorkspaceFocus);
         }
     }
-    readonly property var workspacePaneState: workspaceLayout.saveState()
+    // In PDF mode the checkpoint keeps the Markdown arrangement (layoutBeforePdf)
+    // as layoutMode, so ordinary documents never inherit the PDF layout, and
+    // the PDF's own layout as pdfLayoutMode.
+    readonly property var workspacePaneState: {
+        var state = workspaceLayout.saveState();
+        if (pdfMode && layoutBeforePdf) {
+            state.pdfLayoutMode = state.layoutMode;
+            state.layoutMode = layoutBeforePdf.layoutMode;
+            state.lastEditingLayoutMode = layoutBeforePdf.lastEditingLayoutMode === 1 ? 1 : 0;
+        }
+        return state;
+    }
     // PDF mode (Cycle 160): the PDF takes the preview pane's slot and the editor
     // shows its notes. Opening a PDF starts in PDF only, or split when it has
     // notes; leaving PDF mode restores the arrangement chosen before it.
@@ -557,10 +568,10 @@ ApplicationWindow {
     // The PDF menu and toolbar commands. A command that needs the pane shows it first.
     function pdfCommand(command) {
         if (!pdfReader) return;
-        if (workspaceLayout.effectiveLayoutMode === 0 && command !== "thumbnails")
-            setDocumentView(workspaceLayout.availableWidth >= 800 ? 1 : 2);
+        if (command !== "thumbnails" && command !== "copyQuote") revealPdfPane();
         var reader = pdfReader;
         switch (command) {
+        case "copyQuote": reader.copyMarkdownQuote(); break;
         case "goToPage": Qt.callLater(reader.focusPageField); break;
         case "zoomIn": reader.zoomIn(); break;
         case "zoomOut": reader.zoomOut(); break;
@@ -571,15 +582,22 @@ ApplicationWindow {
         case "find": Qt.callLater(reader.openFind, false); break;
         }
     }
+    // The PDF pane is hidden in the Notes layout: show it beside the notes (or alone when narrow).
+    function revealPdfPane() {
+        if (pdfMode && workspaceLayout.effectiveLayoutMode === 0)
+            setDocumentView(workspaceLayout.availableWidth >= 800 ? 1 : 2);
+    }
     property var layoutBeforePdf: null
+    // Opening a PDF starts in PDF only, or split when there are notes to show.
+    function adoptPdfLayout(withNotes) {
+        if (!win.layoutBeforePdf)
+            win.layoutBeforePdf = { layoutMode: workspaceLayout.layoutMode, lastEditingLayoutMode: workspaceLayout.lastEditingLayoutMode };
+        if (win.searchOpen) win.closeSearch(false);
+        workspaceLayout.layoutMode = withNotes ? 1 : 2;
+    }
     Connections {
         target: backend.pdf
-        function onOpened() {
-            if (!win.layoutBeforePdf)
-                win.layoutBeforePdf = { layoutMode: workspaceLayout.layoutMode, lastEditingLayoutMode: workspaceLayout.lastEditingLayoutMode };
-            if (win.searchOpen) win.closeSearch(false);
-            workspaceLayout.layoutMode = backend.pdf.notesExist ? 1 : 2;
-        }
+        function onOpened() { win.adoptPdfLayout(backend.pdf.notesExist); }
         function onActiveChanged() {
             if (backend.pdf.active || !win.layoutBeforePdf) return;
             var before = win.layoutBeforePdf;
@@ -588,11 +606,23 @@ ApplicationWindow {
             workspaceLayout.lastEditingLayoutMode = before.lastEditingLayoutMode;
         }
     }
+    Connections {
+        target: backend
+        // Recovered notes are shown beside their PDF.
+        function onDocumentRecovered() { if (backend.pdf.active) win.adoptPdfLayout(true); }
+    }
     // The approved presentation is adopted once, including checkpointed windows.
     // Future launches restore each window's subsequently chosen layout as usual.
     readonly property bool adoptReferenceWorkspace: typeof referenceWorkspaceUpgrade !== "undefined" && referenceWorkspaceUpgrade
     function restoreWorkspacePaneState(state) {
-        workspaceLayout.restoreState(state);
+        var restored = workspaceLayout.restoreState(state);
+        // A PDF window: state.layoutMode is the Markdown arrangement to return to.
+        if (restored && backend.pdf.active) {
+            win.layoutBeforePdf = { layoutMode: workspaceLayout.layoutMode, lastEditingLayoutMode: workspaceLayout.lastEditingLayoutMode };
+            var pdfLayout = state.pdfLayoutMode;
+            workspaceLayout.layoutMode = typeof pdfLayout === "number" && pdfLayout % 1 === 0 && pdfLayout >= 0 && pdfLayout <= 2
+                ? pdfLayout : (backend.pdf.notesExist || backend.modified ? 1 : 2);
+        }
         workspaceSettings.showMarkup = true;
         if (adoptReferenceWorkspace) applyReferenceWorkspace();
     }
@@ -867,8 +897,11 @@ ApplicationWindow {
     }
     Connections {
         target: backend.editorBridge
-        function onCursorMoved(anchor, head) { if (win.formatBarShown) blockStyleTimer.restart(); }
+        function onCursorMoved(anchor, head) { liveLinkCaret = head; if (win.formatBarShown) blockStyleTimer.restart(); }
     }
+    // Go > Open Link acts at the caret of the surface in use (Source or Live).
+    property int liveLinkCaret: -1
+    readonly property int linkCaretPosition: workspaceLayout.liveEditEnabled ? liveLinkCaret : editor.cursorPosition
     Connections {
         target: workspaceLayout
         function onLiveEditEnabledChanged() { blockStyleTimer.restart(); }
@@ -1715,9 +1748,13 @@ ApplicationWindow {
         });
     }
 
+    // Local Markdown, text and PDF targets open in the window (a PDF at its #page=N).
+    function opensInWindow(url) {
+        return /^file:.*\.(md|markdown|mdown|txt|text|pdf)(#.*)?$/i.test(String(url));
+    }
     function openSourceLink() {
-        var link = backend.sourceLinkAt(editor.cursorPosition);
-        if (/^file:.*\.(md|markdown|mdown|txt|text)(#.*)?$/i.test(String(link))) requestOpen(link);
+        var link = backend.sourceLinkAt(linkCaretPosition);
+        if (opensInWindow(link)) requestOpen(link);
         else backend.openExternalUrl(link);
     }
 
@@ -1736,7 +1773,7 @@ ApplicationWindow {
     function navigateDocumentFragment(fragment) {
         if (fragment === "") return false;
         var pdfPage = /^page=(\d+)$/.exec(fragment);
-        if (backend.pdf.active && pdfPage) { backend.pdf.requestedPage = Number(pdfPage[1]) - 1; return true; }
+        if (backend.pdf.active && pdfPage) { revealPdfPane(); backend.pdf.requestedPage = Number(pdfPage[1]) - 1; return true; }
         var decoded;
         try { decoded = decodeURIComponent(fragment); }
         catch (error) {
@@ -1807,10 +1844,12 @@ ApplicationWindow {
             if (parts.fragment !== "" && (parts.url === "" || parts.url === String(backend.fileUrl)))
                 return navigateDocumentFragment(parts.fragment);
             backend.rememberCursor(editor.cursorPosition);
-            // The PDF on screen (or its notes): only its requested page changes.
-            if (!backend.modified || (backend.pdf.active && (parts.url === String(backend.pdf.url) || parts.url === String(backend.pdf.notesUrl)))) {
+            // The PDF on screen (or its notes): no prompt, only its requested page changes.
+            if (backend.showsPdf(parts.url)) {
+                revealPdfPane();
                 return openDocumentTarget(parts.url, parts.fragment);
             }
+            if (!backend.modified) return openDocumentTarget(parts.url, parts.fragment);
             pendingOpenUrl = parts.url;
             pendingOpenFragment = parts.fragment;
             pendingAction = "open";
@@ -2640,9 +2679,10 @@ ApplicationWindow {
 
     Dialogs.FileDialog {
         id: openFileDialog
+        objectName: "openFileDialog"
         title: "Open File"
         fileMode: Dialogs.FileDialog.OpenFile
-        nameFilters: ["Markdown files (*.md *.markdown)", "All files (*)"]
+        nameFilters: ["Markdown, text and PDF (*.md *.markdown *.mdown *.txt *.text *.pdf)", "Markdown files (*.md *.markdown *.mdown)", "PDF files (*.pdf)", "All files (*)"]
         onAccepted: win.requestOpen(selectedFile)
     }
 
@@ -2698,7 +2738,7 @@ ApplicationWindow {
         function showFor(rename) {
             renaming = rename;
             errorText = "";
-            var name = backend.fileName;
+            var name = win.pdfMode ? backend.pdf.fileName : backend.fileName;
             var dot = name.lastIndexOf(".");
             fileNameInput.text = rename ? name : (dot > 0 ? name.slice(0, dot) + " copy" + name.slice(dot) : name + " copy.md");
             open();
@@ -2715,7 +2755,7 @@ ApplicationWindow {
             Label {
                 Layout.fillWidth: true
                 wrapMode: Text.Wrap
-                text: fileNameDialog.renaming ? "Rename in the current folder. Unsaved edits stay in this window."
+                text: fileNameDialog.renaming ? (win.pdfMode ? "Rename the PDF and its notes in the current folder. Unsaved notes stay in this window." : "Rename in the current folder. Unsaved edits stay in this window.")
                     : "Create a copy in the current folder, including unsaved edits. Keep editing the original."
             }
             TextField { id: fileNameInput; objectName: "fileNameInput"; Layout.fillWidth: true; onAccepted: fileNameDialog.submit() }
@@ -3733,7 +3773,7 @@ ApplicationWindow {
             }
             onLinkRequested: function(link) {
                 var resolved = backend.resolveDocumentLink(link);
-                if (/^file:.*\.(md|markdown|mdown|txt|text)(#.*)?$/i.test(String(resolved)))
+                if (win.opensInWindow(resolved))
                     win.requestOpen(resolved);
                 else
                     backend.openExternalUrl(resolved);
@@ -3882,11 +3922,35 @@ ApplicationWindow {
         onStatisticsRequested: workspaceCommands.run("statistics")
     }
 
+    // A Markdown, text or PDF file dropped anywhere on the window opens here,
+    // through the usual unsaved-changes prompt (the first file, when several
+    // are dropped). Other drops (an image over Live) pass to what lies beneath.
+    DropArea {
+        id: fileDropArea
+        objectName: "fileDropArea"
+        anchors.fill: parent
+        z: 1000
+        function droppedDocument(urls) {
+            for (var i = 0; urls && i < urls.length; ++i)
+                if (win.opensInWindow(urls[i])) return urls[i];
+            return null;
+        }
+        onEntered: function(drag) { drag.accepted = drag.hasUrls && droppedDocument(drag.urls) !== null; }
+        onDropped: function(drop) {
+            var url = droppedDocument(drop.urls);
+            if (url === null) { drop.accepted = false; return; }
+            drop.acceptProposedAction();
+            win.requestOpen(url);
+        }
+    }
+
     Component.onCompleted: {
         Qt.callLater(function() { if (backend.publishingThemeError) win.showPublishingThemeNotice(backend.publishingThemeError); });
         workspaceLayout.filesVisible = workspaceSettings.libraryVisible;
         workspaceLayout.organizerVisible = workspaceSettings.organizerVisible;
         workspaceLayout.layoutMode = workspaceSettings.layoutMode;
+        // A PDF recovered while the window was being built (its notes unsaved): split, over the default layout.
+        if (backend.pdf.active) { win.layoutBeforePdf = null; win.adoptPdfLayout(backend.pdf.notesExist || backend.modified); }
         if (workspaceSettings.appearanceRevision < 1) {
             if (workspaceSettings.writingSize === 20) workspaceSettings.writingSize = 16;
             workspaceSettings.appearanceRevision = 1;

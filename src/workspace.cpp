@@ -1,4 +1,7 @@
 #include "workspace.h"
+#include "backend.h"
+#include <QJSValue>
+#include <QVariant>
 #include <QLocalSocket>
 #include <QDir>
 #include <QFile>
@@ -97,4 +100,36 @@ QRect WorkspaceStore::visibleGeometry(const QRect &saved,const QRect &available,
     const int height=qBound(minimum.height(),saved.height(),qMax(minimum.height(),available.height()));
     return QRect(qBound(available.left(),saved.x(),qMax(available.left(),available.right()-width+1)),
                  qBound(available.top(),saved.y(),qMax(available.top(),available.bottom()-height+1)),width,height);
+}
+
+QJsonObject WorkspaceStore::documentEntry(Backend &backend, QObject *window) {
+    QJsonObject entry{{"url", backend.displayedFileUrl().toString()},
+                      {"cursor", window->property("workspaceCursor").toInt()}};
+    // QML var properties may carry their map as a QJSValue. Save desired
+    // pane state, independently of the currently contracted geometry.
+    QVariant paneState = window->property("workspacePaneState");
+    if (paneState.metaType() == QMetaType::fromType<QJSValue>())
+        paneState = paneState.value<QJSValue>().toVariant();
+    const QJsonValue paneStateJson = QJsonValue::fromVariant(paneState);
+    if (paneStateJson.isObject()) entry["paneState"] = paneStateJson;
+    return entry;
+}
+
+void WorkspaceStore::restoreDocumentEntry(QObject *window, const QJsonObject &entry, int screenWidth) {
+    // Older checkpoints have no paneState; preserve the QML migration/defaults.
+    const auto paneVersion = entry["paneState"].toObject().value("version");
+    // The outer workspace file remains version 1. Pane state has its own
+    // schema; QML migrates legacy combined view modes to version 2.
+    if (entry["paneState"].isObject()
+        && (paneVersion == QJsonValue(1) || paneVersion == QJsonValue(2))) {
+        auto paneState = entry["paneState"].toObject();
+        // Clamp a restored preview preference to this display, rather than
+        // the temporarily narrow restored window. Runtime contraction is QML-only.
+        if (paneState["previewWidth"].isDouble())
+            paneState["previewWidth"] = qBound(320.0, paneState["previewWidth"].toDouble(),
+                double(qMax(320, screenWidth - 480)));
+        QMetaObject::invokeMethod(window, "restoreWorkspacePaneState",
+                                  Q_ARG(QVariant, paneState.toVariantMap()));
+    }
+    QMetaObject::invokeMethod(window, "restoreWorkspaceCursor", Q_ARG(QVariant, entry["cursor"].toInt()));
 }

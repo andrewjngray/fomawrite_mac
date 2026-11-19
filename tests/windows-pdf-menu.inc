@@ -311,3 +311,31 @@ void FomawriteTest::windowsPdfMenuCopyAndKeysRouteByFocus() {
     QCOMPARE(barAltChords, QStringList{"windowsShortcutPreviousIssue"});
     QVERIFY2(p.w.error.isEmpty(), qPrintable(p.w.error));
 }
+
+// Copy as Markdown Quote (Mac cycle 162) on the Windows PDF menu: first item,
+// enabled only with a PDF selection, same clipboard text as the Mac menu.
+void FomawriteTest::windowsPdfMenuCopiesAMarkdownQuote() {
+    Cycle103SettingsSnapshot settings;
+    Cycle160Fixtures f; QVERIFY(f.make());
+    WindowsPdfMenuFixture m; QVERIFY(m.start(f));
+    auto &p = m.p;
+    QVERIFY(m.openPdf(f.url("geometry.pdf")));
+    QTRY_VERIFY(p.page(0));
+    auto *quote = m.item("copyQuote"); QVERIFY(quote);
+    QVERIFY(quote->property("text").toString().startsWith("Copy as Markdown Quote"));
+    QVERIFY(!quote->property("enabled").toBool());
+    const QString text = p.w.backend.pdf()->pageText(0);
+    const QVariant alpha = p.w.backend.pdf()->selectionAt(0, int(text.indexOf("ALPHA")), 5);
+    QMetaObject::invokeMethod(p.reader, "setSelection", Q_ARG(QVariant, 0), Q_ARG(QVariant, alpha));
+    QTRY_VERIFY(quote->property("enabled").toBool());
+    QGuiApplication::clipboard()->setText("before");
+    QVERIFY(QMetaObject::invokeMethod(quote, "triggered"));
+    QTRY_COMPARE(QGuiApplication::clipboard()->text(), QStringLiteral("> ALPHA\n\n[Page 1](geometry.pdf#page=1)\n"));
+    // Its shortcut exists once, for Windows only, and is not a Ctrl+Alt chord.
+    auto *shortcut = m.bar->findChild<QObject *>("windowsShortcutPdfCopyQuote"); QVERIFY(shortcut);
+    QCOMPARE(shortcut->property("sequence").value<QKeySequence>(), QKeySequence("Ctrl+Shift+C"));
+    QCOMPARE(shortcut->property("enabled").toBool(), p.w.window->property("isWindows").toBool());
+    p.call("clearSelection");
+    QTRY_VERIFY(!quote->property("enabled").toBool());
+    p.w.backend.discardRecovery();
+}

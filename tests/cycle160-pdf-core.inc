@@ -512,6 +512,53 @@ void FomawriteTest::pdfOpenFailuresHistoryAndRecentsUseThePdf() {
     QCOMPARE(d.backend.documentBaseUrl(), QUrl::fromLocalFile(f.directory.path() + QDir::separator()));
 }
 
+#ifdef Q_OS_MACOS
+#include <fcntl.h>
+#include <sys/param.h>
+#include <unistd.h>
+// How many of this process's open file descriptors refer to `path`.
+static int cycle162OpenDescriptorsFor(const QString &path) {
+    const QByteArray wanted = QFileInfo(path).canonicalFilePath().toLocal8Bit();
+    int count = 0;
+    for (int fd = 0, limit = getdtablesize(); fd < limit; ++fd) {
+        char name[MAXPATHLEN];
+        if (fcntl(fd, F_GETPATH, name) == 0 && QFileInfo(QString::fromLocal8Bit(name)).canonicalFilePath().toLocal8Bit() == wanted) ++count;
+    }
+    return count;
+}
+#endif
+
+// The PDF is read into memory and its file is not held open, so it can be
+// renamed, moved or replaced while shown (Windows refuses those on an open
+// file; Windows CI's rename test is the evidence there).
+void FomawriteTest::pdfSessionDoesNotHoldTheFileOpen() {
+    Cycle160Fixtures f; QVERIFY(f.make());
+    QVERIFY(PdfFixtures::write(f.path("pages-300.pdf"), PdfFixtures::manyPagesDocument(300)));
+    PdfSession pdf;
+    QVERIFY(pdf.load(f.url("pages-300.pdf")));
+    QCOMPARE(pdf.pageCount(), 300);
+    QVERIFY(pdf.pageText(249).contains("250"));
+#ifdef Q_OS_MACOS
+    QCOMPARE(cycle162OpenDescriptorsFor(f.path("pages-300.pdf")), 0);
+#endif
+    // The loaded document does not depend on the file any more.
+    QVERIFY(QFile::remove(f.path("pages-300.pdf")));
+    QVERIFY(pdf.pageText(299).contains("300"));
+    QVERIFY(!pdf.selectionAt(120, 0, 4).value("rects").toList().isEmpty());
+    // Password-protected and damaged files behave as before through this path.
+    PdfSession locked;
+    const QString lockedPath = QFINDTESTDATA("fixtures/password.pdf");
+    QVERIFY(locked.load(QUrl::fromLocalFile(lockedPath)));
+    QCOMPARE(locked.state(), QStringLiteral("password"));
+    QVERIFY(locked.unlock(QStringLiteral("fomawrite-user")));
+#ifdef Q_OS_MACOS
+    QCOMPARE(cycle162OpenDescriptorsFor(lockedPath), 0);
+#endif
+    PdfSession damaged;
+    QVERIFY(!damaged.load(f.url("damaged.pdf")));
+    QCOMPARE(damaged.state(), QStringLiteral("error"));
+}
+
 // A notes file beside a PDF that cannot be loaded opens as plain Markdown.
 void FomawriteTest::pdfNotesStillOpenWhenTheirPdfCannotBeRead() {
     Cycle103SettingsSnapshot settings;
@@ -611,7 +658,8 @@ void FomawriteTest::pdfExplorerListsPdfsAndFoldsNotesIntoABadge() {
     const QVariantMap info = backend.libraryItemInfo(report);
     QVERIFY(info.value("pdf").toBool());
     QVERIFY(info.value("hasNotes").toBool());
-    for (const char *action : {"copyMarkdown", "duplicate", "rename", "trash", "exportHtml"})
+    // Rename and Trash move the notes with the PDF since Cycle 162 (tests/cycle162-pdf-integration.inc).
+    for (const char *action : {"copyMarkdown", "duplicate", "exportHtml"})
         QVERIFY2(!backend.libraryItemAction(report, QString::fromLatin1(action), "Other.pdf"), action);
     QVERIFY(QFileInfo::exists(path("Report.pdf")) && !QFileInfo::exists(path("Other.pdf")));
 

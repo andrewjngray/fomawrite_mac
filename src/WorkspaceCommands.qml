@@ -147,7 +147,10 @@ QtObject {
     }
     function isEnabled(id) {
         if (["strike", "inlineCode", "pageBreak"].indexOf(id) >= 0) return window.canFormatSource || window.canFormatLive;
-        if (["duplicate", "rename", "move", "reveal"].indexOf(id) >= 0) return backend.fileUrl.toString() !== "";
+        // A PDF and its notes are renamed and moved together, never duplicated.
+        if (id === "duplicate") return backend.fileUrl.toString() !== "" && !backend.pdf.active;
+        if (id === "rename" || id === "move") return backend.fileUrl.toString() !== "" || backend.pdf.active;
+        if (id === "reveal") return backend.fileUrl.toString() !== "";
         if (["quickOpen", "refreshTags"].indexOf(id) >= 0) return library.rootFolder.toString() !== "";
         if (id === "spelling" || id === "nextIssue" || id === "previousIssue") return backend.spellCheck.available;
         if (id === "checkSpellingWhileTyping") return backend.spellCheck.available;

@@ -1,5 +1,6 @@
 #include "pdfsession.h"
 
+#include <QBuffer>
 #include <QClipboard>
 #include <QDateTime>
 #include <QElapsedTimer>
@@ -14,10 +15,38 @@
 #include <QPdfSelection>
 #include <QRegularExpression>
 #include <QSettings>
+#include <algorithm>
 #include <cmath>
 #include <functional>
 
 namespace {
+// A PDF read into memory rather than held open. Qt PDF otherwise keeps the
+// file open for as long as the document lives, and Windows then refuses to
+// rename, move or replace it (by Fomawrite's own Rename and page saves, or by
+// another program regenerating the PDF). In memory, a rewrite on disk also
+// cannot tear a page that is read later. Very large files keep the old
+// behaviour so they do not occupy that much memory.
+class UnlockedFilePdf : public QPdfDocument {
+public:
+    static constexpr qint64 MemoryLimit = 512ll * 1024 * 1024;
+    ~UnlockedFilePdf() override { close(); } // releases m_buffer before it is destroyed
+    QPdfDocument::Error loadFile(const QString &path) {
+        QFile file(path);
+        if (file.size() > MemoryLimit) return load(path);
+        if (!file.open(QIODevice::ReadOnly)) return QPdfDocument::Error::FileNotFound;
+        m_bytes = file.readAll();
+        if (file.error() != QFileDevice::NoError) return QPdfDocument::Error::DataNotYetAvailable;
+        file.close();
+        m_buffer.setData(m_bytes);
+        m_buffer.open(QIODevice::ReadOnly);
+        load(&m_buffer);
+        return error();
+    }
+private:
+    QByteArray m_bytes;
+    QBuffer m_buffer;
+};
+
 QString loadErrorText(QPdfDocument::Error error, const QString &name) {
     switch (error) {
     case QPdfDocument::Error::FileNotFound: return QStringLiteral("%1 could not be found.").arg(name);
@@ -30,6 +59,7 @@ QString loadErrorText(QPdfDocument::Error error, const QString &name) {
 
 const QString RememberedViewsKey = QStringLiteral("pdf/rememberedViews");
 const QString ThumbnailsKey = QStringLiteral("pdf/thumbnailsVisible");
+const QString SidebarViewKey = QStringLiteral("pdf/sidebarView");
 
 QVariantList normalisedRects(const QList<QPolygonF> &polygons) {
     QVariantList rects;
@@ -103,9 +133,9 @@ bool PdfSession::load(const QUrl &url, const QString &password) {
     if (!target.isLocalFile()) return fail(QStringLiteral("Only local PDF files can be opened."));
     if (!file.isFile()) return fail(QStringLiteral("%1 could not be found.").arg(name));
     target = QUrl::fromLocalFile(file.absoluteFilePath());
-    auto document = std::make_unique<QPdfDocument>();
+    auto document = std::make_unique<UnlockedFilePdf>();
     if (!password.isEmpty()) document->setPassword(password);
-    const QPdfDocument::Error error = document->load(file.absoluteFilePath());
+    const QPdfDocument::Error error = document->loadFile(file.absoluteFilePath());
     if (error == QPdfDocument::Error::None && document->status() == QPdfDocument::Status::Ready) {
         m_lastError.clear();
         adopt(std::move(document), target, password, QStringLiteral("ready"));
@@ -121,9 +151,9 @@ bool PdfSession::load(const QUrl &url, const QString &password) {
 
 bool PdfSession::unlock(const QString &password) {
     if (m_state != QLatin1String("password") || !m_url.isLocalFile()) return false;
-    auto document = std::make_unique<QPdfDocument>();
+    auto document = std::make_unique<UnlockedFilePdf>();
     document->setPassword(password);
-    const QPdfDocument::Error error = document->load(m_url.toLocalFile());
+    const QPdfDocument::Error error = document->loadFile(m_url.toLocalFile());
     if (error != QPdfDocument::Error::None || document->status() != QPdfDocument::Status::Ready) {
         m_lastError = loadErrorText(error, fileName());
         return false;
@@ -172,6 +202,30 @@ void PdfSession::adopt(std::unique_ptr<QPdfDocument> document, const QUrl &url, 
     emit revisionChanged();
     if (!wasActive) emit activeChanged();
     if (!sameFile) emit opened();
+}
+
+bool PdfSession::relocate(const QUrl &url) {
+    if (!active() || !url.isLocalFile()) return false;
+    const QFileInfo file(url.toLocalFile());
+    if (!file.isFile()) return false;
+    const QUrl from = m_url;
+    const QUrl target = QUrl::fromLocalFile(file.absoluteFilePath());
+    if (m_state == QLatin1String("ready")) {
+        auto document = std::make_unique<UnlockedFilePdf>();
+        if (!m_password.isEmpty()) document->setPassword(m_password);
+        const QPdfDocument::Error error = document->loadFile(file.absoluteFilePath());
+        if (error != QPdfDocument::Error::None || document->status() != QPdfDocument::Status::Ready) return false;
+        m_url = target; // the same file: adopt keeps the requested page and announces no new PDF
+        adopt(std::move(document), target, m_password, QStringLiteral("ready"));
+    } else {
+        m_url = target;
+        readInfo();
+        watch();
+        refreshNotesExist();
+    }
+    emit relocated(from);
+    emit urlChanged();
+    return true;
 }
 
 void PdfSession::close() {
@@ -255,9 +309,9 @@ void PdfSession::reloadFromDisk() {
         return;
     }
     if (m_state == QLatin1String("password")) { watch(); return; }
-    auto document = std::make_unique<QPdfDocument>();
+    auto document = std::make_unique<UnlockedFilePdf>();
     if (!m_password.isEmpty()) document->setPassword(m_password);
-    const QPdfDocument::Error error = document->load(path);
+    const QPdfDocument::Error error = document->loadFile(path);
     if (error == QPdfDocument::Error::None && document->status() == QPdfDocument::Status::Ready) {
         adopt(std::move(document), m_url, m_password, QStringLiteral("ready"));
         return;
@@ -503,12 +557,74 @@ void PdfSession::copyText(const QString &text) const {
     if (auto *clipboard = QGuiApplication::clipboard()) clipboard->setText(text);
 }
 
+QString PdfSession::linkDestination(const QString &fileName) {
+    QString result;
+    for (const QChar c : fileName) {
+        if (c.isSpace() || QStringLiteral("%()<>#?[]\\").contains(c)) {
+            for (const char byte : QString(c).toUtf8())
+                result += QStringLiteral("%%1").arg(uchar(byte), 2, 16, QLatin1Char('0')).toUpper();
+        } else {
+            result += c;
+        }
+    }
+    return result;
+}
+
+QString PdfSession::markdownQuote(const QString &text, const QString &fileName, int page, const QString &label) {
+    QString normalised = text;
+    normalised.replace(QStringLiteral("\r\n"), QStringLiteral("\n"));
+    for (const QChar separator : {QChar(u'\r'), QChar(QChar::LineSeparator), QChar(QChar::ParagraphSeparator)})
+        normalised.replace(separator, QLatin1Char('\n'));
+    static const QRegularExpression runs(QStringLiteral("[\\t\\f\\v \\x{00A0}]+"));
+    QStringList lines;
+    bool blank = false;
+    for (QString line : normalised.split(QLatin1Char('\n'))) {
+        line = line.replace(runs, QStringLiteral(" ")).trimmed();
+        if (line.isEmpty()) { blank = !lines.isEmpty(); continue; }
+        if (blank) lines.append(QStringLiteral(">"));
+        blank = false;
+        lines.append(QStringLiteral("> ") + line);
+    }
+    const QString number = QString::number(page + 1);
+    QString name = label.isEmpty() || label == number ? number : label;
+    name.replace(QLatin1Char('\\'), QStringLiteral("\\\\")).replace(QLatin1Char('['), QStringLiteral("\\[")).replace(QLatin1Char(']'), QStringLiteral("\\]"));
+    return lines.join(QLatin1Char('\n')) + QStringLiteral("\n\n[Page %1](%2#page=%3)\n").arg(name, linkDestination(fileName), number);
+}
+
+QString PdfSession::markdownQuoteFor(int page, const QString &text) const {
+    if (!ready() || page < 0 || page >= pageCount() || text.trimmed().isEmpty()) return {};
+    return markdownQuote(text, fileName(), page, pageLabel(page));
+}
+
+bool PdfSession::copyMarkdownQuote(int page, const QString &text) const {
+    const QString quote = markdownQuoteFor(page, text);
+    if (quote.isEmpty()) return false;
+    copyText(quote);
+    return true;
+}
+
+QString PdfSession::pageLinkAddress(int page) const {
+    if (!active() || page < 0) return {};
+    return linkDestination(fileName()) + QStringLiteral("#page=%1").arg(page + 1);
+}
+
 bool PdfSession::thumbnailsVisible() const { return QSettings().value(ThumbnailsKey, false).toBool(); }
 
 void PdfSession::setThumbnailsVisible(bool visible) {
     if (visible == thumbnailsVisible()) return;
     QSettings().setValue(ThumbnailsKey, visible);
     emit thumbnailsVisibleChanged();
+}
+
+QString PdfSession::sidebarView() const {
+    return QSettings().value(SidebarViewKey).toString() == QLatin1String("contents") ? QStringLiteral("contents") : QStringLiteral("thumbnails");
+}
+
+void PdfSession::setSidebarView(const QString &view) {
+    const QString value = view == QLatin1String("contents") ? QStringLiteral("contents") : QStringLiteral("thumbnails");
+    if (value == sidebarView()) return;
+    QSettings().setValue(SidebarViewKey, value);
+    emit sidebarViewChanged();
 }
 
 void PdfSession::noteRenderRequest() {
@@ -533,6 +649,39 @@ QVariantMap PdfSession::rememberedView(const QUrl &url) const {
         if (view.value(QStringLiteral("path")).toString() == key) return view;
     }
     return {};
+}
+
+void PdfSession::moveRememberedView(const QString &fromKey, const QUrl &to) {
+    const QString toKey = viewKey(to);
+    if (fromKey.isEmpty() || toKey.isEmpty() || fromKey == toKey) return;
+    QSettings settings;
+    QVariantList views = settings.value(RememberedViewsKey).toList();
+    bool changed = false;
+    // A view already written under the new path (the open reader) is the newer one.
+    const auto hasKey = [&](const QString &key) {
+        return std::any_of(views.cbegin(), views.cend(), [&](const QVariant &value) { return value.toMap().value(QStringLiteral("path")).toString() == key; });
+    };
+    if (hasKey(toKey)) {
+        if (views.removeIf([&](const QVariant &value) { return value.toMap().value(QStringLiteral("path")).toString() == fromKey; }))
+            settings.setValue(RememberedViewsKey, views);
+        return;
+    }
+    for (QVariant &value : views) {
+        QVariantMap view = value.toMap();
+        if (view.value(QStringLiteral("path")).toString() != fromKey) continue;
+        view.insert(QStringLiteral("path"), toKey);
+        value = view;
+        changed = true;
+    }
+    if (changed) settings.setValue(RememberedViewsKey, views);
+}
+
+void PdfSession::forgetRememberedView(const QString &key) {
+    if (key.isEmpty()) return;
+    QSettings settings;
+    QVariantList views = settings.value(RememberedViewsKey).toList();
+    if (views.removeIf([&](const QVariant &value) { return value.toMap().value(QStringLiteral("path")).toString() == key; }))
+        settings.setValue(RememberedViewsKey, views);
 }
 
 void PdfSession::rememberView(const QUrl &url, int page, const QString &mode, qreal zoom) {

@@ -98,13 +98,18 @@ MenuBar {
     Shortcut { objectName: "windowsShortcutNextIssue"; sequence: "Ctrl+;"; context: Qt.WindowShortcut; enabled: win.isWindows && workspaceCommands.isEnabled("nextIssue"); onActivated: root.dispatch(function() { workspaceCommands.run("nextIssue") }) }
     Shortcut { objectName: "windowsShortcutPreviousIssue"; sequence: "Ctrl+Alt+;"; context: Qt.WindowShortcut; enabled: win.isWindows && workspaceCommands.isEnabled("previousIssue"); onActivated: root.dispatch(function() { workspaceCommands.run("previousIssue") }) }
     // Held outside the bar's contents; syncPdfMenu places it before Window.
-    // No shortcuts: Ctrl+Alt is AltGr on many layouts, Ctrl+Shift+G is Find
+    // Copy as Markdown Quote is Ctrl+Shift+C, as on the Mac (free on Windows).
+    // No others: Ctrl+Alt is AltGr on many layouts, Ctrl+Shift+G is Find
     // Previous and Ctrl+I is Italic. Zoom keys and Ctrl+F already route to the
     // pane when it has focus (PdfReader.qml, win.openSearch).
+    readonly property bool pdfHasSelection: win.pdfMode && !!win.pdfReader && win.pdfReader.selectionText.length > 0
+    Shortcut { objectName: "windowsShortcutPdfCopyQuote"; sequence: "Ctrl+Shift+C"; context: Qt.WindowShortcut; enabled: win.isWindows && root.pdfHasSelection; onActivated: win.pdfCommand("copyQuote") }
     property Menu pdfMenu: WorkspaceMenu {
         objectName: "windowsPdfMenu"
         title: "&PDF"
         readonly property bool ready: win.pdfMode && !!win.pdfReader && win.pdfReader.ready
+        MenuItem { objectName: "windows_pdf_copyQuote"; text: "Copy as Markdown Quote"; enabled: root.pdfHasSelection; onTriggered: root.dispatch(function() { win.pdfCommand("copyQuote") }) }
+        MenuSeparator {}
         MenuItem { objectName: "windows_pdf_goToPage"; text: "Go to Page…"; enabled: root.pdfMenu.ready; onTriggered: root.dispatch(function() { win.pdfCommand("goToPage") }) }
         MenuSeparator {}
         MenuItem { objectName: "windows_pdf_zoomIn"; text: "Zoom In"; enabled: root.pdfMenu.ready && win.pdfReader.zoom < win.pdfReader.maximumZoom - 0.001; onTriggered: root.dispatch(function() { win.pdfCommand("zoomIn") }) }
@@ -530,7 +535,7 @@ MenuBar {
         MenuItem { objectName: "goLibraryForward"; text: "Forward in Library"; enabled: backend.library.canGoForward; onTriggered: root.dispatch(function() { backend.library.navigateHistory(1) }) }
         MenuItem { objectName: "goEnclosingFolder"; text: "Enclosing Folder"; enabled: backend.library.rootFolder.toString() !== ""; onTriggered: root.dispatch(function() { backend.library.enclosingFolder() }) }
         MenuSeparator {}
-        MenuItem { objectName: "goOpenLink"; text: "Open Link"; enabled: backend.sourceLinkAt(editor.cursorPosition).toString() !== ""; onTriggered: root.dispatch(function() { win.openSourceLink() }) }
+        MenuItem { objectName: "goOpenLink"; text: "Open Link"; enabled: backend.sourceLinkAt(win.linkCaretPosition).toString() !== ""; onTriggered: root.dispatch(function() { win.openSourceLink() }) }
         Command { commandId: "quickOpen"; objectName: "goQuickSearch"; text: "Quick Search…" }
         MenuItem { objectName: "goCommandPalette"; text: "Command Palette…"; onTriggered: root.dispatch(function() { commandPalette.open() }) }
         MenuSeparator {}

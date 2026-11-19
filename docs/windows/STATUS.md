@@ -45,6 +45,11 @@ only updates. [Short instructions](../../START-HERE.md).
   (session, page item, `Backend::open` routing, explorer). Programme: `docs/pdf-plan.md`; Mac records
   are `README-mac.md` in `research/cycle-159` and `research/cycle-160`. Windows menu entries for PDF
   come with Mac cycle 162.
+- **PDF Phase 1 (19 Nov):** Mac `master` `4657596` (cycles 161–162, build 162) is merged, with a Windows
+  PDF menu (`src/WindowsMenuBar.qml`, in the bar only in PDF mode), Copy as Markdown Quote on
+  Ctrl+Shift+C and Edit → Copy for the PDF selection (`tests/windows-pdf-menu.inc`). To confirm on
+  real Windows: the menu's appearance and mnemonic, Alt/arrow navigation while it is inserted or
+  removed, Ctrl+= / Ctrl+- / Ctrl+0 in the PDF pane, and Rename of a PDF that is open.
 - **Still open:** intermittent imported-theme atomic replacement failure cause,
   remaining clipboard/search and Print desktop checks, broader recovery/display/storage
   acceptance, physical x64 hardware, and installer/signing/distribution qualification.

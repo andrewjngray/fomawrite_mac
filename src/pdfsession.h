@@ -45,6 +45,8 @@ class PdfSession : public QObject {
     Q_PROPERTY(bool searching READ searching NOTIFY searchingChanged)
     // The thumbnails column beside the pages (app setting).
     Q_PROPERTY(bool thumbnailsVisible READ thumbnailsVisible WRITE setThumbnailsVisible NOTIFY thumbnailsVisibleChanged)
+    // What that column shows when the PDF has an outline: "thumbnails" or "contents" (app setting).
+    Q_PROPERTY(QString sidebarView READ sidebarView WRITE setSidebarView NOTIFY sidebarViewChanged)
     // How many page renders PdfPage items have asked for (tests and diagnostics).
     Q_PROPERTY(int renderRequestCount READ renderRequestCount NOTIFY renderRequestCountChanged)
 public:
@@ -53,6 +55,18 @@ public:
 
     static bool isPdfPath(const QString &path);
     static QUrl notesUrlFor(const QUrl &pdfUrl);
+    // The key a PDF's remembered view is kept under (its canonical path while it exists).
+    static QString viewKey(const QUrl &url);
+    // A renamed or moved PDF keeps its remembered view; a trashed one loses it.
+    static void moveRememberedView(const QString &fromKey, const QUrl &to);
+    static void forgetRememberedView(const QString &key);
+    // "Copy as Markdown Quote": the text as a blockquote, a blank line, then
+    // [Page N](<file name>#page=N), with the page label as the link text when
+    // the PDF labels the page differently. Ends with a newline.
+    static QString markdownQuote(const QString &text, const QString &fileName, int page, const QString &label);
+    // A file name as a Markdown link destination (spaces, parentheses and the
+    // like percent-encoded).
+    static QString linkDestination(const QString &fileName);
 
     bool active() const { return !m_url.isEmpty(); }
     QString state() const { return m_state; }
@@ -75,6 +89,8 @@ public:
     bool searching() const { return m_searching; }
     bool thumbnailsVisible() const;
     void setThumbnailsVisible(bool visible);
+    QString sidebarView() const;
+    void setSidebarView(const QString &view);
     int renderRequestCount() const { return m_renderRequestCount; }
     void noteRenderRequest();
 
@@ -84,6 +100,10 @@ public:
     Q_INVOKABLE bool load(const QUrl &url, const QString &password = QString());
     Q_INVOKABLE bool unlock(const QString &password);
     Q_INVOKABLE void close();
+    // The open PDF now lives at `url` (renamed or moved with its notes): it is
+    // read from there without counting as a newly opened PDF, so the view keeps
+    // its place. False (nothing changed) when it cannot be read there.
+    bool relocate(const QUrl &url);
     Q_INVOKABLE QSizeF pageSize(int page) const;
     Q_INVOKABLE QString pageLabel(int page) const;
     Q_INVOKABLE QString pageText(int page) const;
@@ -102,6 +122,11 @@ public:
     Q_INVOKABLE QVariantList outline() const;
     Q_INVOKABLE void refreshNotesExist();
     Q_INVOKABLE void copyText(const QString &text) const;
+    // markdownQuote for this PDF's page (0-based) on the clipboard; false without text.
+    Q_INVOKABLE QString markdownQuoteFor(int page, const QString &text) const;
+    Q_INVOKABLE bool copyMarkdownQuote(int page, const QString &text) const;
+    // `File.pdf#page=N` for an internal link (page 0-based), as a Markdown link destination.
+    Q_INVOKABLE QString pageLinkAddress(int page) const;
     // The last page (0-based), zoom mode ("fit" or "fixed") and zoom (1 = 100%)
     // a PDF was read at, by canonical path; {} when it has none. The newest
     // RememberedViewLimit PDFs are kept. Opening a PDF requests its remembered page.
@@ -125,6 +150,9 @@ signals:
     void searchResultsChanged();
     void searchingChanged();
     void thumbnailsVisibleChanged();
+    void sidebarViewChanged();
+    // relocate() moved the PDF from `from`; emitted before urlChanged.
+    void relocated(const QUrl &from);
     void renderRequestCountChanged();
     // A different PDF was opened (not a reload of the same file).
     void opened();
@@ -141,7 +169,6 @@ private:
     QVariantList pageMatches(int page, const QString &query, int limit) const;
     void searchSlice();
     void resetSearch();
-    static QString viewKey(const QUrl &url);
     std::unique_ptr<QPdfDocument> m_document;
     std::unique_ptr<QPdfPageRenderer> m_renderer;
     QUrl m_url;

@@ -162,7 +162,7 @@ int main(int argc, char *argv[]) {
     app.setOrganizationName(QStringLiteral("AndrewGray"));
     app.setOrganizationDomain(QStringLiteral("andrewjngray.github.io"));
     app.setApplicationDisplayName(QStringLiteral("Fomawrite"));
-    app.setApplicationVersion(QStringLiteral("0.3.0-dev56"));
+    app.setApplicationVersion(QStringLiteral("0.3.0-dev57"));
     const int documentCheck = app.arguments().indexOf(QStringLiteral("--check-document-views"));
     if (documentCheck >= 0) {
         const QString destination = app.arguments().value(documentCheck + 1);
@@ -278,19 +278,13 @@ int main(int argc, char *argv[]) {
             QRect normal=w->geometry();
             if (w->windowState()!=Qt::WindowNoState && session->checkpoint.contains("width"))
                 normal=QRect(session->checkpoint["x"].toInt(),session->checkpoint["y"].toInt(),session->checkpoint["width"].toInt(),session->checkpoint["height"].toInt());
-            QJsonObject entry{{"url", session->backend->fileUrl().toString()},
-                {"cursor", w->property("workspaceCursor").toInt()},
-                {"x", normal.x()}, {"y", normal.y()}, {"width", normal.width()}, {"height", normal.height()},
-                {"screen", w->screen() ? w->screen()->name() : QString()}, {"state", int(w->windowState())},
-                {"active", lastActiveWindow == w},
-                {"root", session->backend->library()->property("rootFolder").toUrl().toString()}};
-            // QML var properties may carry their map as a QJSValue. Save desired
-            // pane state, independently of the currently contracted geometry.
-            QVariant paneState = w->property("workspacePaneState");
-            if (paneState.metaType() == QMetaType::fromType<QJSValue>())
-                paneState = paneState.value<QJSValue>().toVariant();
-            const QJsonValue paneStateJson = QJsonValue::fromVariant(paneState);
-            if (paneStateJson.isObject()) entry["paneState"] = paneStateJson;
+            // url, cursor and pane state; a PDF window by its PDF.
+            QJsonObject entry = WorkspaceStore::documentEntry(*session->backend, w);
+            entry["x"] = normal.x(); entry["y"] = normal.y(); entry["width"] = normal.width(); entry["height"] = normal.height();
+            entry["screen"] = w->screen() ? w->screen()->name() : QString();
+            entry["state"] = int(w->windowState());
+            entry["active"] = lastActiveWindow == w;
+            entry["root"] = session->backend->library()->property("rootFolder").toUrl().toString();
 #ifdef Q_OS_MACOS
             const auto native = macWorkspaceState(w);
             entry["group"] = native.value("group").toString();
@@ -443,7 +437,7 @@ int main(int argc, char *argv[]) {
                 for (int i = 0; i < quitWorkspace.size(); ++i) {
                     if (quitWorkspace[i].toObject() == session->checkpoint) {
                         auto entry = session->checkpoint;
-                        entry["url"] = session->backend->fileUrl().toString();
+                        entry["url"] = session->backend->displayedFileUrl().toString();
                         quitWorkspace[i] = entry; break;
                     }
                 }
@@ -488,7 +482,7 @@ int main(int argc, char *argv[]) {
         std::shared_ptr<Session> restored;
         bool alreadyOpen = false;
         for (const auto &session : sessions)
-            if (QFileInfo(session->backend->fileUrl().toLocalFile()).canonicalFilePath() == QFileInfo(url.toLocalFile()).canonicalFilePath()) {
+            if (session->backend->ownsDocument(QFileInfo(url.toLocalFile()).canonicalFilePath())) {
                 alreadyOpen = true;
                 if (!restoredViews.contains(session->backend)) { restored = session; break; }
             }
@@ -505,28 +499,14 @@ int main(int argc, char *argv[]) {
         w->setScreen(target);
         const QRect saved(entry["x"].toInt(),entry["y"].toInt(),entry["width"].toInt(1100),entry["height"].toInt(720));
         w->setGeometry(WorkspaceStore::visibleGeometry(saved,target->availableGeometry(),QSize(w->minimumWidth(),w->minimumHeight())));
-        // Older checkpoints have no paneState; preserve the QML migration/defaults.
-        const auto paneVersion = entry["paneState"].toObject().value("version");
-        // The outer workspace file remains version 1. Pane state has its own
-        // schema; QML migrates legacy combined view modes to version 2.
-        if (entry["paneState"].isObject()
-            && (paneVersion == QJsonValue(1) || paneVersion == QJsonValue(2))) {
-            auto paneState = entry["paneState"].toObject();
-            // Clamp a restored preview preference to this display, rather than
-            // the temporarily narrow restored window. Runtime contraction is QML-only.
-            if (paneState["previewWidth"].isDouble())
-                paneState["previewWidth"] = qBound(320.0, paneState["previewWidth"].toDouble(),
-                    double(qMax(320, target->availableGeometry().width() - 480)));
-            QMetaObject::invokeMethod(w, "restoreWorkspacePaneState",
-                                      Q_ARG(QVariant, paneState.toVariantMap()));
-        }
+        // Pane state (a PDF window's layout included) and cursor.
+        WorkspaceStore::restoreDocumentEntry(w, entry, target->availableGeometry().width());
         restored->checkpoint=entry;
         const int state=entry["state"].toInt();
         if (state==Qt::WindowMinimized || state==Qt::WindowFullScreen || state==Qt::WindowMaximized) {
             QPointer<QWindow> guarded=w;
             QTimer::singleShot(0,w,[guarded,state] { if(guarded) guarded->setWindowState(Qt::WindowState(state)); });
         }
-        QMetaObject::invokeMethod(w, "restoreWorkspaceCursor", Q_ARG(QVariant, entry["cursor"].toInt()));
         if (entry["active"].toBool()) activeWindow = w;
         const QString group = entry["group"].toString();
         if (!group.isEmpty()) tabGroups[group][entry["order"].toInt()] = w;
