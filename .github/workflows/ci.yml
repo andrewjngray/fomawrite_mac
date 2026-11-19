@@ -59,6 +59,11 @@ jobs:
           cache: true
           cache-key-prefix: install-qt-action-${{ matrix.qt }}
 
+      - name: Install qpdf (PDF page editing, Cycle 165)
+        run: |
+          brew install qpdf pkgconf
+          pkg-config --modversion libqpdf
+
       - name: Show toolchain
         run: |
           "$QT_ROOT_DIR/bin/qmake" -v

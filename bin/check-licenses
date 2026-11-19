@@ -30,6 +30,9 @@ for module in GPL_ONLY:
     hits = sorted({n for n in names if f"Qt{module}" in n or f"Qt6{module}" in n or f"qt{module.lower()}" in n.lower()})
     if hits:
         problems.append(f"GPL-only Qt module {module} bundled: {', '.join(hits)}")
+# qpdf is Apache-2.0: shipping its library requires its notice.
+if any(n.lower().startswith(("libqpdf", "qpdf")) for n in names) and not (licenses / "qpdf-Apache-2.0.txt").is_file():
+    problems.append("qpdf is bundled but licenses/qpdf-Apache-2.0.txt is missing")
 if mac and any(n.endswith(".dylib") for n in names) and not any((licenses / "homebrew").glob("*")):
     problems.append("bundled Homebrew libraries have no licence files in licenses/homebrew")
 if problems:

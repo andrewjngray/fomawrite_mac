@@ -73,3 +73,17 @@ DISTFILES += src/publishingfolderacceptancecheck.inc src/pdfacceptancecheck.inc
 # PDF reading (Cycle 160)
 SOURCES += src/pdfsession.cpp src/pdfpageitem.cpp src/pdfnotes.cpp src/pdfmarks.cpp
 HEADERS += src/pdfsession.h src/pdfpageitem.h src/pdfnotes.h src/pdfmarks.h
+
+# PDF page operations over qpdf (Cycle 165). qpdf is found through pkg-config
+# (Homebrew on macOS; vcpkg's lib/pkgconfig on Windows, with PKG_CONFIG_PATH
+# set), or set QPDF_PREFIX=<prefix with include/ and lib/> to link directly.
+SOURCES += src/pdfeditor.cpp
+HEADERS += src/pdfeditor.h
+isEmpty(QPDF_PREFIX): QPDF_PREFIX = $$(QPDF_PREFIX)
+!isEmpty(QPDF_PREFIX) {
+    INCLUDEPATH += $$QPDF_PREFIX/include
+    LIBS += -L$$QPDF_PREFIX/lib -lqpdf
+} else {
+    CONFIG += link_pkgconfig
+    PKGCONFIG += libqpdf
+}

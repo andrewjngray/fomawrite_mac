@@ -205,6 +205,15 @@ private slots:
     void libraryNewMenuListsTheNewAndViewItemsInOrder();
     void libraryPlusCreatesADocumentAndNewFolderOpensTheFolderDialog();
     void libraryPlusPutsTheCaretInTheNewDocument();
+    void pdfEditorChecksWhetherADocumentCanBeEdited();
+    void pdfEditorRotatesOnePageSeveralPagesAndExistingRotation();
+    void pdfEditorRotatesAnInheritedRotation();
+    void pdfEditorRemovesPages();
+    void pdfEditorMovesPages();
+    void pdfEditorInsertsPagesAtStartMiddleAndEnd();
+    void pdfEditorExtractsPagesIntoANewDocument();
+    void pdfEditorRefusesWhatItCannotEditAndRejectsBadArguments();
+    void pdfEditorKeepsMetadataOutlineAndLinks();
     void pdfSessionLoadsRefusesAndUnlocks();
     void pdfSessionReportsPageSizesLabelsAndText();
     void pdfSessionSelectionGeometryMatchesTheSpikeMapping();
@@ -5436,3 +5445,4 @@ int main(int argc, char **argv) {
 #include "cycle163-pdf-markup.inc"
 #include "cycle164-pdf-notes.inc"
 #include "cycle164-pdf-anchoring.inc"
+#include "cycle165-pdf-editor.inc"
