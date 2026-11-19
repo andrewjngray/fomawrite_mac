@@ -2,8 +2,9 @@ import QtQuick
 import QtQuick.Controls
 
 // The PDF pane's toolbar, in Preview's order: thumbnails · zoom out, actual
-// size, zoom in · fit width · page · Inspector · find. Narrow panes fold actual
-// size, then fit width, then thumbnails, then the Inspector into a "more" menu.
+// size, zoom in · fit width · page · highlighter · Inspector · find. Narrow
+// panes fold actual size, then fit width, then thumbnails, then the Inspector
+// into a "more" menu, and last the "of N" beside the page field.
 Rectangle {
     id: bar
     objectName: "pdfToolbar"
@@ -20,11 +21,12 @@ Rectangle {
 
     readonly property real sideMargin: 12
     readonly property real spacing: 6
-    readonly property var foldOrder: ["actual", "fit", "thumbnails", "inspector"]
-    readonly property var foldWidths: ({ actual: 54, fit: 34 + spacing, thumbnails: 34 + spacing, inspector: 34 + spacing })
-    readonly property real baseWidth: 2 * sideMargin + 66 + spacing + pageCluster.implicitWidth + 12 + 34
+    readonly property var foldOrder: ["actual", "fit", "thumbnails", "inspector", "count"]
+    readonly property var foldWidths: ({ actual: 54, fit: 34 + spacing, thumbnails: 34 + spacing, inspector: 34 + spacing,
+                                         count: pageCountLabel.implicitWidth + pageCluster.spacing })
+    readonly property real baseWidth: 2 * sideMargin + 66 + spacing + pageField.width + spacing + highlighter.implicitWidth + 12 + 34
     readonly property var plan: {
-        var shown = { actual: true, fit: true, thumbnails: true, inspector: true };
+        var shown = { actual: true, fit: true, thumbnails: true, inspector: true, count: true };
         var folded = false;
         function total() {
             var sum = bar.baseWidth;
@@ -138,7 +140,9 @@ Rectangle {
                 Keys.onEscapePressed: function(event) { text = shownText; bar.reader.focusPages(); event.accepted = true; }
             }
             Label {
+                id: pageCountLabel
                 objectName: "pdfPageCount"
+                visible: bar.plan.count
                 anchors.verticalCenter: parent.verticalCenter
                 readonly property string number: String(bar.reader.currentPage + 1)
                 text: !bar.reader.ready ? "" : bar.reader.currentLabel !== number
@@ -148,6 +152,65 @@ Rectangle {
                 font.pixelSize: 13
             }
         }
+        // Preview's highlighter (Cycle 163): the pen marks the selection with
+        // the current tool, or without a selection turns marking mode on and
+        // off; the arrow chooses the colour, underline or strikethrough.
+        ToolbarGroup {
+            id: highlighter
+            objectName: "pdfHighlighterGroup"
+            readonly property string verb: bar.reader.markTool === "strike" ? "Strike through" : bar.reader.markVerb(bar.reader.markTool)
+            ToolbarButton {
+                id: penButton
+                objectName: "pdfHighlighter"
+                grouped: true
+                focusPolicy: Qt.TabFocus
+                iconName: "highlight"
+                checked: bar.reader.markingMode
+                hint: bar.reader.markingMode ? "Stop marking"
+                    : bar.reader.selectionText !== "" ? highlighter.verb + " the selected text"
+                    : highlighter.verb + " text as you select it"
+                enabled: bar.controlsEnabled && !!bar.reader.marks
+                onClicked: bar.reader.usePen()
+                Rectangle {
+                    objectName: "pdfHighlighterSwatch"
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    y: parent.height - 8
+                    width: 14
+                    height: 3
+                    radius: 1.5
+                    color: bar.reader.colourValue(bar.reader.markTool === "highlight" ? bar.reader.markColour : "red")
+                    opacity: penButton.enabled ? 1 : 0.45
+                }
+            }
+            ToolbarButton {
+                id: highlighterMenuButton
+                objectName: "pdfHighlighterMenuButton"
+                grouped: true
+                showDivider: true
+                implicitWidth: 18
+                iconName: "down"
+                iconSize: 12
+                focusPolicy: Qt.TabFocus
+                hint: "Highlight colour and style"
+                enabled: bar.controlsEnabled && !!bar.reader.marks
+                onClicked: highlighterMenu.popup(highlighter, 0, highlighter.height + 4)
+            }
+        }
+    }
+
+    CompactMenu {
+        id: highlighterMenu
+        objectName: "pdfHighlighterMenu"
+        width: 180
+        readonly property bool highlighting: bar.reader.markTool === "highlight"
+        PdfToolMenuItem { objectName: "pdfToolYellow"; text: "Yellow"; swatch: bar.reader.markColours.yellow; ticked: highlighterMenu.highlighting && bar.reader.markColour === "yellow"; onTriggered: bar.reader.chooseTool("yellow") }
+        PdfToolMenuItem { objectName: "pdfToolGreen"; text: "Green"; swatch: bar.reader.markColours.green; ticked: highlighterMenu.highlighting && bar.reader.markColour === "green"; onTriggered: bar.reader.chooseTool("green") }
+        PdfToolMenuItem { objectName: "pdfToolBlue"; text: "Blue"; swatch: bar.reader.markColours.blue; ticked: highlighterMenu.highlighting && bar.reader.markColour === "blue"; onTriggered: bar.reader.chooseTool("blue") }
+        PdfToolMenuItem { objectName: "pdfToolPink"; text: "Pink"; swatch: bar.reader.markColours.pink; ticked: highlighterMenu.highlighting && bar.reader.markColour === "pink"; onTriggered: bar.reader.chooseTool("pink") }
+        PdfToolMenuItem { objectName: "pdfToolPurple"; text: "Purple"; swatch: bar.reader.markColours.purple; ticked: highlighterMenu.highlighting && bar.reader.markColour === "purple"; onTriggered: bar.reader.chooseTool("purple") }
+        MenuSeparator {}
+        PdfToolMenuItem { objectName: "pdfToolUnderline"; text: "Underline"; ticked: bar.reader.markTool === "underline"; onTriggered: bar.reader.chooseTool("underline") }
+        PdfToolMenuItem { objectName: "pdfToolStrike"; text: "Strikethrough"; ticked: bar.reader.markTool === "strike"; onTriggered: bar.reader.chooseTool("strike") }
     }
 
     Row {

@@ -69,6 +69,7 @@
         <file>WindowsPaginatedPreview.qml</file>
         <file>PdfReader.qml</file>
         <file>PdfToolbar.qml</file>
+        <file>PdfToolMenuItem.qml</file>
         <file>PdfFindBar.qml</file>
         <file>PdfThumbnails.qml</file>
         <file>PdfContents.qml</file>

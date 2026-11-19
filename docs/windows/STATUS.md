@@ -50,6 +50,12 @@ only updates. [Short instructions](../../START-HERE.md).
   Ctrl+Shift+C and Edit → Copy for the PDF selection (`tests/windows-pdf-menu.inc`). To confirm on
   real Windows: the menu's appearance and mnemonic, Alt/arrow navigation while it is inserted or
   removed, Ctrl+= / Ctrl+- / Ctrl+0 in the PDF pane, and Rename of a PDF that is open.
+- **Mac cycle 163 merged (19 Nov):** highlights, underline and strikethrough in the PDF notes
+  (Mac record `research/cycle-163/README-mac.md`; this branch's own `research/cycle-163`
+  is the earlier launcher cycle). The Windows PDF menu gained Highlight Text, Underline Text
+  and Strike Through Text (`windows_pdf_highlight`, `_underline`, `_strike`), enabled with a PDF
+  selection and with no keyboard shortcuts (Ctrl+Alt is AltGr on many layouts); the toolbar
+  pen and the page's context menu come with the merge. Menu test: `windowsPdfMenuMarksTheSelection`.
 - **Still open:** intermittent imported-theme atomic replacement failure cause,
   remaining clipboard/search and Print desktop checks, broader recovery/display/storage
   acceptance, physical x64 hardware, and installer/signing/distribution qualification.

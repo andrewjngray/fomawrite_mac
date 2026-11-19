@@ -638,6 +638,8 @@ Backend::Backend(QObject *parent, bool outputOnly, const QString &omarchyCurrent
         for (auto *backend : liveBackends) windows.append(backend);
         for (const auto &backend : windows) if (backend) emit backend->quitPreparationCanceled();
     });
+    m_pdfMarks = std::make_unique<PdfMarks>(&m_pdf, [this] { return currentDocumentText(); },
+                                            [this](const PdfNotes::Edit &edit) { return applyNotesEdit(edit); });
     connect(&m_library, &FileLibrary::rootFolderChanged, this, &Backend::fileUrlChanged);
     const QString stateDirectory = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
     QDir().mkpath(stateDirectory);
@@ -2117,6 +2119,7 @@ void Backend::attachDocument(QObject *textDocument) {
     connect(m_document, &QTextDocument::contentsChanged,
             this, &Backend::documentStatisticsChanged);
     connect(m_document, &QTextDocument::contentsChange, this, &Backend::forwardLiveChange);
+    connect(m_document, &QTextDocument::contentsChanged, m_pdfMarks.get(), &PdfMarks::scheduleRefresh);
 
     connect(m_document, &QTextDocument::undoCommandAdded, this, [this] {
         if (m_loading || m_formattingTypography || m_sourceHistoryTraversal) return;
@@ -4398,7 +4401,7 @@ bool Backend::liveEditMarkdown(const QString &action) {
 
 void Backend::forwardLiveChange(int position, int charsRemoved, int charsAdded) {
     if (m_loading) { m_liveMirrorValid = false; ++m_liveDocumentGeneration; return; }
-    if (!m_liveMirrorValid || m_applyingLiveChanges || !m_editorBridge->isReady()) return;
+    if (!m_liveMirrorValid || m_applyingLiveChanges || m_applyingNotesEdit || !m_editorBridge->isReady()) return;
     const QString now = currentDocumentText();
     // QTextDocument reports replacing an empty document as removing its final
     // block character, and any other disagreement with the mirror would make
@@ -4767,6 +4770,37 @@ void Backend::setStyleReviewWords(const QString &customWords,
         if (end > start) spans.append({start, end - start});
     }
     m_highlighter->setReviewSpans(spans);
+}
+
+bool Backend::applyNotesEdit(const PdfNotes::Edit &edit) {
+    if (!m_document || edit.isEmpty()) return false;
+    const int length = currentDocumentText().size();
+    int previousEnd = 0;
+    for (const PdfNotes::Change &change : edit) {
+        if (change.position < previousEnd || change.removed < 0 || change.position + change.removed > length) return false;
+        previousEnd = change.position + change.removed;
+    }
+    // The page gets the whole edit as one change set (one step of its history)
+    // rather than one push per change.
+    const bool toLive = m_liveMirrorValid && m_editorBridge->isReady();
+    m_applyingNotesEdit = true;
+    QTextCursor cursor(m_document);
+    cursor.beginEditBlock();
+    for (auto it = edit.crbegin(); it != edit.crend(); ++it) {
+        cursor.setPosition(it->position);
+        cursor.setPosition(it->position + it->removed, QTextCursor::KeepAnchor);
+        cursor.insertText(it->inserted);
+    }
+    cursor.endEditBlock();
+    m_applyingNotesEdit = false;
+    if (toLive) {
+        QJsonArray changes;
+        for (const PdfNotes::Change &change : edit)
+            changes.append(QJsonObject{{"from", change.position}, {"to", change.position + change.removed}, {"insert", change.inserted}});
+        m_liveMirror = currentDocumentText();
+        m_editorBridge->pushIsolatedChanges(QString::fromUtf8(QJsonDocument(changes).toJson(QJsonDocument::Compact)));
+    }
+    return true;
 }
 
 bool Backend::correctWriting(int start,int end,const QString &expected,const QString &replacement) {

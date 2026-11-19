@@ -339,3 +339,38 @@ void FomawriteTest::windowsPdfMenuCopiesAMarkdownQuote() {
     QTRY_VERIFY(!quote->property("enabled").toBool());
     p.w.backend.discardRecovery();
 }
+
+// Highlight Text, Underline Text and Strike Through Text (Mac cycle 163) on the
+// Windows PDF menu: present, disabled without a selection, enabled with one,
+// and Highlight stores a mark in the notes. No shortcuts for them.
+void FomawriteTest::windowsPdfMenuMarksTheSelection() {
+    Cycle103SettingsSnapshot settings;
+    QSettings().remove("pdf/markupTool");
+    QSettings().remove("pdf/highlightColour");
+    Cycle160Fixtures f; QVERIFY(f.make());
+    WindowsPdfMenuFixture m; QVERIFY(m.start(f));
+    auto &p = m.p;
+    QVERIFY(m.openPdf(f.url("geometry.pdf")));
+    QTRY_VERIFY(p.page(0));
+    const QStringList commands{"highlight", "underline", "strike"};
+    const QStringList texts{"Highlight Text", "Underline Text", "Strike Through Text"};
+    QList<QObject *> items;
+    for (int i = 0; i < 3; ++i) {
+        auto *item = m.item(commands.at(i)); QVERIFY2(item, qPrintable(commands.at(i)));
+        QCOMPARE(item->objectName(), "windows_pdf_" + commands.at(i));
+        QCOMPARE(item->property("text").toString(), texts.at(i));
+        QVERIFY(!item->property("enabled").toBool());
+        items << item;
+    }
+    const int alpha = int(p.w.backend.pdf()->pageText(0).indexOf("ALPHA"));
+    QVERIFY(cycle163Select(p, 0, "ALPHA"));
+    for (auto *item : items) QTRY_VERIFY(item->property("enabled").toBool());
+    QVERIFY(p.w.editor->property("text").toString().isEmpty());
+    QVERIFY(QMetaObject::invokeMethod(items.at(0), "triggered"));
+    QTRY_VERIFY(p.w.editor->property("text").toString().contains(
+        QStringLiteral("<!-- fomawrite:pdf highlight page=1 colour=yellow text=%1+5 -->").arg(alpha)));
+    QCOMPARE(cycle163Kinds(p), QStringList{QStringLiteral("highlight:yellow:%1").arg(alpha)});
+    for (auto *item : items) QTRY_VERIFY(!item->property("enabled").toBool()); // the selection is used up
+    p.w.backend.discardRecovery();
+}
+

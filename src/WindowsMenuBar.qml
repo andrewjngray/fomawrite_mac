@@ -108,6 +108,11 @@ MenuBar {
         objectName: "windowsPdfMenu"
         title: "&PDF"
         readonly property bool ready: win.pdfMode && !!win.pdfReader && win.pdfReader.ready
+        // No shortcuts on Windows for the marks: the Mac's Control+Command chords would be Ctrl+Alt here, which is AltGr on many layouts.
+        MenuItem { objectName: "windows_pdf_highlight"; text: "Highlight Text"; enabled: root.pdfHasSelection; onTriggered: root.dispatch(function() { win.pdfCommand("highlight") }) }
+        MenuItem { objectName: "windows_pdf_underline"; text: "Underline Text"; enabled: root.pdfHasSelection; onTriggered: root.dispatch(function() { win.pdfCommand("underline") }) }
+        MenuItem { objectName: "windows_pdf_strike"; text: "Strike Through Text"; enabled: root.pdfHasSelection; onTriggered: root.dispatch(function() { win.pdfCommand("strike") }) }
+        MenuSeparator {}
         MenuItem { objectName: "windows_pdf_copyQuote"; text: "Copy as Markdown Quote"; enabled: root.pdfHasSelection; onTriggered: root.dispatch(function() { win.pdfCommand("copyQuote") }) }
         MenuSeparator {}
         MenuItem { objectName: "windows_pdf_goToPage"; text: "Go to Page…"; enabled: root.pdfMenu.ready; onTriggered: root.dispatch(function() { win.pdfCommand("goToPage") }) }

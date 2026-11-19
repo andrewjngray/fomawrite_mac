@@ -75,5 +75,5 @@ DISTFILES += src/publishingthemeacceptancecheck.inc src/vendor/md4c/LICENSE.md
 DISTFILES += src/publishingfolderacceptancecheck.inc src/pdfacceptancecheck.inc
 
 # PDF reading (Cycle 160)
-SOURCES += src/pdfsession.cpp src/pdfpageitem.cpp
-HEADERS += src/pdfsession.h src/pdfpageitem.h
+SOURCES += src/pdfsession.cpp src/pdfpageitem.cpp src/pdfnotes.cpp src/pdfmarks.cpp
+HEADERS += src/pdfsession.h src/pdfpageitem.h src/pdfnotes.h src/pdfmarks.h

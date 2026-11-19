@@ -123,3 +123,29 @@ test("applyChanges is not echoed; undo/redo are reported like user edits", () =>
   assert.equal(reports[2].rev, 8);
   void view;
 });
+
+test("isolated host changes are each one undo step, even when adjacent and quick", () => {
+  const session = new Session();
+  const view = fakeView(session, "");
+  session.setDocument("abc", 0);
+  // Plain host changes in quick succession that touch each other join into one step.
+  session.applyChanges('[{"from":3,"to":3,"insert":"1"}]', 1);
+  session.applyChanges('[{"from":4,"to":4,"insert":"2"}]', 2);
+  assert.equal(session.getText(), "abc12");
+  assert.ok(session.undo());
+  assert.equal(session.getText(), "abc");
+  // Isolated ones stay apart, and a change set (two ranges) is one step.
+  session.setDocument("abc", 3);
+  session.applyChanges('{"isolate":true,"changes":[{"from":0,"to":0,"insert":"H\\n"},{"from":3,"to":3,"insert":"!"}]}', 4);
+  session.applyChanges('{"isolate":true,"changes":[{"from":6,"to":6,"insert":"?"}]}', 5);
+  assert.equal(session.getText(), "H\nabc!?");
+  assert.equal(session.revision, 5);
+  assert.ok(session.undo());
+  assert.equal(session.getText(), "H\nabc!");
+  assert.ok(session.undo());
+  assert.equal(session.getText(), "abc");
+  assert.ok(session.redo());
+  assert.equal(session.getText(), "H\nabc!");
+  assert.throws(() => session.applyChanges('{"isolate":true}', 6));
+  void view;
+});
