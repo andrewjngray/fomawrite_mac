@@ -176,7 +176,7 @@ Follow-up outside the phases: move `PublishingPreview.qml` off `PdfPageImage` to
 | 160 | PDF core | Done, pushed; installed on the Mac as build 162 |
 | 161 | PDF pane | Done, pushed; installed on the Mac as build 162 |
 | 162 | Links and integration (Phase 1 complete) | Done, pushed; installed on the Mac as build 162 (`/Applications` is build 162). Windows: CI green on x64 and ARM64 (run 44431006252, commit `cdf47c3`) but **not yet installed in the VM** |
-| 163 | Notes model and text markup | Done in source on both branches: Mac commit and Windows merge and CI result to be filled in. **Not installed** on either machine (the Mac has build 162; the VM does not have 162 either) |
+| 163 | Notes model and text markup | Done in source on both branches: Mac `master` `279d72e` (plus test fix `8283065`); merged into `windows/port` as `1d21369`, which adds Highlight / Underline / Strike Through Text to the Windows PDF menu (no shortcuts); Windows CI run 44440728575 green on x64 and ARM64 with no re-run needed. **Not installed** on either machine (the Mac has build 162; the VM does not have 162 either) |
 | 164 | Notes on the page and navigation: note pins, mark and notes navigation, marker chips in Live, re-anchoring and the unplaced list | Not started |
 | 165 | qpdf, saving, recovery copy, notes remapping | Not started |
 | 166 | Page operations in the pane | Not started |
