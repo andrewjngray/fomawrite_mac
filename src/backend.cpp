@@ -2309,7 +2309,7 @@ bool Backend::openPdf(const QUrl &url, bool *pdfUnreadable) {
     static const QRegularExpression pageFragment(QStringLiteral("^page=(\\d+)$"));
     const auto pageMatch = pageFragment.match(url.fragment());
     if (samePdf) {
-        if (pageMatch.hasMatch()) m_pdf.setRequestedPage(pageMatch.captured(1).toInt() - 1);
+        if (pageMatch.hasMatch()) m_pdf.requestBaselinePage(pageMatch.captured(1).toInt() - 1);
         recordOpened(m_pdf.url());
         return true;
     }
@@ -2322,7 +2322,7 @@ bool Backend::openPdf(const QUrl &url, bool *pdfUnreadable) {
     }
     if (notesExist) adoptDocument(notesUrl, notes, m_pdf.url());
     else startCompanionDocument(m_pdf.url());
-    if (pageMatch.hasMatch()) m_pdf.setRequestedPage(pageMatch.captured(1).toInt() - 1);
+    if (pageMatch.hasMatch()) m_pdf.requestBaselinePage(pageMatch.captured(1).toInt() - 1);
     emit fileUrlChanged(); // displayedFileUrl
     return true;
 }

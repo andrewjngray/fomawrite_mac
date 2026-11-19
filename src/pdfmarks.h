@@ -86,6 +86,8 @@ private:
     bool ready() const;
     bool applyEdit(const PdfNotes::Edit &edit);
     QPoint clampedPoint(int page, double x, double y) const;
+    QPoint baselinePoint(int page, double x, double y) const;
+    bool refuseInserted(int page) const;
 
     PdfSession *m_session;
     TextSource m_text;

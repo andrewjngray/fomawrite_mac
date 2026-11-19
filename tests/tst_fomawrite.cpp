@@ -214,6 +214,16 @@ private slots:
     void pdfEditorExtractsPagesIntoANewDocument();
     void pdfEditorRefusesWhatItCannotEditAndRejectsBadArguments();
     void pdfEditorKeepsMetadataOutlineAndLinks();
+    void pdfPagesEditsApplyToTheSessionsDocument();
+    void pdfPagesMapComposesAcrossOperations();
+    void pdfPagesUndoAndRedoRestoreExactBytesWithinABound();
+    void pdfPagesRefusalsLeaveTheStateUntouched();
+    void pdfPagesFileChangedOnDiskWhileEditingIsFlagged();
+    void pdfPagesAdoptingTheWorkingStateRebasesTheHistory();
+    void pdfPagesTextIndicesDoNotChangeWithRotation();
+    void pdfPagesMarksAndPinsStayOnTheirContent();
+    void pdfPagesMarkingWhilePendingWritesBaselineNumbers();
+    void pdfPagesLinksScrollToTheTranslatedPage();
     void pdfSessionLoadsRefusesAndUnlocks();
     void pdfSessionReportsPageSizesLabelsAndText();
     void pdfSessionSelectionGeometryMatchesTheSpikeMapping();
@@ -5446,3 +5456,4 @@ int main(int argc, char **argv) {
 #include "cycle164-pdf-notes.inc"
 #include "cycle164-pdf-anchoring.inc"
 #include "cycle165-pdf-editor.inc"
+#include "cycle165-pdf-pages.inc"
