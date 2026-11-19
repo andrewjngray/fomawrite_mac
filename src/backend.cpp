@@ -27,6 +27,8 @@
 #include <QTextBoundaryFinder>
 #include <QStringDecoder>
 #include "backend.h"
+#include "pdfeditor.h"
+#include "pdffiles.h"
 #include "harperscheme.h"
 #include "macbridge.h"
 #include <QClipboard>
@@ -2497,6 +2499,124 @@ void Backend::saveAsDialog() {
 
 void Backend::saveAs(const QUrl &url) {
     saveTo(url);
+}
+
+QString Backend::pdfRecoveryFolder() const {
+    return QDir(QStandardPaths::writableLocation(QStandardPaths::AppDataLocation)).filePath(QStringLiteral("pdf-previous"));
+}
+
+bool Backend::failPdfSave(const QString &message) {
+    m_pdfSaveNotice.clear();
+    m_pdfSaveError = message;
+    emit pdfSaveErrorChanged();
+    setStatus(message);
+    return false;
+}
+
+// Saving pending page edits: conflict check, verified write, recovery copy, atomic replace (PdfFiles), then
+// the session rebases on the saved bytes and the notes are renumbered as one edit and saved with the PDF.
+bool Backend::savePdf(bool force) {
+    if (!m_pdf.active() || !m_pdf.pagesModified()) return true;
+    const bool hadMessage = !m_pdfSaveError.isEmpty() || !m_pdfSaveNotice.isEmpty();
+    m_pdfSaveError.clear();
+    m_pdfSaveNotice.clear();
+    if (hadMessage) emit pdfSaveErrorChanged();
+    const QString failAt = std::exchange(m_pdfFailAt, QString());
+    if (!m_pdf.url().isLocalFile()) return failPdfSave(QStringLiteral("Only local PDFs can be saved."));
+    const QString path = m_pdf.url().toLocalFile();
+    QFile disk(path);
+    if (!disk.open(QIODevice::ReadOnly))
+        return failPdfSave(QStringLiteral("%1 could not be read before saving. Your page changes were not saved.").arg(m_pdf.fileName()));
+    const QByteArray onDisk = disk.readAll();
+    disk.close();
+    if (!force && onDisk != m_pdf.baselineBytes())
+        return failPdfSave(QStringLiteral("The PDF changed on disk. Your page changes were not saved."));
+    PdfFiles::Options options;
+    options.path = path;
+    options.bytes = m_pdf.workingBytes();
+    options.expectedPages = m_pdf.pageCount();
+    options.recoveryFolder = pdfRecoveryFolder();
+    options.requirePrevious = true;
+    options.previous = onDisk;
+    options.failAt = failAt;
+    if (options.bytes.isEmpty()) return failPdfSave(QStringLiteral("This PDF is too large to save page changes."));
+    const QString error = PdfFiles::writeVerified(options);
+    if (!error.isEmpty()) return failPdfSave(error);
+
+    // The file is replaced. What the notes must say now, from the map as it was at the moment of saving.
+    const QVector<PdfSession::PageOrigin> map = m_pdf.pageMap();
+    QList<PdfNotes::PageRemap> pages(m_pdf.baselinePageCount());
+    for (int working = 0; working < map.size(); ++working) {
+        const int origin = map.at(working).origin;
+        if (origin < 0 || origin >= pages.size()) continue;
+        pages[origin].newPage = working + 1;
+        pages[origin].rotation = map.at(working).rotation;
+        pages[origin].size = m_pdf.baselineSizeOfWorkingPage(working);
+    }
+    QByteArray oldBytes = m_pdf.baselineBytes();
+    QBuffer oldBuffer(&oldBytes);
+    std::unique_ptr<QPdfDocument> oldDocument;
+    const auto oldLabel = [&](int page) {
+        if (!oldDocument) {
+            oldBuffer.open(QIODevice::ReadOnly);
+            oldDocument = std::make_unique<QPdfDocument>();
+            oldDocument->load(&oldBuffer);
+        }
+        return oldDocument->status() == QPdfDocument::Status::Ready ? oldDocument->pageLabel(page - 1) : QString();
+    };
+    const auto newLabel = [&](int page) { return m_pdf.pageLabel(page - 1); };
+    const PdfNotes::Edit edit = PdfNotes::renumber(currentDocumentText(), m_pdf.fileName(), pages, oldLabel, newLabel);
+    m_pdf.adoptWorkingAsBaseline(); // the file watcher then finds the file equal to the baseline: no reload
+    m_pdf.savedToDisk();
+    setStatus(QStringLiteral("Saved %1").arg(m_pdf.fileName()));
+    if (!edit.isEmpty() && !applyNotesEdit(edit)) {
+        m_pdfSaveNotice = QStringLiteral("The PDF was saved, but its notes could not be renumbered.");
+        emit pdfSaveErrorChanged();
+        return true;
+    }
+    const bool titled = m_fileUrl.isLocalFile();
+    const bool untitled = !titled && m_saveTarget.isLocalFile() && !QFileInfo::exists(m_saveTarget.toLocalFile())
+        && !currentDocumentText().trimmed().isEmpty();
+    if (m_modified && (titled || untitled)) {
+        save();
+        if (m_modified) {
+            m_pdfSaveNotice = QStringLiteral("The PDF was saved, but its notes were not: %1").arg(m_status);
+            emit pdfSaveErrorChanged();
+        }
+    }
+    return true;
+}
+
+bool Backend::exportPdfPages(const QUrl &url, const QList<int> &pages) {
+    const bool hadMessage = !m_pdfSaveError.isEmpty() || !m_pdfSaveNotice.isEmpty();
+    m_pdfSaveError.clear();
+    m_pdfSaveNotice.clear();
+    if (hadMessage) emit pdfSaveErrorChanged();
+    const QString failAt = std::exchange(m_pdfFailAt, QString());
+    if (!m_pdf.active() || m_pdf.state() != QLatin1String("ready") || m_pdf.workingBytes().isEmpty())
+        return failPdfSave(QStringLiteral("There is no PDF to export pages from."));
+    if (!url.isLocalFile()) return failPdfSave(QStringLiteral("Only local files can be written."));
+    const QString target = url.toLocalFile();
+    const QString open = QFileInfo(m_pdf.url().toLocalFile()).canonicalFilePath();
+    if (QFileInfo::exists(target) && QFileInfo(target).canonicalFilePath() == open)
+        return failPdfSave(QStringLiteral("Choose a different file: this would replace the open PDF."));
+    PdfFiles::Options options;
+    options.path = target;
+    options.recoveryFolder = pdfRecoveryFolder();
+    options.failAt = failAt;
+    if (pages.isEmpty()) {
+        options.bytes = m_pdf.workingBytes();
+        options.expectedPages = m_pdf.pageCount();
+    } else {
+        const PdfEditor::Result result = PdfEditor::extract(m_pdf.workingBytes(), QVector<int>(pages.begin(), pages.end()));
+        if (!result.ok) return failPdfSave(result.error);
+        options.bytes = result.bytes;
+        options.expectedPages = int(pages.size());
+    }
+    const QString error = PdfFiles::writeVerified(options);
+    if (!error.isEmpty()) return failPdfSave(error);
+    setStatus(QStringLiteral("Exported %1").arg(QFileInfo(target).fileName()));
+    return true;
 }
 
 void Backend::fileDialogCanceled() {

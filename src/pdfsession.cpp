@@ -934,6 +934,11 @@ bool PdfSession::adoptWorkingAsBaseline() {
     return true;
 }
 
+void PdfSession::savedToDisk() {
+    if (m_changedOnDisk) { m_changedOnDisk = false; emit changedOnDiskChanged(); }
+    watch();
+}
+
 int PdfSession::workingPageForBaseline(int baselinePage) const {
     if (baselinePage < 0) return -1;
     for (int i = 0; i < m_working.map.size(); ++i)
@@ -956,14 +961,7 @@ QSizeF PdfSession::baselineSizeOfWorkingPage(int workingPage) const {
 
 namespace {
 // (x, y) on a page of size (w, h) after turning it clockwise by `degrees`.
-QPointF turned(QPointF p, QSizeF size, int degrees) {
-    switch (mod360(degrees)) {
-    case 90: return {size.height() - p.y(), p.x()};
-    case 180: return {size.width() - p.x(), size.height() - p.y()};
-    case 270: return {p.y(), size.width() - p.x()};
-    default: return p;
-    }
-}
+QPointF turned(QPointF p, QSizeF size, int degrees) { return PdfNotes::turnedPoint(p, size, degrees); }
 }
 
 QPointF PdfSession::baselinePointToWorking(int workingPage, QPointF point) const {

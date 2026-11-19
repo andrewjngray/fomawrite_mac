@@ -51,8 +51,8 @@ QT += webchannel
 SOURCES += ../src/typorabase.cpp ../src/publishingthemes.cpp ../src/publishinghtml.cpp ../src/publishingpdf.cpp ../src/publisher.cpp ../src/editorbridge.cpp ../src/vendor/md4c/md4c.c
 
 # PDF reading (Cycle 160)
-SOURCES += ../src/pdfsession.cpp ../src/pdfpageitem.cpp ../src/pdfnotes.cpp ../src/pdfmarks.cpp
-HEADERS += ../src/pdfsession.h ../src/pdfpageitem.h ../src/pdfnotes.h ../src/pdfmarks.h
+SOURCES += ../src/pdfsession.cpp ../src/pdfpageitem.cpp ../src/pdfnotes.cpp ../src/pdfmarks.cpp ../src/pdffiles.cpp
+HEADERS += ../src/pdfsession.h ../src/pdfpageitem.h ../src/pdfnotes.h ../src/pdfmarks.h ../src/pdffiles.h
 HEADERS += pdffixtures.h
 win32: LIBS += -lpsapi
 

@@ -182,6 +182,8 @@ public:
     // The working document becomes the baseline (after it was saved): the map is the identity, pagesModified
     // false, and every state on the undo and redo stacks is rebased onto the new baseline.
     bool adoptWorkingAsBaseline();
+    // After the working bytes were written to the file: the changed-on-disk flag clears and the new file is watched.
+    void savedToDisk();
     // Undo history limits (default 20 states, 256 MB of bytes); the oldest states go first.
     void setUndoLimits(int states, qint64 bytes);
 

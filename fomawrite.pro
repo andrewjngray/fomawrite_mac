@@ -71,8 +71,8 @@ DISTFILES += src/publishingthemeacceptancecheck.inc src/vendor/md4c/LICENSE.md
 DISTFILES += src/publishingfolderacceptancecheck.inc src/pdfacceptancecheck.inc
 
 # PDF reading (Cycle 160)
-SOURCES += src/pdfsession.cpp src/pdfpageitem.cpp src/pdfnotes.cpp src/pdfmarks.cpp
-HEADERS += src/pdfsession.h src/pdfpageitem.h src/pdfnotes.h src/pdfmarks.h
+SOURCES += src/pdfsession.cpp src/pdfpageitem.cpp src/pdfnotes.cpp src/pdfmarks.cpp src/pdffiles.cpp
+HEADERS += src/pdfsession.h src/pdfpageitem.h src/pdfnotes.h src/pdfmarks.h src/pdffiles.h
 
 # PDF page operations over qpdf (Cycle 165). qpdf is found through pkg-config
 # (Homebrew on macOS; vcpkg's lib/pkgconfig on Windows, with PKG_CONFIG_PATH

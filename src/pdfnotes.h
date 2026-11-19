@@ -1,6 +1,8 @@
 #pragma once
 
 #include <QList>
+#include <QPointF>
+#include <QSizeF>
 #include <QString>
 #include <QStringList>
 #include <functional>
@@ -166,5 +168,26 @@ struct Placement {
 // receives a 1-based page and returns an empty string for a page that does
 // not exist.
 Placement place(const Item &item, const std::function<QString(int)> &pageText);
+
+// A point on a page of view size `size` after the page is turned clockwise by
+// `degrees` (0, 90, 180, 270): the one transform for drawing and for saving.
+QPointF turnedPoint(QPointF point, QSizeF size, int degrees);
+
+// What saving page edits did to one baseline page (index = baseline page - 1).
+struct PageRemap {
+    int newPage = 0;   // 1-based; 0 when the page was removed
+    int rotation = 0;  // clockwise, relative to the baseline
+    QSizeF size;       // the baseline page's view size
+};
+// The edit that renumbers the notes after the PDF was saved: marker page=
+// values (at= and rect= turned with their page), links "File.pdf#page=N" to
+// this PDF and generated page headings. Nothing moves and every other byte is
+// kept. Items on a removed page get page=0 (never placed); a generated heading
+// of a removed page becomes "## Deleted page N". `oldLabel` / `newLabel` give a
+// 1-based page's label before and after (a link whose text is the generated
+// "Page N" or "Page <label>" follows; one the writer changed is left alone).
+// An identity map gives an empty edit.
+Edit renumber(const QString &text, const QString &pdfFileName, const QList<PageRemap> &pages,
+              const std::function<QString(int)> &oldLabel, const std::function<QString(int)> &newLabel);
 
 }

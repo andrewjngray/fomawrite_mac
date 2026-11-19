@@ -55,6 +55,10 @@ class Backend : public QObject, public PublishingSource {
     Q_PROPERTY(QObject *pdf READ pdf CONSTANT)
     // The marks in the PDF's notes, and the highlighter's settings (Cycle 163).
     Q_PROPERTY(QObject *pdfMarks READ pdfMarks CONSTANT)
+    // Why the last savePdf or exportPdfPages failed (plain English; cleared by the next success), and what
+    // went wrong after the PDF itself was saved (its notes could not be renumbered or saved).
+    Q_PROPERTY(QString pdfSaveError READ pdfSaveError NOTIFY pdfSaveErrorChanged)
+    Q_PROPERTY(QString pdfSaveNotice READ pdfSaveNotice NOTIFY pdfSaveErrorChanged)
     // The file the window shows: the PDF in PDF mode, otherwise the document.
     // Recents, history, the explorer's highlight and window ownership use it.
     Q_PROPERTY(QUrl displayedFileUrl READ displayedFileUrl NOTIFY fileUrlChanged)
@@ -234,6 +238,17 @@ public:
     Q_INVOKABLE void save();
     Q_INVOKABLE void saveAsDialog();
     Q_INVOKABLE void saveAs(const QUrl &url);
+    // Saves pending page edits (Cycle 165): see docs/pdf-plan.md §4.4 and research/cycle-165/NOTES-part2b.md.
+    // True when there was nothing to save or the PDF was written; `force` writes over a file that changed on disk.
+    Q_INVOKABLE bool savePdf(bool force = false);
+    // Writes the working pages (0-based; all when empty) to another PDF; the session and notes are unchanged.
+    Q_INVOKABLE bool exportPdfPages(const QUrl &url, const QList<int> &pages);
+    QString pdfSaveError() const { return m_pdfSaveError; }
+    QString pdfSaveNotice() const { return m_pdfSaveNotice; }
+    // The folder of recovery copies for PDFs replaced by savePdf (by PDF path: PdfFiles::recoveryCopies).
+    QString pdfRecoveryFolder() const;
+    // Tests: make the next PDF write fail at "write", "verify", "recovery" or "replace" (cleared after one use).
+    void failNextPdfWrite(const QString &stage) { m_pdfFailAt = stage; }
     Q_INVOKABLE void fileDialogCanceled();
     Q_INVOKABLE void discardRecovery();
     Q_INVOKABLE void reloadFromDisk();
@@ -376,11 +391,16 @@ signals:
     void openDialogRequested();
     void saveDialogRequested(const QUrl &suggestedUrl);
     void saveSucceeded();
+    void pdfSaveErrorChanged();
     void externalChangeDetected(bool deleted, bool locallyModified);
 
 private:
     PdfSession m_pdf;
     std::unique_ptr<PdfMarks> m_pdfMarks;
+    QString m_pdfSaveError;
+    QString m_pdfSaveNotice;
+    QString m_pdfFailAt;
+    bool failPdfSave(const QString &message);
     bool m_applyingNotesEdit = false;
     QUrl m_saveTarget;
     bool openPdf(const QUrl &url, bool *pdfUnreadable = nullptr);

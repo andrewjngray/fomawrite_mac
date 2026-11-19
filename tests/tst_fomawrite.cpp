@@ -224,6 +224,19 @@ private slots:
     void pdfPagesMarksAndPinsStayOnTheirContent();
     void pdfPagesMarkingWhilePendingWritesBaselineNumbers();
     void pdfPagesLinksScrollToTheTranslatedPage();
+    void pdfSavingWritesEachOperationAndKeepsThePreviousBytes();
+    void pdfSavingKeepsTheLatestRecoveryCopiesOfEachFile();
+    void pdfSavingFailuresLeaveEverythingAsItWas();
+    void pdfSavingVerifiesTheFileItWrote();
+    void pdfSavingRefusesAFileThatChangedOnDisk();
+    void pdfSavingDoesNotReloadOrDropTheUndoHistory();
+    void pdfSavingUndoAfterSaveThenSavingAgainRestoresTheOldBytes();
+    void pdfSavingRenumbersTheNotesAndMarksStayOnTheirContent();
+    void pdfSavingRewritesHeadingsAndRemovedPagesAndKeepsEverythingElse();
+    void pdfSavingRenumbersWithOneEditorUndoStepAndKeepsWindowsLineBreaksOnDisk();
+    void pdfSavingSavesTheNotesDocumentWhenItHasATarget();
+    void pdfSavingKeepsMarkingIntoTheRightSectionAfterAReorder();
+    void pdfSavingExportsPagesWithoutChangingTheSession();
     void pdfSessionLoadsRefusesAndUnlocks();
     void pdfSessionReportsPageSizesLabelsAndText();
     void pdfSessionSelectionGeometryMatchesTheSpikeMapping();
@@ -5457,3 +5470,4 @@ int main(int argc, char **argv) {
 #include "cycle164-pdf-anchoring.inc"
 #include "cycle165-pdf-editor.inc"
 #include "cycle165-pdf-pages.inc"
+#include "cycle165-pdf-saving.inc"
