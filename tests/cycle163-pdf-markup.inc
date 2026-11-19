@@ -1052,12 +1052,13 @@ void FomawriteTest::pdfMarkingInPdfOnlyLayoutKeepsLayoutAndFocus() {
     Cycle160Fixtures f; QVERIFY(f.make());
     Cycle161Pane p; QVERIFY2(p.start(), qPrintable(p.w.error));
     p.w.layout->setProperty("liveEditEnabled", true);
+    // The page is ready before the PDF opens: opening goes through the window's document barrier, which waits for a loading page.
+    auto *bridge = p.w.backend.editorBridge();
+    QTRY_VERIFY_WITH_TIMEOUT(bridge->isReady(), 30000);
     QVERIFY(p.open(f.url("geometry.pdf")));
     QTRY_VERIFY(p.page(0));
     QCOMPARE(p.w.layout->property("layoutMode").toInt(), 2);
     QTRY_COMPARE(p.w.layout->property("effectiveLayoutMode").toInt(), 2);
-    auto *bridge = p.w.backend.editorBridge();
-    QTRY_VERIFY_WITH_TIMEOUT(bridge->isReady(), 30000);
     const QString title = p.w.quick->title();
     cycle163Drag(p, 0, "OMEGA");
     QTRY_COMPARE(p.reader->property("selectionText").toString(), QStringLiteral("OMEGA"));
