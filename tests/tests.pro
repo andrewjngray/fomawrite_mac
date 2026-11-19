@@ -66,6 +66,13 @@ isEmpty(QPDF_PREFIX): QPDF_PREFIX = $$(QPDF_PREFIX)
     INCLUDEPATH += $$QPDF_PREFIX/include
     LIBS += -L$$QPDF_PREFIX/lib -lqpdf
 } else {
-    CONFIG += link_pkgconfig
-    PKGCONFIG += libqpdf
+    # Not PKGCONFIG: that puts every cflag, including qpdf's -std=c++20, on the
+    # C compiler line too (md4c.c). Take include paths and libraries, and keep any
+    # other flag for C++ only; the app's own C++ standard stays as set above.
+    QPDF_CFLAGS = $$system(pkg-config --cflags libqpdf)
+    for(flag, QPDF_CFLAGS) {
+        contains(flag, ^-I.*): INCLUDEPATH += $$replace(flag, ^-I, )
+        else: !contains(flag, ^-std=.*): QMAKE_CXXFLAGS += $$flag
+    }
+    LIBS += $$system(pkg-config --libs libqpdf)
 }

@@ -26,9 +26,15 @@ Build 165 (`0.3.0-dev60`), 19 November 2026. First build cycle of Phase 3 of the
 - Self-check, headless: `pdfChecks` 2 pass, `qmlWarnings` empty, everything passes except the five known headless `publishingThemeChecks`. No new self-check group this cycle.
 - Packaging: `bin/package-mac` exit 0, `dist/Fomawrite.app` 524 MB; `bin/check-licenses` passes; `otool -L` of the packaged binary shows `@rpath/libqpdf.30.dylib` and `libqpdf.30.dylib` is in `Contents/Frameworks`; nothing resolves to /opt/homebrew.
 
+## After the first push: CI build fix and Windows half
+- **GitHub macOS build failure.** On the runner (Xcode 16.4) `md4c.c` failed with `invalid argument '-std=c++20' not allowed with 'C'`. Cause: `PKGCONFIG += libqpdf` adds qpdf's pkg-config cflags, including `-std=c++20`, to the C compiler flags as well as C++. Fix in `fomawrite.pro` and `tests/tests.pro`: the pkg-config branch now reads `pkg-config --cflags libqpdf`, takes `-I` paths into `INCLUDEPATH`, drops any `-std=` flag and puts other flags in `QMAKE_CXXFLAGS`; libraries come from `--libs`. The app's C++ standard and the `QPDF_PREFIX` path are unchanged. Checked locally: generated `CFLAGS` has no `-std`, and the C++ include path has the qpdf headers.
+- **Ported from `windows/port` (f7e8a1c, 7b11ce7), applied cleanly:** `src/pdffiles.cpp` uses a plain `QFile` temporary with a removing guard instead of `QTemporaryFile`, `flushToDisk` reopens by name, and `replaceFile` retries and reports the Windows error. Windows refused the replace (error 32, sharing violation) until the temporary was a plain `QFile`. `tests/cycle165-pdf-pages.inc` waits 300 ms before the write in `pdfPagesFileChangedOnDiskWhileEditingIsFlagged`.
+- **Windows half done:** merge 9f1de06, tested tip 7b11ce7 (record commit 2a43400); Windows run 44506354001 green on x64 and ARM64 with launch and update checks. qpdf from vcpkg baseline 9eec002df1cd109f8f104cd966a763daf9751489 (qpdf 12.4.2), shipping `qpdf30.dll`, `z.dll`, `jpeg62.dll`; package about 1.1 MB larger.
+- **Open:** vcpkg cache hit not yet observed; `bin/windows/build.ps1` now needs `QPDF_PREFIX`; the `.pro` fix reaches `windows/port` with the next merge (its macOS CI job stays red until then).
+
 ## Known gaps
 - No interface yet, so nothing is reachable by the user.
-- Windows build and packaging of qpdf are not done in this commit; the Windows replace code (`MoveFileExW`, `FlushFileBuffers`) is written but not yet built or run.
+- (Windows build, packaging and replace code: done later, see above.)
 - After a save, undoing the notes renumbering in the editor (Cmd-Z) leaves the notes with old page numbers against the saved PDF, so marks can land on wrong pages. To be designed in cycle 166 before the interface makes saving reachable.
 - Marking a page inserted from another PDF is refused until saved.
 - Sections in the notes are renumbered but not re-ordered after a page move.

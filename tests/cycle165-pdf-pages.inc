@@ -267,6 +267,9 @@ void FomawriteTest::pdfPagesFileChangedOnDiskWhileEditingIsFlagged() {
     // Without pending edits a change reloads as before, and the flag is clear.
     Cycle165Session t;
     QVERIFY(t.open(cycle165Marked(3)));
+    // Windows registers a new watch on its watcher thread; a write straight after
+    // opening can fall before the watch's first snapshot and go unnoticed.
+    QTest::qWait(300);
     QVERIFY(PdfFixtures::write(t.path, cycle165Marked(5)));
     QVERIFY(QTest::qWaitFor([&] { return t.session.pageCount() == 5; }, 5000));
     QVERIFY(!t.session.changedOnDiskWhileEditing());

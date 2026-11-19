@@ -7,9 +7,14 @@
 #include <QFile>
 #include <QFileInfo>
 #include <QPdfDocument>
-#include <QTemporaryFile>
+#include <QUuid>
 #ifdef Q_OS_WIN
-#include <io.h>
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
 #include <windows.h>
 #else
 #include <cstdio>
@@ -19,6 +24,19 @@
 namespace PdfFiles {
 
 namespace {
+// A file beside the target that is removed with this object unless released.
+class TemporaryFile : public QFile {
+public:
+    using QFile::QFile;
+    ~TemporaryFile() override {
+        if (isOpen()) close();
+        if (m_remove) QFile::remove(fileName());
+    }
+    void keep() { m_remove = false; }
+private:
+    bool m_remove = true;
+};
+
 QString keyFor(const QString &pdfPath) {
     const QFileInfo info(pdfPath);
     QString key = info.exists() ? info.canonicalFilePath() : info.absoluteFilePath();
@@ -50,13 +68,43 @@ QString storeCopy(const QString &base, const QString &pdfPath, const QByteArray 
     return QString();
 }
 
-bool replaceFile(const QString &from, const QString &to) {
 #ifdef Q_OS_WIN
-    return MoveFileExW(reinterpret_cast<const wchar_t *>(QDir::toNativeSeparators(from).utf16()),
-                       reinterpret_cast<const wchar_t *>(QDir::toNativeSeparators(to).utf16()),
-                       MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH) != 0;
+const wchar_t *wide(const QString &native) { return reinterpret_cast<const wchar_t *>(native.utf16()); }
+#endif
+
+// On Windows a scanner or indexer may hold either file for a moment, so a
+// sharing violation is retried briefly; `why` carries the system error.
+bool replaceFile(const QString &from, const QString &to, QString *why) {
+#ifdef Q_OS_WIN
+    const QString source = QDir::toNativeSeparators(from);
+    const QString target = QDir::toNativeSeparators(to);
+    DWORD error = 0;
+    for (int attempt = 0; attempt < 10; ++attempt) {
+        if (MoveFileExW(wide(source), wide(target), MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH)) return true;
+        error = GetLastError();
+        if (error != ERROR_ACCESS_DENIED && error != ERROR_SHARING_VIOLATION && error != ERROR_LOCK_VIOLATION) break;
+        Sleep(50);
+    }
+    if (why) *why = QStringLiteral("Windows error %1").arg(error);
+    return false;
 #else
+    Q_UNUSED(why);
     return std::rename(QFile::encodeName(from).constData(), QFile::encodeName(to).constData()) == 0;
+#endif
+}
+
+// Flush a closed file's data to disk. The file is reopened by name rather than
+// through the Qt file's handle, so no handle is left open to block the rename.
+void flushToDisk(const QString &path) {
+#ifdef Q_OS_WIN
+    HANDLE h = CreateFileW(wide(QDir::toNativeSeparators(path)), GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+                           nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+    if (h == INVALID_HANDLE_VALUE) return;
+    FlushFileBuffers(h);
+    CloseHandle(h);
+#else
+    QFile file(path);
+    if (file.open(QIODevice::ReadWrite)) fsync(file.handle());
 #endif
 }
 }
@@ -109,18 +157,17 @@ QString writeVerified(const Options &o) {
     if (o.requirePrevious && previous != o.previous) return changed;
 
     // The temporary file is removed with this object unless the replace succeeds.
-    QTemporaryFile temporary(target.absoluteDir().filePath(QStringLiteral(".fomawrite-XXXXXX.tmp")));
-    if (!temporary.open())
+    // A plain QFile, not QTemporaryFile: on Windows the temporary must be certainly closed
+    // (no handle without share-delete) before it can be renamed over the original.
+    TemporaryFile temporary(target.absoluteDir().filePath(
+        QStringLiteral(".fomawrite-%1.tmp").arg(QUuid::createUuid().toString(QUuid::Id128).left(12))));
+    if (!temporary.open(QIODevice::WriteOnly | QIODevice::NewOnly))
         return QStringLiteral("Could not create a temporary file next to %1; is the folder writable? Nothing was saved.").arg(name);
     const QString writeError = QStringLiteral("Could not write the new %1 (the disk may be full). The original is unchanged.").arg(name);
     if (o.failAt == QLatin1String("write")) { temporary.write(o.bytes.left(o.bytes.size() / 2)); return writeError; }
     if (temporary.write(o.bytes) != o.bytes.size() || !temporary.flush()) return writeError;
-#ifdef Q_OS_WIN
-    FlushFileBuffers(reinterpret_cast<HANDLE>(_get_osfhandle(temporary.handle())));
-#else
-    fsync(temporary.handle());
-#endif
     temporary.close();
+    flushToDisk(temporary.fileName());
 
     // Verify what is on disk, not what we meant to write.
     {
@@ -150,11 +197,13 @@ QString writeVerified(const Options &o) {
         failed = !again.open(QIODevice::ReadOnly) || again.readAll() != o.previous;
         if (failed) { if (!kept.isEmpty()) QFile::remove(kept); return changed; }
     }
-    if (failed || !replaceFile(temporary.fileName(), real)) {
+    QString systemError;
+    if (failed || !replaceFile(temporary.fileName(), real, &systemError)) {
         if (!kept.isEmpty()) QFile::remove(kept);
-        return QStringLiteral("Could not replace %1 (is it open in another program?). The original is unchanged.").arg(name);
+        return QStringLiteral("Could not replace %1 (is it open in another program?%2). The original is unchanged.")
+            .arg(name, systemError.isEmpty() ? QString() : QStringLiteral(" %1").arg(systemError));
     }
-    temporary.setAutoRemove(false);
+    temporary.keep();
     return QString();
 }
 

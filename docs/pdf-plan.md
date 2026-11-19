@@ -180,13 +180,13 @@ Follow-up outside the phases: move `PublishingPreview.qml` off `PdfPageImage` to
 | 162 | Links and integration (Phase 1 complete) | Done, pushed; installed on the Mac and in the Windows VM as build 163 (19 November 2026) |
 | 163 | Notes model and text markup | Done in source on both branches: Mac `master` `279d72e` (plus test fix `8283065`); merged into `windows/port` as `1d21369`, which adds Highlight / Underline / Strike Through Text to the Windows PDF menu (no shortcuts); Windows CI run 44440728575 green on x64 and ARM64 with no re-run needed. Installed on the Mac and in the Windows VM as build 163 (19 November 2026). |
 | 164 | Notes on the page and navigation: note pins, mark and notes navigation, marker chips in Live, re-anchoring and the unplaced list | Done in source on Mac `master` (build 164, `0.3.0-dev59`); installed on the Mac and in the Windows VM (19 November 2026). Windows merge: see the Windows branch `CHANGELOG.md` |
-| 165 | qpdf, saving, recovery copy, notes remapping | Done in source on Mac `master` (build 165, `0.3.0-dev60`); no interface yet (cycle 166 adds it); Windows half (qpdf build and packaging, `MoveFileExW` replace) pending; not installed. [Record](../research/cycle-165/README.md) |
+| 165 | qpdf, saving, recovery copy, notes remapping | Done in source on both branches (Mac `master` build 165, `0.3.0-dev60`; Windows merged and CI-green); no interface yet (cycle 166 adds it); not installed (build 164 is what is installed on the Mac and in the Windows VM). [Record](../research/cycle-165/README.md) |
 | 166 | Page operations in the pane | Not started |
 | 167 onward | Phase 4 (§4.5) | Waits for Andrew's decisions |
 
 ### What remains
 1. Builds 160-164 are installed on the Mac and in the Windows VM (build 164 installed 19 November 2026).
-2. Cycle 165 is done in source on the Mac branch; next is the Windows half of 165 (qpdf build and packaging, the `MoveFileExW` replace code run), then cycle 166 (the interface, and the ⌘Z renumbering gap above).
+2. Cycle 165 is done in source on both branches (not installed; build 164 is what is installed on the Mac and in the Windows VM); next is cycle 166, which must first settle the ⌘Z-after-save gap, then build the interface.
 3. Cycle 166.
 4. Phase 4 decisions (Andrew).
 5. Known open items: Live has no click-to-follow for links; no selection across pages; pinch zoom untested; text soft above about 300% zoom; the intermittent Windows theme-file test (`publishingFolderThemesRefreshAfterExternalChanges`, "Cannot atomically edit a folder theme"), which passes on a re-run; the marks of cycle 163 and the pins, popover, flash, chips and unplaced list of cycle 164 have not been looked at on screen (including dark mode); no Qt test of a chip click in a running Live page; marks re-anchor only within 3 pages.
