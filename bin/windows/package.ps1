@@ -3,6 +3,7 @@ param([ValidateSet('arm64', 'x64')][string]$Architecture = 'arm64', [string]$QtR
 . "$PSScriptRoot/common.ps1"
 Assert-Windows
 $QtRoot = Get-QtRoot $QtRoot
+$QpdfPrefix = Get-QpdfPrefix
 Enter-MsvcEnvironment $Architecture
 $env:PATH = (Join-Path $QtRoot 'bin') + ';' + $env:PATH
 $exe = Join-Path $RepoRoot "build/windows-$Architecture/fomawrite.exe"
@@ -21,4 +22,4 @@ Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'START-FOMAWRITE.cmd') -Destinat
 # portable ZIP must launch without elevation or an installed development kit.
 # package-manifest inventories actual native CRT DLL versions and prefers the
 # selected compiler's v143 runtime; compatible newer v14 runtimes are explicit.
-Invoke-Checked python @("$PSScriptRoot/package-manifest.py", '--architecture', $Architecture, '--qt-root', $QtRoot, '--stage', $stage)
+Invoke-Checked python @("$PSScriptRoot/package-manifest.py", '--architecture', $Architecture, '--qt-root', $QtRoot, '--qpdf-prefix', $QpdfPrefix, '--stage', $stage)

@@ -1849,7 +1849,7 @@ ApplicationWindow {
     function navigateDocumentFragment(fragment) {
         if (fragment === "") return false;
         var pdfPage = /^page=(\d+)$/.exec(fragment);
-        if (backend.pdf.active && pdfPage) { revealPdfPane(); backend.pdf.requestedPage = Number(pdfPage[1]) - 1; return true; }
+        if (backend.pdf.active && pdfPage) { revealPdfPane(); backend.pdf.requestBaselinePage(Number(pdfPage[1]) - 1); return true; }
         var decoded;
         try { decoded = decodeURIComponent(fragment); }
         catch (error) {

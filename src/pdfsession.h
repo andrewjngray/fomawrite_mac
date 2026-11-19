@@ -3,12 +3,14 @@
 #include <QFileSystemWatcher>
 #include <QHash>
 #include <QObject>
+#include <QByteArray>
 #include <QPointF>
 #include <QSizeF>
 #include <QTimer>
 #include <QUrl>
 #include <QVariantList>
 #include <QVariantMap>
+#include <QVector>
 #include <memory>
 
 class QPdfDocument;
@@ -49,7 +51,25 @@ class PdfSession : public QObject {
     Q_PROPERTY(QString sidebarView READ sidebarView WRITE setSidebarView NOTIFY sidebarViewChanged)
     // How many page renders PdfPage items have asked for (tests and diagnostics).
     Q_PROPERTY(int renderRequestCount READ renderRequestCount NOTIFY renderRequestCountChanged)
+    // Pending page edits (Cycle 165): see docs/pdf-plan.md §4.4. Page indices are of the working document.
+    Q_PROPERTY(bool canUndoPageEdit READ canUndoPageEdit NOTIFY pageEditsChanged)
+    Q_PROPERTY(bool canRedoPageEdit READ canRedoPageEdit NOTIFY pageEditsChanged)
+    // The working document differs from the PDF as loaded from disk (the baseline).
+    Q_PROPERTY(bool pagesModified READ pagesModified NOTIFY pageEditsChanged)
+    // The last page edit's plain-English refusal or failure; cleared by the next success.
+    Q_PROPERTY(QString pageEditError READ pageEditError NOTIFY pageEditErrorChanged)
+    // Edits to a digitally signed PDF are refused until this is true (reset when another PDF opens).
+    Q_PROPERTY(bool signedEditsAllowed READ signedEditsAllowed WRITE setSignedEditsAllowed NOTIFY signedEditsAllowedChanged)
+    // The file changed on disk while page edits were pending; the working state was left alone.
+    Q_PROPERTY(bool changedOnDiskWhileEditing READ changedOnDiskWhileEditing NOTIFY changedOnDiskChanged)
 public:
+    // For one page of a document state: the baseline page it came from (-1: inserted from another file) and its
+    // clockwise rotation relative to the baseline (0, 90, 180 or 270).
+    struct PageOrigin {
+        int origin = -1;
+        int rotation = 0;
+        bool operator==(const PageOrigin &o) const { return origin == o.origin && rotation == o.rotation; }
+    };
     explicit PdfSession(QObject *parent = nullptr);
     ~PdfSession() override;
 
@@ -137,6 +157,53 @@ public:
     Q_INVOKABLE QVariantMap rememberedView(const QUrl &url = QUrl()) const;
     Q_INVOKABLE void rememberView(const QUrl &url, int page, const QString &mode, qreal zoom);
 
+    // Page edits. Each refuses (false, pageEditError says why) a PDF that is not ready, too large to hold in
+    // memory, damaged, password protected, or signed while signedEditsAllowed is false. A change that changes
+    // nothing returns true and records no undo step. `before` is a working page index, 0..pageCount.
+    Q_INVOKABLE bool rotatePages(const QList<int> &pages, int degreesClockwise);
+    Q_INVOKABLE bool removePages(const QList<int> &pages);
+    Q_INVOKABLE bool movePages(const QList<int> &pages, int before);
+    Q_INVOKABLE bool insertPdf(const QUrl &file, int before);
+    Q_INVOKABLE bool undoPageEdit();
+    Q_INVOKABLE bool redoPageEdit();
+    bool canUndoPageEdit() const { return !m_undo.isEmpty(); }
+    bool canRedoPageEdit() const { return !m_redo.isEmpty(); }
+    bool pagesModified() const { return m_modified; }
+    QString pageEditError() const { return m_pageEditError; }
+    void setPageEditError(const QString &message);
+    bool signedEditsAllowed() const { return m_signedEditsAllowed; }
+    void setSignedEditsAllowed(bool allowed);
+    bool changedOnDiskWhileEditing() const { return m_changedOnDisk; }
+    // For saving (part 2b): the bytes as loaded from disk, the bytes shown, and the working page map.
+    QByteArray baselineBytes() const { return m_baselineBytes; }
+    QByteArray workingBytes() const { return m_working.bytes; }
+    QVector<PageOrigin> pageMap() const { return m_working.map; }
+    int baselinePageCount() const { return m_baselinePages; }
+    // The working document becomes the baseline (after it was saved): the map is the identity, pagesModified
+    // false, and every state on the undo and redo stacks is rebased onto the new baseline.
+    bool adoptWorkingAsBaseline();
+    // After the working bytes were written to the file: the changed-on-disk flag clears and the new file is watched.
+    void savedToDisk();
+    // Undo history limits (default 20 states, 256 MB of bytes); the oldest states go first.
+    void setUndoLimits(int states, qint64 bytes);
+
+    // Baseline <-> working translation (0-based; the notes keep baseline page numbers until saved).
+    // -1 when the baseline page was removed, or the working page was inserted from another file.
+    Q_INVOKABLE int workingPageForBaseline(int baselinePage) const;
+    Q_INVOKABLE int baselinePageForWorking(int workingPage) const;
+    // The rotation of the working page relative to the baseline (0, 90, 180, 270).
+    Q_INVOKABLE int rotationOfWorkingPage(int workingPage) const;
+    // The working page's size as the baseline had it (width and height swap for 90 and 270).
+    Q_INVOKABLE QSizeF baselineSizeOfWorkingPage(int workingPage) const;
+    // A point in the baseline page's view coordinates -> the same spot on the working page, and back.
+    Q_INVOKABLE QPointF baselinePointToWorking(int workingPage, QPointF point) const;
+    Q_INVOKABLE QPointF workingPointToBaseline(int workingPage, QPointF point) const;
+    // The 0-based baseline page (and its label) a note link to working page `page` names.
+    int linkPage(int page) const;
+    QString linkLabel(int page) const;
+    // `#page=N` (N-1 = baselinePage): scrolls to the working page that came from it; nothing when it was removed.
+    Q_INVOKABLE void requestBaselinePage(int baselinePage);
+
     static constexpr int SearchLimit = 1000;
     static constexpr int RememberedViewLimit = 200;
 
@@ -160,6 +227,10 @@ signals:
     void renderRequestCountChanged();
     // A different PDF was opened (not a reload of the same file).
     void opened();
+    void pageEditsChanged();
+    void pageEditErrorChanged();
+    void signedEditsAllowedChanged();
+    void changedOnDiskChanged();
 
 private:
     bool ready() const;
@@ -173,7 +244,29 @@ private:
     QVariantList pageMatches(int page, const QString &query, int limit) const;
     void searchSlice();
     void resetSearch();
+    struct EditState {
+        QByteArray bytes;
+        QVector<PageOrigin> map;
+    };
+    bool canEditPages();
+    bool commitPageEdit(bool ok, const QString &error, const QByteArray &bytes, const QVector<PageOrigin> &map);
+    bool showState(const EditState &state, bool keepPage = true);
+    void resetEditState(const QByteArray &bytes, int pages);
+    void updateModified();
+    void trimUndo();
     std::unique_ptr<QPdfDocument> m_document;
+    QByteArray m_baselineBytes;
+    int m_baselinePages = 0;
+    EditState m_working;
+    QList<EditState> m_undo;
+    QList<EditState> m_redo;
+    bool m_modified = false;
+    bool m_signedEditsAllowed = false;
+    bool m_changedOnDisk = false;
+    bool m_keepEditState = false;
+    QString m_pageEditError;
+    int m_undoStateLimit = 20;
+    qint64 m_undoByteLimit = 256ll * 1024 * 1024;
     std::unique_ptr<QPdfPageRenderer> m_renderer;
     QUrl m_url;
     QString m_password;

@@ -140,10 +140,78 @@ def deploy_runtime(stage, architecture):
             "compatibilitySource": MSVC_COMPATIBILITY}
 
 
+# DLLs that come from the vcpkg prefix (qpdf and what it loads) and the notice
+# each needs in licenses/. qpdf's own notice is the shared one in licenses/;
+# the others are vcpkg's recorded copyright files. An unknown DLL is an error,
+# so a new dependency cannot ship without a decision about its notice.
+VCPKG_PORTS = [(r"qpdf\d*\.dll", "qpdf", "qpdf-Apache-2.0.txt"),
+               (r"zlib1\.dll", "zlib", "zlib-copyright.txt"),
+               (r"(?:jpeg\d+|turbojpeg)\.dll", "libjpeg-turbo", "libjpeg-turbo-copyright.txt"),
+               (r"spng\.dll", "libspng", "libspng-copyright.txt")]
+
+
+def vcpkg_port(dll_name):
+    for pattern, port, notice in VCPKG_PORTS:
+        if re.fullmatch(pattern, dll_name, re.IGNORECASE):
+            return port, notice
+    raise SystemExit(f"{dll_name} comes from vcpkg but has no licence notice rule in package-manifest.py")
+
+
+def vcpkg_dll_closure(bin_dir):
+    """The qpdf DLLs in a vcpkg bin folder plus every DLL there they import, transitively."""
+    available = {path.name.lower(): path for path in bin_dir.glob("*.dll")}
+    pending = [name for name in available if re.fullmatch(VCPKG_PORTS[0][0], name)]
+    if not pending:
+        raise SystemExit(f"No qpdf DLL in {bin_dir}")
+    chosen = set()
+    while pending:
+        name = pending.pop()
+        if name in chosen:
+            continue
+        chosen.add(name)
+        pending.extend(dep for dep in dumpbin_imports(available[name]) if dep in available)
+    return {name: available[name] for name in sorted(chosen)}
+
+
+def deploy_vcpkg(stage, prefix):
+    """Copy the qpdf DLLs and their vcpkg dependencies beside the executable."""
+    dlls = vcpkg_dll_closure(prefix / "bin")
+    for name, path in dlls.items():
+        shutil.copy2(path, stage / name)
+    print("Deployed vcpkg DLLs: " + ", ".join(dlls), flush=True)
+    return sorted(dlls)
+
+
+def copy_vcpkg_notices(prefix, licenses, dll_names):
+    for name in dll_names:
+        port, notice = vcpkg_port(name)
+        if port != "qpdf":
+            shutil.copyfile(prefix / "share" / port / "copyright", licenses / notice)
+
+
+def check_vcpkg_notices(stage):
+    """Every vcpkg DLL in the package needs its notice in licenses/; qpdf's is mandatory."""
+    problems = []
+    for path in sorted(stage.glob("*.dll")):
+        try:
+            _, notice = vcpkg_port(path.name)
+        except SystemExit:
+            continue
+        file = stage / "licenses" / notice
+        if not file.is_file() or not file.read_text(encoding="utf-8", errors="replace").strip():
+            problems.append(f"{path.name} is bundled but licenses/{notice} is missing or empty")
+    if not list(stage.glob("qpdf*.dll")):
+        problems.append("the qpdf DLL is not in the package")
+    if problems:
+        raise SystemExit("Licence check failed:\n  " + "\n  ".join(problems))
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--architecture", choices=["arm64", "x64"], required=True)
     parser.add_argument("--qt-root", type=Path, required=True)
+    parser.add_argument("--qpdf-prefix", type=Path, required=True,
+                        help="vcpkg installed/<triplet> folder holding qpdf and its dependencies")
     parser.add_argument("--stage", type=Path, required=True)
     args = parser.parse_args()
     root = Path(__file__).resolve().parents[2]
@@ -151,6 +219,8 @@ def main():
     build_record = build_identity.verify(root / f"build/windows-{args.architecture}", args.architecture)
     if sha(stage / "Fomawrite.exe") != build_record["executableSha256"]:
         raise SystemExit("Deployed executable differs from the verified native build")
+    # Before the runtime inventory: the vcpkg DLLs import the CRT and must be counted.
+    vcpkg_dlls = deploy_vcpkg(stage, args.qpdf_prefix.resolve())
     runtime = deploy_runtime(stage, args.architecture)
     required = ["Fomawrite.exe", "Qt6Core.dll", "Qt6Gui.dll", "Qt6Quick.dll", "Qt6Qml.dll",
                 "Qt6Pdf.dll", "Qt6WebEngineCore.dll", "QtWebEngineProcess.exe",
@@ -182,8 +252,11 @@ def main():
                          ("licenses/Qt-GPL-3.0-only.txt", "Qt-GPL-3.0-only.txt"),
                          ("licenses/Chromium-BSD-3-Clause.txt", "Chromium-BSD-3-Clause.txt"),
                          ("licenses/PDFium-BSD-3-Clause.txt", "PDFium-BSD-3-Clause.txt"),
+                         ("licenses/qpdf-Apache-2.0.txt", "qpdf-Apache-2.0.txt"),
                          ("windows/THIRD-PARTY-NOTICES.txt", "THIRD-PARTY-NOTICES-Windows.txt")]:
         shutil.copyfile(root / source, licenses / name)
+    copy_vcpkg_notices(args.qpdf_prefix.resolve(), licenses, vcpkg_dlls)
+    check_vcpkg_notices(stage)
     # Qt WebEngine does not serve chrome://credits; keep an SDK-supplied
     # Chromium credits file when one exists.
     credits = list(args.qt_root.rglob("qtwebengine_licenses.html"))
@@ -205,7 +278,7 @@ def main():
     manifest = {"schemaVersion": 1, "application": "Fomawrite", "applicationVersion": version,
                 "commit": commit, "trackedSourceDirty": bool(dirty), "architecture": args.architecture,
                 "qtVersion": install["qtVersion"], "qtInstall": install, "nativeBuild": build_record,
-                "msvcRuntime": runtime,
+                "msvcRuntime": runtime, "vcpkgDlls": vcpkg_dlls,
                 "compilerToolset": os.environ.get("VCToolsVersion"),
                 "distributionQualification": "internal build; full licensing/install acceptance pending",
                 "windowsSdk": os.environ.get("WindowsSDKVersion"), "buildOs": platform.platform(),

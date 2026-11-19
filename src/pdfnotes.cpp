@@ -2,6 +2,7 @@
 
 #include <QPair>
 #include <QRegularExpression>
+#include <QUrl>
 #include <algorithm>
 #include <limits>
 
@@ -542,6 +543,145 @@ Placement place(const Item &item, const std::function<QString(int)> &pageText) {
         }
     }
     return {};
+}
+
+QPointF turnedPoint(QPointF p, QSizeF size, int degrees) {
+    switch (((degrees % 360) + 360) % 360) {
+    case 90: return {size.height() - p.y(), p.x()};
+    case 180: return {size.width() - p.x(), size.height() - p.y()};
+    case 270: return {p.y(), size.width() - p.x()};
+    default: return p;
+    }
+}
+
+namespace {
+QString escapedLabel(QString label) {
+    return label.replace(QLatin1Char('\\'), QStringLiteral("\\\\")).replace(QLatin1Char('['), QStringLiteral("\\["))
+        .replace(QLatin1Char(']'), QStringLiteral("\\]"));
+}
+QString unescapedLabel(const QString &label) {
+    QString out;
+    for (int i = 0; i < label.size(); ++i) {
+        if (label.at(i) == QLatin1Char('\\') && i + 1 < label.size()) ++i;
+        out += label.at(i);
+    }
+    return out;
+}
+bool pointInPage(double x, double y, QSizeF size) { return x >= 0 && y >= 0 && x <= size.width() && y <= size.height(); }
+}
+
+Edit renumber(const QString &text, const QString &pdfFileName, const QList<PageRemap> &pages,
+              const std::function<QString(int)> &oldLabel, const std::function<QString(int)> &newLabel) {
+    const auto remapOf = [&](int page) -> const PageRemap * {
+        return page >= 1 && page <= pages.size() ? &pages.at(page - 1) : nullptr;
+    };
+    Edit changes;
+    const Document document = parse(text);
+    // Markers.
+    for (const Item &item : document.items) {
+        const PageRemap *remap = remapOf(item.page);
+        if (!remap) continue;
+        const Key *pageKey = nullptr, *atKey = nullptr, *rectKey = nullptr;
+        for (const Key &key : item.keys) {
+            if (key.name == QLatin1String("page") && !pageKey) pageKey = &key;
+            else if (key.name == QLatin1String("at") && !atKey) atKey = &key;
+            else if (key.name == QLatin1String("rect") && !rectKey) rectKey = &key;
+        }
+        if (!pageKey || pageKey->value.toInt() != item.page) continue;
+        if (remap->newPage != item.page)
+            changes.append({pageKey->valueStart, pageKey->valueEnd - pageKey->valueStart, QString::number(remap->newPage)});
+        if (remap->newPage < 1 || remap->rotation % 360 == 0) continue;
+        if (atKey) {
+            const QStringList xy = atKey->value.split(QLatin1Char(','));
+            bool okX = false, okY = false;
+            const int x = xy.size() == 2 ? xy.at(0).toInt(&okX) : 0, y = xy.size() == 2 ? xy.at(1).toInt(&okY) : 0;
+            if (okX && okY && pointInPage(x, y, remap->size)) {
+                const QPoint to = turnedPoint(QPointF(x, y), remap->size, remap->rotation).toPoint();
+                changes.append({atKey->valueStart, atKey->valueEnd - atKey->valueStart, QStringLiteral("%1,%2").arg(to.x()).arg(to.y())});
+            }
+        }
+        if (rectKey) {
+            const QStringList v = rectKey->value.split(QLatin1Char(','));
+            bool ok[4] = {false, false, false, false};
+            double n[4] = {0, 0, 0, 0};
+            if (v.size() == 4)
+                for (int i = 0; i < 4; ++i) n[i] = v.at(i).toDouble(&ok[i]);
+            if (v.size() == 4 && ok[0] && ok[1] && ok[2] && ok[3]) {
+                const QPointF a = turnedPoint(QPointF(n[0], n[1]), remap->size, remap->rotation);
+                const QPointF b = turnedPoint(QPointF(n[2], n[3]), remap->size, remap->rotation);
+                changes.append({rectKey->valueStart, rectKey->valueEnd - rectKey->valueStart,
+                                QStringLiteral("%1,%2,%3,%4").arg(qRound(qMin(a.x(), b.x()))).arg(qRound(qMin(a.y(), b.y())))
+                                    .arg(qRound(qMax(a.x(), b.x()))).arg(qRound(qMax(a.y(), b.y())))});
+            }
+        }
+    }
+    // Links to this PDF and page headings, outside code fences and inline code.
+    static const QRegularExpression link(QStringLiteral("\\[((?:[^\\]\\\\]|\\\\.)*)\\]\\(<?([^)\\s>]*)#page=(\\d+)>?\\)"));
+    static const QRegularExpression plainHeading(QStringLiteral("^( {0,3}#{1,6}[ \\t]+)(?:Page[ \\t]+)(\\d+)([ \\t]*)$"));
+    static const QRegularExpression labelText(QStringLiteral("^Page (.+)$"));
+    QChar fence;
+    int fenceLength = 0;
+    for (const Line &line : splitLines(text)) {
+        const QString content = text.mid(line.start, line.end - line.start);
+        const auto open = fenceOpenPattern().match(content);
+        if (fenceLength > 0) {
+            const QString trimmed = content.trimmed();
+            if (!trimmed.isEmpty() && trimmed.count(fence) == trimmed.size() && trimmed.size() >= fenceLength) fenceLength = 0;
+            continue;
+        }
+        if (open.hasMatch() && !(open.captured(1).startsWith(QLatin1Char('`')) && open.captured(2).contains(QLatin1Char('`')))) {
+            fence = open.captured(1).at(0);
+            fenceLength = int(open.captured(1).size());
+            continue;
+        }
+        const bool heading = headingPattern().match(content).hasMatch();
+        bool anyLink = false, lineReplaced = false;
+        for (auto it = link.globalMatch(content); it.hasNext() && !lineReplaced;) {
+            const QRegularExpressionMatch match = it.next();
+            QString destination = QUrl::fromPercentEncoding(match.captured(2).toUtf8());
+            if (destination.startsWith(QLatin1String("./"))) destination.remove(0, 2);
+            if (destination != pdfFileName) continue;
+            anyLink = true;
+            if (content.left(match.capturedStart()).count(QLatin1Char('`')) % 2) continue;
+            const int old = match.captured(3).toInt();
+            const PageRemap *remap = remapOf(old);
+            if (!remap) continue;
+            const int numberStart = line.start + match.capturedStart(3);
+            if (remap->newPage == 0) {
+                if (heading && isGeneratedHeading(content, old)) {
+                    changes.append({line.start, int(content.size()), QStringLiteral("## Deleted page %1").arg(old)});
+                    lineReplaced = true;
+                } else if (heading) {
+                    changes.append({numberStart, int(match.capturedLength(3)), QStringLiteral("0")});
+                }
+                continue;
+            }
+            if (remap->newPage == old) continue;
+            changes.append({numberStart, int(match.capturedLength(3)), QString::number(remap->newPage)});
+            const auto lt = labelText.match(match.captured(1));
+            if (!lt.hasMatch()) continue;
+            const QString shown = unescapedLabel(lt.captured(1));
+            if (shown != QString::number(old) && (shown.isEmpty() || shown != oldLabel(old))) continue;
+            const QString label = newLabel(remap->newPage);
+            const QString now = escapedLabel(label.isEmpty() || label == QString::number(remap->newPage)
+                                                 ? QString::number(remap->newPage) : label);
+            if (now != lt.captured(1))
+                changes.append({line.start + int(match.capturedStart(1)) + 5, int(lt.captured(1).size()), now});
+        }
+        if (!anyLink && heading && !content.contains(QLatin1String("#page="))) {
+            const auto plain = plainHeading.match(content);
+            const PageRemap *remap = plain.hasMatch() ? remapOf(plain.captured(2).toInt()) : nullptr;
+            if (!remap) continue;
+            const int old = plain.captured(2).toInt();
+            if (remap->newPage == 0)
+                changes.append({line.start + int(plain.captured(1).size()), int(content.size() - plain.captured(1).size()),
+                                QStringLiteral("Deleted page %1").arg(old)});
+            else if (remap->newPage != old)
+                changes.append({line.start + int(plain.capturedStart(2)), int(plain.capturedLength(2)), QString::number(remap->newPage)});
+        }
+    }
+    std::sort(changes.begin(), changes.end(), [](const Change &a, const Change &b) { return a.position < b.position; });
+    return changes;
 }
 
 }

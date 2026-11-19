@@ -4,6 +4,18 @@
 // p5 "PAD", p6 "FAR". Uses the cycle 160-164 helpers.
 
 namespace {
+// Clicks an item once its place has stopped moving (a slow machine finishes the
+// toolbar's layout late), and, if its popup did not open, once more.
+bool cycle164ClickToOpen(Cycle161Pane &p, QQuickItem *button, const char *popupName) {
+    QRectF before;
+    QTest::qWaitFor([&] { const QRectF now = cycle103SceneBounds(button); const bool same = now == before && now.width() > 0; before = now; QTest::qWait(60); return same; }, 5000);
+    for (int attempt = 0; attempt < 2; ++attempt) {
+        QTest::mouseClick(p.w.quick, Qt::LeftButton, Qt::NoModifier, cycle103SceneBounds(button).center().toPoint());
+        auto *popup = p.w.window->findChild<QObject *>(popupName);
+        if (popup && QTest::qWaitFor([&] { return popup->property("visible").toBool(); }, 3000)) return true;
+    }
+    return false;
+}
 QByteArray cycle164AnchorPdf() {
     using namespace PdfFixtures;
     const auto page = [](const QByteArray &content) { return Page{content, 0, {}, {}}; };
@@ -103,9 +115,8 @@ void FomawriteTest::pdfUnplacedItemsAreNotDrawnAndAreListed() {
     QTRY_VERIFY(button->isVisible());
     QCOMPARE(button->property("text").toString(), QStringLiteral("6 unplaced"));
     QVERIFY(!p.reader->property("unplacedItems").toList().isEmpty());
-    QTest::mouseClick(p.w.quick, Qt::LeftButton, Qt::NoModifier, cycle103SceneBounds(button).center().toPoint());
+    QVERIFY(cycle164ClickToOpen(p, button, "pdfUnplacedList"));
     auto *popup = p.w.window->findChild<QObject *>("pdfUnplacedList"); QVERIFY(popup);
-    QTRY_VERIFY(popup->property("visible").toBool());
     const auto rows = cycle103VisualItems(qvariant_cast<QQuickItem *>(popup->property("contentItem")), "pdfUnplacedRow");
     QCOMPARE(rows.size(), 6);
     QStringList lines;
@@ -142,8 +153,7 @@ void FomawriteTest::pdfClickingAnUnplacedRowRevealsItInTheNotes() {
     const int noteText = int(notes.indexOf("Pinned to nowhere."));
     QQuickItem *button = p.item("pdfUnplacedButton"); QVERIFY(button);
     const auto clickRow = [&](const QString &kind) -> bool {
-        QTest::mouseClick(p.w.quick, Qt::LeftButton, Qt::NoModifier, cycle103SceneBounds(button).center().toPoint());
-        if (!QTest::qWaitFor([&] { return p.w.window->findChild<QObject *>("pdfUnplacedList")->property("visible").toBool(); }, 3000)) return false;
+        if (!cycle164ClickToOpen(p, button, "pdfUnplacedList")) return false;
         for (QQuickItem *row : cycle103VisualItems(qvariant_cast<QQuickItem *>(p.w.window->findChild<QObject *>("pdfUnplacedList")->property("contentItem")), "pdfUnplacedRow")) {
             if (row->property("kindText").toString() != kind) continue;
             QRectF before;

@@ -20,6 +20,16 @@ The Visual C++ runtime files are Microsoft redistributable components deployed
 app-locally from the selected compatible v14 runtime, under Microsoft's
 redistribution terms.
 
+qpdf (page editing) comes from vcpkg (commit pinned in windows/vcpkg-baseline.txt),
+built dynamically for the package's architecture, as qpdf*.dll beside
+Fomawrite.exe, with the DLLs it loads that Windows does not provide:
+  qpdf, Apache License 2.0 (licenses/qpdf-Apache-2.0.txt).
+  zlib1.dll, zlib licence (licenses/zlib-copyright.txt, vcpkg's copy).
+  jpeg62.dll, libjpeg-turbo: BSD-3-Clause, IJG and zlib terms
+  (licenses/libjpeg-turbo-copyright.txt, vcpkg's copy).
+qpdf is built with its own cryptography, so no OpenSSL DLL is shipped. The exact
+DLLs deployed are listed under vcpkgDlls in manifest.json.
+
 The application and dependency versions, source commit, archive checksums,
 executable, embedded resources and deployed file hashes are in manifest.json.
 

@@ -3,8 +3,9 @@ param([ValidateSet('arm64', 'x64')][string]$Architecture = 'arm64', [string]$QtR
 . "$PSScriptRoot/common.ps1"
 Assert-Windows
 $QtRoot = Get-QtRoot $QtRoot
+$QpdfPrefix = Get-QpdfPrefix
 Enter-MsvcEnvironment $Architecture
-$env:PATH = (Join-Path $QtRoot 'bin') + ';' + $env:PATH
+$env:PATH = (Join-Path $QtRoot 'bin') + ';' + (Join-Path $QpdfPrefix 'bin') + ';' + $env:PATH
 Invoke-Checked python @("$PSScriptRoot/fetch-harper.py")
 $build = Join-Path $RepoRoot "build/windows-$Architecture"
 New-Item -ItemType Directory -Force -Path $build | Out-Null

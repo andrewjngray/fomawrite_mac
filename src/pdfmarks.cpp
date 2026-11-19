@@ -45,8 +45,10 @@ void PdfMarks::setHighlightColour(const QString &colour) {
 
 bool PdfMarks::ready() const { return m_session->active() && m_session->state() == QLatin1String("ready"); }
 
+// `page` is a 1-based BASELINE page, as the notes number them; empty when it was removed.
 QString PdfMarks::pageText(int page) const {
-    return page >= 1 && page <= m_session->pageCount() ? m_session->pageText(page - 1) : QString();
+    const int working = m_session->workingPageForBaseline(page - 1);
+    return working >= 0 && working < m_session->pageCount() ? m_session->pageText(working) : QString();
 }
 
 QVariantList PdfMarks::rects(int page, int start, int length) const {
@@ -78,6 +80,21 @@ QPoint PdfMarks::clampedPoint(int page, double x, double y) const {
     return {int(qBound(0.0, std::round(x), std::floor(size.width()))), int(qBound(0.0, std::round(y), std::floor(size.height())))};
 }
 
+// A point on working page `page` (view points) as the notes keep it: in the baseline page's own coordinates.
+QPoint PdfMarks::baselinePoint(int page, double x, double y) const {
+    const QPoint clamped = clampedPoint(page, x, y);
+    if (m_session->rotationOfWorkingPage(page) == 0) return clamped;
+    const QPointF turned = m_session->workingPointToBaseline(page, clamped);
+    const QSizeF size = m_session->baselineSizeOfWorkingPage(page);
+    return {int(qBound(0.0, std::round(turned.x()), std::floor(size.width()))), int(qBound(0.0, std::round(turned.y()), std::floor(size.height())))};
+}
+
+bool PdfMarks::refuseInserted(int page) const {
+    if (m_session->baselinePageForWorking(page) >= 0) return false;
+    m_session->setPageEditError(QStringLiteral("Save the PDF before marking inserted pages."));
+    return true;
+}
+
 PdfMarks::Current PdfMarks::current() const {
     Current now;
     now.text = m_text();
@@ -101,20 +118,24 @@ void PdfMarks::refresh() {
         for (int i = 0; i < now.document.items.size(); ++i) {
             const PdfNotes::Item &item = now.document.items.at(i);
             const PdfNotes::Placement &placement = now.placements.at(i);
-            const int page = (placement.placed ? placement.page : item.page) - 1;
+            // The notes number pages as the PDF was last saved; the pane shows the working pages.
+            const int page = placement.placed ? m_session->workingPageForBaseline(placement.page - 1) : item.page - 1;
             const int direction = placement.placed ? m_session->textDirection(page) : 0;
             if (item.kind == QLatin1String("note")) {
                 // A note whose page does not exist, or whose at= lies outside its page, is unplaced.
-                bool valid = item.hasAt && item.page >= 1 && item.page <= m_session->pageCount();
+                const int working = m_session->workingPageForBaseline(item.page - 1);
+                bool valid = item.hasAt && item.page >= 1 && working >= 0;
                 if (valid) {
-                    const QSizeF size = m_session->pageSize(item.page - 1);
+                    const QSizeF size = m_session->baselineSizeOfWorkingPage(working);
                     valid = item.atX >= 0 && item.atY >= 0 && item.atX <= size.width() && item.atY <= size.height();
                 }
-                const QPoint at = valid ? QPoint(item.atX, item.atY) : QPoint();
+                QPoint at = valid ? QPoint(item.atX, item.atY) : QPoint();
+                if (valid && m_session->rotationOfWorkingPage(working) != 0)
+                    at = m_session->baselinePointToWorking(working, QPointF(item.atX, item.atY)).toPoint();
                 items.append(QVariantMap{
                     {QStringLiteral("index"), i},
                     {QStringLiteral("kind"), item.kind},
-                    {QStringLiteral("page"), item.page - 1},
+                    {QStringLiteral("page"), valid ? working : item.page - 1},
                     {QStringLiteral("x"), at.x()},
                     {QStringLiteral("y"), at.y()},
                     {QStringLiteral("placed"), valid},
@@ -162,10 +183,12 @@ QString PdfMarks::mark(const QString &kind, const QString &colour, int page, int
     if (!ready() || !PdfNotes::isTextMarkup(kind) || page < 0 || page >= m_session->pageCount() || start < 0 || length <= 0) return {};
     const QString text = m_session->pageText(page);
     if (start + length > text.size()) return {};
+    if (refuseInserted(page)) return {};
+    const int baselinePage = m_session->baselinePageForWorking(page);
     const Current now = current();
     for (int i = 0; i < now.document.items.size(); ++i) {
         const PdfNotes::Placement &placement = now.placements.at(i);
-        if (now.document.items.at(i).kind == kind && placement.placed && placement.page == page + 1
+        if (now.document.items.at(i).kind == kind && placement.placed && placement.page == baselinePage + 1
                 && placement.start == start && placement.length == length) {
             const PdfNotes::Edit edit = PdfNotes::removeMark(now.text, now.document.items.at(i), text.mid(start, length));
             if (edit.isEmpty() || !applyEdit(edit)) return {};
@@ -176,11 +199,11 @@ QString PdfMarks::mark(const QString &kind, const QString &colour, int page, int
     PdfNotes::Mark mark;
     mark.kind = kind;
     mark.colour = kind == QLatin1String("highlight") && !PdfNotes::highlightColours().contains(colour) ? QString() : colour;
-    mark.page = page + 1;
+    mark.page = baselinePage + 1;
     mark.start = start;
     mark.length = length;
     mark.text = text.mid(start, length);
-    const PdfNotes::Edit edit = PdfNotes::insertMark(now.text, mark, m_session->fileName(), m_session->pageLabel(page));
+    const PdfNotes::Edit edit = PdfNotes::insertMark(now.text, mark, m_session->fileName(), m_session->linkLabel(page));
     if (edit.isEmpty() || !applyEdit(edit)) return {};
     refresh();
     return QStringLiteral("added");
@@ -214,12 +237,13 @@ bool PdfMarks::recolourMark(int index, const QString &colour) {
 
 int PdfMarks::placeNote(int page, double x, double y) {
     if (!ready() || page < 0 || page >= m_session->pageCount()) return -1;
-    const QPoint at = clampedPoint(page, x, y);
+    if (refuseInserted(page)) return -1;
+    const QPoint at = baselinePoint(page, x, y);
     PdfNotes::Note note;
-    note.page = page + 1;
+    note.page = m_session->baselinePageForWorking(page) + 1;
     note.x = at.x();
     note.y = at.y();
-    const PdfNotes::NoteInsert insert = PdfNotes::insertNote(m_text(), note, m_session->fileName(), m_session->pageLabel(page));
+    const PdfNotes::NoteInsert insert = PdfNotes::insertNote(m_text(), note, m_session->fileName(), m_session->linkLabel(page));
     if (insert.edit.isEmpty() || !applyEdit(insert.edit)) return -1;
     refresh();
     return insert.caret;
@@ -231,8 +255,9 @@ bool PdfMarks::moveNote(int index, double x, double y) {
     const int i = currentIndex(now, index);
     if (i < 0) return false;
     const PdfNotes::Item &item = now.document.items.at(i);
-    if (item.kind != QLatin1String("note") || item.page < 1 || item.page > m_session->pageCount()) return false;
-    const QPoint at = clampedPoint(item.page - 1, x, y);
+    const int working = m_session->workingPageForBaseline(item.page - 1);
+    if (item.kind != QLatin1String("note") || item.page < 1 || working < 0) return false;
+    const QPoint at = baselinePoint(working, x, y);
     const PdfNotes::Edit edit = PdfNotes::moveNote(now.text, item, at.x(), at.y());
     if (edit.isEmpty() || !applyEdit(edit)) return false;
     refresh();

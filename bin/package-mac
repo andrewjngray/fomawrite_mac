@@ -93,7 +93,8 @@ cp "$ROOT/src/vendor/md4c/LICENSE.md" "$LICENSES/MD4C-MIT.txt"
 cp "$ROOT/src/editor/dist/harper/LICENSE" "$LICENSES/Harper-Apache-2.0.txt"
 cp "$ROOT/src/editor/dist/THIRD-PARTY-NOTICES.txt" "$LICENSES/Editor-THIRD-PARTY-NOTICES.txt"
 cp "$ROOT/licenses/Qt-LGPL-3.0-only.txt" "$ROOT/licenses/Qt-GPL-3.0-only.txt" \
-   "$ROOT/licenses/Chromium-BSD-3-Clause.txt" "$ROOT/licenses/PDFium-BSD-3-Clause.txt" "$LICENSES/"
+   "$ROOT/licenses/Chromium-BSD-3-Clause.txt" "$ROOT/licenses/PDFium-BSD-3-Clause.txt" \
+   "$ROOT/licenses/qpdf-Apache-2.0.txt" "$LICENSES/"
 {
     cat "$ROOT/licenses/THIRD-PARTY-NOTICES.txt"
     printf '\nmacOS build\n  Qt %s from Homebrew. Bundled Qt frameworks:\n' "$("$QMAKE" -query QT_VERSION)"

@@ -39,3 +39,9 @@ Build 164 (`0.3.0-dev59`), 19 November 2026. Second build cycle of Phase 2 of th
 
 ## Not installed
 `/Applications/Fomawrite.app` and the Windows VM are build 163; build 164 exists in source and in `build/` only.
+
+## CI follow-up: GitHub macOS runner flake
+
+`pdfClickOnMarkOrPinShowsItsItemInTheNotes` failed once on GitHub's macOS runner (run 44460688304) at the PDF-only pin click (`selectedPin` still null). Cause: test timing only. `cycle164Click` computed the click point after two fixed 30 ms waits, right after the layout switched to PDF only, so on a slow machine the click landed on blank page (which clears the selection). The quiet window never suppresses selecting a pin, and the product code is unchanged. Not reproduced locally, even with the machine loaded.
+Fix: `cycle164Click` now waits until the point is stable inside the viewport, the PDF-only click waits for the pin to be drawn and uses `QTRY_VERIFY`, and two immediate note-count asserts after a click became `QTRY_COMPARE`.
+Second GitHub run (85be127): the pin test passed, but `pdfUnplacedItemsAreNotDrawnAndAreListed` failed the same way (test timing): the click on the "6 unplaced" toolbar button went to a spot the toolbar had not finished laying out, so the list never opened. `cycle164ClickToOpen` now waits for the button to stop moving and clicks again if the popup did not open. Product code still unchanged.

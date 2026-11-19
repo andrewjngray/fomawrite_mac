@@ -297,6 +297,52 @@ class DeploymentEvidenceTests(unittest.TestCase):
                 packaging.dumpbin_imports(self.exe)
 
 
+
+class QpdfPackagingTests(unittest.TestCase):
+    """The package must carry qpdf's licence notice with the qpdf DLLs."""
+
+    def stage(self, dlls, notices):
+        directory = tempfile.TemporaryDirectory()
+        self.addCleanup(directory.cleanup)
+        stage = Path(directory.name)
+        (stage / "licenses").mkdir()
+        for name in dlls:
+            (stage / name).write_bytes(b"MZ")
+        for name in notices:
+            (stage / "licenses" / name).write_text("licence text\n")
+        return stage
+
+    def test_qpdf_with_its_notices_passes(self):
+        stage = self.stage(["qpdf30.dll", "zlib1.dll", "jpeg62.dll"],
+                           ["qpdf-Apache-2.0.txt", "zlib-copyright.txt", "libjpeg-turbo-copyright.txt"])
+        packaging.check_vcpkg_notices(stage)
+
+    def test_qpdf_without_its_notice_is_rejected(self):
+        stage = self.stage(["qpdf30.dll", "zlib1.dll"], ["zlib-copyright.txt"])
+        with self.assertRaisesRegex(SystemExit, "qpdf-Apache-2.0.txt"):
+            packaging.check_vcpkg_notices(stage)
+
+    def test_dependency_without_its_notice_is_rejected(self):
+        stage = self.stage(["qpdf30.dll", "zlib1.dll"], ["qpdf-Apache-2.0.txt"])
+        with self.assertRaisesRegex(SystemExit, "zlib-copyright.txt"):
+            packaging.check_vcpkg_notices(stage)
+
+    def test_package_without_the_qpdf_dll_is_rejected(self):
+        stage = self.stage([], ["qpdf-Apache-2.0.txt"])
+        with self.assertRaisesRegex(SystemExit, "qpdf DLL is not in the package"):
+            packaging.check_vcpkg_notices(stage)
+
+    def test_unknown_vcpkg_dll_needs_a_decision(self):
+        with self.assertRaises(SystemExit):
+            packaging.vcpkg_port("openssl-surprise.dll")
+
+    def test_closure_follows_imports_and_ignores_unrelated_dlls(self):
+        stage = self.stage(["qpdf30.dll", "jpeg62.dll", "zlib1.dll", "unrelated.dll"], [])
+        imports = {"qpdf30.dll": ["kernel32.dll", "jpeg62.dll", "zlib1.dll"], "jpeg62.dll": ["zlib1.dll"], "zlib1.dll": ["kernel32.dll"]}
+        with patch.object(packaging, "dumpbin_imports", lambda path: imports[path.name]):
+            self.assertEqual(["jpeg62.dll", "qpdf30.dll", "zlib1.dll"], sorted(packaging.vcpkg_dll_closure(stage)))
+
+
 class MenuProofDataRowContractTests(unittest.TestCase):
     def test_exact_windows_production_rows_match_qt_junit_names(self):
         # Qt's native JUnit logger uses function(tag), while its CLI selector

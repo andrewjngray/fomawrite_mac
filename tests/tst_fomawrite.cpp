@@ -253,6 +253,38 @@ private slots:
     void libraryNewMenuListsTheNewAndViewItemsInOrder();
     void libraryPlusCreatesADocumentAndNewFolderOpensTheFolderDialog();
     void libraryPlusPutsTheCaretInTheNewDocument();
+    void pdfEditorChecksWhetherADocumentCanBeEdited();
+    void pdfEditorRotatesOnePageSeveralPagesAndExistingRotation();
+    void pdfEditorRotatesAnInheritedRotation();
+    void pdfEditorRemovesPages();
+    void pdfEditorMovesPages();
+    void pdfEditorInsertsPagesAtStartMiddleAndEnd();
+    void pdfEditorExtractsPagesIntoANewDocument();
+    void pdfEditorRefusesWhatItCannotEditAndRejectsBadArguments();
+    void pdfEditorKeepsMetadataOutlineAndLinks();
+    void pdfPagesEditsApplyToTheSessionsDocument();
+    void pdfPagesMapComposesAcrossOperations();
+    void pdfPagesUndoAndRedoRestoreExactBytesWithinABound();
+    void pdfPagesRefusalsLeaveTheStateUntouched();
+    void pdfPagesFileChangedOnDiskWhileEditingIsFlagged();
+    void pdfPagesAdoptingTheWorkingStateRebasesTheHistory();
+    void pdfPagesTextIndicesDoNotChangeWithRotation();
+    void pdfPagesMarksAndPinsStayOnTheirContent();
+    void pdfPagesMarkingWhilePendingWritesBaselineNumbers();
+    void pdfPagesLinksScrollToTheTranslatedPage();
+    void pdfSavingWritesEachOperationAndKeepsThePreviousBytes();
+    void pdfSavingKeepsTheLatestRecoveryCopiesOfEachFile();
+    void pdfSavingFailuresLeaveEverythingAsItWas();
+    void pdfSavingVerifiesTheFileItWrote();
+    void pdfSavingRefusesAFileThatChangedOnDisk();
+    void pdfSavingDoesNotReloadOrDropTheUndoHistory();
+    void pdfSavingUndoAfterSaveThenSavingAgainRestoresTheOldBytes();
+    void pdfSavingRenumbersTheNotesAndMarksStayOnTheirContent();
+    void pdfSavingRewritesHeadingsAndRemovedPagesAndKeepsEverythingElse();
+    void pdfSavingRenumbersWithOneEditorUndoStepAndKeepsWindowsLineBreaksOnDisk();
+    void pdfSavingSavesTheNotesDocumentWhenItHasATarget();
+    void pdfSavingKeepsMarkingIntoTheRightSectionAfterAReorder();
+    void pdfSavingExportsPagesWithoutChangingTheSession();
     void pdfSessionLoadsRefusesAndUnlocks();
     void pdfSessionReportsPageSizesLabelsAndText();
     void pdfSessionSelectionGeometryMatchesTheSpikeMapping();
@@ -6404,4 +6436,7 @@ int main(int argc, char **argv) {
 #include "cycle163-pdf-markup.inc"
 #include "cycle164-pdf-notes.inc"
 #include "cycle164-pdf-anchoring.inc"
+#include "cycle165-pdf-editor.inc"
+#include "cycle165-pdf-pages.inc"
+#include "cycle165-pdf-saving.inc"
 #include "windows-pdf-menu.inc"

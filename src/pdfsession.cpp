@@ -1,5 +1,6 @@
 #include "pdfsession.h"
 #include "pdfnotes.h"
+#include "pdfeditor.h"
 
 #include <QBuffer>
 #include <QClipboard>
@@ -43,6 +44,17 @@ public:
         load(&m_buffer);
         return error();
     }
+    // A document made from bytes already in memory (an edited PDF).
+    QPdfDocument::Error loadBytes(const QByteArray &bytes, const QString &password = QString()) {
+        m_bytes = bytes;
+        if (!password.isEmpty()) setPassword(password);
+        m_buffer.setData(m_bytes);
+        m_buffer.open(QIODevice::ReadOnly);
+        load(&m_buffer);
+        return error();
+    }
+    // The file's bytes; empty when it was too large to hold in memory.
+    const QByteArray &bytes() const { return m_bytes; }
 private:
     QByteArray m_bytes;
     QBuffer m_buffer;
@@ -180,6 +192,11 @@ void PdfSession::adopt(std::unique_ptr<QPdfDocument> document, const QUrl &url, 
     m_pageText.clear();
     m_characterBoxes.clear();
     m_textDirections.clear();
+    if (!m_keepEditState) {
+        const auto *file = dynamic_cast<UnlockedFilePdf *>(m_document.get());
+        if (!sameFile && m_signedEditsAllowed) { m_signedEditsAllowed = false; emit signedEditsAllowedChanged(); }
+        resetEditState(file ? file->bytes() : QByteArray(), m_document ? m_document->pageCount() : 0);
+    }
     m_password = password;
     m_url = url;
     m_state = state; // announced below, after the document is in place
@@ -212,7 +229,7 @@ bool PdfSession::relocate(const QUrl &url) {
     if (!file.isFile()) return false;
     const QUrl from = m_url;
     const QUrl target = QUrl::fromLocalFile(file.absoluteFilePath());
-    if (m_state == QLatin1String("ready")) {
+    if (m_state == QLatin1String("ready") && !m_modified) {
         auto document = std::make_unique<UnlockedFilePdf>();
         if (!m_password.isEmpty()) document->setPassword(m_password);
         const QPdfDocument::Error error = document->loadFile(file.absoluteFilePath());
@@ -243,6 +260,9 @@ void PdfSession::close() {
     m_characterBoxes.clear();
     m_textDirections.clear();
     m_password.clear();
+    resetEditState(QByteArray(), 0);
+    if (m_signedEditsAllowed) { m_signedEditsAllowed = false; emit signedEditsAllowedChanged(); }
+    m_pageEditError.clear();
     m_info.clear();
     m_largestPageSize = QSizeF();
     m_url.clear();
@@ -306,6 +326,15 @@ void PdfSession::watch() {
 void PdfSession::reloadFromDisk() {
     if (!active()) return;
     const QString path = m_url.toLocalFile();
+    if (m_modified) { // pending page edits are never replaced by what is on disk
+        if (!m_changedOnDisk) { m_changedOnDisk = true; emit changedOnDiskChanged(); }
+        watch();
+        return;
+    }
+    if (ready() && (!m_undo.isEmpty() || !m_redo.isEmpty()) && !m_baselineBytes.isEmpty()) {
+        QFile now(path); // what was just saved: the history stays
+        if (now.open(QIODevice::ReadOnly) && now.readAll() == m_baselineBytes) { watch(); return; }
+    }
     if (!QFileInfo::exists(path)) {
         setState(QStringLiteral("error"), QStringLiteral("%1 is no longer available.").arg(fileName()));
         watch();
@@ -599,7 +628,7 @@ QString PdfSession::markdownQuote(const QString &text, const QString &fileName, 
 
 QString PdfSession::markdownQuoteFor(int page, const QString &text) const {
     if (!ready() || page < 0 || page >= pageCount() || text.trimmed().isEmpty()) return {};
-    return markdownQuote(text, fileName(), page, pageLabel(page));
+    return markdownQuote(text, fileName(), linkPage(page), linkLabel(page));
 }
 
 bool PdfSession::copyMarkdownQuote(int page, const QString &text) const {
@@ -611,7 +640,7 @@ bool PdfSession::copyMarkdownQuote(int page, const QString &text) const {
 
 QString PdfSession::pageLinkAddress(int page) const {
     if (!active() || page < 0) return {};
-    return linkDestination(fileName()) + QStringLiteral("#page=%1").arg(page + 1);
+    return linkDestination(fileName()) + QStringLiteral("#page=%1").arg(linkPage(page) + 1);
 }
 
 bool PdfSession::thumbnailsVisible() const { return QSettings().value(ThumbnailsKey, false).toBool(); }
@@ -702,4 +731,249 @@ void PdfSession::rememberView(const QUrl &url, int page, const QString &mode, qr
     views.prepend(view);
     while (views.size() > RememberedViewLimit) views.removeLast();
     settings.setValue(RememberedViewsKey, views);
+}
+
+// ---- Pending page edits (Cycle 165) ----
+
+namespace {
+int mod360(int degrees) { return ((degrees % 360) + 360) % 360; }
+}
+
+void PdfSession::setPageEditError(const QString &message) {
+    if (m_pageEditError == message) return;
+    m_pageEditError = message;
+    emit pageEditErrorChanged();
+}
+
+void PdfSession::setSignedEditsAllowed(bool allowed) {
+    if (m_signedEditsAllowed == allowed) return;
+    m_signedEditsAllowed = allowed;
+    emit signedEditsAllowedChanged();
+}
+
+void PdfSession::setUndoLimits(int states, qint64 bytes) {
+    m_undoStateLimit = qMax(0, states);
+    m_undoByteLimit = qMax<qint64>(0, bytes);
+    trimUndo();
+    emit pageEditsChanged();
+}
+
+// The page a link or quote to working page `page` names in the notes: the baseline page, while the
+// notes keep baseline numbers (a page inserted from another file has none, and keeps its own number).
+int PdfSession::linkPage(int page) const {
+    const int origin = baselinePageForWorking(page);
+    return origin >= 0 ? origin : page;
+}
+
+QString PdfSession::linkLabel(int page) const {
+    const int origin = baselinePageForWorking(page);
+    return origin >= 0 && origin != page ? QString::number(origin + 1) : pageLabel(page);
+}
+
+void PdfSession::resetEditState(const QByteArray &bytes, int pages) {
+    const bool changed = m_modified || !m_undo.isEmpty() || !m_redo.isEmpty() || m_changedOnDisk;
+    m_baselineBytes = bytes;
+    m_baselinePages = pages;
+    m_working.bytes = bytes;
+    m_working.map.clear();
+    for (int i = 0; i < pages; ++i) m_working.map.append({i, 0});
+    m_undo.clear();
+    m_redo.clear();
+    m_modified = false;
+    const bool wasChangedOnDisk = m_changedOnDisk;
+    m_changedOnDisk = false;
+    if (wasChangedOnDisk) emit changedOnDiskChanged();
+    if (changed) emit pageEditsChanged();
+}
+
+void PdfSession::updateModified() {
+    bool modified = m_working.bytes != m_baselineBytes || m_working.map.size() != m_baselinePages;
+    for (int i = 0; !modified && i < m_working.map.size(); ++i)
+        modified = m_working.map.at(i).origin != i || m_working.map.at(i).rotation != 0;
+    m_modified = modified;
+}
+
+void PdfSession::trimUndo() {
+    qint64 total = 0;
+    for (const EditState &state : std::as_const(m_undo)) total += state.bytes.size();
+    while (!m_undo.isEmpty() && (m_undo.size() > m_undoStateLimit || total > m_undoByteLimit)) {
+        total -= m_undo.first().bytes.size();
+        m_undo.removeFirst();
+    }
+}
+
+bool PdfSession::canEditPages() {
+    if (!ready()) { setPageEditError(QStringLiteral("There is no PDF open to change.")); return false; }
+    if (m_working.bytes.isEmpty()) {
+        setPageEditError(QStringLiteral("This PDF is too large to change its pages."));
+        return false;
+    }
+    return true;
+}
+
+// Shows `state`'s bytes in the pane (the pane follows revisionChanged); false, nothing changed, if they cannot be shown.
+bool PdfSession::showState(const EditState &state, bool) {
+    auto document = std::make_unique<UnlockedFilePdf>();
+    const QPdfDocument::Error error = document->loadBytes(state.bytes);
+    if (error != QPdfDocument::Error::None || document->status() != QPdfDocument::Status::Ready) return false;
+    m_keepEditState = true;
+    adopt(std::move(document), m_url, m_password, QStringLiteral("ready"));
+    m_keepEditState = false;
+    return true;
+}
+
+bool PdfSession::commitPageEdit(bool ok, const QString &error, const QByteArray &bytes, const QVector<PageOrigin> &map) {
+    if (!ok) { setPageEditError(error.isEmpty() ? QStringLiteral("The pages could not be changed.") : error); return false; }
+    if (bytes == m_working.bytes) { setPageEditError(QString()); return true; } // nothing changed
+    EditState next{bytes, map};
+    EditState previous = m_working;
+    // The new state is shown first; if Qt PDF cannot read it, nothing has changed.
+    if (!showState(next)) { setPageEditError(QStringLiteral("The changed PDF could not be shown. Nothing was changed.")); return false; }
+    m_undo.append(std::move(previous));
+    m_redo.clear();
+    m_working = std::move(next);
+    trimUndo();
+    updateModified();
+    setPageEditError(QString());
+    emit pageEditsChanged();
+    return true;
+}
+
+namespace {
+// Composes an operation's page list onto the state's map from the baseline.
+QVector<PdfSession::PageOrigin> composed(const QVector<PdfSession::PageOrigin> &before, const QVector<PdfEditor::PageRef> &pages) {
+    QVector<PdfSession::PageOrigin> after;
+    for (const PdfEditor::PageRef &ref : pages) {
+        if (ref.source < 0 || ref.source >= before.size()) { after.append({-1, 0}); continue; }
+        const PdfSession::PageOrigin &was = before.at(ref.source);
+        after.append({was.origin, was.origin < 0 ? 0 : mod360(was.rotation + ref.rotation)});
+    }
+    return after;
+}
+}
+
+bool PdfSession::rotatePages(const QList<int> &pages, int degreesClockwise) {
+    if (!canEditPages()) return false;
+    const PdfEditor::Result r = PdfEditor::rotate(m_working.bytes, pages, degreesClockwise, m_signedEditsAllowed);
+    return commitPageEdit(r.ok, r.error, r.bytes, r.ok ? composed(m_working.map, r.pages) : QVector<PageOrigin>());
+}
+
+bool PdfSession::removePages(const QList<int> &pages) {
+    if (!canEditPages()) return false;
+    const PdfEditor::Result r = PdfEditor::remove(m_working.bytes, pages, m_signedEditsAllowed);
+    return commitPageEdit(r.ok, r.error, r.bytes, r.ok ? composed(m_working.map, r.pages) : QVector<PageOrigin>());
+}
+
+bool PdfSession::movePages(const QList<int> &pages, int before) {
+    if (!canEditPages()) return false;
+    const PdfEditor::Result r = PdfEditor::move(m_working.bytes, pages, before, m_signedEditsAllowed);
+    return commitPageEdit(r.ok, r.error, r.bytes, r.ok ? composed(m_working.map, r.pages) : QVector<PageOrigin>());
+}
+
+bool PdfSession::insertPdf(const QUrl &file, int before) {
+    if (!canEditPages()) return false;
+    if (!file.isLocalFile()) { setPageEditError(QStringLiteral("Only a local PDF file can be inserted.")); return false; }
+    QFile other(file.toLocalFile());
+    if (!other.open(QIODevice::ReadOnly)) {
+        setPageEditError(QStringLiteral("%1 could not be read.").arg(QFileInfo(other.fileName()).fileName()));
+        return false;
+    }
+    const QByteArray bytes = other.readAll();
+    other.close();
+    const PdfEditor::Result r = PdfEditor::insert(m_working.bytes, bytes, before, m_signedEditsAllowed);
+    return commitPageEdit(r.ok, r.error, r.bytes, r.ok ? composed(m_working.map, r.pages) : QVector<PageOrigin>());
+}
+
+bool PdfSession::undoPageEdit() {
+    if (m_undo.isEmpty() || !ready()) return false;
+    const EditState target = m_undo.last();
+    if (!showState(target)) { setPageEditError(QStringLiteral("The earlier version could not be shown. Nothing was changed.")); return false; }
+    m_undo.removeLast();
+    m_redo.append(std::move(m_working));
+    m_working = target;
+    updateModified();
+    setPageEditError(QString());
+    emit pageEditsChanged();
+    return true;
+}
+
+bool PdfSession::redoPageEdit() {
+    if (m_redo.isEmpty() || !ready()) return false;
+    const EditState target = m_redo.last();
+    if (!showState(target)) { setPageEditError(QStringLiteral("The later version could not be shown. Nothing was changed.")); return false; }
+    m_redo.removeLast();
+    m_undo.append(std::move(m_working));
+    m_working = target;
+    trimUndo();
+    updateModified();
+    setPageEditError(QString());
+    emit pageEditsChanged();
+    return true;
+}
+
+bool PdfSession::adoptWorkingAsBaseline() {
+    if (!ready() || m_working.bytes.isEmpty()) return false;
+    const QVector<PageOrigin> old = m_working.map;
+    const auto rebase = [&](EditState &state) {
+        for (PageOrigin &entry : state.map) {
+            int found = -1;
+            if (entry.origin >= 0)
+                for (int j = 0; j < old.size() && found < 0; ++j)
+                    if (old.at(j).origin == entry.origin) found = j;
+            if (found < 0) entry = {-1, 0};
+            else entry = {found, mod360(entry.rotation - old.at(found).rotation)};
+        }
+    };
+    for (EditState &state : m_undo) rebase(state);
+    for (EditState &state : m_redo) rebase(state);
+    m_baselineBytes = m_working.bytes;
+    m_baselinePages = old.size();
+    for (int i = 0; i < old.size(); ++i) m_working.map[i] = {i, 0};
+    updateModified();
+    emit pageEditsChanged();
+    return true;
+}
+
+void PdfSession::savedToDisk() {
+    if (m_changedOnDisk) { m_changedOnDisk = false; emit changedOnDiskChanged(); }
+    watch();
+}
+
+int PdfSession::workingPageForBaseline(int baselinePage) const {
+    if (baselinePage < 0) return -1;
+    for (int i = 0; i < m_working.map.size(); ++i)
+        if (m_working.map.at(i).origin == baselinePage) return i;
+    return -1;
+}
+
+int PdfSession::baselinePageForWorking(int workingPage) const {
+    return workingPage >= 0 && workingPage < m_working.map.size() ? m_working.map.at(workingPage).origin : -1;
+}
+
+int PdfSession::rotationOfWorkingPage(int workingPage) const {
+    return workingPage >= 0 && workingPage < m_working.map.size() ? m_working.map.at(workingPage).rotation : 0;
+}
+
+QSizeF PdfSession::baselineSizeOfWorkingPage(int workingPage) const {
+    const QSizeF size = pageSize(workingPage);
+    return rotationOfWorkingPage(workingPage) % 180 == 0 ? size : size.transposed();
+}
+
+namespace {
+// (x, y) on a page of size (w, h) after turning it clockwise by `degrees`.
+QPointF turned(QPointF p, QSizeF size, int degrees) { return PdfNotes::turnedPoint(p, size, degrees); }
+}
+
+QPointF PdfSession::baselinePointToWorking(int workingPage, QPointF point) const {
+    return turned(point, baselineSizeOfWorkingPage(workingPage), rotationOfWorkingPage(workingPage));
+}
+
+QPointF PdfSession::workingPointToBaseline(int workingPage, QPointF point) const {
+    return turned(point, pageSize(workingPage), 360 - rotationOfWorkingPage(workingPage));
+}
+
+void PdfSession::requestBaselinePage(int baselinePage) {
+    const int working = workingPageForBaseline(baselinePage);
+    if (!m_modified) { setRequestedPage(baselinePage); return; } // as before page edits existed
+    if (working >= 0) setRequestedPage(working);
 }

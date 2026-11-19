@@ -31,6 +31,14 @@ Qt PDF (PDFium)
   (PDFium-BSD-3-Clause.txt). Qt's list of its third-party components:
   https://doc.qt.io/qt-6/qtpdf-licensing.html
 
+PDF page editing
+  qpdf, copyright Jay Berkenbilt and Manfred Holger, Apache License 2.0
+  (qpdf-Apache-2.0.txt, which also carries the notices of the public-domain
+  Rijndael code and the sphlib SHA-2 code it contains). It rewrites PDFs when
+  pages are rotated, removed, reordered or inserted. On macOS it brings
+  libjpeg-turbo (IJG/BSD/zlib) and OpenSSL 4 libcrypto (Apache 2.0), licence
+  files in the homebrew folder.
+
 Live editor (JavaScript)
   CodeMirror, Lezer, KaTeX and their dependencies, all MIT: each package's
   version and full licence text is in Editor-THIRD-PARTY-NOTICES.txt.

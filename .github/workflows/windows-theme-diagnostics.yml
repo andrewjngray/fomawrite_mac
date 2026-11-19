@@ -28,13 +28,19 @@ jobs:
         run: |
           python bin/windows/install-qt.py --architecture arm64 --output "$env:QT_ROOT_DIR"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - uses: actions/cache@v4
+        with:
+          path: build/vcpkg-cache
+          key: vcpkg-qpdf-arm64-${{ hashFiles('windows/vcpkg-baseline.txt', 'bin/windows/vcpkg-qpdf.ps1') }}
+      - name: Build qpdf with vcpkg (pinned baseline, binary cache)
+        run: ./bin/windows/vcpkg-qpdf.ps1 -Architecture arm64
       - name: Build regression executable and retain source identity
         run: |
           . ./bin/windows/common.ps1
           $qt = Get-QtRoot
           Enter-MsvcEnvironment arm64
           Invoke-Checked python @("$RepoRoot/bin/windows/fetch-harper.py")
-          $env:PATH = (Join-Path $qt 'bin') + ';' + $env:PATH
+          $env:PATH = (Join-Path $qt 'bin') + ';' + (Join-Path $env:QPDF_PREFIX 'bin') + ';' + $env:PATH
           $build = Join-Path $RepoRoot 'build-tests/windows-theme-diagnostics'
           New-Item -ItemType Directory -Force $build | Out-Null
           git rev-parse HEAD | Set-Content "$build/commit.txt"
@@ -49,7 +55,7 @@ jobs:
         run: |
           . ./bin/windows/common.ps1
           $qt = Get-QtRoot
-          $env:PATH = (Join-Path $qt 'bin') + ';' + $env:PATH
+          $env:PATH = (Join-Path $qt 'bin') + ';' + (Join-Path $env:QPDF_PREFIX 'bin') + ';' + $env:PATH
           $env:QT_QPA_PLATFORM = 'offscreen'
           $build = Join-Path $RepoRoot 'build-tests/windows-theme-diagnostics'
           Push-Location $build

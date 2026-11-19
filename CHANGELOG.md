@@ -4,6 +4,10 @@ One line per cycle, newest first. Each line links to the cycle's record under `r
 
 ## 0.3.0 development series (Cycles 97–)
 
+- **Mac cycle 165 merged into Windows (19 Nov): page edits with qpdf** — Mac record `research/cycle-165/README-mac.md`. `PdfEditor` (qpdf 12), safe PDF saving (`pdffiles`, with a `MoveFileExW` replace on Windows) and pending page edits come with the merge; no interface yet. The Windows build now gets qpdf from vcpkg (pinned baseline, binary cache) and the package ships qpdf's DLLs with their licence notices.
+
+- **165 (Mac)** — Page edits with qpdf and safe saving; no interface yet (`0.3.0-dev60`, build 165). [Record](research/cycle-165/README-mac.md)
+
 - **Mac cycle 164 merged into Windows (19 Nov): notes on the page** — Mac record `research/cycle-164/README-mac.md`. Note pins, page and notes navigation, the unplaced list and marker chips in Live come with the merge; the Windows PDF menu gains Note (no keyboard shortcut: the Mac's Ctrl+Cmd chord would be Ctrl+Alt, which is AltGr on many layouts), with a menu test.
 
 - **164 (Mac)** — Notes on the page (`0.3.0-dev59`, build 164). [Record](research/cycle-164/README-mac.md)

@@ -70,3 +70,14 @@ function Enter-MsvcEnvironment {
     if (-not $env:VCToolsVersion.StartsWith($toolVersion + '.')) { throw 'VsDevCmd selected an unexpected toolset.' }
     Write-Host "MSVC2022 $($env:VCToolsVersion), host $hostArchitecture, target $Architecture"
 }
+
+function Get-QpdfPrefix {
+    # qpdf (vcpkg, dynamic): the folder with include/, lib/qpdf.lib and bin/qpdf*.dll.
+    $path = $env:QPDF_PREFIX
+    if (-not $path) { throw 'Set QPDF_PREFIX to the vcpkg qpdf prefix; bin/windows/vcpkg-qpdf.ps1 builds it.' }
+    $resolved = (Resolve-Path -LiteralPath $path).Path
+    foreach ($need in 'include/qpdf/QPDF.hh', 'lib/qpdf.lib') {
+        if (-not (Test-Path -LiteralPath (Join-Path $resolved $need))) { throw "QPDF_PREFIX $resolved lacks $need" }
+    }
+    return $resolved
+}

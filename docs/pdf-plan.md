@@ -116,6 +116,7 @@ All PDF tools live on the pane or in a PDF menu that exists only in PDF mode; th
 
 - qpdf 12 (Apache-2.0) is the only library that writes PDFs, used from one file (`src/pdfeditor.{h,cpp}`). Mac: Homebrew `qpdf`, bundled by packaging with its licence files gathered by `bin/tidy-mac-bundle.py`. Windows: vcpkg with a pinned baseline, the DLLs deployed and noticed by `bin/windows/package-manifest.py`. `bin/check-licenses` requires the qpdf notice.
 - Rotate, delete, reorder and insert are **pending edits**: the page list and per-page rotation in `PdfSession` change at once (the view follows), with undo and redo, and the window shows unsaved changes. **Save** writes the new PDF to a temporary file with qpdf, verifies it opens with the expected page count, atomically replaces the original, keeps the previous bytes in Fomawrite's recovery store, reloads, and rewrites `page=` values and page headings in the notes in the same step. **Save As…** and **Export Selected Pages…** write new files.
+- **As built in cycle 165:** the build is qmake with `pkg-config` (`libqpdf`), not CMake. Pending edits keep the saved PDF's page numbers (the baseline) until Save; the pane and marks translate at draw time, so the notes are not touched while editing and are renumbered once, as one editor undo step, when the PDF is saved. The previous bytes of a replaced PDF are kept in `<AppData>/pdf-previous/<hash of path>/` (latest 3 per file). Open for cycle 166: after a save, ⌘Z in the editor undoes the notes renumbering and leaves old page numbers against the saved PDF, so marks can land on wrong pages; design this before the interface makes saving reachable.
 - Refused with a clear message: encrypted PDFs that qpdf cannot rewrite without the owner password; digitally signed PDFs unless Andrew confirms that the signature will be invalidated.
 - Merge: Insert Pages from File…, dropping a PDF from the explorer onto the thumbnails, and later Combine for several PDFs selected in the explorer.
 
@@ -178,17 +179,17 @@ Follow-up outside the phases: move `PublishingPreview.qml` off `PdfPageImage` to
 | 161 | PDF pane | Done, pushed; installed on the Mac and in the Windows VM as build 163 (19 November 2026) |
 | 162 | Links and integration (Phase 1 complete) | Done, pushed; installed on the Mac and in the Windows VM as build 163 (19 November 2026) |
 | 163 | Notes model and text markup | Done in source on both branches: Mac `master` `279d72e` (plus test fix `8283065`); merged into `windows/port` as `1d21369`, which adds Highlight / Underline / Strike Through Text to the Windows PDF menu (no shortcuts); Windows CI run 44440728575 green on x64 and ARM64 with no re-run needed. Installed on the Mac and in the Windows VM as build 163 (19 November 2026). |
-| 164 | Notes on the page and navigation: note pins, mark and notes navigation, marker chips in Live, re-anchoring and the unplaced list | Done in source on Mac `master` (build 164, `0.3.0-dev59`); not installed. Windows merge: see the Windows branch `CHANGELOG.md` |
-| 165 | qpdf, saving, recovery copy, notes remapping | Not started |
+| 164 | Notes on the page and navigation: note pins, mark and notes navigation, marker chips in Live, re-anchoring and the unplaced list | Done in source on Mac `master` (build 164, `0.3.0-dev59`); installed on the Mac and in the Windows VM (19 November 2026). Windows merge: see the Windows branch `CHANGELOG.md` |
+| 165 | qpdf, saving, recovery copy, notes remapping | Done in source on Mac `master` (build 165, `0.3.0-dev60`); no interface yet (cycle 166 adds it); Windows half (qpdf build and packaging, `MoveFileExW` replace) pending; not installed. [Record](../research/cycle-165/README.md) |
 | 166 | Page operations in the pane | Not started |
 | 167 onward | Phase 4 (§4.5) | Waits for Andrew's decisions |
 
 ### What remains
-1. Builds 160-163 are installed on the Mac and in the Windows VM as build 163 (installed 19 November 2026). Cycle 164 is done in source and not installed; install it when Andrew says.
-2. Cycle 165 is next.
+1. Builds 160-164 are installed on the Mac and in the Windows VM (build 164 installed 19 November 2026).
+2. Cycle 165 is done in source on the Mac branch; next is the Windows half of 165 (qpdf build and packaging, the `MoveFileExW` replace code run), then cycle 166 (the interface, and the ⌘Z renumbering gap above).
 3. Cycle 166.
 4. Phase 4 decisions (Andrew).
-5. Known open items: Live has no click-to-follow for links; no selection across pages; pinch zoom untested; text soft above about 300% zoom; GitHub's macOS CI job gets no runner, so the Mac suite is run locally (`./bin/test`); the intermittent Windows theme-file test (`publishingFolderThemesRefreshAfterExternalChanges`, "Cannot atomically edit a folder theme"), which passes on a re-run; the marks of cycle 163 and the pins, popover, flash, chips and unplaced list of cycle 164 have not been looked at on screen (including dark mode); no Qt test of a chip click in a running Live page; marks re-anchor only within 3 pages.
+5. Known open items: Live has no click-to-follow for links; no selection across pages; pinch zoom untested; text soft above about 300% zoom; the intermittent Windows theme-file test (`publishingFolderThemesRefreshAfterExternalChanges`, "Cannot atomically edit a folder theme"), which passes on a re-run; the marks of cycle 163 and the pins, popover, flash, chips and unplaced list of cycle 164 have not been looked at on screen (including dark mode); no Qt test of a chip click in a running Live page; marks re-anchor only within 3 pages.
 
 ### How to resume
 Each remaining cycle is built from its row in §5 and the design in §4 by a sub-agent on a lower-cost model (Opus or Sonnet), one cycle at a time; Fable is used only for planning. Start by reading `research/cycle-16N/README.md` of the previous cycle (for cycle 165, `research/cycle-164/README.md`), then `AGENTS.md` ("What a cycle is"). The Windows branch gets the Mac cycle by a merge (`windows/port`), as recorded in its `CHANGELOG.md`.
