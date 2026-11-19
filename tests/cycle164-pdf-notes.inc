@@ -22,7 +22,17 @@ QVariantList cycle164Notes(Cycle161Pane &p) {
 }
 QList<QQuickItem *> cycle164Pins(Cycle161Pane &p) { return cycle103VisualItems(p.list, QStringLiteral("pdfNotePin")); }
 void cycle164Click(Cycle161Pane &p, int page, QPointF points) {
-    p.reveal(page, points);
+    // Wait for the real condition: the page is laid out, and the point stays put
+    // inside the viewport across two looks (a slow machine finishes a layout
+    // change late; a click at the old place would land on blank page).
+    QPointF last(-1, -1);
+    QTest::qWaitFor([&] {
+        p.reveal(page, points);
+        const QPointF now = p.scene(page, points);
+        const bool stable = now == last && p.viewport().contains(now);
+        last = now;
+        return stable;
+    }, 5000);
     QTest::mouseClick(p.w.quick, Qt::LeftButton, Qt::NoModifier, p.scene(page, points).toPoint());
 }
 // The caret line of the Source editor is inside the notes' viewport.
@@ -147,7 +157,7 @@ void FomawriteTest::pdfNotePlacedByClickIsOneUndoStepInSource() {
     QVERIFY(p.reader->property("noteTool").toBool());
     cycle164Click(p, 0, QPointF(300, 400));
     QTRY_COMPARE(p.w.layout->property("effectiveLayoutMode").toInt(), 1); // PDF only became Split
-    QCOMPARE(cycle164Notes(p).size(), 1);
+    QTRY_COMPARE(cycle164Notes(p).size(), 1);
     const QVariantMap note = cycle164Notes(p).first().toMap();
     QVERIFY(qAbs(note.value("x").toInt() - 300) <= 1 && qAbs(note.value("y").toInt() - 400) <= 1);
     const QString marker = cycle164Marker(1, note.value("x").toInt(), note.value("y").toInt());
@@ -195,7 +205,7 @@ void FomawriteTest::pdfNotePlacedByClickIsOneUndoStepInLive() {
     p.call("armNote");
     QVERIFY(p.reader->property("noteTool").toBool());
     cycle164Click(p, 0, QPointF(250, 300));
-    QCOMPARE(cycle164Notes(p).size(), 1);
+    QTRY_COMPARE(cycle164Notes(p).size(), 1);
     const QVariantMap note = cycle164Notes(p).first().toMap();
     const QString marker = cycle164Marker(1, note.value("x").toInt(), note.value("y").toInt());
     const QString placed = PdfNotes::headerLine() + QStringLiteral("\n\nMy notes\n\n## [Page 1](geometry.pdf#page=1)\n\n") + marker + QStringLiteral("\n\n");
@@ -381,8 +391,10 @@ void FomawriteTest::pdfClickOnMarkOrPinShowsItsItemInTheNotes() {
     p.w.layout->setProperty("layoutMode", 2);
     QTRY_COMPARE(p.w.layout->property("effectiveLayoutMode").toInt(), 2);
     QTRY_VERIFY(p.page(0));
+    // The pin is drawn where the notes put it before the click is sent.
+    QTRY_VERIFY(!cycle164Pins(p).isEmpty());
     cycle164Click(p, 0, QPointF(300, 500));
-    QTest::qWait(100);
+    QTRY_VERIFY(!p.reader->property("selectedPin").isNull());
     QCOMPARE(p.w.layout->property("effectiveLayoutMode").toInt(), 2);
     QCOMPARE(p.w.editor->property("cursorPosition").toInt(), 3);
     QVERIFY(!p.reader->property("selectedPin").isNull());
