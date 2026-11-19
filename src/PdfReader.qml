@@ -12,6 +12,8 @@ Rectangle {
     id: root
     objectName: "pdfReader"
     property var session: null
+    // backend.pdfMarks: the marks in the notes and the highlighter's settings (Cycle 163).
+    property var marks: null
     property int bottomInset: 0
     property bool darkMode: false
     readonly property int pageGap: 12
@@ -47,6 +49,86 @@ Rectangle {
     property int selectionLength: 0
     property string selectionText: ""
     property var selectionRects: []
+
+    // Marks (Cycle 163). The highlighter's tool, Preview's colours (the page
+    // is always white, so they read the same in light and dark windows), and
+    // the placed text marks by page.
+    readonly property string markTool: marks ? marks.tool : "highlight"
+    readonly property string markColour: marks ? marks.highlightColour : "yellow"
+    readonly property var markColours: ({ yellow: "#ffd60a", green: "#34c759", blue: "#3d9df5", pink: "#ff5c9d", purple: "#a970ff", red: "#ff3b30" })
+    readonly property real highlightOpacity: 0.5
+    // While on, every selection made by dragging or double-click is marked at once.
+    property bool markingMode: false
+    readonly property var marksByPage: {
+        var byPage = ({});
+        var items = marks ? marks.items : [];
+        for (var i = 0; i < items.length; ++i) {
+            var item = items[i];
+            if (!item.placed || (item.kind !== "highlight" && item.kind !== "underline" && item.kind !== "strike")) continue;
+            var list = byPage[item.page] || (byPage[item.page] = []);
+            for (var r = 0; r < item.rects.length; ++r)
+                list.push({ index: item.index, kind: item.kind, colour: item.colour, rect: item.rects[r], direction: item.direction });
+        }
+        return byPage;
+    }
+    function colourValue(name) { return markColours[name] || markColours.yellow; }
+    function markVerb(kind) { return kind === "underline" ? "Underline" : kind === "strike" ? "Strikethrough" : "Highlight"; }
+    // Where a mark is drawn, in page points, around one line's glyph-tight
+    // box (baseline to cap height) and along the text's direction: a
+    // highlight padded to the line's height as Preview draws it, an
+    // underline just below the baseline, a strikethrough through the middle.
+    function markShape(kind, rect, direction) {
+        var vertical = direction === 90 || direction === 270;
+        var h = vertical ? rect.width : rect.height;
+        if (kind === "highlight") {
+            var below = 0.32 * h, above = 0.22 * h, along = 0.5;
+            switch (direction) {
+            case 90: return Qt.rect(rect.x - below, rect.y - along, rect.width + below + above, rect.height + 2 * along);
+            case 180: return Qt.rect(rect.x - along, rect.y - below, rect.width + 2 * along, rect.height + below + above);
+            case 270: return Qt.rect(rect.x - above, rect.y - along, rect.width + below + above, rect.height + 2 * along);
+            default: return Qt.rect(rect.x - along, rect.y - above, rect.width + 2 * along, rect.height + below + above);
+            }
+        }
+        var thickness = Math.max(1.5 / Math.max(0.01, pageScale), 0.08 * h);
+        var rise = kind === "underline" ? -0.12 * h : 0.42 * h; // from the baseline toward the cap height
+        switch (direction) {
+        case 90: return Qt.rect(rect.x + rise - thickness / 2, rect.y, thickness, rect.height);
+        case 180: return Qt.rect(rect.x, rect.y + rise - thickness / 2, rect.width, thickness);
+        case 270: return Qt.rect(rect.x + rect.width - rise - thickness / 2, rect.y, thickness, rect.height);
+        default: return Qt.rect(rect.x, rect.y + rect.height - rise - thickness / 2, rect.width, thickness);
+        }
+    }
+    // The topmost mark under a point of a page (points), or null.
+    function markAt(page, point) {
+        var list = marksByPage[page] || [];
+        for (var i = list.length - 1; i >= 0; --i) {
+            var area = markShape("highlight", list[i].rect, list[i].direction);
+            if (point.x >= area.x && point.x <= area.x + area.width && point.y >= area.y && point.y <= area.y + area.height)
+                return list[i];
+        }
+        return null;
+    }
+    // Marks the selection (then clears it); "added", "removed" or "".
+    function markSelection(kind, colour) {
+        if (!marks || selectionText === "" || selectionPage < 0) return "";
+        var result = marks.mark(kind, kind === "highlight" ? (colour || markColour) : "red", selectionPage, selectionStart, selectionLength);
+        clearSelection();
+        return result;
+    }
+    function markWithTool() { return markSelection(markTool, markColour); }
+    // The toolbar's pen: marks a selection, or turns marking mode on or off.
+    function usePen() {
+        if (selectionText !== "") { markingMode = false; markWithTool(); return; }
+        markingMode = !markingMode;
+    }
+    // The pen's menu: a colour (a highlight) or "underline" / "strike".
+    function chooseTool(choice) {
+        if (!marks) return;
+        if (choice === "underline" || choice === "strike") marks.tool = choice;
+        else { marks.highlightColour = choice; marks.tool = "highlight"; }
+        if (selectionText !== "") markWithTool();
+    }
+    onReadyChanged: if (!ready) markingMode = false
 
     // Find.
     property bool findOpen: false
@@ -239,9 +321,10 @@ Rectangle {
     // The page's context menu: at `point` (in `item`), over `link` when there is one.
     // Opened after the click's own events (the menu is anchored to the reader,
     // which outlives the page delegate).
-    function showPageMenu(item, point, link) {
+    function showPageMenu(item, point, link, mark) {
         var at = item.mapToItem(root, point.x, point.y);
         menuTimer.link = link;
+        menuTimer.mark = mark || null;
         menuTimer.at = at;
         menuTimer.restart();
     }
@@ -346,9 +429,10 @@ Rectangle {
     Timer {
         id: menuTimer
         property var link: null
+        property var mark: null
         property point at
         interval: 0
-        onTriggered: { pageMenu.link = link; pageMenu.popup(root, at.x, at.y); }
+        onTriggered: { pageMenu.link = link; pageMenu.mark = mark; pageMenu.popup(root, at.x, at.y); }
     }
     function adoptDocument() {
         if (!session || !ready || String(session.url) === String(shownUrl)) return;
@@ -401,7 +485,11 @@ Rectangle {
         case Qt.Key_Left: scrollBy(-40, 0); break;
         case Qt.Key_Home: pages.contentY = clampY(pages.originY); break;
         case Qt.Key_End: pages.contentY = clampY(pages.originY + pages.contentHeight); break;
-        case Qt.Key_Escape: if (selectionText === "") return; clearSelection(); break;
+        case Qt.Key_Escape:
+            if (selectionText !== "") clearSelection();
+            else if (markingMode) markingMode = false;
+            else return;
+            break;
         default: return;
         }
         event.accepted = true;
@@ -508,6 +596,21 @@ Rectangle {
             Item {
                 x: page.x; width: page.width; height: page.height
                 Repeater {
+                    model: root.marksByPage[pageSlot.index] || []
+                    Rectangle {
+                        required property var modelData
+                        readonly property rect shape: root.markShape(modelData.kind, modelData.rect, modelData.direction)
+                        objectName: "pdfMark_" + modelData.kind
+                        x: shape.x * root.pageScale
+                        y: shape.y * root.pageScale
+                        width: shape.width * root.pageScale
+                        height: shape.height * root.pageScale
+                        radius: modelData.kind === "highlight" ? 2 : 0
+                        color: root.colourValue(modelData.colour)
+                        opacity: modelData.kind === "highlight" ? root.highlightOpacity : 1
+                    }
+                }
+                Repeater {
                     model: root.findByPage[pageSlot.index] || []
                     Rectangle {
                         required property var modelData
@@ -564,6 +667,7 @@ Rectangle {
                     root.setSelection(pageSlot.index, root.session.selectionBetween(pageSlot.index, pressPoint, point));
                 }
                 onReleased: function(mouse) {
+                    if (dragging && root.markingMode) root.markWithTool();
                     if (dragging || wordClick) return;
                     var link = root.linkAt(pageSlot.links, toPoints(mouse));
                     if (link) { root.clearSelection(); root.followLink(link); }
@@ -572,12 +676,14 @@ Rectangle {
                 onDoubleClicked: function(mouse) {
                     wordClick = true;
                     root.setSelection(pageSlot.index, root.session.wordAt(pageSlot.index, toPoints(mouse)));
+                    if (root.markingMode) root.markWithTool();
                 }
                 onExited: hoverLink = null
                 // The platform's context-menu gesture (right-click, Control-click,
                 // the Menu key); the selection is kept, as in Preview.
                 ContextMenu.onRequested: function(position) {
-                    root.showPageMenu(pageMouse, position, root.linkAt(pageSlot.links, Qt.point(position.x / root.pageScale, position.y / root.pageScale)));
+                    var point = Qt.point(position.x / root.pageScale, position.y / root.pageScale);
+                    root.showPageMenu(pageMouse, position, root.linkAt(pageSlot.links, point), root.markAt(pageSlot.index, point));
                 }
             }
         }
@@ -676,6 +782,10 @@ Rectangle {
         id: pageMenu
         objectName: "pdfPageMenu"
         property var link: null
+        // The mark under the pointer ({index, kind, colour, …}), or null.
+        property var mark: null
+        readonly property bool onHighlight: !!mark && mark.kind === "highlight"
+        readonly property bool hasSelection: root.selectionText !== ""
         readonly property string findLabel: {
             var text = root.selectionText.replace(/\s+/g, " ").trim();
             return text.length > 24 ? text.slice(0, 24).trim() + "…" : text;
@@ -688,6 +798,28 @@ Rectangle {
             visible: root.selectionText !== ""
             height: visible ? implicitHeight : 0
             onTriggered: { pageMenu.close(); root.openFind(true); }
+        }
+        MenuSeparator { visible: pageMenu.hasSelection; height: visible ? implicitHeight : 0 }
+        CompactMenuItem { objectName: "pdfContextHighlight"; text: "Highlight"; visible: pageMenu.hasSelection; height: visible ? implicitHeight : 0; onTriggered: { pageMenu.close(); root.markSelection("highlight", root.markColour); } }
+        CompactMenuItem { objectName: "pdfContextUnderline"; text: "Underline"; visible: pageMenu.hasSelection; height: visible ? implicitHeight : 0; onTriggered: { pageMenu.close(); root.markSelection("underline"); } }
+        CompactMenuItem { objectName: "pdfContextStrike"; text: "Strikethrough"; visible: pageMenu.hasSelection; height: visible ? implicitHeight : 0; onTriggered: { pageMenu.close(); root.markSelection("strike"); } }
+        MenuSeparator { visible: !!pageMenu.mark; height: visible ? implicitHeight : 0 }
+        PdfToolMenuItem { objectName: "pdfContextColour_yellow"; text: "Yellow"; swatch: root.markColours.yellow; visible: pageMenu.onHighlight; height: visible ? implicitHeight : 0; ticked: pageMenu.onHighlight && pageMenu.mark.colour === "yellow"; onTriggered: pageMenu.recolour("yellow") }
+        PdfToolMenuItem { objectName: "pdfContextColour_green"; text: "Green"; swatch: root.markColours.green; visible: pageMenu.onHighlight; height: visible ? implicitHeight : 0; ticked: pageMenu.onHighlight && pageMenu.mark.colour === "green"; onTriggered: pageMenu.recolour("green") }
+        PdfToolMenuItem { objectName: "pdfContextColour_blue"; text: "Blue"; swatch: root.markColours.blue; visible: pageMenu.onHighlight; height: visible ? implicitHeight : 0; ticked: pageMenu.onHighlight && pageMenu.mark.colour === "blue"; onTriggered: pageMenu.recolour("blue") }
+        PdfToolMenuItem { objectName: "pdfContextColour_pink"; text: "Pink"; swatch: root.markColours.pink; visible: pageMenu.onHighlight; height: visible ? implicitHeight : 0; ticked: pageMenu.onHighlight && pageMenu.mark.colour === "pink"; onTriggered: pageMenu.recolour("pink") }
+        PdfToolMenuItem { objectName: "pdfContextColour_purple"; text: "Purple"; swatch: root.markColours.purple; visible: pageMenu.onHighlight; height: visible ? implicitHeight : 0; ticked: pageMenu.onHighlight && pageMenu.mark.colour === "purple"; onTriggered: pageMenu.recolour("purple") }
+        CompactMenuItem {
+            objectName: "pdfContextRemoveMark"
+            text: pageMenu.mark ? "Remove " + root.markVerb(pageMenu.mark.kind) : ""
+            visible: !!pageMenu.mark
+            height: visible ? implicitHeight : 0
+            onTriggered: { var mark = pageMenu.mark; pageMenu.close(); if (mark && root.marks) root.marks.removeMark(mark.index); }
+        }
+        function recolour(colour) {
+            var mark = pageMenu.mark;
+            pageMenu.close();
+            if (mark && root.marks) root.marks.recolourMark(mark.index, colour);
         }
         MenuSeparator { visible: !!pageMenu.link; height: visible ? implicitHeight : 0 }
         CompactMenuItem {

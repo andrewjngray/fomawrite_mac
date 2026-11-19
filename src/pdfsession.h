@@ -111,6 +111,10 @@ public:
     Q_INVOKABLE QVariantMap selectionBetween(int page, QPointF from, QPointF to) const;
     Q_INVOKABLE QVariantMap selectionAt(int page, int start, int length) const;
     Q_INVOKABLE QVariantMap wordAt(int page, QPointF point) const;
+    // The direction the page's text runs in the view, in degrees clockwise:
+    // 0 left to right, 90 downwards, 180 right to left, 270 upwards (pages
+    // turned by /Rotate). Marks draw their lines and padding along it.
+    Q_INVOKABLE int textDirection(int page) const;
     // Case-insensitive; [{page, start, length, rects, context}], at most SearchLimit.
     Q_INVOKABLE QVariantList search(const QString &query) const;
     // Replaces searchResults with the matches for `query`, found in slices.
@@ -192,6 +196,7 @@ private:
     const QList<QRectF> &characterBoxes(int page) const;
     int characterNear(int page, QPointF point) const;
     mutable QHash<int, QList<QRectF>> m_characterBoxes;
+    mutable QHash<int, int> m_textDirections;
     QFileSystemWatcher m_watcher;
     QTimer m_reloadTimer;
 };

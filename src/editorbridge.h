@@ -52,6 +52,9 @@ public:
     Q_INVOKABLE void scrollTo(double fraction);
     // Host-side document changes the page must apply (not reported back).
     Q_INVOKABLE void pushChanges(const QString &changesJson);
+    // The same, as exactly one step of the page's history, never grouped with
+    // the edits before or after it (marks made from the PDF pane).
+    void pushIsolatedChanges(const QString &changesJson);
     // Place the page's caret (UTF-16 offset); the page scrolls it into view.
     Q_INVOKABLE void placeCursor(int position);
     // Selects [anchor, head] (UTF-16 offsets) and scrolls it into view.

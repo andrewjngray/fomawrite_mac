@@ -59,6 +59,9 @@ void EditorBridge::pushChanges(const QString &changesJson) {
     emit revisionChanged();
     emit applyChanges(changesJson, m_revision);
 }
+void EditorBridge::pushIsolatedChanges(const QString &changesJson) {
+    pushChanges(QStringLiteral("{\"isolate\":true,\"changes\":%1}").arg(changesJson));
+}
 void EditorBridge::scrolled(double fraction) { emit scrollFractionChanged(fraction); }
 
 void EditorBridge::ready() {

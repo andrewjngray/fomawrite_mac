@@ -1,4 +1,5 @@
 #include "pdfsession.h"
+#include "pdfnotes.h"
 
 #include <QBuffer>
 #include <QClipboard>
@@ -178,6 +179,7 @@ void PdfSession::adopt(std::unique_ptr<QPdfDocument> document, const QUrl &url, 
     }
     m_pageText.clear();
     m_characterBoxes.clear();
+    m_textDirections.clear();
     m_password = password;
     m_url = url;
     m_state = state; // announced below, after the document is in place
@@ -239,6 +241,7 @@ void PdfSession::close() {
     m_document.reset();
     m_pageText.clear();
     m_characterBoxes.clear();
+    m_textDirections.clear();
     m_password.clear();
     m_info.clear();
     m_largestPageSize = QSizeF();
@@ -322,6 +325,7 @@ void PdfSession::reloadFromDisk() {
     m_document.reset();
     m_pageText.clear();
     m_characterBoxes.clear();
+    m_textDirections.clear();
     ++m_revision;
     setState(QStringLiteral("error"), loadErrorText(error, fileName()));
     emit revisionChanged();
@@ -424,6 +428,36 @@ int PdfSession::characterNear(int page, QPointF point) const {
         if (distance < best) { best = distance; nearest = i; }
     }
     return nearest;
+}
+
+// The page's text runs along its first line of two or more characters: from
+// the first character's box to the last one's.
+int PdfSession::textDirection(int page) const {
+    if (!ready() || page < 0 || page >= m_document->pageCount()) return 0;
+    if (auto it = m_textDirections.constFind(page); it != m_textDirections.cend()) return it.value();
+    const QString text = pageText(page);
+    const auto centre = [&](int index) {
+        QRectF box;
+        for (const QPolygonF &polygon : m_document->getSelectionAtIndex(page, index, 1).bounds()) box |= polygon.boundingRect().normalized();
+        return box.center();
+    };
+    int direction = 0;
+    for (int from = 0; from < text.size();) {
+        int to = from;
+        while (to < text.size() && text.at(to) != QLatin1Char('\n') && text.at(to) != QLatin1Char('\r')) ++to;
+        int first = from, last = to - 1;
+        while (first < to && text.at(first).isSpace()) ++first;
+        while (last > first && text.at(last).isSpace()) --last;
+        if (last > first) {
+            const QPointF delta = centre(last) - centre(first);
+            if (qAbs(delta.x()) >= qAbs(delta.y())) direction = delta.x() >= 0 ? 0 : 180;
+            else direction = delta.y() >= 0 ? 90 : 270;
+            break;
+        }
+        from = to + 1;
+    }
+    m_textDirections.insert(page, direction);
+    return direction;
 }
 
 QVariantMap PdfSession::selectionBetween(int page, QPointF from, QPointF to) const {
@@ -557,38 +591,10 @@ void PdfSession::copyText(const QString &text) const {
     if (auto *clipboard = QGuiApplication::clipboard()) clipboard->setText(text);
 }
 
-QString PdfSession::linkDestination(const QString &fileName) {
-    QString result;
-    for (const QChar c : fileName) {
-        if (c.isSpace() || QStringLiteral("%()<>#?[]\\").contains(c)) {
-            for (const char byte : QString(c).toUtf8())
-                result += QStringLiteral("%%1").arg(uchar(byte), 2, 16, QLatin1Char('0')).toUpper();
-        } else {
-            result += c;
-        }
-    }
-    return result;
-}
+QString PdfSession::linkDestination(const QString &fileName) { return PdfNotes::linkDestination(fileName); }
 
 QString PdfSession::markdownQuote(const QString &text, const QString &fileName, int page, const QString &label) {
-    QString normalised = text;
-    normalised.replace(QStringLiteral("\r\n"), QStringLiteral("\n"));
-    for (const QChar separator : {QChar(u'\r'), QChar(QChar::LineSeparator), QChar(QChar::ParagraphSeparator)})
-        normalised.replace(separator, QLatin1Char('\n'));
-    static const QRegularExpression runs(QStringLiteral("[\\t\\f\\v \\x{00A0}]+"));
-    QStringList lines;
-    bool blank = false;
-    for (QString line : normalised.split(QLatin1Char('\n'))) {
-        line = line.replace(runs, QStringLiteral(" ")).trimmed();
-        if (line.isEmpty()) { blank = !lines.isEmpty(); continue; }
-        if (blank) lines.append(QStringLiteral(">"));
-        blank = false;
-        lines.append(QStringLiteral("> ") + line);
-    }
-    const QString number = QString::number(page + 1);
-    QString name = label.isEmpty() || label == number ? number : label;
-    name.replace(QLatin1Char('\\'), QStringLiteral("\\\\")).replace(QLatin1Char('['), QStringLiteral("\\[")).replace(QLatin1Char(']'), QStringLiteral("\\]"));
-    return lines.join(QLatin1Char('\n')) + QStringLiteral("\n\n[Page %1](%2#page=%3)\n").arg(name, linkDestination(fileName), number);
+    return PdfNotes::quoteBlock(text) + QStringLiteral("\n\n") + PdfNotes::pageLink(fileName, page + 1, label) + QStringLiteral("\n");
 }
 
 QString PdfSession::markdownQuoteFor(int page, const QString &text) const {

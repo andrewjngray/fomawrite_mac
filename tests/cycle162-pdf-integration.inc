@@ -281,9 +281,11 @@ void FomawriteTest::pdfCopyAsMarkdownQuoteAndThePageMenu() {
     QVERIFY(PdfFixtures::write(f.path("Labelled Report.pdf"), cycle161LabelledDocument()));
     Cycle161Pane p; QVERIFY2(p.start(), qPrintable(p.w.error));
     QVERIFY(p.open(f.url("Labelled Report.pdf")));
-    auto *menuItem = p.w.window->findChild<QObject *>("pdfMenuCopyQuote"); QVERIFY(menuItem);
+    const Cycle161Menus menus{p.w.window.data()};
+    auto *menuItem = menus.item("copyQuote"); QVERIFY(menuItem);
     QCOMPARE(menuItem->property("text").toString(), QStringLiteral("Copy as Markdown Quote"));
-    QCOMPARE(menuItem->property("shortcut").toString(), QStringLiteral("Ctrl+Shift+C"));
+    // The native item carries the shortcut; the Windows bar declares it as a Shortcut (windows-pdf-menu.inc).
+    if (menus.native()) QCOMPARE(menuItem->property("shortcut").toString(), QStringLiteral("Ctrl+Shift+C"));
     QVERIFY(!menuItem->property("enabled").toBool());
     PdfSession *pdf = p.w.backend.pdf();
     const QString page = pdf->pageText(0);

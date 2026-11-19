@@ -113,7 +113,7 @@ for name in ('PublishingPreview.qml', 'LiveEditorPane.qml', 'NativeMenuBar.qml',
              'themes/claude-like.css', 'themes/omawrite.css',
              'DocumentFindBar.qml', 'DocumentOutline.qml', 'PaneZoomState.qml',
              'PaneZoomControls.qml', 'WorkspaceHeader.qml', 'LibraryPane.qml', 'LinkEditor.qml', 'LinkSyntax.js', 'ExportHub.qml', 'SquareDialogButton.qml',
-             'PdfReader.qml', 'PdfToolbar.qml', 'PdfFindBar.qml', 'PdfThumbnails.qml', 'PdfContents.qml', 'PdfInspector.qml'):
+             'PdfReader.qml', 'PdfToolbar.qml', 'PdfFindBar.qml', 'PdfThumbnails.qml', 'PdfContents.qml', 'PdfInspector.qml', 'PdfToolMenuItem.qml'):
     if name not in report.get('resourceSha256', {}):
         failures.append(f'No embedded hash for {name}')
 expected_version = re.search(r'setApplicationVersion\(QStringLiteral\("([^"]+)"\)\)',

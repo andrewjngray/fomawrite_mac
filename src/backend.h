@@ -24,6 +24,7 @@
 #include "harperengine.h"
 #include "harperupdater.h"
 #include "pdfsession.h"
+#include "pdfmarks.h"
 
 class MarkdownHighlighter;
 class QTextDocument;
@@ -52,6 +53,8 @@ class Backend : public QObject, public PublishingSource {
     Q_PROPERTY(QObject *editorBridge READ editorBridge CONSTANT)
     // The window's PDF (PDF mode while backend.pdf.active): the document is then its notes file.
     Q_PROPERTY(QObject *pdf READ pdf CONSTANT)
+    // The marks in the PDF's notes, and the highlighter's settings (Cycle 163).
+    Q_PROPERTY(QObject *pdfMarks READ pdfMarks CONSTANT)
     // The file the window shows: the PDF in PDF mode, otherwise the document.
     // Recents, history, the explorer's highlight and window ownership use it.
     Q_PROPERTY(QUrl displayedFileUrl READ displayedFileUrl NOTIFY fileUrlChanged)
@@ -92,6 +95,13 @@ public:
     QObject *publisher() { return m_publisher.get(); }
     EditorBridge *editorBridge() { return m_editorBridge.get(); }
     PdfSession *pdf() { return &m_pdf; }
+    PdfMarks *pdfMarks() { return m_pdfMarks.get(); }
+    // Applies a notes edit (PdfNotes::Edit, changes in the current text's
+    // coordinates) as one undoable edit of the document, as Review pane
+    // corrections are: the Source editor shows it at once and keeps its caret,
+    // and a Live page holding the document receives it as one change set that
+    // is exactly one step of its own history. Nothing is written to disk.
+    bool applyNotesEdit(const PdfNotes::Edit &edit);
     QUrl displayedFileUrl() const;
     // Whether this window shows `canonicalPath`: its document, or in PDF mode
     // the PDF or its notes file.
@@ -127,6 +137,9 @@ public:
     Q_INVOKABLE void syncLiveEditor(int cursor = -1);
     // Re-style the Live editor after a theme change without reloading the document.
     Q_INVOKABLE void pushLiveTheme();
+    // Whether the Live page holds the document and receives its host edits
+    // (so it records them in its own history).
+    Q_INVOKABLE bool liveMirrorsDocument() const { return m_liveMirrorValid && m_editorBridge->isReady(); }
     // The Live editor's last caret position, for carrying it back to Source.
     Q_INVOKABLE int liveCursor() const { return m_editorBridge->lastCursor(); }
     // Format commands while the Live editor has focus: the existing edit
@@ -367,6 +380,8 @@ signals:
 
 private:
     PdfSession m_pdf;
+    std::unique_ptr<PdfMarks> m_pdfMarks;
+    bool m_applyingNotesEdit = false;
     QUrl m_saveTarget;
     bool openPdf(const QUrl &url, bool *pdfUnreadable = nullptr);
     void closePdf();

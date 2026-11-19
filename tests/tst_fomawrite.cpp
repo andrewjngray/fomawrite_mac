@@ -239,6 +239,21 @@ private slots:
     void pdfWindowsOwnBothThePdfAndItsNotes();
     void pdfRenameMoveAndTrashCarryTheNotes();
     void pdfOpensFromTheOpenDialogDropsAndOpenWith();
+    void pdfNotesParsesEveryFormatFeature();
+    void pdfNotesParseToleratesHostileInput();
+    void pdfNotesInsertsTheCanonicalExampleExactly();
+    void pdfNotesInsertKeepsPagesAndTextOrder();
+    void pdfNotesRemoveAndRecolour();
+    void pdfNotesInsertThenRemoveRestoresTheBytes();
+    void pdfNotesPlaceFindsMovedText();
+    void pdfMarksAreOneUndoStepInSource();
+    void pdfMarksAreOneUndoStepInLive();
+    void pdfMarkInUntitledNotesIsWrittenOnlyBySave();
+    void pdfMarkOverlaysFollowTheTextOnEveryRotation();
+    void pdfMarksFollowEditsToTheNotes();
+    void pdfHighlighterPenMenuAndMarkingMode();
+    void pdfMarkupMenuItemsAndPageContextMenu();
+    void pdfMarkingInPdfOnlyLayoutKeepsLayoutAndFocus();
     void libraryNewMenuItemsAreDisabledWithoutAFolder();
     void harperBridgeAnswersLintRequestsFromTheHost();
     void harperEngineCachesDedupesAndMapsKinds();
@@ -5406,3 +5421,4 @@ int main(int argc, char **argv) {
 #include "cycle160-pdf-core.inc"
 #include "cycle161-pdf-pane.inc"
 #include "cycle162-pdf-integration.inc"
+#include "cycle163-pdf-markup.inc"

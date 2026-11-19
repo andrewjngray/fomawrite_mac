@@ -419,6 +419,11 @@ Platform.MenuBar {
         title: "PDF"
         visible: win.pdfMode
         enabled: win.pdfMode
+        // Preview's ⌃⌘H, ⌃⌘U, ⌃⌘S (Qt's Meta is Control on macOS, its Ctrl is Command).
+        Platform.MenuItem { objectName: "pdfMenuHighlight"; text: "Highlight Text"; shortcut: "Meta+Ctrl+H"; enabled: win.pdfMode && !!win.pdfReader && win.pdfReader.selectionText.length > 0; onTriggered: win.pdfCommand("highlight") }
+        Platform.MenuItem { objectName: "pdfMenuUnderline"; text: "Underline Text"; shortcut: "Meta+Ctrl+U"; enabled: win.pdfMode && !!win.pdfReader && win.pdfReader.selectionText.length > 0; onTriggered: win.pdfCommand("underline") }
+        Platform.MenuItem { objectName: "pdfMenuStrike"; text: "Strike Through Text"; shortcut: "Meta+Ctrl+S"; enabled: win.pdfMode && !!win.pdfReader && win.pdfReader.selectionText.length > 0; onTriggered: win.pdfCommand("strike") }
+        Platform.MenuSeparator {}
         Platform.MenuItem { objectName: "pdfMenuCopyQuote"; text: "Copy as Markdown Quote"; shortcut: "Ctrl+Shift+C"; enabled: win.pdfMode && !!win.pdfReader && win.pdfReader.selectionText.length > 0; onTriggered: win.pdfCommand("copyQuote") }
         Platform.MenuSeparator {}
         Platform.MenuItem { objectName: "pdfMenuGoToPage"; text: "Go to Page…"; shortcut: "Ctrl+Alt+G"; enabled: win.pdfMode && !!win.pdfReader && win.pdfReader.ready; onTriggered: win.pdfCommand("goToPage") }

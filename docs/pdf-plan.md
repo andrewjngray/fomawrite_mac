@@ -1,6 +1,6 @@
 # PDF in Fomawrite: development programme
 
-Status: **approved and in build; Phase 1 (cycles 160–162) complete.** Phase 0 (decisions and spikes) is complete: [research/cycle-159/README.md](../research/cycle-159/README.md). This is version 2 of the plan: version 1 was drafted on 18 November 2026 (Claude Opus 5.5); it was reviewed against the code and the Phase 0 results and rewritten as this programme on 19 November 2026 (Claude Fable 5.2). The "Review" section says what changed and why.
+Status: **approved and in build. Phase 1 (cycles 160–162) is complete and installed on the Mac; cycle 163 (text markup in the notes) is complete in source; work is paused there.** See §9 for the state of the programme and how to resume. Phase 0 (decisions and spikes) is complete: [research/cycle-159/README.md](../research/cycle-159/README.md). This is version 2 of the plan: version 1 was drafted on 18 November 2026 (Claude Opus 5.5); it was reviewed against the code and the Phase 0 results and rewritten as this programme on 19 November 2026 (Claude Fable 5.2). The "Review" section says what changed and why.
 
 **What it is.** The plan for PDF reading, Preview-style markup (highlight, underline, strikethrough, notes on the page) saved as Markdown, and page operations (rotate, reorder, delete, merge) in Fomawrite, on Mac and Windows, with Markdown remaining where Andrew writes. It holds Andrew's requirements (§1), the design (§2–§4), the cycle-by-cycle programme with acceptance tests (§5), how the work is run and verified (§6) and the risks (§7).
 
@@ -93,6 +93,7 @@ Ask about the return date.
 - First line: `<!-- fomawrite:pdf-notes 1 -->` (format version). The title and page headings are ordinary Markdown that Andrew may edit or delete; Fomawrite adds a page heading only when it inserts the first item for a page, keeping pages in order.
 - Marker grammar: `<!-- fomawrite:pdf KIND key=value … -->` on its own line. `KIND`: `highlight`, `underline`, `strike`, `note`; later `rect`, `oval`, `line`, `arrow`, `text`. Keys: `page` (1-based, as shown in the page link); `colour` (`yellow`, `green`, `blue`, `pink`, `purple` for highlights, any of those or `red` for underline and strike); `text=START+LENGTH` (character range in Qt PDF's text for that page); `at=X,Y` and `rect=X0,Y0,X1,Y1` in page view points (§4.1). Qt PDF does not expose a page's rotation or CropBox, so view points are what Fomawrite can measure exactly; when Fomawrite rotates a page (Phase 3) it rewrites these values with the page numbers, and the Phase 4 export converts them to PDF user space with qpdf, which can read both, using the spike 2 mapping. Unknown kinds and keys are kept and ignored.
 - An item is its marker plus the block that follows, up to the next marker, heading or end of file. For text markup the first block is a blockquote of the marked text; anything after it is Andrew's comment. For a note, the following text is the note.
+- **As built in cycle 163** (`src/pdfnotes.cpp`; the example above is produced byte for byte): a page heading names the page label when it differs from the number (`[Page iii](Report.pdf#page=3)`) and the file name is percent-encoded; the `# Notes on <file>` title is added only to empty notes; the header line goes at the very top when the first mark is inserted into notes that have none, and is not put back if deleted; pages are kept in ascending order and items in text order within a page, separated by blank lines; an item ends at the next marker or any heading; markers inside fenced or indented code are text; Windows line breaks are kept; `colour=` is written for every text mark (red for underline and strike). Removal deletes the marker and its quote while the quote still equals the page's text (otherwise only the marker; the writer's comment always stays), takes a generated page heading with the page's last item and the header line (and an untouched title) with the notes' last mark. Re-anchoring searches the same page for the quote nearest the stored start, then three pages either side. Notes holding only the header line and no marks lose that line on an insert followed by a remove (the one non-restoring case).
 - **Drawing.** Overlays come from parsing the editor's current text, saved or not, so undo in the editor removes the highlight from the page. Text markup geometry comes from the text range (`PdfSession`); if the page's text at that range no longer equals the quote, the quote is searched for on the page and then on neighbouring pages; an item that cannot be placed is listed as "unplaced" in the PDF pane and left untouched in the file.
 - **Removing** a mark from the PDF pane deletes its marker and its unedited quote; Andrew's own comment text stays in the file as plain Markdown.
 - **Links.** `Report.pdf#page=3` in any Markdown document opens the PDF at that page (Source, Live and Preview); in the notes file it scrolls the PDF beside it.
@@ -164,3 +165,29 @@ Follow-up outside the phases: move `PublishingPreview.qml` off `PdfPageImage` to
 4. Explorer: **one row per PDF with a notes badge**.
 5. Export annotated PDF: not yet decided; stays in Phase 4.
 6. Review the plan, make it a complete programme, then build it, using development models for implementation (19 November).
+
+---
+
+## 9. State of the programme (19 November 2026)
+
+| Cycle | What | Status |
+|---|---|---|
+| 159 | Phase 0: decisions, spikes, review | Done; [record](../research/cycle-159/README.md) |
+| 160 | PDF core | Done, pushed; installed on the Mac as build 162 |
+| 161 | PDF pane | Done, pushed; installed on the Mac as build 162 |
+| 162 | Links and integration (Phase 1 complete) | Done, pushed; installed on the Mac as build 162 (`/Applications` is build 162). Windows: CI green on x64 and ARM64 (run 44431006252, commit `cdf47c3`) but **not yet installed in the VM** |
+| 163 | Notes model and text markup | Done in source on both branches: Mac commit and Windows merge and CI result to be filled in. **Not installed** on either machine (the Mac has build 162; the VM does not have 162 either) |
+| 164 | Notes on the page and navigation: note pins, mark and notes navigation, marker chips in Live, re-anchoring and the unplaced list | Not started |
+| 165 | qpdf, saving, recovery copy, notes remapping | Not started |
+| 166 | Page operations in the pane | Not started |
+| 167 onward | Phase 4 (§4.5) | Waits for Andrew's decisions |
+
+### What remains
+1. Install build 163 on the Mac and in the Windows VM when Andrew says (the VM also still lacks build 162: its installer script picks the newest run whose two diagnostic artifacts are unique, and the re-run of run 44431006252 left a duplicate ARM64 artifact, so it chose an older run).
+2. Cycle 164.
+3. Cycles 165 and 166.
+4. Phase 4 decisions (Andrew).
+5. Known open items: Live has no click-to-follow for links; no selection across pages; pinch zoom untested; text soft above about 300% zoom; GitHub's macOS CI job gets no runner, so the Mac suite is run locally (`./bin/test`); the intermittent Windows theme-file test (`publishingFolderThemesRefreshAfterExternalChanges`, "Cannot atomically edit a folder theme"), which passes on a re-run of the failed job; cycle 163's marks have not been looked at on screen (pen drag, underline and strike positions, colours in a dark window).
+
+### How to resume
+Each remaining cycle is built from its row in §5 and the design in §4 by a sub-agent on a lower-cost model (Opus or Sonnet), one cycle at a time; Fable is used only for planning. Start by reading `research/cycle-16N/README.md` of the previous cycle (for cycle 164, `research/cycle-163/README.md`), then `AGENTS.md` ("What a cycle is"). The Windows branch gets the Mac cycle by a merge (`windows/port`), as recorded in its `CHANGELOG.md`.

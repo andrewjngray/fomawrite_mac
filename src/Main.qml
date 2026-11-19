@@ -85,15 +85,21 @@ ApplicationWindow {
         documentFooter.pointerReveal = false;
         documentChromeHidden = true;
     }
+    // With the PDF pane focused, Undo and Redo act on its notes where their
+    // history is: marks are host edits that a Live page holding the document
+    // also records, so in Live they must be undone there (Cycle 163).
+    function notesHistoryInLive() {
+        return pdfOwnsKeyboard && workspaceLayout.liveEditEnabled && liveEditorLoader.item !== null && backend.liveMirrorsDocument();
+    }
     function undoEditing() {
         // The Live editor keeps its own history; undoing the mirrored document
         // underneath it would diverge the two. Route to the page instead.
-        if (canFormatLive) { backend.editorBridge.requestUndo(); return; }
+        if (canFormatLive || notesHistoryInLive()) { backend.editorBridge.requestUndo(); return; }
         if (editTarget === editor) editor.cursorPosition = backend.undoSource(editor.cursorPosition);
         else editTarget.undo();
     }
     function redoEditing() {
-        if (canFormatLive) { backend.editorBridge.requestRedo(); return; }
+        if (canFormatLive || notesHistoryInLive()) { backend.editorBridge.requestRedo(); return; }
         if (editTarget === editor) editor.cursorPosition = backend.redoSource(editor.cursorPosition);
         else editTarget.redo();
     }
@@ -523,10 +529,14 @@ ApplicationWindow {
     // The PDF menu and toolbar commands. A command that needs the pane shows it first.
     function pdfCommand(command) {
         if (!pdfReader) return;
-        if (command !== "thumbnails" && command !== "copyQuote") revealPdfPane();
+        var marking = command === "highlight" || command === "underline" || command === "strike";
+        if (command !== "thumbnails" && command !== "copyQuote" && !marking) revealPdfPane();
         var reader = pdfReader;
         switch (command) {
         case "copyQuote": reader.copyMarkdownQuote(); break;
+        case "highlight": reader.markSelection("highlight", reader.markColour); break;
+        case "underline": reader.markSelection("underline"); break;
+        case "strike": reader.markSelection("strike"); break;
         case "goToPage": Qt.callLater(reader.focusPageField); break;
         case "zoomIn": reader.zoomIn(); break;
         case "zoomOut": reader.zoomOut(); break;
@@ -3633,6 +3643,7 @@ ApplicationWindow {
             SplitView.minimumWidth: 320
             sourceComponent: PdfReader {
                 session: backend.pdf
+                marks: backend.pdfMarks
                 bottomInset: documentFooter.height
                 darkMode: win.darkMode
                 onOpenUrlRequested: function(link) { backend.openExternalUrl(link); }

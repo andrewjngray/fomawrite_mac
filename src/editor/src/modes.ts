@@ -5,7 +5,7 @@ import {
   Annotation, Compartment, EditorState, Extension, Prec, Transaction, TransactionSpec,
 } from "@codemirror/state";
 import { EditorView, drawSelection, keymap } from "@codemirror/view";
-import { defaultKeymap, history, historyKeymap, undo as cmUndo, redo as cmRedo } from "@codemirror/commands";
+import { defaultKeymap, history, historyKeymap, isolateHistory, undo as cmUndo, redo as cmRedo } from "@codemirror/commands";
 import { HighlightStyle, syntaxHighlighting, syntaxTree } from "@codemirror/language";
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import { searchKeymap, search } from "@codemirror/search";
@@ -228,10 +228,18 @@ export class Session {
     this.view.dispatch({ effects: [appearanceEffect.of({ ...this.presentation, mode: this.mode }), showMarksEffect.of(this.showMarks)], annotations: External.of(true) });
   }
 
-  /** Apply host-side changes without echoing them back. Throws on malformed/out-of-range input. */
+  /**
+   * Apply host-side changes without echoing them back. Throws on malformed/out-of-range input.
+   * `json` is the change list, or {"isolate": true, "changes": [...]} for a host edit that must
+   * be exactly one undo step, never grouped with the edits before or after it (PDF marks).
+   */
   applyChanges(json: string, revision: number) {
-    const specs = jsonToChangeSpecs(json, this.view.state.doc.length);
-    this.view.dispatch({ changes: specs, annotations: External.of(true), addToHistory: false } as TransactionSpec);
+    const raw = JSON.parse(json);
+    const isolate = !Array.isArray(raw) && raw !== null && typeof raw === "object" && raw.isolate === true;
+    const list = Array.isArray(raw) ? json : JSON.stringify(raw?.changes ?? null);
+    const specs = jsonToChangeSpecs(list, this.view.state.doc.length);
+    const annotations = isolate ? [External.of(true), isolateHistory.of("full")] : External.of(true);
+    this.view.dispatch({ changes: specs, annotations, addToHistory: false } as TransactionSpec);
     this.revision = revision;
   }
 
