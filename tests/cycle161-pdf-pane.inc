@@ -36,6 +36,36 @@ void cycle161Type(QWindow *window, const QString &text) {
     for (const QChar c : text) QTest::keyClick(window, c.toLatin1());
 }
 
+// The PDF menu and Edit > Copy are in the native menu bar on macOS and in
+// WindowsMenuBar.qml elsewhere (the native bar is not loaded there). Tests
+// reach the items through this, by command id ("goToPage", "copyQuote", …).
+struct Cycle161Menus {
+    QObject *window = nullptr;
+    QObject *nativeMenu() const { return window->findChild<QObject *>("nativePdfMenu"); }
+    QObject *windowsBar() const { return window->findChild<QObject *>("windowsMenuBar"); }
+    bool native() const { return nativeMenu() != nullptr; }
+    QObject *item(const QString &command) const {
+        if (native()) return window->findChild<QObject *>("pdfMenu" + command.left(1).toUpper() + command.mid(1));
+        return windowsBar() ? windowsBar()->findChild<QObject *>("windows_pdf_" + command) : nullptr;
+    }
+    QObject *editCopy() const {
+        if (native()) return window->findChild<QObject *>("editCopy");
+        return windowsBar() ? windowsBar()->findChild<QObject *>("windows_editCopy") : nullptr;
+    }
+    bool pdfMenuShown() const {
+        if (auto *menu = nativeMenu()) return menu->property("visible").toBool();
+        QVariant index = -1;
+        if (auto *bar = windowsBar()) QMetaObject::invokeMethod(bar, "pdfMenuIndex", Q_RETURN_ARG(QVariant, index));
+        return index.toInt() >= 0;
+    }
+    // The Windows bar hands focus back to the item it last saw editing, as it
+    // does when a menu opens; a test that triggers an item directly says which.
+    void rememberFocus(QQuickWindow *quick) const {
+        if (auto *bar = windowsBar())
+            QMetaObject::invokeMethod(bar, "rememberEditingFocus", Q_ARG(QVariant, QVariant::fromValue(quick->activeFocusItem())));
+    }
+};
+
 struct Cycle161Pane {
     Cycle117Window w;
     QQuickItem *reader = nullptr;
@@ -492,10 +522,12 @@ void FomawriteTest::pdfPaneSelectsCopiesAndFollowsLinks() {
     QGuiApplication::clipboard()->setText("before");
     p.key(Qt::Key_C, Qt::ControlModifier);
     QTRY_COMPARE(QGuiApplication::clipboard()->text(), QStringLiteral("ALPHA"));
-    auto *menuCopy = p.w.window->findChild<QObject *>("editCopy");
+    const Cycle161Menus menus{p.w.window.data()};
+    auto *menuCopy = menus.editCopy();
     QVERIFY(menuCopy);
     QVERIFY(menuCopy->property("enabled").toBool());
     QGuiApplication::clipboard()->setText("before");
+    menus.rememberFocus(p.w.quick);
     QVERIFY(QMetaObject::invokeMethod(menuCopy, "triggered"));
     QCOMPARE(QGuiApplication::clipboard()->text(), QStringLiteral("ALPHA"));
 
@@ -852,8 +884,8 @@ void FomawriteTest::pdfModeFooterTitleAndMenusRestoreMarkdown() {
     p.w.layout->setProperty("layoutMode", 1);
     p.w.layout->setProperty("previewWidth", 600);
     QTRY_COMPARE(p.w.layout->property("effectiveLayoutMode").toInt(), 1);
-    auto *pdfMenu = p.w.window->findChild<QObject *>("nativePdfMenu");
-    QVERIFY(pdfMenu);
+    const Cycle161Menus menus{p.w.window.data()};
+    QVERIFY(menus.native() || menus.windowsBar());
     const QStringList footerNames{"singleModeButton", "previewSplitButton", "previewOnlyButton"};
     const QStringList chrome{"documentPublishingControls", "previewTemplateButton", "previewHeaderModeLabel",
                              "previewZoomControls", "previewHeaderExportButton", "formatBar", "sourceAppearanceButton"};
@@ -869,7 +901,7 @@ void FomawriteTest::pdfModeFooterTitleAndMenusRestoreMarkdown() {
             state << name + (item ? (item->isVisible() ? "+" : "-") + item->property("text").toString() : QStringLiteral("?"));
         }
         state << "title=" + p.w.window->property("title").toString();
-        state << QStringLiteral("pdfMenu=") + (pdfMenu->property("visible").toBool() ? "true" : "false");
+        state << QStringLiteral("pdfMenu=") + (menus.pdfMenuShown() ? "true" : "false");
         return state;
     };
     QTest::qWait(50);
@@ -906,38 +938,38 @@ void FomawriteTest::pdfModeFooterTitleAndMenusRestoreMarkdown() {
     QTRY_COMPARE(p.w.window->property("title").toString(), QStringLiteral("* geometry.pdf - Fomawrite"));
     p.w.backend.save();
     QTRY_COMPARE(p.w.window->property("title").toString(), QStringLiteral("geometry.pdf - Fomawrite"));
-    QVERIFY(pdfMenu->property("visible").toBool());
+    QTRY_VERIFY(menus.pdfMenuShown());
 
     // The PDF menu's items drive the pane.
-    const auto menuItem = [&](const char *name) { return p.w.window->findChild<QObject *>(name); };
-    for (const char *name : {"pdfMenuGoToPage", "pdfMenuZoomIn", "pdfMenuZoomOut", "pdfMenuActualSize", "pdfMenuFitWidth",
-                             "pdfMenuThumbnails", "pdfMenuInspector", "pdfMenuFind"}) {
+    const auto menuItem = [&](const char *command) { return menus.item(command); };
+    for (const char *name : {"goToPage", "zoomIn", "zoomOut", "actualSize", "fitWidth", "thumbnails", "inspector", "find"}) {
         QVERIFY2(menuItem(name), name);
         QVERIFY2(menuItem(name)->property("enabled").toBool(), name);
     }
-    QCOMPARE(menuItem("pdfMenuInspector")->property("shortcut").toString(), QStringLiteral("Ctrl+Alt+I"));
-    QVERIFY(QMetaObject::invokeMethod(menuItem("pdfMenuActualSize"), "triggered"));
+    // The Mac shortcut; the Windows menu gives the Inspector none (Ctrl+Alt is AltGr).
+    if (menus.native()) QCOMPARE(menuItem("inspector")->property("shortcut").toString(), QStringLiteral("Ctrl+Alt+I"));
+    QVERIFY(QMetaObject::invokeMethod(menuItem("actualSize"), "triggered"));
     QTRY_COMPARE(p.zoom(), 1.0);
-    QVERIFY(QMetaObject::invokeMethod(menuItem("pdfMenuZoomIn"), "triggered"));
+    QVERIFY(QMetaObject::invokeMethod(menuItem("zoomIn"), "triggered"));
     QTRY_COMPARE(p.zoom(), 1.1);
-    QVERIFY(QMetaObject::invokeMethod(menuItem("pdfMenuFitWidth"), "triggered"));
+    QVERIFY(QMetaObject::invokeMethod(menuItem("fitWidth"), "triggered"));
     QTRY_COMPARE(p.reader->property("zoomMode").toString(), QStringLiteral("fit"));
-    QCOMPARE(menuItem("pdfMenuThumbnails")->property("text").toString(), QStringLiteral("Show Thumbnails"));
-    QVERIFY(QMetaObject::invokeMethod(menuItem("pdfMenuThumbnails"), "triggered"));
+    QCOMPARE(menuItem("thumbnails")->property("text").toString(), QStringLiteral("Show Thumbnails"));
+    QVERIFY(QMetaObject::invokeMethod(menuItem("thumbnails"), "triggered"));
     QTRY_VERIFY(p.item("pdfThumbnails")->isVisible());
-    QCOMPARE(menuItem("pdfMenuThumbnails")->property("text").toString(), QStringLiteral("Hide Thumbnails"));
-    QVERIFY(QMetaObject::invokeMethod(menuItem("pdfMenuThumbnails"), "triggered"));
+    QCOMPARE(menuItem("thumbnails")->property("text").toString(), QStringLiteral("Hide Thumbnails"));
+    QVERIFY(QMetaObject::invokeMethod(menuItem("thumbnails"), "triggered"));
     QTRY_VERIFY(!p.item("pdfThumbnails")->isVisible());
-    QVERIFY(QMetaObject::invokeMethod(menuItem("pdfMenuGoToPage"), "triggered"));
+    QVERIFY(QMetaObject::invokeMethod(menuItem("goToPage"), "triggered"));
     QTRY_VERIFY(p.item("pdfPageField")->hasActiveFocus());
-    QVERIFY(QMetaObject::invokeMethod(menuItem("pdfMenuInspector"), "triggered"));
+    QVERIFY(QMetaObject::invokeMethod(menuItem("inspector"), "triggered"));
     QTRY_VERIFY(p.object("pdfInspector")->property("opened").toBool());
     QMetaObject::invokeMethod(p.object("pdfInspector"), "close");
     QTRY_VERIFY(!p.object("pdfInspector")->property("opened").toBool());
     // From Notes only, Find in PDF brings the PDF back beside the notes.
     p.w.layout->setProperty("layoutMode", 0);
     QTRY_COMPARE(p.w.layout->property("effectiveLayoutMode").toInt(), 0);
-    QVERIFY(QMetaObject::invokeMethod(menuItem("pdfMenuFind"), "triggered"));
+    QVERIFY(QMetaObject::invokeMethod(menuItem("find"), "triggered"));
     QTRY_COMPARE(p.w.layout->property("effectiveLayoutMode").toInt(), 1);
     QTRY_VERIFY(p.item("pdfFindBar")->isVisible());
     p.call("closeFind");
@@ -955,7 +987,7 @@ void FomawriteTest::pdfModeFooterTitleAndMenusRestoreMarkdown() {
     QVERIFY(QMetaObject::invokeMethod(p.w.window.data(), "requestOpen", Q_ARG(QVariant, QUrl::fromLocalFile(markdown))));
     QTRY_VERIFY(!p.w.backend.pdf()->active());
     QTRY_COMPARE(p.w.layout->property("effectiveLayoutMode").toInt(), 1);
-    QTRY_VERIFY(!pdfMenu->property("visible").toBool());
+    QTRY_VERIFY(!menus.pdfMenuShown());
     QTest::qWait(50);
     QCOMPARE(snapshot(), markdownState);
 }
