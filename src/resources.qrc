@@ -72,6 +72,7 @@
         <file>PdfThumbnails.qml</file>
         <file>PdfContents.qml</file>
         <file>PdfInspector.qml</file>
+        <file>PdfUnplacedList.qml</file>
         <file>ExportHub.qml</file>
         <file>StyleGallery.qml</file>
         <file alias="Main.qml">Main.qml</file>

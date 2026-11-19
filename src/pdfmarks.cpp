@@ -104,8 +104,13 @@ void PdfMarks::refresh() {
             const int page = (placement.placed ? placement.page : item.page) - 1;
             const int direction = placement.placed ? m_session->textDirection(page) : 0;
             if (item.kind == QLatin1String("note")) {
-                const bool valid = item.hasAt && item.page >= 1 && item.page <= m_session->pageCount();
-                const QPoint at = valid ? clampedPoint(item.page - 1, item.atX, item.atY) : QPoint();
+                // A note whose page does not exist, or whose at= lies outside its page, is unplaced.
+                bool valid = item.hasAt && item.page >= 1 && item.page <= m_session->pageCount();
+                if (valid) {
+                    const QSizeF size = m_session->pageSize(item.page - 1);
+                    valid = item.atX >= 0 && item.atY >= 0 && item.atX <= size.width() && item.atY <= size.height();
+                }
+                const QPoint at = valid ? QPoint(item.atX, item.atY) : QPoint();
                 items.append(QVariantMap{
                     {QStringLiteral("index"), i},
                     {QStringLiteral("kind"), item.kind},

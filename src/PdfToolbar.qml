@@ -10,6 +10,7 @@ Rectangle {
     objectName: "pdfToolbar"
     required property var reader
     readonly property bool controlsEnabled: reader.ready
+    readonly property int unplacedCount: reader.unplacedItems.length
     readonly property Item inspectorAnchor: plan.inspector ? inspectorButton : overflowButton
     function focusPageField() {
         if (!pageField.enabled) return;
@@ -25,6 +26,7 @@ Rectangle {
     readonly property var foldWidths: ({ actual: 54, fit: 34 + spacing, thumbnails: 34 + spacing, inspector: 34 + spacing,
                                          count: pageCountLabel.implicitWidth + pageCluster.spacing })
     readonly property real baseWidth: 2 * sideMargin + 66 + spacing + pageField.width + spacing + highlighter.implicitWidth + spacing + 34 + 12 + 34
+        + (unplacedCount > 0 ? unplacedButton.implicitWidth + spacing : 0)
     readonly property var plan: {
         var shown = { actual: true, fit: true, thumbnails: true, inspector: true, count: true };
         var folded = false;
@@ -229,6 +231,17 @@ Rectangle {
         anchors.rightMargin: bar.sideMargin
         anchors.verticalCenter: parent.verticalCenter
         spacing: bar.spacing
+        // Items in the notes that cannot be placed on the page (Cycle 164).
+        ToolbarButton {
+            id: unplacedButton
+            objectName: "pdfUnplacedButton"
+            visible: bar.unplacedCount > 0
+            text: bar.unplacedCount + " unplaced"
+            hint: "Notes that cannot be placed on the page"
+            enabled: bar.controlsEnabled
+            focusPolicy: Qt.TabFocus
+            onClicked: bar.reader.showUnplaced(unplacedButton)
+        }
         ToolbarButton {
             id: inspectorButton
             objectName: "pdfInspectorButton"

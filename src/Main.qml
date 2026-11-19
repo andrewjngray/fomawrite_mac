@@ -582,7 +582,20 @@ ApplicationWindow {
         if (focus) { win.setEditingMode(false); win.lastWritingSurface = "source"; }
         editor.cursorPosition = position;
         if (focus) editor.forceActiveFocus();
-        Qt.callLater(editorFlick.ensureCursorVisible);
+        pdfCaretScrollTries = 0;
+        pdfCaretScrollTimer.restart();
+    }
+    // Scrolls the notes to the caret once a layout change in progress (PDF only -> Split) has finished.
+    property int pdfCaretScrollTries: 0
+    Timer {
+        id: pdfCaretScrollTimer
+        interval: 40
+        repeat: true
+        onTriggered: {
+            if (win.changingDocumentView && ++win.pdfCaretScrollTries < 40) return;
+            stop();
+            editorFlick.ensureCursorVisible();
+        }
     }
     function revealPdfItemInNotes(index) {
         if (!backend.pdfMarks || workspaceLayout.effectiveLayoutMode === 2) return;

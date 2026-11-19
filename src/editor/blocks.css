@@ -245,3 +245,34 @@
 }
 #write.fw-mode-live .fw-front-matter-line { color: var(--fw-front-matter-fg); }
 #write.fw-mode-live .fw-extras-collapsed { height: 0; line-height: 0; font-size: 0; padding: 0 !important; margin: 0; overflow: hidden; }
+/* PDF notes marker chips (Cycle 164) */
+:root {
+  --fw-pdf-chip-fg: #57606a;
+  --fw-pdf-chip-bg: rgba(175, 184, 193, 0.2);
+  --fw-pdf-chip-quiet-fg: #8c959f;
+  --fw-pdf-pin: #b08800;
+}
+:root.dark {
+  --fw-pdf-chip-fg: #b1bac4;
+  --fw-pdf-chip-bg: rgba(110, 118, 129, 0.3);
+  --fw-pdf-chip-quiet-fg: #7d8590;
+  --fw-pdf-pin: #e3b341;
+}
+#write.fw-mode-live .fw-pdf-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4em;
+  padding: 0 0.6em;
+  border-radius: 999px;
+  background: var(--fw-pdf-chip-bg);
+  color: var(--fw-pdf-chip-fg);
+  font-size: 0.8em;
+  line-height: 1.6;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  user-select: none;
+}
+#write.fw-mode-live .fw-pdf-chip-header { color: var(--fw-pdf-chip-quiet-fg); background: transparent; border: 1px solid var(--fw-pdf-chip-bg); }
+#write.fw-mode-live .fw-pdf-chip-dot { width: 0.7em; height: 0.7em; border-radius: 50%; display: inline-block; }
+#write.fw-mode-live .fw-pdf-chip-pin { width: 0.95em; height: 0.95em; fill: var(--fw-pdf-pin); }
+#write.fw-mode-live .fw-pdf-marker-src { color: var(--fw-pdf-chip-quiet-fg); }

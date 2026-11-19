@@ -263,6 +263,9 @@ private slots:
     void pdfCaretIntoAnItemShowsItOnThePage();
     void pdfDragSelectingFromAHighlightStillSelects();
     void pdfNoteToolButtonMenuItemAndShortcut();
+    void pdfReanchoredMarksAreDrawnAtTheQuoteAndRemovable();
+    void pdfUnplacedItemsAreNotDrawnAndAreListed();
+    void pdfClickingAnUnplacedRowRevealsItInTheNotes();
     void libraryNewMenuItemsAreDisabledWithoutAFolder();
     void harperBridgeAnswersLintRequestsFromTheHost();
     void harperEngineCachesDedupesAndMapsKinds();
@@ -5432,3 +5435,4 @@ int main(int argc, char **argv) {
 #include "cycle162-pdf-integration.inc"
 #include "cycle163-pdf-markup.inc"
 #include "cycle164-pdf-notes.inc"
+#include "cycle164-pdf-anchoring.inc"

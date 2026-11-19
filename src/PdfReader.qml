@@ -130,6 +130,24 @@ Rectangle {
         selectedNoteMarker = "";
         return marks.removeMark(pin.index);
     }
+    // Items that cannot be drawn: their quote is nowhere near its page, or the
+    // page or position of a note does not exist (Cycle 164). They exist only in the notes.
+    readonly property var unplacedItems: {
+        var found = [];
+        var items = marks ? marks.items : [];
+        for (var i = 0; i < items.length; ++i) {
+            var item = items[i];
+            if (item.placed) continue;
+            if (item.kind === "note" || item.kind === "highlight" || item.kind === "underline" || item.kind === "strike") found.push(item);
+        }
+        return found;
+    }
+    // A row of the unplaced list: show the item in the notes (the PDF alone switches to Split first).
+    function revealUnplaced(index) {
+        editorNeeded();
+        // After the layout has settled, so the notes can scroll to the item.
+        Qt.callLater(function() { root.revealInNotesRequested(index); });
+    }
     function itemForMarker(marker) {
         var items = marks ? marks.items : [];
         for (var i = 0; i < items.length; ++i) if (items[i].marker === marker) return items[i];
@@ -999,6 +1017,11 @@ Rectangle {
         id: inspector
         reader: root
     }
+    PdfUnplacedList {
+        id: unplacedList
+        reader: root
+    }
+    function showUnplaced(anchor) { if (ready) unplacedList.showFrom(anchor); }
 
     CompactMenu {
         id: pageMenu
