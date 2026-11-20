@@ -6,6 +6,8 @@ Dialog {
 
     property string fileName: "Untitled.md"
     property string pendingAction: "close"
+    property bool pdfPagesModified: false
+    property bool notesModified: false
     property bool darkMode: true
     property color textColor: backend.palette.text
     property color strongTextColor: backend.palette.text
@@ -48,7 +50,9 @@ Dialog {
 
         Label {
             width: parent.width
-            text: "Save changes to " + root.fileName + ((root.pendingAction === "close" || root.pendingAction === "quit") ? " before closing?" : " before switching documents?")
+            text: (root.pdfPagesModified ? (root.notesModified ? "Save PDF page and notes changes to " : "Save PDF page changes to ")
+                : "Save changes to ") + root.fileName
+                + ((root.pendingAction === "close" || root.pendingAction === "quit") ? " before closing?" : " before switching documents?")
             color: root.textColor
             wrapMode: Text.Wrap
             font.family: "iA Writer Mono S"

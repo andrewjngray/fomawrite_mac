@@ -23,6 +23,7 @@ struct Options {
 // An empty string on success, otherwise a plain-English reason. On failure the
 // file at `path` is exactly as it was and no temporary file is left behind.
 QString writeVerified(const Options &options);
+QString changedOnDiskError();
 // Whether `bytes` opens in Qt PDF with `pages` pages (0: any number).
 bool opens(const QByteArray &bytes, int pages, QString *why = nullptr);
 // The folder holding the recovery copies of `pdfPath` and the copies, newest first.

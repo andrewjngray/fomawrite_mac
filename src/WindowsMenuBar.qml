@@ -103,6 +103,8 @@ MenuBar {
     // Previous and Ctrl+I is Italic. Zoom keys and Ctrl+F already route to the
     // pane when it has focus (PdfReader.qml, win.openSearch).
     readonly property bool pdfHasSelection: win.pdfMode && !!win.pdfReader && win.pdfReader.selectionText.length > 0
+    Shortcut { sequence: "Ctrl+L"; context: Qt.WindowShortcut; enabled: win.isWindows && win.pdfOwnsKeyboard && root.pdfMenu.ready; onActivated: win.pdfCommand("rotateLeft") }
+    Shortcut { sequence: "Ctrl+R"; context: Qt.WindowShortcut; enabled: win.isWindows && win.pdfOwnsKeyboard && root.pdfMenu.ready; onActivated: win.pdfCommand("rotateRight") }
     Shortcut { objectName: "windowsShortcutPdfCopyQuote"; sequence: "Ctrl+Shift+C"; context: Qt.WindowShortcut; enabled: win.isWindows && root.pdfHasSelection; onActivated: win.pdfCommand("copyQuote") }
     property Menu pdfMenu: WorkspaceMenu {
         objectName: "windowsPdfMenu"
@@ -113,6 +115,15 @@ MenuBar {
         MenuItem { objectName: "windows_pdf_underline"; text: "Underline Text"; enabled: root.pdfHasSelection; onTriggered: root.dispatch(function() { win.pdfCommand("underline") }) }
         MenuItem { objectName: "windows_pdf_strike"; text: "Strike Through Text"; enabled: root.pdfHasSelection; onTriggered: root.dispatch(function() { win.pdfCommand("strike") }) }
         MenuItem { objectName: "windows_pdf_note"; text: "Note"; enabled: root.pdfMenu.ready; onTriggered: root.dispatch(function() { win.pdfCommand("note") }) }
+        MenuSeparator {}
+        MenuItem { objectName: "windows_pdf_rotateLeft"; text: "Rotate Left"; enabled: root.pdfMenu.ready; onTriggered: root.dispatch(function() { win.pdfCommand("rotateLeft") }) }
+        MenuItem { objectName: "windows_pdf_rotateRight"; text: "Rotate Right"; enabled: root.pdfMenu.ready; onTriggered: root.dispatch(function() { win.pdfCommand("rotateRight") }) }
+        MenuItem { objectName: "windows_pdf_deletePages"; text: "Delete Selected Pages"; enabled: root.pdfMenu.ready && win.pdfReader.canRemoveSelectedPages; onTriggered: root.dispatch(function() { win.pdfCommand("deletePages") }) }
+        MenuItem { objectName: "windows_pdf_insertPages"; text: "Insert Pages from File…"; enabled: root.pdfMenu.ready; onTriggered: root.dispatch(function() { win.pdfCommand("insertPages") }) }
+        MenuItem { objectName: "windows_pdf_exportPages"; text: "Export Selected Pages…"; enabled: root.pdfMenu.ready; onTriggered: root.dispatch(function() { win.pdfCommand("exportPages") }) }
+        MenuItem { objectName: "windows_pdf_undoPages"; text: "Undo Page Edit"; enabled: backend.pdf.canUndoPageEdit; onTriggered: root.dispatch(function() { win.pdfCommand("undoPages") }) }
+        MenuItem { objectName: "windows_pdf_redoPages"; text: "Redo Page Edit"; enabled: backend.pdf.canRedoPageEdit; onTriggered: root.dispatch(function() { win.pdfCommand("redoPages") }) }
+        MenuItem { objectName: "windows_pdf_recovery"; text: "Previous PDF Copies…"; enabled: win.pdfMode; onTriggered: root.dispatch(function() { win.pdfCommand("recovery") }) }
         MenuSeparator {}
         MenuItem { objectName: "windows_pdf_copyQuote"; text: "Copy as Markdown Quote"; enabled: root.pdfHasSelection; onTriggered: root.dispatch(function() { win.pdfCommand("copyQuote") }) }
         MenuSeparator {}

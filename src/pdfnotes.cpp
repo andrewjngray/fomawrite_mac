@@ -680,6 +680,9 @@ Edit renumber(const QString &text, const QString &pdfFileName, const QList<PageR
                 changes.append({line.start + int(plain.capturedStart(2)), int(plain.capturedLength(2)), QString::number(remap->newPage)});
         }
     }
+    changes.removeIf([&](const Change &change) {
+        return QStringView(text).mid(change.position, change.removed) == change.inserted;
+    });
     std::sort(changes.begin(), changes.end(), [](const Change &a, const Change &b) { return a.position < b.position; });
     return changes;
 }

@@ -32,7 +32,7 @@ Platform.MenuBar {
         Platform.MenuSeparator {}
         Platform.MenuItem { objectName: "fileClose"; text: "Close"; onTriggered: win.close() }
         Platform.MenuSeparator {}
-        Platform.MenuItem { objectName: "fileSave"; text: "Save"; onTriggered: backend.save() }
+        Platform.MenuItem { objectName: "fileSave"; text: "Save"; onTriggered: win.saveDocument() }
         Platform.MenuItem { objectName: "fileDuplicate"; text: "Duplicate…"; enabled: backend.fileUrl.toString() !== "" && !win.pdfMode; onTriggered: fileNameDialog.showFor(false) }
         Platform.MenuItem { objectName: "fileRename"; text: "Rename…"; enabled: backend.fileUrl.toString() !== "" || win.pdfMode; onTriggered: fileNameDialog.showFor(true) }
         Platform.MenuItem {
@@ -424,6 +424,15 @@ Platform.MenuBar {
         Platform.MenuItem { objectName: "pdfMenuUnderline"; text: "Underline Text"; shortcut: "Meta+Ctrl+U"; enabled: win.pdfMode && !!win.pdfReader && win.pdfReader.selectionText.length > 0; onTriggered: win.pdfCommand("underline") }
         Platform.MenuItem { objectName: "pdfMenuStrike"; text: "Strike Through Text"; shortcut: "Meta+Ctrl+S"; enabled: win.pdfMode && !!win.pdfReader && win.pdfReader.selectionText.length > 0; onTriggered: win.pdfCommand("strike") }
         Platform.MenuItem { objectName: "pdfMenuNote"; text: "Note"; shortcut: "Meta+Ctrl+N"; enabled: win.pdfMode && !!win.pdfReader && win.pdfReader.ready; onTriggered: win.pdfCommand("note") }
+        Platform.MenuSeparator {}
+        Platform.MenuItem { objectName: "pdfMenuRotateLeft"; text: "Rotate Left"; enabled: !!win.pdfReader && win.pdfReader.ready; shortcut: win.pdfOwnsKeyboard ? "Ctrl+L" : ""; onTriggered: win.pdfCommand("rotateLeft") }
+        Platform.MenuItem { objectName: "pdfMenuRotateRight"; text: "Rotate Right"; enabled: !!win.pdfReader && win.pdfReader.ready; shortcut: win.pdfOwnsKeyboard ? "Ctrl+R" : ""; onTriggered: win.pdfCommand("rotateRight") }
+        Platform.MenuItem { objectName: "pdfMenuDeletePages"; text: "Delete Selected Pages"; enabled: !!win.pdfReader && win.pdfReader.canRemoveSelectedPages; onTriggered: win.pdfCommand("deletePages") }
+        Platform.MenuItem { objectName: "pdfMenuInsertPages"; text: "Insert Pages from File…"; enabled: !!win.pdfReader && win.pdfReader.ready; onTriggered: win.pdfCommand("insertPages") }
+        Platform.MenuItem { objectName: "pdfMenuExportPages"; text: "Export Selected Pages…"; enabled: !!win.pdfReader && win.pdfReader.ready; onTriggered: win.pdfCommand("exportPages") }
+        Platform.MenuItem { text: "Undo Page Edit"; enabled: backend.pdf.canUndoPageEdit; onTriggered: win.pdfCommand("undoPages") }
+        Platform.MenuItem { text: "Redo Page Edit"; enabled: backend.pdf.canRedoPageEdit; onTriggered: win.pdfCommand("redoPages") }
+        Platform.MenuItem { text: "Previous PDF Copies…"; onTriggered: win.pdfCommand("recovery") }
         Platform.MenuSeparator {}
         Platform.MenuItem { objectName: "pdfMenuCopyQuote"; text: "Copy as Markdown Quote"; shortcut: "Ctrl+Shift+C"; enabled: win.pdfMode && !!win.pdfReader && win.pdfReader.selectionText.length > 0; onTriggered: win.pdfCommand("copyQuote") }
         Platform.MenuSeparator {}

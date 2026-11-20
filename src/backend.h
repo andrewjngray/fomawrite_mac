@@ -58,6 +58,7 @@ class Backend : public QObject, public PublishingSource {
     // Why the last savePdf or exportPdfPages failed (plain English; cleared by the next success), and what
     // went wrong after the PDF itself was saved (its notes could not be renumbered or saved).
     Q_PROPERTY(QString pdfSaveError READ pdfSaveError NOTIFY pdfSaveErrorChanged)
+    Q_PROPERTY(bool pdfSaveNeedsOverwrite READ pdfSaveNeedsOverwrite NOTIFY pdfSaveErrorChanged)
     Q_PROPERTY(QString pdfSaveNotice READ pdfSaveNotice NOTIFY pdfSaveErrorChanged)
     // The file the window shows: the PDF in PDF mode, otherwise the document.
     // Recents, history, the explorer's highlight and window ownership use it.
@@ -107,8 +108,9 @@ public:
     // coordinates) as one undoable edit of the document, as Review pane
     // corrections are: the Source editor shows it at once and keeps its caret,
     // and a Live page holding the document receives it as one change set that
-    // is exactly one step of its own history. Nothing is written to disk.
-    bool applyNotesEdit(const PdfNotes::Edit &edit);
+    // is exactly one step of its own history. A saved PDF remap starts fresh history on both surfaces.
+    // Nothing is written to disk.
+    bool applyNotesEdit(const PdfNotes::Edit &edit, bool resetHistory = false);
     QUrl displayedFileUrl() const;
     // Whether this window shows `canonicalPath`: its document, or in PDF mode
     // the PDF or its notes file.
@@ -254,9 +256,11 @@ public:
     // Writes the working pages (0-based; all when empty) to another PDF; the session and notes are unchanged.
     Q_INVOKABLE bool exportPdfPages(const QUrl &url, const QList<int> &pages);
     QString pdfSaveError() const { return m_pdfSaveError; }
+    bool pdfSaveNeedsOverwrite() const;
     QString pdfSaveNotice() const { return m_pdfSaveNotice; }
     // The folder of recovery copies for PDFs replaced by savePdf (by PDF path: PdfFiles::recoveryCopies).
     QString pdfRecoveryFolder() const;
+    Q_INVOKABLE bool openPdfRecoveryFolder() const;
     // Tests: make the next PDF write fail at "write", "verify", "recovery" or "replace" (cleared after one use).
     void failNextPdfWrite(const QString &stage) { m_pdfFailAt = stage; }
     Q_INVOKABLE void fileDialogCanceled();

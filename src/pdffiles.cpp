@@ -138,6 +138,10 @@ bool opens(const QByteArray &bytes, int pages, QString *why) {
     return true;
 }
 
+QString changedOnDiskError() {
+    return QStringLiteral("The PDF changed on disk. Your page changes were not saved.");
+}
+
 QString writeVerified(const Options &o) {
     const QFileInfo given(o.path);
     const bool exists = given.exists();
@@ -153,7 +157,7 @@ QString writeVerified(const Options &o) {
         if (!existing.open(QIODevice::ReadOnly)) return QStringLiteral("%1 could not be read before saving. Nothing was saved.").arg(name);
         previous = existing.readAll();
     }
-    const QString changed = QStringLiteral("The PDF changed on disk. Your page changes were not saved.");
+    const QString changed = changedOnDiskError();
     if (o.requirePrevious && previous != o.previous) return changed;
 
     // The temporary file is removed with this object unless the replace succeeds.

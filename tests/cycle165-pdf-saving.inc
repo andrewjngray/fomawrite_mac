@@ -1,6 +1,6 @@
 // Cycle 165 part 2b — saving page edits (Backend::savePdf): the conflict check, the verified write, the recovery
-// copy, the atomic replace, the session adopting the saved file, the notes renumbered at save as one editor edit and
-// saved with the PDF, undo after save, and Backend::exportPdfPages. No user interface yet.
+// copy, the atomic replace, the session adopting the saved file, the notes renumbered and saved with the PDF,
+// undo across the save boundary, and Backend::exportPdfPages. No user interface yet.
 
 #include "pdffiles.h"
 
@@ -161,6 +161,8 @@ void FomawriteTest::pdfSavingFailuresLeaveEverythingAsItWas() {
         const QByteArray notesOnDisk = cycle165Bytes(s.notes);
         QVERIFY(s.pdf()->rotatePages({0}, 90));
         QVERIFY(s.pdf()->movePages({2}, 0));
+        QVERIFY(s.pdf()->rotatePages({0}, 90));
+        QVERIFY(s.pdf()->undoPageEdit());
         const QByteArray working = s.pdf()->workingBytes();
         const QStringList filesBefore = s.files();
         s.backend()->failNextPdfWrite(stage);
@@ -171,11 +173,13 @@ void FomawriteTest::pdfSavingFailuresLeaveEverythingAsItWas() {
         QVERIFY(s.recoveryCopies().isEmpty() || stage == QLatin1String("never"));
         QVERIFY(s.pdf()->pagesModified());
         QVERIFY(s.pdf()->canUndoPageEdit());
+        QVERIFY(s.pdf()->canRedoPageEdit());
+        QVERIFY(s.draft.editor->property("canUndo").toBool());
         QCOMPARE(s.pdf()->workingBytes(), working);
         QCOMPARE(s.pdf()->baselineBytes(), original);
         QCOMPARE(s.text(), notes);
         QCOMPARE(cycle165Bytes(s.notes), notesOnDisk);
-        // The failure was one use: the same save now works, and undo still reaches the start.
+        // The failure was one use: the same save now works.
         QVERIFY2(s.backend()->savePdf(), qPrintable(s.backend()->pdfSaveError()));
         QCOMPARE(cycle165Bytes(s.path), working);
         QVERIFY(s.backend()->pdfSaveError().isEmpty());
@@ -262,7 +266,7 @@ void FomawriteTest::pdfSavingRefusesAFileThatChangedOnDisk() {
     QVERIFY(s.pdf()->pagesModified());
 }
 
-void FomawriteTest::pdfSavingDoesNotReloadOrDropTheUndoHistory() {
+void FomawriteTest::pdfSavingDoesNotReloadThePdf() {
     Cycle165Save s;
     QVERIFY(s.open(cycle165Marked(3)));
     QVERIFY(s.pdf()->rotatePages({0}, 90));
@@ -271,7 +275,6 @@ void FomawriteTest::pdfSavingDoesNotReloadOrDropTheUndoHistory() {
     const int revision = s.pdf()->revision();
     QTest::qWait(1200); // well past the watcher's debounce
     QCOMPARE(s.pdf()->revision(), revision);
-    QVERIFY(s.pdf()->canUndoPageEdit());
     QVERIFY(!s.pdf()->changedOnDiskWhileEditing());
     QVERIFY(!s.pdf()->pagesModified());
     QCOMPARE(s.pdf()->state(), QStringLiteral("ready"));
@@ -280,42 +283,47 @@ void FomawriteTest::pdfSavingDoesNotReloadOrDropTheUndoHistory() {
     QTRY_COMPARE_WITH_TIMEOUT(s.pdf()->pageCount(), 4, 5000);
 }
 
-void FomawriteTest::pdfSavingUndoAfterSaveThenSavingAgainRestoresTheOldBytes() {
+void FomawriteTest::pdfSavingResetsPageHistoryAndKeepsUnchangedNotesHistory() {
     Cycle165Save s;
-    const QByteArray original = cycle165Marked(3);
-    QVERIFY(s.open(original));
-    s.markPage(0);
-    const QString first = s.text();
+    const QString notes = QStringLiteral("Plain notes.\n");
+    QVERIFY(s.open(cycle165Marked(3), notes));
+    const auto type = [&](const QString &text) {
+        return QMetaObject::invokeMethod(s.draft.editor.data(), "insert",
+                                         Q_ARG(int, 0), Q_ARG(QString, text));
+    };
+    QVERIFY(type(QStringLiteral("First. ")));
+    QVERIFY(type(QStringLiteral("Second. ")));
+    QVERIFY(QMetaObject::invokeMethod(s.draft.editor.data(), "undo"));
+    const QString beforeSave = s.text();
+    QVERIFY(beforeSave != notes);
+    QVERIFY(s.draft.editor->property("canUndo").toBool());
+    QVERIFY(s.draft.editor->property("canRedo").toBool());
+
+    QVERIFY(s.pdf()->removePages({1}));
+    const QByteArray saved = s.pdf()->workingBytes();
     QVERIFY(s.pdf()->rotatePages({0}, 90));
-    QVERIFY(s.pdf()->movePages({0}, 3));
-    QVERIFY(s.backend()->savePdf());
-    const QString saved = s.text();
-    QVERIFY(saved != first);
-    const QList<QVariantMap> savedDrawing = s.drawn();
     QVERIFY(s.pdf()->undoPageEdit());
-    // Pending again, with the earlier bytes exactly; the notes are not rewritten back by a page undo ...
-    QVERIFY(s.pdf()->pagesModified());
-    QCOMPARE(s.pdf()->workingBytes().size() > 0, true);
-    QVERIFY(s.pdf()->undoPageEdit());
-    QCOMPARE(s.pdf()->workingBytes(), original);
-    QCOMPARE(s.text(), saved);
-    // ... but the translation keeps the marks on their content: the same pin and mark as before the edits.
-    const QList<QVariantMap> now = s.drawn();
-    QCOMPARE(now.size(), 2);
-    QCOMPARE(now.at(0).value("page").toInt(), 0);
-    QVERIFY(now.at(0).value("placed").toBool());
-    QCOMPARE(now.at(1).value("x").toInt(), 100);
-    QCOMPARE(now.at(1).value("y").toInt(), 200);
-    QCOMPARE(s.texts(), (QStringList{"PAGEA", "PAGEB", "PAGEC"}));
-    // Saving again writes the old bytes back exactly and renumbers the notes back.
+    QVERIFY(s.pdf()->canUndoPageEdit());
+    QVERIFY(s.pdf()->canRedoPageEdit());
     QVERIFY2(s.backend()->savePdf(), qPrintable(s.backend()->pdfSaveError()));
-    QCOMPARE(cycle165Bytes(s.path), original);
-    QCOMPARE(s.text(), first);
-    QCOMPARE(s.recoveryCopies().size(), 2);
+    QCOMPARE(cycle165Bytes(s.path), saved);
+    QVERIFY(!s.pdf()->canUndoPageEdit());
+    QVERIFY(!s.pdf()->canRedoPageEdit());
+    QCOMPARE(s.text(), beforeSave);
+    QVERIFY(s.draft.editor->property("canUndo").toBool());
+    QVERIFY(s.draft.editor->property("canRedo").toBool());
+    QVERIFY(QMetaObject::invokeMethod(s.draft.editor.data(), "undo"));
+    QCOMPARE(s.text(), notes);
+    QVERIFY(QMetaObject::invokeMethod(s.draft.editor.data(), "redo"));
+    QCOMPARE(s.text(), beforeSave);
+
+    QVERIFY(s.pdf()->rotatePages({0}, 90));
+    QVERIFY(s.pdf()->undoPageEdit());
+    QCOMPARE(s.pdf()->workingBytes(), saved);
     QVERIFY(!s.pdf()->pagesModified());
-    // Redo is possible from the rebased history too.
+    // A no-op Save did not write a new baseline or clear the pending Redo.
+    QVERIFY(s.backend()->savePdf());
     QVERIFY(s.pdf()->redoPageEdit());
-    QVERIFY(s.pdf()->pagesModified());
 }
 
 void FomawriteTest::pdfSavingRenumbersTheNotesAndMarksStayOnTheirContent() {
@@ -437,7 +445,7 @@ void FomawriteTest::pdfSavingRewritesHeadingsAndRemovedPagesAndKeepsEverythingEl
              QStringLiteral("## [Page 3](My%20Report.pdf#page=3)\n\n<!-- fomawrite:pdf note page=3 at=1,2 -->\n"));
 }
 
-void FomawriteTest::pdfSavingRenumbersWithOneEditorUndoStepAndKeepsWindowsLineBreaksOnDisk() {
+void FomawriteTest::pdfSavingRenumbersAndClearsSourceHistoryAndKeepsWindowsLineBreaks() {
     Cycle165Save s;
     const QString notes = QStringLiteral(
         "<!-- fomawrite:pdf-notes 1 -->\r\n# Notes on doc.pdf\r\n\r\n## [Page 1](doc.pdf#page=1)\r\n\r\n"
@@ -445,9 +453,13 @@ void FomawriteTest::pdfSavingRenumbersWithOneEditorUndoStepAndKeepsWindowsLineBr
         "<!-- fomawrite:pdf note page=2 at=10,20 -->\r\nSecond.\r\n");
     QVERIFY(s.open(cycle165Marked(2), notes));
     QCOMPARE(cycle165Bytes(s.notes), notes.toUtf8());
+    QVERIFY(QMetaObject::invokeMethod(s.draft.editor.data(), "insert",
+                                     Q_ARG(int, s.text().size()), Q_ARG(QString, QStringLiteral("Later writing."))));
+    QVERIFY(QMetaObject::invokeMethod(s.draft.editor.data(), "undo"));
+    QVERIFY(s.draft.editor->property("canRedo").toBool());
     const QString before = s.text();
     QVERIFY(s.pdf()->movePages({0}, 2));
-    QVERIFY(s.backend()->savePdf());
+    QVERIFY2(s.backend()->savePdf(), qPrintable(s.backend()->pdfSaveError()));
     const QString after = s.text();
     QVERIFY(after != before);
     // Notes are saved with the PDF, in the file's own line breaks, and nothing is left unsaved.
@@ -458,11 +470,71 @@ void FomawriteTest::pdfSavingRenumbersWithOneEditorUndoStepAndKeepsWindowsLineBr
         "<!-- fomawrite:pdf note page=1 at=10,20 -->\r\nSecond.\r\n");
     QCOMPARE(cycle165Bytes(s.notes), expected.toUtf8());
     QVERIFY(!cycle165Bytes(s.notes).contains("\n\n"));
-    // The renumbering was one step of the editor's history.
-    QVERIFY(QMetaObject::invokeMethod(s.draft.editor.data(), "undo"));
-    QCOMPARE(s.text(), before);
-    QVERIFY(QMetaObject::invokeMethod(s.draft.editor.data(), "redo"));
+    QVERIFY(!s.draft.editor->property("canUndo").toBool());
+    QVERIFY(!s.draft.editor->property("canRedo").toBool());
+    s.backend()->undoSource(0);
+    s.backend()->redoSource(0);
     QCOMPARE(s.text(), after);
+    QVERIFY(QMetaObject::invokeMethod(s.draft.editor.data(), "insert",
+                                     Q_ARG(int, 0), Q_ARG(QString, QStringLiteral("New writing. "))));
+    QCOMPARE(s.text(), QStringLiteral("New writing. ") + after);
+    s.backend()->undoSource(0);
+    QCOMPARE(s.text(), after);
+}
+
+void FomawriteTest::pdfSavingResetsLiveNotesHistoryOnlyWhenReferencesChange() {
+    for (const bool renumber : {false, true}) {
+        Cycle103SettingsSnapshot settings;
+        QTemporaryDir temporary;
+        QVERIFY(temporary.isValid());
+        Cycle134Page page;
+        QVERIFY2(page.create(), qPrintable(page.error));
+        QTRY_VERIFY_WITH_TIMEOUT(page.bridge()->isReady(), 15000);
+        const QString pdfPath = temporary.filePath(QStringLiteral("doc.pdf"));
+        QVERIFY(PdfFixtures::write(pdfPath, cycle165Marked(2)));
+        const QString original = renumber
+            ? QStringLiteral("Notes.\n\n<!-- fomawrite:pdf note page=1 at=100,200 -->\nPin text.\n")
+            : QStringLiteral("Notes.\n");
+        QFile file(pdfPath + QStringLiteral(".md"));
+        QVERIFY(file.open(QIODevice::WriteOnly));
+        QCOMPARE(file.write(original.toUtf8()), original.toUtf8().size());
+        file.close();
+        QVERIFY(page.backend.open(QUrl::fromLocalFile(pdfPath)));
+        page.backend.syncLiveEditor();
+        QCOMPARE(page.pageText(), original);
+
+        const QString insert = QStringLiteral("[{\"from\":0,\"to\":0,\"insert\":\"Draft. \"}]");
+        page.bridge()->injectUserChanges(insert);
+        const QString beforeSave = QStringLiteral("Draft. ") + original;
+        QTRY_COMPARE(page.canonical(), beforeSave);
+        QVERIFY(page.backend.pdf()->movePages({0}, 2));
+        page.backend.failNextPdfWrite(QStringLiteral("replace"));
+        QVERIFY(!page.backend.savePdf());
+        page.bridge()->requestUndo();
+        QCOMPARE(page.pageText(), original);
+        page.bridge()->requestRedo();
+        QCOMPARE(page.pageText(), beforeSave);
+        QTRY_COMPARE(page.canonical(), beforeSave);
+
+        QSignalSpy resets(page.bridge(), &EditorBridge::setDocument);
+        QVERIFY2(page.backend.savePdf(), qPrintable(page.backend.pdfSaveError()));
+        QString saved = beforeSave;
+        if (renumber) saved.replace(QStringLiteral("page=1"), QStringLiteral("page=2"));
+        QCOMPARE(page.canonical(), saved);
+        QCOMPARE(page.pageText(), saved);
+        QCOMPARE(resets.count(), renumber ? 1 : 0);
+
+        page.bridge()->requestUndo();
+        QCOMPARE(page.pageText(), renumber ? saved : original);
+        page.bridge()->requestRedo();
+        QCOMPARE(page.pageText(), saved);
+        page.bridge()->injectUserChanges(insert);
+        QCOMPARE(page.pageText(), QStringLiteral("Draft. ") + saved);
+        page.bridge()->requestUndo();
+        QCOMPARE(page.pageText(), saved);
+        page.backend.discardRecovery();
+        QDir(page.backend.pdfRecoveryFolder()).removeRecursively();
+    }
 }
 
 void FomawriteTest::pdfSavingSavesTheNotesDocumentWhenItHasATarget() {

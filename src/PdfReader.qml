@@ -2,6 +2,7 @@ pragma ComponentBehavior: Bound
 
 import QtQuick
 import QtQuick.Controls
+import QtQuick.Dialogs as Dialogs
 import Fomawrite 1.0
 
 // The PDF in the preview pane's slot (Cycles 160–161): a toolbar, the pages in
@@ -49,6 +50,188 @@ Rectangle {
     // The page with most of its area in view (0-based).
     property int currentPage: 0
     readonly property string currentLabel: session && ready && revision >= 0 ? session.pageLabel(currentPage) : ""
+
+    // The thumbnail selection is independent of the page visible in the reader.
+    property var selectedPages: []
+    property int selectionAnchorPage: -1
+    readonly property var pageTargets: selectedPages.length ? selectedPages : (ready ? [Math.min(currentPage, pageCount - 1)] : [])
+    readonly property bool canRemoveSelectedPages: ready && pageTargets.length < pageCount
+    property var signedEdit: null
+
+    function selectThumbnail(page, modifiers) {
+        if ((modifiers & Qt.ShiftModifier) && selectionAnchorPage >= 0) {
+            var range = [];
+            for (var i = Math.min(page, selectionAnchorPage); i <= Math.max(page, selectionAnchorPage); ++i)
+                range.push(i);
+            selectedPages = range;
+        } else if (modifiers & (Qt.ControlModifier | Qt.MetaModifier)) {
+            var selected = selectedPages.length ? selectedPages.slice() : [currentPage];
+            var index = selected.indexOf(page);
+            if (index < 0) selected.push(page);
+            else selected.splice(index, 1);
+            selectedPages = selected.sort(function(a, b) { return a - b; });
+            selectionAnchorPage = page;
+        } else {
+            selectedPages = [page];
+            selectionAnchorPage = page;
+        }
+        goToPage(page);
+    }
+
+    function selectPageRange(first, count) {
+        if (!ready || count <= 0) return;
+        var selection = [];
+        for (var i = first; i < first + count && i < pageCount; ++i) selection.push(i);
+        selectedPages = selection;
+        selectionAnchorPage = first;
+        goToPage(first);
+    }
+
+    function editPages(operation) {
+        if (!ready) return;
+        if (operation()) return;
+        if (session.pageEditNeedsSignatureConsent()) {
+            signedEdit = operation;
+            signedPdfDialog.open();
+        } else showPageEditError();
+    }
+
+    function showPageEditError() {
+        if (!session || !session.pageEditError) return;
+        pdfPageNotice.text = session.pageEditError;
+        pdfPageNotice.open();
+    }
+
+    function rotateSelectedPages(turn) {
+        var targets = pageTargets.slice();
+        editPages(function() {
+            if (!session.rotatePages(targets, turn)) return false;
+            selectedPages = targets;
+            selectionAnchorPage = targets[0];
+            goToPage(targets[0]);
+            return true;
+        });
+    }
+
+    function removeSelectedPages() {
+        if (!canRemoveSelectedPages) return;
+        var targets = pageTargets.slice();
+        editPages(function() {
+            if (!session.removePages(targets)) return false;
+            selectPageRange(Math.min(targets[0], pageCount - 1), 1);
+            return true;
+        });
+    }
+
+    function moveSelectedPages(before) {
+        var targets = pageTargets.slice();
+        var start = before - targets.filter(function(page) { return page < before; }).length;
+        editPages(function() {
+            if (!session.movePages(targets, before)) return false;
+            selectPageRange(start, targets.length);
+            return true;
+        });
+    }
+
+    function insertPagesAt(url, before) {
+        editPages(function() {
+            var count = pageCount;
+            if (!session.insertPdf(url, before)) return false;
+            selectPageRange(before, pageCount - count);
+            return true;
+        });
+    }
+
+    function choosePagesToInsert() {
+        insertPdfDialog.beforePage = pageTargets[0];
+        insertPdfDialog.open();
+    }
+
+    function choosePageExport() {
+        exportPdfDialog.pages = pageTargets.slice();
+        exportPdfDialog.open();
+    }
+
+    function dropPdfOnThumbnails(url, point) {
+        var boundary = thumbnails.dropBoundary(root, point);
+        if (boundary < 0) return false;
+        insertPagesAt(url, boundary);
+        return true;
+    }
+
+    function undoPages() {
+        if (session.canUndoPageEdit && !session.undoPageEdit()) showPageEditError();
+    }
+
+    function redoPages() {
+        if (session.canRedoPageEdit && !session.redoPageEdit()) showPageEditError();
+    }
+
+    Dialogs.FileDialog {
+        id: insertPdfDialog
+        objectName: "insertPdfDialog"
+        property int beforePage: 0
+        title: "Insert Pages from File"
+        fileMode: Dialogs.FileDialog.OpenFile
+        nameFilters: ["PDF files (*.pdf)"]
+        onAccepted: root.insertPagesAt(selectedFile, beforePage)
+    }
+
+    Dialogs.FileDialog {
+        id: exportPdfDialog
+        objectName: "exportPdfPagesDialog"
+        property var pages: []
+        title: "Export Selected Pages"
+        fileMode: Dialogs.FileDialog.SaveFile
+        nameFilters: ["PDF files (*.pdf)"]
+        defaultSuffix: "pdf"
+        onAccepted: {
+            if (!backend.exportPdfPages(selectedFile, pages)) {
+                pdfPageNotice.text = backend.pdfSaveError;
+                pdfPageNotice.open();
+            }
+        }
+    }
+
+    Dialog {
+        id: signedPdfDialog
+        objectName: "signedPdfPageEditDialog"
+        title: "Digitally signed PDF"
+        modal: true
+        parent: Overlay.overlay
+        anchors.centerIn: parent
+        width: Math.min(400, Math.max(240, parent.width - 24))
+        implicitHeight: header.implicitHeight + confirmation.implicitHeight + footer.implicitHeight
+                        + topPadding + bottomPadding + 2 * spacing
+        contentItem: Label {
+            id: confirmation
+            wrapMode: Text.WordWrap
+            text: "Changing these pages will invalidate the PDF’s signature. Continue editing?"
+        }
+        footer: DialogButtonBox {
+            Button { text: "Cancel"; DialogButtonBox.buttonRole: DialogButtonBox.RejectRole }
+            Button { text: "Continue"; DialogButtonBox.buttonRole: DialogButtonBox.AcceptRole }
+        }
+        onAccepted: {
+            var operation = root.signedEdit;
+            root.signedEdit = null;
+            if (!operation) return;
+            root.session.signedEditsAllowed = true;
+            if (!operation()) root.showPageEditError();
+        }
+        onRejected: root.signedEdit = null
+    }
+
+    Dialog {
+        id: pdfPageNotice
+        property alias text: message.text
+        title: "PDF Page Changes"
+        modal: true
+        anchors.centerIn: parent
+        width: Math.min(400, root.width - 24)
+        standardButtons: Dialog.Ok
+        contentItem: Label { id: message; wrapMode: Text.WordWrap; textFormat: Text.PlainText }
+    }
 
     // The current text selection (one page); Phase 2 marks it.
     property int selectionPage: -1
@@ -590,6 +773,8 @@ Rectangle {
         function onRequestedPageChanged() { root.showRequestedPage(); }
         function onRevisionChanged() {
             root.clearSelection();
+            root.selectedPages = [];
+            root.selectionAnchorPage = -1;
             adoptTimer.restart();
             if (root.findOpen && root.findBar.query !== "") findTimer.restart();
         }
