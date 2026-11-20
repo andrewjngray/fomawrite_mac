@@ -331,8 +331,9 @@ void PdfSession::reloadFromDisk() {
         watch();
         return;
     }
-    if (ready() && (!m_undo.isEmpty() || !m_redo.isEmpty()) && !m_baselineBytes.isEmpty()) {
-        QFile now(path); // what was just saved: the history stays
+    if (ready() && !m_baselineBytes.isEmpty()) {
+        // File and directory notifications can arrive after our own save.
+        QFile now(path);
         if (now.open(QIODevice::ReadOnly) && now.readAll() == m_baselineBytes) { watch(); return; }
     }
     if (!QFileInfo::exists(path)) {

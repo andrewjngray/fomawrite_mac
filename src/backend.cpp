@@ -2617,7 +2617,10 @@ bool Backend::savePdf(bool force) {
     const bool untitled = !titled && m_saveTarget.isLocalFile() && !QFileInfo::exists(m_saveTarget.toLocalFile())
         && !currentDocumentText().trimmed().isEmpty();
     if (m_modified && (titled || untitled)) {
-        saveCurrentTextTo(titled ? m_fileUrl : m_saveTarget, true);
+        // The first save creates the companion. Existing notes need the
+        // external-change check. Keep a copy because saving clears m_saveTarget.
+        const QUrl notesTarget = titled ? m_fileUrl : m_saveTarget;
+        saveCurrentTextTo(notesTarget, titled);
         if (m_modified) {
             m_pdfSaveNotice = QStringLiteral("The PDF was saved, but its notes were not: %1").arg(m_status);
             emit pdfSaveErrorChanged();
