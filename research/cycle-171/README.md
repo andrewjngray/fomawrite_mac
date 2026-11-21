@@ -13,3 +13,5 @@ Build 171 (`0.3.0-dev66`).
 - Native Cocoa passed both drag tests, the Split Source Find test, and the narrow PDF controls test. The stable Dev bundle was prepared and passed strict signature verification.
 - The full Mac suite passed all 431 checks. The signed Dev app passed the native document-view harness. [Native report](native-bundle/report.json)
 - [Hands-on checklist](../usability/cycle-171.md).
+
+Published on `master` at `c5201bb`. [Mac CI](https://github.com/andrewjngray/fomawrite_mac/actions/runs/44946120769) passed 419 Qt checks with zero failures and 12 skips. All 334 editor tests passed. The Windows port at `1b35c431a3f5` passed both native regression and deployed-app checks (ARM64 528 and x64 528 Qt checks with zero failures or skips). [Windows CI](https://github.com/andrewjngray/fomawrite_mac/actions/runs/44946256820)
