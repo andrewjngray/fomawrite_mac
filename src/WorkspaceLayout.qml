@@ -17,6 +17,9 @@ QtObject {
     property real reviewWidth: 320
     property real availableWidth: 1100 // Content width, excluding splitter handles.
     property string activeSurface: "source"
+    property real splitSourceMinimumWidth: 480
+    readonly property real organizerMaximumWidth: (Qt.platform.os === "osx" || Qt.platform.os === "windows") ? 400 : 288
+    readonly property real fileMaximumWidth: (Qt.platform.os === "osx" || Qt.platform.os === "windows") ? 520 : 420
 
     readonly property bool effectiveOrganizerVisible: _effective.organizerVisible
     readonly property bool effectiveFilesVisible: _effective.filesVisible
@@ -56,7 +59,7 @@ QtObject {
         return (organizerVisible && level < 1 ? 184 : 0)
                 + (filesVisible && level < 2 ? 232 : 0)
                 + (reviewVisible ? 240 : 0)
-                + (mode === 1 ? 800 : 320)
+                + (mode === 1 ? splitSourceMinimumWidth + 320 : 320)
     }
 
     function recalculate(resetContraction) {
@@ -85,11 +88,11 @@ QtObject {
         // The review pane is the last to give way: it is dropped only when even
         // the narrowest arrangement leaves no room for it beside the document.
         var showReview = reviewVisible && width >= minimumAt(level)
-        var organizer = showOrganizer ? boundedWidth(organizerWidth, 184, 288, 208) : 0
-        var files = showFiles ? boundedWidth(fileWidth, 232, 420, 288) : 0
+        var organizer = showOrganizer ? boundedWidth(organizerWidth, 184, organizerMaximumWidth, 208) : 0
+        var files = showFiles ? boundedWidth(fileWidth, 232, fileMaximumWidth, 288) : 0
         var preview = mode === 1 ? boundedWidth(previewWidth, 320, 2400, 420) : 0
         var review = showReview ? boundedWidth(reviewWidth, 240, 640, 320) : 0
-        var documentMinimum = mode === 1 ? 480 : 320
+        var documentMinimum = mode === 1 ? splitSourceMinimumWidth : 320
         var excess = Math.max(0, organizer + files + preview + review + documentMinimum - width)
         var reduction = showOrganizer ? Math.min(excess, organizer - 184) : 0
         organizer -= reduction
@@ -112,13 +115,58 @@ QtObject {
     // Call only for a user resize; never pass an automatically contracted width.
     function updateWidth(pane, width) {
         if (pane === "organizer")
-            organizerWidth = boundedWidth(width, 184, 288, organizerWidth)
+            organizerWidth = boundedWidth(width, 184, organizerMaximumWidth, organizerWidth)
         else if (pane === "files")
-            fileWidth = boundedWidth(width, 232, 420, fileWidth)
+            fileWidth = boundedWidth(width, 232, fileMaximumWidth, fileWidth)
         else if (pane === "preview")
             previewWidth = boundedWidth(width, 320, 2400, previewWidth)
         else if (pane === "review")
             reviewWidth = boundedWidth(width, 240, 640, reviewWidth)
+    }
+
+    function splitResizeWidths() {
+        return { organizer: effectiveOrganizerWidth, files: effectiveFileWidth,
+                 preview: effectivePreviewWidth, review: effectiveReviewWidth,
+                 source: effectiveSourceWidth }
+    }
+
+    // In Split, the Source pane fills the leftover space. Once it reaches
+    // its minimum, a wider navigation pane can take spare width from the
+    // preview and then the other resizable panes.
+    function resizeSplitSidebar(pane, requested, start) {
+        var isOrganizer = pane === "organizer"
+        var minimum = isOrganizer ? 184 : 232
+        var next = boundedWidth(requested, minimum, isOrganizer ? organizerMaximumWidth : fileMaximumWidth, start[pane])
+        var spareSource = Math.max(0, start.source - splitSourceMinimumWidth)
+        var need = Math.max(0, next - start[pane] - spareSource)
+        var preview = start.preview - Math.min(need, start.preview - 320)
+        need -= start.preview - preview
+        var other = isOrganizer ? start.files : start.organizer
+        if (other > 0) {
+            var freed = Math.min(need, other - (isOrganizer ? 232 : 184))
+            other -= freed
+            need -= freed
+        }
+        var review = start.review
+        if (review > 0) {
+            var freedReview = Math.min(need, review - 240)
+            review -= freedReview
+            need -= freedReview
+        }
+        next -= need
+        var organizer = isOrganizer ? next : other
+        var files = isOrganizer ? other : next
+        if (organizer === effectiveOrganizerWidth && files === effectiveFileWidth &&
+                preview === effectivePreviewWidth && review === effectiveReviewWidth)
+            return
+
+        _batching = true
+        if (organizer > 0) organizerWidth = organizer
+        if (files > 0) fileWidth = files
+        previewWidth = preview
+        if (review > 0) reviewWidth = review
+        _batching = false
+        recalculate(false)
     }
 
     function saveState() {
@@ -126,8 +174,8 @@ QtObject {
             reviewVisible: reviewVisible,
             layoutMode: desiredMode(), liveEditEnabled: liveEditEnabled,
             lastEditingLayoutMode: lastEditingLayoutMode === 1 ? 1 : 0,
-            organizerWidth: boundedWidth(organizerWidth, 184, 288, 208),
-            fileWidth: boundedWidth(fileWidth, 232, 420, 288),
+            organizerWidth: boundedWidth(organizerWidth, 184, organizerMaximumWidth, 208),
+            fileWidth: boundedWidth(fileWidth, 232, fileMaximumWidth, 288),
             previewWidth: boundedWidth(previewWidth, 320, 2400, 420),
             reviewWidth: boundedWidth(reviewWidth, 240, 640, 320) }
     }
@@ -154,8 +202,8 @@ QtObject {
         liveEditEnabled = restoredVisual || (typeof state.liveEditEnabled === "boolean" ? state.liveEditEnabled : false)
         lastEditingLayoutMode = restoredMode !== 2 ? restoredMode
                 : state.version === 2 && state.lastEditingLayoutMode === 1 ? 1 : 0
-        organizerWidth = boundedWidth(state.organizerWidth, 184, 288, 208)
-        fileWidth = boundedWidth(state.fileWidth, 232, 420, 288)
+        organizerWidth = boundedWidth(state.organizerWidth, 184, organizerMaximumWidth, 208)
+        fileWidth = boundedWidth(state.fileWidth, 232, fileMaximumWidth, 288)
         previewWidth = boundedWidth(state.previewWidth, 320, 2400, 420)
         _batching = false
         recalculate(true)
@@ -181,6 +229,7 @@ QtObject {
     onPreviewWidthChanged: recalculate(false)
     onReviewWidthChanged: recalculate(false)
     onAvailableWidthChanged: recalculate(false)
+    onSplitSourceMinimumWidthChanged: recalculate(true)
     onActiveSurfaceChanged: recalculate(false)
     Component.onCompleted: recalculate(true)
 }

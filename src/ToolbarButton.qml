@@ -9,6 +9,7 @@ Button {
     property string hint: text
     property bool grouped: false
     property bool showDivider: false
+    property bool emphasizeCheck: false
     property real iconSize: 18
     property real iconStrokeWidth: 2
     readonly property var segments: grouped && parent ? Array.prototype.filter.call(parent.children, function(child) { return child.visible && child.grouped === true }) : []
@@ -89,8 +90,9 @@ Button {
             : control.checked ? (control.windowActive ? control.selectedColor : backend.palette.selectedRow)
             : control.hovered && control.enabled ? control.hoverColor
             : control.grouped ? "transparent" : control.restColor
-        border.width: control.focusIndicated ? 2 : control.grouped ? 0 : 1
-        border.color: control.focusIndicated ? backend.palette.focus : control.outlineColor
+        readonly property bool emphasized: control.focusIndicated || (control.emphasizeCheck && control.checked)
+        border.width: emphasized ? 2 : control.grouped ? 0 : 1
+        border.color: emphasized ? backend.palette.focus : control.outlineColor
         opacity: control.enabled ? 1 : 0.55
         Rectangle {
             objectName: "toolbarSegmentDivider"

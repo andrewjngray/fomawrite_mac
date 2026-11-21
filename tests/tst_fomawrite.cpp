@@ -348,6 +348,18 @@ private slots:
     void pdfCaretIntoAnItemShowsItOnThePage();
     void pdfDragSelectingFromAHighlightStillSelects();
     void pdfNoteToolButtonMenuItemAndShortcut();
+#if defined(Q_OS_MACOS) || defined(Q_OS_WIN)
+    void pdfToolbarRotatesCurrentAndSelectedPages();
+    void pdfToolbarMakesTheActiveToolClear();
+    void pdfFitPageShowsWholePageAndRemembersTheMode();
+    void splitSourceFindCentersTypedText();
+    void pdfNotePinCopiesAndShowsAHoverCard();
+    void pdfNoteCardDragsAndKeepsCreationDetails();
+    void pdfSplitNavigationDividersBorrowRoomAtTheSourceMinimum();
+    void pdfSplitFitsWiderSidebarsInTheSameWindow();
+    void pdfNoteDraftCommitsAndCancelsInPdfOnlyView();
+    void pdfNoteDraftEditsTheFullBodyWithoutTouchingOtherNotes();
+#endif
     void pdfReanchoredMarksAreDrawnAtTheQuoteAndRemovable();
     void pdfUnplacedItemsAreNotDrawnAndAreListed();
     void pdfClickingAnUnplacedRowRevealsItInTheNotes();
@@ -6446,3 +6458,12 @@ int main(int argc, char **argv) {
 #include "cycle165-pdf-saving.inc"
 #include "cycle166-pdf-controls.inc"
 #include "windows-pdf-menu.inc"
+#include "cycle167-pdf-note-editor.inc"
+
+#include "cycle168-pdf-toolbar.inc"
+
+#include "cycle169-pdf-note-card.inc"
+
+#include "cycle170-split-resizing.inc"
+
+#include "cycle171-pdf-widths.inc"

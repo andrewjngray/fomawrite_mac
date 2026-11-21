@@ -63,7 +63,7 @@ struct WindowsPdfMenuFixture {
         return QTest::qWaitFor([&] { return !p.w.backend.pdf()->active(); }, 5000);
     }
 };
-const QStringList WindowsPdfMenuCommands{"goToPage", "zoomIn", "zoomOut", "actualSize", "fitWidth", "thumbnails", "inspector", "find"};
+const QStringList WindowsPdfMenuCommands{"goToPage", "zoomIn", "zoomOut", "actualSize", "fitWidth", "fitPage", "thumbnails", "inspector", "find"};
 const QStringList WindowsMarkdownMenus{"&File", "&Edit", "F&ormat", "Authors", "&View", "Window", "F&ocus", "&Go", "&Help"};
 }
 
@@ -94,7 +94,7 @@ void FomawriteTest::windowsPdfMenuIsPresentOnlyInPdfMode() {
         QCOMPARE(m.pdfMenu(), menu);
         QCOMPARE(m.pdfBarItems(), 1);
         QCOMPARE(m.focusMenuEntries(), 1);
-        // Eight items, in the Mac menu's order and wording, all enabled.
+        // The navigation and view items are enabled and use the same labels as the PDF toolbar.
         QStringList texts;
         for (const QString &command : WindowsPdfMenuCommands) {
             auto *item = m.item(command);
@@ -102,7 +102,7 @@ void FomawriteTest::windowsPdfMenuIsPresentOnlyInPdfMode() {
             QVERIFY2(item->property("enabled").toBool(), qPrintable(command));
             texts << item->property("text").toString();
         }
-        QCOMPARE(texts, QStringList({"Go to Page…", "Zoom In", "Zoom Out", "Actual Size", "Zoom to Fit Width",
+        QCOMPARE(texts, QStringList({"Go to Page…", "Zoom In", "Zoom Out", "Actual Size", "Zoom to Fit Width", "Fit Page",
                                      "Show Thumbnails", "Show Inspector", "Find in PDF…"}));
         // A second PDF replaces the first without a second menu.
         QVERIFY(m.openPdf(f.url("navigation.pdf")));
@@ -164,6 +164,8 @@ void FomawriteTest::windowsPdfMenuItemsDriveThePane() {
     QCOMPARE(p.reader->property("zoomMode").toString(), QStringLiteral("fixed"));
     QVERIFY(trigger("fitWidth"));
     QTRY_COMPARE(p.reader->property("zoomMode").toString(), QStringLiteral("fit"));
+    QVERIFY(trigger("fitPage"));
+    QTRY_COMPARE(p.reader->property("zoomMode").toString(), QStringLiteral("fitPage"));
     QCOMPARE(m.item("thumbnails")->property("text").toString(), QStringLiteral("Show Thumbnails"));
     QVERIFY(trigger("thumbnails"));
     QTRY_VERIFY(p.item("pdfThumbnails")->isVisible());

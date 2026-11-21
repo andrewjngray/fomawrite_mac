@@ -443,6 +443,7 @@ Platform.MenuBar {
         Platform.MenuItem { objectName: "pdfMenuActualSize"; text: "Actual Size"; enabled: win.pdfMode && !!win.pdfReader && win.pdfReader.ready; onTriggered: win.pdfCommand("actualSize") }
         Platform.MenuItem { objectName: "pdfMenuFitWidth"; text: "Zoom to Fit Width"; enabled: win.pdfMode && !!win.pdfReader && win.pdfReader.ready; onTriggered: win.pdfCommand("fitWidth") }
         Platform.MenuSeparator {}
+        Platform.MenuItem { objectName: "pdfMenuFitPage"; text: "Fit Page"; enabled: win.pdfMode && !!win.pdfReader && win.pdfReader.ready; onTriggered: win.pdfCommand("fitPage") }
         Platform.MenuItem { objectName: "pdfMenuThumbnails"; text: backend.pdf.thumbnailsVisible ? "Hide Thumbnails" : "Show Thumbnails"; enabled: win.pdfMode; onTriggered: win.pdfCommand("thumbnails") }
         Platform.MenuItem { objectName: "pdfMenuInspector"; text: "Show Inspector"; shortcut: "Ctrl+Alt+I"; enabled: win.pdfMode && !!win.pdfReader && win.pdfReader.ready; onTriggered: win.pdfCommand("inspector") }
         Platform.MenuSeparator {}

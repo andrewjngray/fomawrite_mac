@@ -1,10 +1,8 @@
 import QtQuick
 import QtQuick.Controls
 
-// The PDF pane's toolbar, in Preview's order: thumbnails · zoom out, actual
-// size, zoom in · fit width · page · highlighter · note · Inspector · find. Narrow
-// panes fold actual size, then fit width, then thumbnails, then the Inspector
-// into a "more" menu, and last the "of N" beside the page field.
+// Reading and markup stay together. Narrow panes move secondary actions
+// into the overflow menu while keeping the page field and common tools in reach.
 Rectangle {
     id: bar
     objectName: "pdfToolbar"
@@ -22,20 +20,24 @@ Rectangle {
 
     readonly property real sideMargin: 12
     readonly property real spacing: 6
-    readonly property var foldOrder: ["actual", "fit", "thumbnails", "inspector", "count"]
-    readonly property var foldWidths: ({ actual: 54, fit: 34 + spacing, thumbnails: 34 + spacing, inspector: 34 + spacing,
+    readonly property var foldOrder: ["actual", "fit", "thumbnails", "inspector", "rotate", "count"]
+    readonly property var foldWidths: ({ actual: 54, fit: fitGroup.implicitWidth + spacing, thumbnails: 34 + spacing, inspector: 34 + spacing,
+                                         rotate: rotateButton.implicitWidth + spacing,
                                          count: pageCountLabel.implicitWidth + pageCluster.spacing })
     readonly property real baseWidth: 2 * sideMargin + 66 + spacing + pageField.width + spacing + highlighter.implicitWidth + spacing + 34 + 12 + 34
         + (unplacedCount > 0 ? unplacedButton.implicitWidth + spacing : 0)
     readonly property var plan: {
-        var shown = { actual: true, fit: true, thumbnails: true, inspector: true, count: true };
+        var shown = { actual: true, fit: true, thumbnails: true, inspector: true, rotate: reader.enhancedPdfToolbar, count: true };
         var folded = false;
         function total() {
             var sum = bar.baseWidth;
             for (var key in shown) if (shown[key]) sum += bar.foldWidths[key];
             return sum + (folded ? 34 + bar.spacing : 0);
         }
-        for (var i = 0; i < foldOrder.length && total() > width; ++i) { shown[foldOrder[i]] = false; folded = true; }
+        for (var i = 0; i < foldOrder.length && total() > width; ++i) {
+            var control = foldOrder[i];
+            if (shown[control]) { shown[control] = false; folded = true; }
+        }
         shown.folded = folded;
         return shown;
     }
@@ -91,15 +93,35 @@ Rectangle {
                 onClicked: bar.reader.zoomIn()
             }
         }
-        ToolbarButton {
-            objectName: "pdfFitWidth"
+        ToolbarGroup {
+            id: fitGroup
             visible: bar.plan.fit
-            iconName: "fit-width"
-            hint: "Zoom to fit width"
-            checked: bar.reader.zoomMode === "fit"
-            enabled: bar.controlsEnabled
-            focusPolicy: Qt.TabFocus
-            onClicked: bar.reader.fitWidth()
+            horizontalPadding: bar.reader.enhancedPdfToolbar ? 1 : 0
+            ToolbarButton {
+                objectName: "pdfFitWidth"
+                grouped: bar.reader.enhancedPdfToolbar
+                iconName: "fit-width"
+                hint: "Zoom to fit width"
+                checked: bar.reader.zoomMode === "fit"
+                enabled: bar.controlsEnabled
+                focusPolicy: Qt.TabFocus
+                onClicked: bar.reader.fitWidth()
+            }
+            ToolbarButton {
+                id: zoomModesButton
+                objectName: "pdfZoomModes"
+                visible: bar.reader.enhancedPdfToolbar
+                grouped: true
+                showDivider: true
+                implicitWidth: 18
+                iconName: "down"
+                iconSize: 12
+                hint: "PDF zoom modes"
+                checked: bar.reader.zoomMode === "fitPage"
+                enabled: bar.controlsEnabled
+                focusPolicy: Qt.TabFocus
+                onClicked: zoomModesMenu.popup(fitGroup, 0, fitGroup.height + 4)
+            }
         }
         Row {
             id: pageCluster
@@ -168,6 +190,7 @@ Rectangle {
                 focusPolicy: Qt.TabFocus
                 iconName: "highlight"
                 checked: bar.reader.markingMode
+                emphasizeCheck: bar.reader.enhancedPdfToolbar
                 hint: bar.reader.markingMode ? "Stop marking"
                     : bar.reader.selectionText !== "" ? highlighter.verb + " the selected text"
                     : highlighter.verb + " text as you select it"
@@ -204,10 +227,35 @@ Rectangle {
             iconName: "note"
             hint: bar.reader.noteTool ? "Cancel note" : "Add a note to the page"
             checked: bar.reader.noteTool
+            emphasizeCheck: bar.reader.enhancedPdfToolbar
             enabled: bar.controlsEnabled && !!bar.reader.marks
             focusPolicy: Qt.TabFocus
             onClicked: bar.reader.armNote()
         }
+        ToolbarButton {
+            id: rotateButton
+            objectName: "pdfRotate"
+            visible: bar.plan.rotate
+            iconName: "rotate"
+            hint: "Rotate " + (bar.reader.pageTargets.length > 1 ? "selected pages" : "page")
+            enabled: bar.controlsEnabled && !bar.reader.noteDraftOpen
+            focusPolicy: Qt.TabFocus
+            onClicked: rotateMenu.popup(rotateButton, 0, rotateButton.height + 4)
+        }
+    }
+
+    CompactMenu {
+        id: rotateMenu
+        objectName: "pdfRotateMenu"
+        CompactMenuItem { objectName: "pdfToolbarRotateLeft"; text: "Rotate Left"; onTriggered: bar.reader.rotateSelectedPages(-90) }
+        CompactMenuItem { objectName: "pdfToolbarRotateRight"; text: "Rotate Right"; onTriggered: bar.reader.rotateSelectedPages(90) }
+    }
+
+    CompactMenu {
+        id: zoomModesMenu
+        objectName: "pdfZoomModesMenu"
+        PdfToolMenuItem { text: "Fit Width"; ticked: bar.reader.zoomMode === "fit"; onTriggered: bar.reader.fitWidth() }
+        PdfToolMenuItem { objectName: "pdfFitPage"; text: "Fit Page"; ticked: bar.reader.zoomMode === "fitPage"; onTriggered: bar.reader.fitPage() }
     }
 
     CompactMenu {
@@ -280,5 +328,8 @@ Rectangle {
         CompactMenuItem { objectName: "pdfOverflowFitWidth"; text: "Zoom to Fit Width"; visible: !bar.plan.fit; height: visible ? implicitHeight : 0; onTriggered: bar.reader.fitWidth() }
         CompactMenuItem { objectName: "pdfOverflowThumbnails"; text: bar.reader.thumbnailsShown ? "Hide Thumbnails" : "Show Thumbnails"; visible: !bar.plan.thumbnails; height: visible ? implicitHeight : 0; onTriggered: bar.reader.toggleThumbnails() }
         CompactMenuItem { objectName: "pdfOverflowInspector"; text: "Show Inspector"; visible: !bar.plan.inspector; height: visible ? implicitHeight : 0; onTriggered: bar.reader.showInspector() }
+        CompactMenuItem { objectName: "pdfOverflowFitPage"; text: "Fit Page"; visible: bar.reader.enhancedPdfToolbar && !bar.plan.fit; height: visible ? implicitHeight : 0; onTriggered: bar.reader.fitPage() }
+        CompactMenuItem { objectName: "pdfOverflowRotateLeft"; text: "Rotate Left"; visible: bar.reader.enhancedPdfToolbar && !bar.plan.rotate; height: visible ? implicitHeight : 0; onTriggered: bar.reader.rotateSelectedPages(-90) }
+        CompactMenuItem { objectName: "pdfOverflowRotateRight"; text: "Rotate Right"; visible: bar.reader.enhancedPdfToolbar && !bar.plan.rotate; height: visible ? implicitHeight : 0; onTriggered: bar.reader.rotateSelectedPages(90) }
     }
 }

@@ -1,7 +1,9 @@
 #include "pdfmarks.h"
 #include "pdfsession.h"
 
+#include <QDateTime>
 #include <QSettings>
+#include <QUrl>
 #include <cmath>
 
 namespace {
@@ -62,6 +64,10 @@ QVariantList PdfMarks::rects(int page, int start, int length) const {
 bool PdfMarks::applyEdit(const PdfNotes::Edit &edit) {
     emit editStarting();
     return m_apply(edit);
+}
+
+static QString noteAuthor(const PdfNotes::Item &item) {
+    return QUrl::fromPercentEncoding(item.value(QStringLiteral("author")).toLatin1());
 }
 
 // A note's text as plain text for the page's popover: its lines trimmed, blank lines kept, cut at 800 characters.
@@ -140,6 +146,7 @@ void PdfMarks::refresh() {
                     {QStringLiteral("y"), at.y()},
                     {QStringLiteral("placed"), valid},
                     {QStringLiteral("text"), noteText(now.text, item)},
+                    {QStringLiteral("author"), noteAuthor(item)},
                     {QStringLiteral("marker"), now.text.mid(item.markerStart, item.markerEnd - item.markerStart)}});
                 continue;
             }
@@ -235,7 +242,15 @@ bool PdfMarks::recolourMark(int index, const QString &colour) {
     return true;
 }
 
-int PdfMarks::placeNote(int page, double x, double y) {
+static QString draftBody(QString body) {
+    body.replace(QStringLiteral("\r\n"), QStringLiteral("\n"));
+    body.replace(QLatin1Char('\r'), QLatin1Char('\n'));
+    while (body.startsWith(QLatin1Char('\n'))) body.remove(0, 1);
+    while (body.endsWith(QLatin1Char('\n'))) body.chop(1);
+    return body;
+}
+
+int PdfMarks::placeNote(int page, double x, double y, const QString &body, const QString &author) {
     if (!ready() || page < 0 || page >= m_session->pageCount()) return -1;
     if (refuseInserted(page)) return -1;
     const QPoint at = baselinePoint(page, x, y);
@@ -243,10 +258,72 @@ int PdfMarks::placeNote(int page, double x, double y) {
     note.page = m_session->baselinePageForWorking(page) + 1;
     note.x = at.x();
     note.y = at.y();
-    const PdfNotes::NoteInsert insert = PdfNotes::insertNote(m_text(), note, m_session->fileName(), m_session->linkLabel(page));
+    if (!body.trimmed().isEmpty()) {
+        note.author = author.trimmed();
+#if defined(Q_OS_WIN)
+        if (note.author.isEmpty()) note.author = qEnvironmentVariable("USERNAME").trimmed();
+#elif defined(Q_OS_MACOS)
+        if (note.author.isEmpty()) note.author = qEnvironmentVariable("USER").trimmed();
+#endif
+        note.created = QDateTime::currentDateTimeUtc().toString(Qt::ISODate);
+    }
+    const PdfNotes::NoteInsert insert = PdfNotes::insertNote(m_text(), note, m_session->fileName(),
+                                                            m_session->linkLabel(page), draftBody(body));
     if (insert.edit.isEmpty() || !applyEdit(insert.edit)) return -1;
     refresh();
     return insert.caret;
+}
+
+QVariantMap PdfMarks::noteDraft(int index) {
+    if (!ready()) return {};
+    const Current now = current();
+    const int i = currentIndex(now, index);
+    if (i < 0) return {};
+    const PdfNotes::Item &item = now.document.items.at(i);
+    if (item.kind != QLatin1String("note")) return {};
+    return {
+        {QStringLiteral("marker"), now.text.mid(item.markerStart, item.markerEnd - item.markerStart)},
+        {QStringLiteral("body"), now.text.mid(item.bodyStart, item.contentEnd - item.bodyStart)},
+        {QStringLiteral("author"), noteAuthor(item)},
+        {QStringLiteral("created"), item.value(QStringLiteral("created"))}
+    };
+}
+
+bool PdfMarks::validNoteDraft(const QString &body) const {
+    return PdfNotes::canUseNoteBody(draftBody(body));
+}
+
+int PdfMarks::matchingNoteIndex(const Current &now, int index, const QString &marker, const QString &previous) const {
+    const int i = currentIndex(now, index);
+    if (i < 0) return -1;
+    const PdfNotes::Item &item = now.document.items.at(i);
+    if (item.kind != QLatin1String("note")
+        || now.text.mid(item.markerStart, item.markerEnd - item.markerStart) != marker
+        || now.text.mid(item.bodyStart, item.contentEnd - item.bodyStart) != previous) return -1;
+    return i;
+}
+
+bool PdfMarks::editNote(int index, const QString &marker, const QString &previous, const QString &body) {
+    if (!ready()) return false;
+    const Current now = current();
+    const int i = matchingNoteIndex(now, index, marker, previous);
+    if (i < 0) return false;
+    if (body == previous) return true;
+    const PdfNotes::Edit edit = PdfNotes::replaceNoteBody(now.text, now.document.items.at(i), draftBody(body));
+    if (edit.isEmpty() || !applyEdit(edit)) return false;
+    refresh();
+    return true;
+}
+
+bool PdfMarks::deleteNote(int index, const QString &marker, const QString &previous) {
+    if (!ready()) return false;
+    const Current now = current();
+    const int i = matchingNoteIndex(now, index, marker, previous);
+    if (i < 0) return false;
+    const PdfNotes::Edit edit = PdfNotes::removeMark(now.text, now.document.items.at(i), {}, true);
+    if (edit.isEmpty() || !applyEdit(edit)) return false;
+    refresh();
+    return true;
 }
 
 bool PdfMarks::moveNote(int index, double x, double y) {

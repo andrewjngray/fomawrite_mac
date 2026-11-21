@@ -146,6 +146,13 @@ Item {
             case "code": c.moveTo(8,7); c.lineTo(3,12); c.lineTo(8,17); c.moveTo(16,7); c.lineTo(21,12); c.lineTo(16,17); line(14,5,10,19); break
             case "highlight":
                 c.moveTo(15,4); c.lineTo(20,9); c.lineTo(11,18); c.lineTo(6,13); c.closePath(); line(6,13,4,19); line(4,19,11,18); line(13,21.5,21,21.5); break
+            case "delete":
+                line(5,7,19,7); c.moveTo(7,7); c.lineTo(8,20); c.lineTo(16,20); c.lineTo(17,7)
+                c.moveTo(10,7); c.lineTo(10,4); c.lineTo(14,4); c.lineTo(14,7); break
+            case "note-bubble":
+                c.moveTo(5,4); c.lineTo(19,4); c.quadraticCurveTo(21,4,21,6); c.lineTo(21,15)
+                c.quadraticCurveTo(21,17,19,17); c.lineTo(11,17); c.lineTo(6,21); c.lineTo(6,17)
+                c.quadraticCurveTo(3,17,3,15); c.lineTo(3,6); c.quadraticCurveTo(3,4,5,4); c.closePath(); break
             case "note":
                 c.roundedRect(4,4,16,16,2.5,2.5); line(8,10,16,10); line(8,14,13,14); break
             case "clear-format": line(4,5,14,5); line(9,5,9,16); line(6,16,12,16); line(14,14,20,20); line(20,14,14,20); break
@@ -162,6 +169,10 @@ Item {
                 c.roundedRect(4,7,11.5,14,1.5,1.5); line(7.5,10.5,12,10.5); line(7.5,13.5,12,13.5); line(7.5,16.5,10.5,16.5)
                 c.moveTo(8.5,7); c.lineTo(8.5,4.5); c.quadraticCurveTo(8.5,3,10,3); c.lineTo(18.5,3)
                 c.quadraticCurveTo(20,3,20,4.5); c.lineTo(20,15.5); c.quadraticCurveTo(20,17,18.5,17); c.lineTo(15.5,17); break
+            case "rotate":
+                c.roundedRect(5,10,12,11,1.5,1.5)
+                c.moveTo(20,12); c.quadraticCurveTo(21,5,14,5); c.lineTo(9,5)
+                c.moveTo(12,2); c.lineTo(9,5); c.lineTo(12,8); break
             case "fit-width":
                 line(3,4,3,20); line(21,4,21,20); line(7,12,17,12)
                 c.moveTo(10,9); c.lineTo(7,12); c.lineTo(10,15); c.moveTo(14,9); c.lineTo(17,12); c.lineTo(14,15); break

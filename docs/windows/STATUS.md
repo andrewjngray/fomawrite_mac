@@ -1,5 +1,9 @@
 # Windows workstream status
 
+## Cycle 171 port
+
+Build `0.3.0-dev66` adds the PDF note editor and hover preview, toolbar Rotate and Fit Page, Source Find alignment, and wider PDF Split sidebars. Native ARM64 and x64 builds validate the port.
+
 ## Current launch setup — 31 October 2026 (Auckland)
 
 Double-click **[Launch.cmd](../../Launch.cmd)** in the Windows repo root. On the Mac,

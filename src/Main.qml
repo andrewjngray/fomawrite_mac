@@ -104,6 +104,7 @@ ApplicationWindow {
     }
     function undoEditing() {
         if (lifecycleInputBlocked) return;
+        if (pdfReader && pdfReader.noteDraftOpen) { pdfReader.undoNoteDraft(); return; }
         // The Live editor keeps its own history; undoing the mirrored document
         // underneath it would diverge the two. Route to the page instead.
         if (pdfOwnsKeyboard && (pdfPagesModified || backend.pdf.canRedoPageEdit)) {
@@ -116,6 +117,7 @@ ApplicationWindow {
     }
     function redoEditing() {
         if (lifecycleInputBlocked) return;
+        if (pdfReader && pdfReader.noteDraftOpen) { pdfReader.redoNoteDraft(); return; }
         if (pdfOwnsKeyboard && (pdfPagesModified || backend.pdf.canRedoPageEdit)) {
             pdfReader.redoPages();
             return;
@@ -540,6 +542,8 @@ ApplicationWindow {
         objectName: "workspaceLayout"
         availableWidth: Math.max(0, win.width - 3)
         Component.onCompleted: backend.liveEditingActive = liveEditEnabled
+        // PDF Split can use the compact Source controls to leave more room for navigation.
+        splitSourceMinimumWidth: (win.isMac || win.isWindows) && win.pdfMode ? 360 : 480
         activeSurface: win.lastWritingSurface
     }
     Connections {
@@ -579,6 +583,7 @@ ApplicationWindow {
     property bool savingPdf: false
 
     function saveDocument() {
+        if (pdfReader && pdfReader.noteDraftOpen && !pdfReader.finishNote()) return;
         if (pdfPagesModified) savePdfPages(false);
         else backend.save();
     }
@@ -617,7 +622,7 @@ ApplicationWindow {
     readonly property bool pdfFindOpen: !!pdfReader && pdfReader.findOpen
     // The PDF menu and toolbar commands. A command that needs the pane shows it first.
     function pdfCommand(command) {
-        if (!pdfReader) return;
+        if (!pdfReader || pdfReader.noteDraftOpen) return;
         var marking = command === "highlight" || command === "underline" || command === "strike";
         if (command !== "thumbnails" && command !== "copyQuote" && !marking) revealPdfPane();
         var reader = pdfReader;
@@ -632,6 +637,7 @@ ApplicationWindow {
         case "zoomOut": reader.zoomOut(); break;
         case "actualSize": reader.actualSize(); break;
         case "fitWidth": reader.fitWidth(); break;
+        case "fitPage": reader.fitPage(); break;
         case "thumbnails": reader.toggleThumbnails(); break;
         case "inspector": Qt.callLater(reader.showInspector); break;
         case "find": Qt.callLater(reader.openFind, false); break;
@@ -835,7 +841,7 @@ ApplicationWindow {
         if (workspaceLayout.effectiveLayoutMode !== 1) return;
         beginDocumentViewportTransition(true);
         var total = editorPane.width + previewSlotItem.width;
-        workspaceLayout.updateWidth("preview", Math.max(320, Math.min(total / 2, total - 480)));
+        workspaceLayout.updateWidth("preview", Math.max(320, Math.min(total / 2, total - workspaceLayout.splitSourceMinimumWidth)));
     }
     // Layout and editing choice are independent. Preview-only is a reading
     // action; returning to editing restores the last chosen arrangement.
@@ -1701,6 +1707,7 @@ ApplicationWindow {
     color: pageColor
 
     function prepareQuit() {
+        if (pdfReader && pdfReader.noteDraftOpen) { backend.cancelQuit(); return; }
         quitPreparationActive = true;
         return withCurrentDocument(function() {
             if (!quitPreparationActive) return;
@@ -1715,6 +1722,7 @@ ApplicationWindow {
         close();
     }
     onClosing: function(close) {
+        if (pdfReader && pdfReader.noteDraftOpen) { close.accepted = false; return; }
         if (closeConfirmed || (!backend.liveEditingActive && !documentModified)) {
             backend.notifyWindowClosed();
             return;
@@ -1867,6 +1875,7 @@ ApplicationWindow {
     }
 
     function requestHistory(direction) {
+        if (pdfReader && pdfReader.noteDraftOpen) return;
         return withCurrentDocument(function() {
             backend.rememberCursor(editor.cursorPosition);
             pendingHistoryDirection = direction;
@@ -1967,6 +1976,7 @@ ApplicationWindow {
     }
 
     function requestOpen(url) {
+        if (pdfReader && pdfReader.noteDraftOpen) return false;
         return withCurrentDocument(function() {
             var parts = documentLinkParts(url);
             if (parts.fragment !== "" && (parts.url === "" || parts.url === String(backend.fileUrl)))
@@ -1987,6 +1997,7 @@ ApplicationWindow {
     }
 
     function requestNewDocument() {
+        if (pdfReader && pdfReader.noteDraftOpen) return;
         return withCurrentDocument(function() {
             pendingAction = "new";
             if (documentModified) unsavedChangesDialog.open();
@@ -1995,6 +2006,7 @@ ApplicationWindow {
     }
 
     function requestCreateDocument(name, inNewWindow) {
+        if (pdfReader && pdfReader.noteDraftOpen) return;
         return withCurrentDocument(function() {
             workspaceLayout.filesVisible = true;
             if (inNewWindow) {
@@ -3055,7 +3067,7 @@ ApplicationWindow {
             visible: workspaceLayout.effectiveOrganizerVisible
             SplitView.preferredWidth: workspaceLayout.effectiveOrganizerWidth
             SplitView.minimumWidth: 184
-            SplitView.maximumWidth: 288
+            SplitView.maximumWidth: workspaceLayout.organizerMaximumWidth
             OrganizerPane {
                 id: organizerPane
                 anchors.fill: parent
@@ -3073,7 +3085,7 @@ ApplicationWindow {
             visible: workspaceLayout.effectiveFilesVisible
             SplitView.preferredWidth: workspaceLayout.effectiveFileWidth
             SplitView.minimumWidth: 232
-            SplitView.maximumWidth: 420
+            SplitView.maximumWidth: workspaceLayout.fileMaximumWidth
             LibraryPane {
                 id: libraryPane
                 anchors.fill: parent
@@ -3093,7 +3105,7 @@ ApplicationWindow {
             color: win.sourceSurfaceColor
             visible: workspaceLayout.effectiveLayoutMode !== 2
             SplitView.fillWidth: true
-            SplitView.minimumWidth: workspaceLayout.effectiveLayoutMode === 1 ? 480 : 320
+            SplitView.minimumWidth: workspaceLayout.effectiveLayoutMode === 1 ? workspaceLayout.splitSourceMinimumWidth : 320
 
         FormatBar {
             id: formatBar
@@ -3944,6 +3956,7 @@ ApplicationWindow {
             sourceComponent: PdfReader {
                 session: backend.pdf
                 marks: backend.pdfMarks
+                noteAuthor: workspaceSettings.authorshipProfileName
                 bottomInset: documentFooter.height
                 darkMode: win.darkMode
                 onOpenUrlRequested: function(link) { backend.openExternalUrl(link); }
@@ -3977,8 +3990,46 @@ ApplicationWindow {
         }
     }
 
-    // SplitView consumes pointer events on its delegates. Own both gestures in
-    // this narrow document gutter; navigation dividers retain native resizing.
+    // Qt's native sidebar dividers only take spare width from the fill pane.
+    // In Split, let a sidebar also borrow from the adjoining visible panes.
+    Repeater {
+        model: ["organizer", "files"]
+        delegate: MouseArea {
+            required property string modelData
+            readonly property Item sidebar: modelData === "organizer" ? organizerSlot : filesSlot
+            visible: sidebar.visible && editorPane.visible && win.previewSlotItem.visible
+            objectName: modelData + "SplitResize"
+            x: workspaceSplit.x + sidebar.x + sidebar.width - 4
+            y: workspaceSplit.y
+            width: 9
+            height: Math.max(0, workspaceSplit.height - documentFooter.height)
+            z: 1
+            acceptedButtons: Qt.LeftButton
+            hoverEnabled: true
+            preventStealing: true
+            cursorShape: Qt.SplitHCursor
+            property real pressX
+            property var startingWidths: null
+            onPressed: function(mouse) {
+                pressX = mapToItem(win.contentItem, mouse.x, mouse.y).x;
+                startingWidths = workspaceLayout.splitResizeWidths();
+            }
+            onPositionChanged: function(mouse) {
+                if (!pressed || !startingWidths) return;
+                var delta = mapToItem(win.contentItem, mouse.x, mouse.y).x - pressX;
+                workspaceLayout.resizeSplitSidebar(modelData, startingWidths[modelData] + delta, startingWidths);
+            }
+            onReleased: startingWidths = null
+            onCanceled: startingWidths = null
+            Rectangle {
+                x: 4; width: 1; height: parent.height
+                visible: parent.containsMouse || parent.pressed
+                color: backend.palette.focus
+            }
+        }
+    }
+
+    // The document gutter also keeps reading position and supports double-click to balance.
     MouseArea {
         id: documentDividerGestures
         objectName: "documentDividerGestures"
@@ -4014,7 +4065,7 @@ ApplicationWindow {
             if (!pressed || balanceOnRelease || !readingAnchors) return;
             var delta = mapToItem(win.contentItem, mouse.x, mouse.y).x - pressSceneX;
             var total = editorPane.width + win.previewSlotItem.width;
-            var next = Math.max(320, Math.min(total - 480, pressPreviewWidth - delta));
+            var next = Math.max(320, Math.min(total - workspaceLayout.splitSourceMinimumWidth, pressPreviewWidth - delta));
             if (Math.abs(next - win.previewSlotItem.width) < 0.5) return;
             preserveReadingPosition();
             workspaceLayout.updateWidth("preview", next);
@@ -4060,7 +4111,7 @@ ApplicationWindow {
         layoutMode: workspaceLayout.effectiveLayoutMode
         pdfMode: win.pdfMode
         liveEditing: workspaceLayout.liveEditEnabled
-        canSplit: workspaceLayout.availableWidth >= 800
+        canSplit: workspaceLayout.availableWidth >= workspaceLayout.splitSourceMinimumWidth + 320
         sourcePaneWidth: editorPane.visible ? editorPane.width : 0
         previewPaneStart: win.previewSlotItem.visible ? win.previewSlotItem.x - x : width
         writingAppearance: workspaceLayout.liveEditEnabled ? backend.publishingThemeName : win.codeAppearance ? "Code" : win.activeWritingAppearance === "editorial" ? "Editorial" : win.activeWritingAppearance === "book" ? "Book" : win.activeWritingAppearance === "omawrite" ? "Omawrite" : "Manuscript"

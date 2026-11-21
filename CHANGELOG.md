@@ -4,6 +4,13 @@ One line per cycle, newest first. Each line links to the cycle's record under `r
 
 ## 0.3.0 development series (Cycles 97–)
 
+- **171** — Wider sidebars in Mac PDF Split (in review). Let Source compact to 360 px and raise the Library and file-list caps. [Record](research/cycle-171/README.md)
+- **170** — Split pane divider resizing (in review). The Library and file-list dividers can borrow unused width from Preview when Source reaches its minimum. [Record](research/cycle-170/README.md)
+- **169** — Mac Source Find and PDF note cards (in review). Centre search text, copy and preview notes from their pins, and move the editor with its creation details visible. [Record](research/cycle-169/README.md)
+- **168** — Mac PDF toolbar (in review). Rotate current or selected pages, see the active markup tool, and fit the whole page in the viewport. [Record](research/cycle-168/README.md)
+- **167** — Mac PDF note popover (in review). Add and edit notes beside their pins in PDF view, with the existing Markdown companion as the backing file. [Record](research/cycle-167/README.md)
+- **166** — PDF page controls and Save (in review): select, rotate, reorder, delete, insert and export pages. Save confirms conflicts and starts fresh page history, and resets notes history when references are rewritten. [Record](research/cycle-166/README.md)
+
 - **Mac cycle 165 merged into Windows (19 Nov): page edits with qpdf** — Mac record `research/cycle-165/README-mac.md`. `PdfEditor` (qpdf 12), safe PDF saving (`pdffiles`, with a `MoveFileExW` replace on Windows) and pending page edits come with the merge; no interface yet. The Windows build now gets qpdf from vcpkg (pinned baseline, binary cache) and the package ships qpdf's DLLs with their licence notices.
   Windows record: vcpkg commit `9eec002df1cd109f8f104cd966a763daf9751489` (tag 2026.10.16, qpdf 12.4.2) pinned in `windows/vcpkg-baseline.txt`; built by `bin/windows/vcpkg-qpdf.ps1`; binary cache key `vcpkg-qpdf-<arch>-<hash of the baseline file and script>`. DLLs added: `qpdf30.dll` (Apache-2.0), `z.dll` (zlib), `jpeg62.dll` (libjpeg-turbo, BSD-3-Clause/IJG/zlib); no OpenSSL. Package grew about 1.1 MB zipped (x64 168.7 to 169.9 MB, ARM64 157.9 to 159.0 MB). `PdfFiles` on Windows writes its temporary with a plain `QFile` (a `QTemporaryFile` blocked `MoveFileExW`: error 32). CI: Windows run 44506354001, green on x64 and ARM64 with the launch and update checks (the cache was saved by this run; a cache hit is not yet observed).
 

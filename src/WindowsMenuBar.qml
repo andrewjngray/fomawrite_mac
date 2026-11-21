@@ -133,6 +133,7 @@ MenuBar {
         MenuItem { objectName: "windows_pdf_zoomOut"; text: "Zoom Out"; enabled: root.pdfMenu.ready && win.pdfReader.zoom > win.pdfReader.minimumZoom + 0.001; onTriggered: root.dispatch(function() { win.pdfCommand("zoomOut") }) }
         MenuItem { objectName: "windows_pdf_actualSize"; text: "Actual Size"; enabled: root.pdfMenu.ready; onTriggered: root.dispatch(function() { win.pdfCommand("actualSize") }) }
         MenuItem { objectName: "windows_pdf_fitWidth"; text: "Zoom to Fit Width"; enabled: root.pdfMenu.ready; onTriggered: root.dispatch(function() { win.pdfCommand("fitWidth") }) }
+        MenuItem { objectName: "windows_pdf_fitPage"; text: "Fit Page"; enabled: root.pdfMenu.ready; onTriggered: root.dispatch(function() { win.pdfCommand("fitPage") }) }
         MenuSeparator {}
         MenuItem { objectName: "windows_pdf_thumbnails"; text: backend.pdf.thumbnailsVisible ? "Hide Thumbnails" : "Show Thumbnails"; enabled: win.pdfMode; onTriggered: root.dispatch(function() { win.pdfCommand("thumbnails") }) }
         MenuItem { objectName: "windows_pdf_inspector"; text: "Show Inspector"; enabled: root.pdfMenu.ready; onTriggered: root.dispatch(function() { win.pdfCommand("inspector") }) }

@@ -144,6 +144,7 @@ void FomawriteTest::pdfNotePlacedByClickIsOneUndoStepInSource() {
     Cycle160Fixtures f; QVERIFY(f.make());
     Cycle161Pane p; QVERIFY2(p.start(), qPrintable(p.w.error));
     QVERIFY(p.open(f.url("geometry.pdf")));
+    QVERIFY(p.reader->setProperty("inPageNoteEditing", false));
     QTRY_VERIFY(p.page(0));
     QCOMPARE(p.w.layout->property("effectiveLayoutMode").toInt(), 2);
     auto *button = p.item("pdfNote"); QVERIFY(button);
@@ -190,6 +191,7 @@ void FomawriteTest::pdfNotePlacedByClickIsOneUndoStepInLive() {
     Cycle160Fixtures f; QVERIFY(f.make());
     Cycle161Pane p; QVERIFY2(p.start(), qPrintable(p.w.error));
     QVERIFY(p.open(f.url("geometry.pdf")));
+    QVERIFY(p.reader->setProperty("inPageNoteEditing", false));
     p.w.layout->setProperty("layoutMode", 1);
     QTRY_COMPARE(p.w.layout->property("effectiveLayoutMode").toInt(), 1);
     QTRY_VERIFY(p.page(0));
@@ -228,6 +230,7 @@ void FomawriteTest::pdfNotePinLandsWhereClickedOnEveryRotation() {
     Cycle160Fixtures f; QVERIFY(f.make());
     Cycle161Pane p; QVERIFY2(p.start(), qPrintable(p.w.error));
     QVERIFY(cycle164Open(p, f, QString(), 2));
+    QVERIFY(p.reader->setProperty("inPageNoteEditing", false));
     for (int page = 0; page < 5; ++page) {
         QVERIFY(p.reader->setProperty("noteTool", true));
         const QPointF points(180, 260);
@@ -274,6 +277,7 @@ void FomawriteTest::pdfNotePopoverMoveAndRemove() {
     const QString notes = QStringLiteral("My notes\n\n## [Page 1](geometry.pdf#page=1)\n\n") + cycle164Marker(1, 300, 400)
         + QStringLiteral("\nAsk about the return date.\n\nMore.\n");
     QVERIFY(cycle164Open(p, f, notes));
+    QVERIFY(p.reader->setProperty("inPageNoteEditing", false));
     QTRY_COMPARE(cycle164Pins(p).size(), 1);
     p.reveal(0, QPointF(300, 400));
     auto popover = [&]() -> QQuickItem * {
@@ -359,6 +363,7 @@ void FomawriteTest::pdfClickOnMarkOrPinShowsItsItemInTheNotes() {
     QString filler;
     for (int i = 0; i < 120; ++i) filler += QStringLiteral("Filler line %1 of the notes.\n\n").arg(i);
     QVERIFY(cycle164Open(p, f, filler));
+    QVERIFY(p.reader->setProperty("inPageNoteEditing", false));
     PdfMarks *marks = p.w.backend.pdfMarks();
     PdfSession *pdf = p.w.backend.pdf();
     QCOMPARE(marks->mark("highlight", "yellow", 0, int(pdf->pageText(0).indexOf("ALPHA")), 5), QStringLiteral("added"));

@@ -273,6 +273,9 @@ void FomawriteTest::pdfSavingDoesNotReloadThePdf() {
     QVERIFY(s.pdf()->movePages({2}, 0));
     QVERIFY(s.backend()->savePdf());
     const int revision = s.pdf()->revision();
+    // Deliver a change notification even on platforms that suppress the
+    // notification from our atomic replace. The bytes still match the baseline.
+    QVERIFY(PdfFixtures::write(s.path, s.pdf()->baselineBytes()));
     QTest::qWait(1200); // well past the watcher's debounce
     QCOMPARE(s.pdf()->revision(), revision);
     QVERIFY(!s.pdf()->changedOnDiskWhileEditing());
