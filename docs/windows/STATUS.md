@@ -1,8 +1,24 @@
 # Windows workstream status
 
-## Cycle 171 port
+## Cycle 171 — 22 November 2026
 
-Build `0.3.0-dev66` adds the PDF note editor and hover preview, toolbar Rotate and Fit Page, Source Find alignment, and wider PDF Split sidebars. Native ARM64 and x64 builds validate the port.
+Build `0.3.0-dev66` adds the PDF note editor and hover preview, toolbar Rotate and Fit Page, Source Find alignment, and wider PDF Split sidebars. Both native jobs passed (ARM64 528 and x64 528 Qt checks with zero failures or skips), including deployed-app checks. The launch and update job also passed. Both downloaded packages were verified against their CI artifact and package manifests. [Windows CI](https://github.com/andrewjngray/fomawrite_mac/actions/runs/44946256820)
+
+The regular Windows launcher selects build 171. The verified downloads are under `dist/windows-testing/downloads/44946256820/`. Use **Launch.cmd** from the Windows checkout on the VM, or **Launch.command** from the Mac.
+
+## Cycle 166 test packages — 21 November 2026
+
+ARM64 and x64 test ZIPs for `0.3.0-dev61` are in
+`dist/windows-testing/cycle-166/44830250294/`. Extract the matching ZIP on
+Windows and run `START-FOMAWRITE.cmd`. At the time, the regular launcher selected build 165.
+
+The [first native run](https://github.com/andrewjngray/fomawrite_mac/actions/runs/44824939391)
+found two Save regressions on both architectures. The fixes suppress a watcher
+reload after saving and allow Save to create the first notes companion.
+[Windows CI](https://github.com/andrewjngray/fomawrite_mac/actions/runs/44830250294)
+at `1c325a8e65fc` passed 518 Qt tests with zero failures or skips per architecture,
+native appearance, deployed-app checks, and launcher checks. Both ZIPs and every
+manifest entry were verified locally. The package folder contains `verified-ci.json`.
 
 ## Current launch setup — 31 October 2026 (Auckland)
 
@@ -11,11 +27,6 @@ Double-click **[Launch.cmd](../../Launch.cmd)** in the Windows repo root. On the
 starts Parallels Windows 11 if needed, and opens the Windows app. **[Update.command](../../Update.command)**
 only updates. [Short instructions](../../START-HERE.md).
 
-- **Current downloaded packages:** `0.3.0-dev60` (build 165), commit `7b11ce730824`,
-  ARM64 and x64, from successful full Windows CI run `44506354001`. The ARM64 package is
-  installed in the Parallels VM (20 November) and running.
-  `dist/windows-testing/current.json` is the local selected-build record; both
-  manifests and every packaged file were verified. The previous b056 packages remain available.
 - **Fresh launcher verification:** 19 Windows PowerShell 5.1 checks plus 22 updater/Mac-orchestration tests;
   [focused launcher CI passed](https://github.com/andrewjngray/fomawrite_mac/actions/runs/41093374244); actual ARM64 staging, Mac-to-VM launch and root
   Launch.cmd document opening passed. One responsive app process handled both
