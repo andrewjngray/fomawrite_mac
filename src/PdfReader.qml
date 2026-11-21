@@ -2,6 +2,8 @@ pragma ComponentBehavior: Bound
 
 import QtQuick
 import QtQuick.Controls
+import QtQuick.Layouts
+import QtQuick.Dialogs as Dialogs
 import Fomawrite 1.0
 
 // The PDF in the preview pane's slot (Cycles 160–161): a toolbar, the pages in
@@ -14,6 +16,7 @@ Rectangle {
     property var session: null
     // backend.pdfMarks: the marks in the notes and the highlighter's settings (Cycle 163).
     property var marks: null
+    property string noteAuthor: ""
     property int bottomInset: 0
     property bool darkMode: false
     readonly property int pageGap: 12
@@ -21,6 +24,7 @@ Rectangle {
     readonly property string pdfState: session ? session.state : "none"
     readonly property int pageCount: session && pdfState === "ready" ? session.pageCount : 0
     readonly property bool ready: pageCount > 0
+    readonly property bool macToolbar: Qt.platform.os === "osx"
     readonly property int revision: session ? session.revision : 0
     readonly property size largestPage: session && revision >= 0 && session.largestPageSize.width > 0 ? session.largestPageSize : Qt.size(612, 792)
     signal openUrlRequested(url link)
@@ -38,17 +42,203 @@ Rectangle {
     readonly property real minimumZoom: 0.25
     readonly property real maximumZoom: 5
     readonly property var zoomStops: [0.25, 0.33, 0.5, 0.67, 0.75, 0.9, 1, 1.1, 1.25, 1.5, 1.75, 2, 2.5, 3, 4, 5]
-    property string zoomMode: "fit" // "fit" (the widest page fills the pane) or "fixed"
+    property string zoomMode: "fit" // "fit" (width), "fitPage", or "fixed"
     property real fixedZoom: 1
     readonly property real fitZoom: Math.max(minimumZoom, Math.min(maximumZoom,
         (pages.width - 2 * sideMargin) / Math.max(1, largestPage.width * pointScale)))
-    readonly property real zoom: zoomMode === "fit" ? fitZoom : fixedZoom
+    // One scale fits all page sizes without zoom jumps while scrolling.
+    readonly property real wholePageZoom: Math.max(0.001, Math.min(maximumZoom,
+        (pages.width - 2 * sideMargin) / Math.max(1, largestPage.width * pointScale),
+        (pages.height - 2 * pageGap) / Math.max(1, largestPage.height * pointScale)))
+    readonly property real zoom: zoomMode === "fit" ? fitZoom : zoomMode === "fitPage" ? wholePageZoom : fixedZoom
     readonly property real pageScale: zoom * pointScale
     readonly property int zoomPercent: Math.round(zoom * 100)
 
     // The page with most of its area in view (0-based).
     property int currentPage: 0
     readonly property string currentLabel: session && ready && revision >= 0 ? session.pageLabel(currentPage) : ""
+
+    // The thumbnail selection is independent of the page visible in the reader.
+    property var selectedPages: []
+    property int selectionAnchorPage: -1
+    readonly property var pageTargets: selectedPages.length ? selectedPages : (ready ? [Math.min(currentPage, pageCount - 1)] : [])
+    readonly property bool canRemoveSelectedPages: ready && pageTargets.length < pageCount
+    property var signedEdit: null
+
+    function selectThumbnail(page, modifiers) {
+        if ((modifiers & Qt.ShiftModifier) && selectionAnchorPage >= 0) {
+            var range = [];
+            for (var i = Math.min(page, selectionAnchorPage); i <= Math.max(page, selectionAnchorPage); ++i)
+                range.push(i);
+            selectedPages = range;
+        } else if (modifiers & (Qt.ControlModifier | Qt.MetaModifier)) {
+            var selected = selectedPages.length ? selectedPages.slice() : [currentPage];
+            var index = selected.indexOf(page);
+            if (index < 0) selected.push(page);
+            else selected.splice(index, 1);
+            selectedPages = selected.sort(function(a, b) { return a - b; });
+            selectionAnchorPage = page;
+        } else {
+            selectedPages = [page];
+            selectionAnchorPage = page;
+        }
+        goToPage(page);
+    }
+
+    function selectPageRange(first, count) {
+        if (!ready || count <= 0) return;
+        var selection = [];
+        for (var i = first; i < first + count && i < pageCount; ++i) selection.push(i);
+        selectedPages = selection;
+        selectionAnchorPage = first;
+        goToPage(first);
+    }
+
+    function editPages(operation) {
+        if (!ready) return;
+        if (operation()) return;
+        if (session.pageEditNeedsSignatureConsent()) {
+            signedEdit = operation;
+            signedPdfDialog.open();
+        } else showPageEditError();
+    }
+
+    function showPageEditError() {
+        if (!session || !session.pageEditError) return;
+        pdfPageNotice.text = session.pageEditError;
+        pdfPageNotice.open();
+    }
+
+    function rotateSelectedPages(turn) {
+        var targets = pageTargets.slice();
+        editPages(function() {
+            if (!session.rotatePages(targets, turn)) return false;
+            selectedPages = targets;
+            selectionAnchorPage = targets[0];
+            goToPage(targets[0]);
+            return true;
+        });
+    }
+
+    function removeSelectedPages() {
+        if (!canRemoveSelectedPages) return;
+        var targets = pageTargets.slice();
+        editPages(function() {
+            if (!session.removePages(targets)) return false;
+            selectPageRange(Math.min(targets[0], pageCount - 1), 1);
+            return true;
+        });
+    }
+
+    function moveSelectedPages(before) {
+        var targets = pageTargets.slice();
+        var start = before - targets.filter(function(page) { return page < before; }).length;
+        editPages(function() {
+            if (!session.movePages(targets, before)) return false;
+            selectPageRange(start, targets.length);
+            return true;
+        });
+    }
+
+    function insertPagesAt(url, before) {
+        editPages(function() {
+            var count = pageCount;
+            if (!session.insertPdf(url, before)) return false;
+            selectPageRange(before, pageCount - count);
+            return true;
+        });
+    }
+
+    function choosePagesToInsert() {
+        insertPdfDialog.beforePage = pageTargets[0];
+        insertPdfDialog.open();
+    }
+
+    function choosePageExport() {
+        exportPdfDialog.pages = pageTargets.slice();
+        exportPdfDialog.open();
+    }
+
+    function dropPdfOnThumbnails(url, point) {
+        var boundary = thumbnails.dropBoundary(root, point);
+        if (boundary < 0) return false;
+        insertPagesAt(url, boundary);
+        return true;
+    }
+
+    function undoPages() {
+        if (session.canUndoPageEdit && !session.undoPageEdit()) showPageEditError();
+    }
+
+    function redoPages() {
+        if (session.canRedoPageEdit && !session.redoPageEdit()) showPageEditError();
+    }
+
+    Dialogs.FileDialog {
+        id: insertPdfDialog
+        objectName: "insertPdfDialog"
+        property int beforePage: 0
+        title: "Insert Pages from File"
+        fileMode: Dialogs.FileDialog.OpenFile
+        nameFilters: ["PDF files (*.pdf)"]
+        onAccepted: root.insertPagesAt(selectedFile, beforePage)
+    }
+
+    Dialogs.FileDialog {
+        id: exportPdfDialog
+        objectName: "exportPdfPagesDialog"
+        property var pages: []
+        title: "Export Selected Pages"
+        fileMode: Dialogs.FileDialog.SaveFile
+        nameFilters: ["PDF files (*.pdf)"]
+        defaultSuffix: "pdf"
+        onAccepted: {
+            if (!backend.exportPdfPages(selectedFile, pages)) {
+                pdfPageNotice.text = backend.pdfSaveError;
+                pdfPageNotice.open();
+            }
+        }
+    }
+
+    Dialog {
+        id: signedPdfDialog
+        objectName: "signedPdfPageEditDialog"
+        title: "Digitally signed PDF"
+        modal: true
+        parent: Overlay.overlay
+        anchors.centerIn: parent
+        width: Math.min(400, Math.max(240, parent.width - 24))
+        implicitHeight: header.implicitHeight + confirmation.implicitHeight + footer.implicitHeight
+                        + topPadding + bottomPadding + 2 * spacing
+        contentItem: Label {
+            id: confirmation
+            wrapMode: Text.WordWrap
+            text: "Changing these pages will invalidate the PDF’s signature. Continue editing?"
+        }
+        footer: DialogButtonBox {
+            Button { text: "Cancel"; DialogButtonBox.buttonRole: DialogButtonBox.RejectRole }
+            Button { text: "Continue"; DialogButtonBox.buttonRole: DialogButtonBox.AcceptRole }
+        }
+        onAccepted: {
+            var operation = root.signedEdit;
+            root.signedEdit = null;
+            if (!operation) return;
+            root.session.signedEditsAllowed = true;
+            if (!operation()) root.showPageEditError();
+        }
+        onRejected: root.signedEdit = null
+    }
+
+    Dialog {
+        id: pdfPageNotice
+        property alias text: message.text
+        title: "PDF Page Changes"
+        modal: true
+        anchors.centerIn: parent
+        width: Math.min(400, root.width - 24)
+        standardButtons: Dialog.Ok
+        contentItem: Label { id: message; wrapMode: Text.WordWrap; textFormat: Text.PlainText }
+    }
 
     // The current text selection (one page); Phase 2 marks it.
     property int selectionPage: -1
@@ -80,6 +270,29 @@ Rectangle {
     }
     // Note pins: placed notes by page, drawn at a fixed size at any zoom.
     readonly property real pinSize: 22
+    property bool inPageNoteEditing: Qt.platform.os === "osx"
+    readonly property bool noteDraftOpen: noteEditor.visible
+    property var hoveredNote: null
+    property point hoverAnchor
+    property bool hoverReady: false
+    function clearNoteHover() {
+        if (!hoveredNote) return;
+        hoveredNote = null;
+        hoverReady = false;
+        noteHoverTimer.stop();
+    }
+    function hoverNote(pin, anchor) {
+        if (!inPageNoteEditing || !pin || noteTool || noteDraftOpen || pageMenu.visible) {
+            clearNoteHover();
+            return;
+        }
+        if (hoveredNote && hoveredNote.index === pin.index) return;
+        hoveredNote = pin;
+        hoverAnchor = anchor;
+        hoverReady = false;
+        noteHoverTimer.restart();
+    }
+    Timer { id: noteHoverTimer; interval: 400; onTriggered: root.hoverReady = true }
     property bool noteTool: false          // armed: the next click on a page places a note
     property string selectedNoteMarker: "" // the selected pin's marker line
     property var dragNote: null            // {index, page, x, y} while a pin is dragged
@@ -102,9 +315,15 @@ Rectangle {
         return null;
     }
     function armNote() {
-        if (!ready || !marks) return;
+        if (!ready || !marks || noteDraftOpen) return;
         noteTool = !noteTool;
-        if (noteTool) { markingMode = false; clearSelection(); selectedNoteMarker = ""; }
+        if (noteTool) {
+            clearNoteHover();
+            markingMode = false;
+            clearSelection();
+            selectedNoteMarker = "";
+            if (macToolbar) focusPages();
+        }
     }
     // The pin under a point of a page (points), or null.
     function pinAt(page, point) {
@@ -114,15 +333,66 @@ Rectangle {
             if (Math.abs(point.x - list[i].x) <= half && Math.abs(point.y - list[i].y) <= half) return list[i];
         return null;
     }
-    function placeNoteAt(page, point) {
+    function placeNoteAt(page, point, anchor) {
         noteTool = false;
         if (!marks) return false;
+        if (inPageNoteEditing) {
+            openNoteDraft(page, point, anchor, -1);
+            return true;
+        }
         editorNeeded();
         var caret = marks.placeNote(page, point.x, point.y);
         if (caret < 0) return false;
         noteEditRequested(caret);
         return true;
     }
+    function openNoteDraft(page, point, anchor, index) {
+        var existing = index < 0 ? null : marks.noteDraft(index);
+        if (index >= 0 && (!existing || !existing.marker)) return;
+        clearNoteHover();
+        noteEditor.page = page;
+        noteEditor.dragOffset = Qt.point(0, 0);
+        noteEditor.author = existing ? existing.author : "";
+        noteEditor.created = existing ? existing.created : "";
+        noteEditor.point = point;
+        noteEditor.anchor = anchor;
+        noteEditor.noteIndex = index;
+        noteEditor.marker = existing ? existing.marker : "";
+        noteEditor.original = existing ? existing.body : "";
+        noteEditor.errorText = "";
+        noteInput.text = noteEditor.original;
+        noteEditor.open();
+    }
+
+    function finishNote() {
+        if (!noteDraftOpen || !marks || noteInput.text.trim() === "") return false;
+        if (!marks.validNoteDraft(noteInput.text)) {
+            noteEditor.errorText = "Use paragraphs here. Edit headings and code fences in Markdown.";
+            return false;
+        }
+        var saved = noteEditor.noteIndex < 0
+            ? marks.placeNote(noteEditor.page, noteEditor.point.x, noteEditor.point.y, noteInput.text, noteAuthor) >= 0
+            : marks.editNote(noteEditor.noteIndex, noteEditor.marker, noteEditor.original, noteInput.text);
+        if (!saved) {
+            noteEditor.errorText = "This note could not be applied. Copy your text before closing.";
+            return false;
+        }
+        noteEditor.close();
+        return true;
+    }
+
+    function deleteDraftNote() {
+        if (!noteDraftOpen || !marks || noteEditor.noteIndex < 0) return;
+        if (!marks.deleteNote(noteEditor.noteIndex, noteEditor.marker, noteEditor.original)) {
+            noteEditor.errorText = "The note changed. Close and reopen it before deleting.";
+            return;
+        }
+        selectedNoteMarker = "";
+        noteEditor.close();
+    }
+
+    function undoNoteDraft() { noteInput.undo(); }
+    function redoNoteDraft() { noteInput.redo(); }
     function selectPin(pin) { selectedNoteMarker = pin ? pin.marker : ""; }
     function removeSelectedPin() {
         var pin = selectedPin;
@@ -251,6 +521,7 @@ Rectangle {
         noteTool = false;
         if (selectionText !== "") { markingMode = false; markWithTool(); return; }
         markingMode = !markingMode;
+        if (macToolbar && markingMode) focusPages();
     }
     // The pen's menu: a colour (a highlight) or "underline" / "strike".
     function chooseTool(choice) {
@@ -259,7 +530,7 @@ Rectangle {
         else { marks.highlightColour = choice; marks.tool = "highlight"; }
         if (selectionText !== "") markWithTool();
     }
-    onReadyChanged: if (!ready) markingMode = false
+    onReadyChanged: if (!ready) { markingMode = false; noteTool = false; }
 
     // Find.
     property bool findOpen: false
@@ -326,8 +597,13 @@ Rectangle {
         pages.positionViewAtIndex(anchor.page, ListView.Beginning);
         var item = pages.itemAtIndex(anchor.page);
         if (item) {
-            pages.contentY = clampY(item.y + anchor.fy * item.height - anchor.viewY);
-            pages.contentX = clampX(item.pageX + anchor.fx * item.pageWidth - anchor.viewX);
+            if (anchor.wholePage) {
+                pages.contentY = clampY(item.y + (item.height - pages.height) / 2);
+                pages.contentX = 0;
+            } else {
+                pages.contentY = clampY(item.y + anchor.fy * item.height - anchor.viewY);
+                pages.contentX = clampX(item.pageX + anchor.fx * item.pageWidth - anchor.viewX);
+            }
         }
         restoringView = false;
         noteViewChanged();
@@ -341,7 +617,8 @@ Rectangle {
     onPageScaleChanged: {
         // Whatever changed the scale, the same place in the document stays in
         // view. Changes before the restore runs keep the first place.
-        var anchor = pendingAnchor || queuedAnchor || viewAnchor;
+        var anchor = pendingAnchor || queuedAnchor ||
+            (zoomMode === "fitPage" ? { page: currentPage, wholePage: true } : viewAnchor);
         pendingAnchor = null;
         if (!anchor || !ready) return;
         queuedAnchor = anchor;
@@ -372,6 +649,13 @@ Rectangle {
     }
     function actualSize() { setZoom("fixed", 1); }
     function fitWidth() { setZoom("fit", fitZoom); }
+    function fitPage() {
+        if (!ready || !macToolbar) return;
+        queuedAnchor = { page: currentPage, wholePage: true };
+        restoringView = true;
+        zoomMode = "fitPage";
+        restoreTimer.restart();
+    }
     function zoomAround(value, viewX, viewY) { setZoom("fixed", value, viewX, viewY); }
 
     function updateCurrentPage() {
@@ -454,6 +738,7 @@ Rectangle {
     // which outlives the page delegate).
     function showPageMenu(item, point, link, mark) {
         var at = item.mapToItem(root, point.x, point.y);
+        clearNoteHover();
         menuTimer.link = link;
         menuTimer.mark = mark || null;
         menuTimer.at = at;
@@ -563,7 +848,13 @@ Rectangle {
         property var mark: null
         property point at
         interval: 0
-        onTriggered: { pageMenu.link = link; pageMenu.mark = mark; pageMenu.popup(root, at.x, at.y); }
+        onTriggered: {
+            pageMenu.link = link;
+            pageMenu.mark = mark;
+            pageMenu.note = root.inPageNoteEditing && root.marks && mark && mark.kind === "note"
+                ? root.marks.noteDraft(mark.index) : null;
+            pageMenu.popup(root, at.x, at.y);
+        }
     }
     function adoptDocument() {
         if (!session || !ready || String(session.url) === String(shownUrl)) return;
@@ -575,7 +866,7 @@ Rectangle {
         queuedAnchor = null;
         var view = session.rememberedView(shownUrl);
         if (view && view.mode === "fixed") { fixedZoom = Math.max(minimumZoom, Math.min(maximumZoom, Number(view.zoom) || 1)); zoomMode = "fixed"; }
-        else zoomMode = "fit";
+        else zoomMode = macToolbar && view && view.mode === "fitPage" ? "fitPage" : "fit";
         requestTimer.restart();
     }
     Connections {
@@ -589,7 +880,10 @@ Rectangle {
         function onUrlChanged() { root.rememberNow(); }
         function onRequestedPageChanged() { root.showRequestedPage(); }
         function onRevisionChanged() {
+            root.clearNoteHover();
             root.clearSelection();
+            root.selectedPages = [];
+            root.selectionAnchorPage = -1;
             adoptTimer.restart();
             if (root.findOpen && root.findBar.query !== "") findTimer.restart();
         }
@@ -622,6 +916,7 @@ Rectangle {
             break;
         case Qt.Key_Escape:
             if (noteTool) noteTool = false;
+            else if (macToolbar && markingMode) markingMode = false;
             else if (selectedNoteMarker !== "") selectedNoteMarker = "";
             else if (selectionText !== "") clearSelection();
             else if (markingMode) markingMode = false;
@@ -673,8 +968,8 @@ Rectangle {
         boundsBehavior: Flickable.StopAtBounds
         ScrollBar.vertical: ScrollBar {}
         ScrollBar.horizontal: ScrollBar { policy: pages.contentWidth > pages.width + 0.5 ? ScrollBar.AsNeeded : ScrollBar.AlwaysOff }
-        onContentYChanged: root.noteViewChanged()
-        onContentXChanged: root.noteViewChanged()
+        onContentYChanged: { root.clearNoteHover(); root.noteViewChanged(); }
+        onContentXChanged: { root.clearNoteHover(); root.noteViewChanged(); }
         onHeightChanged: root.noteViewChanged()
         onCountChanged: if (count > 0) adoptTimer.restart()
         onActiveFocusChanged: if (!activeFocus) root.rememberSoon()
@@ -779,7 +1074,7 @@ Rectangle {
                             border.width: pin.selected ? 2 : 1
                             border.color: pin.selected ? backend.palette.focus : "#b58900"
                         }
-                        LineIcon { anchors.centerIn: parent; width: 14; height: 14; name: "note"; ink: "#5c4a00"; strokeWidth: 2 }
+                        LineIcon { anchors.centerIn: parent; width: 14; height: 14; name: root.inPageNoteEditing ? "note-bubble" : "note"; ink: "#5c4a00"; strokeWidth: 2 }
                         Rectangle {
                             objectName: "pdfNoteFlash"
                             visible: root.flashIndex === pin.modelData.index
@@ -793,7 +1088,7 @@ Rectangle {
                         Rectangle {
                             id: popover
                             objectName: "pdfNotePopover"
-                            visible: pin.selected && !pin.dragged
+                            visible: !root.inPageNoteEditing && pin.selected && !pin.dragged
                             z: 10
                             x: pin.x + root.pinSize + 6 + width > page.width ? -width - 6 : root.pinSize + 6
                             y: 0
@@ -860,9 +1155,10 @@ Rectangle {
                 property bool wordClick: false
                 property var hoverLink: null
                 property var pressPin: null
-                cursorShape: root.noteTool ? Qt.CrossCursor : hoverLink ? Qt.PointingHandCursor : Qt.IBeamCursor
+                cursorShape: root.noteTool ? Qt.CrossCursor : (hoverLink || root.hoveredNote) ? Qt.PointingHandCursor : Qt.IBeamCursor
                 function toPoints(mouse) { return Qt.point(mouse.x / root.pageScale, mouse.y / root.pageScale); }
                 onPressed: function(mouse) {
+                    root.clearNoteHover();
                     root.focusPages();
                     pressPoint = toPoints(mouse);
                     dragging = false;
@@ -871,7 +1167,14 @@ Rectangle {
                 }
                 onPositionChanged: function(mouse) {
                     var point = toPoints(mouse);
-                    if (!pressed) { hoverLink = root.linkAt(pageSlot.links, point); return; }
+                    if (!pressed) {
+                        hoverLink = root.linkAt(pageSlot.links, point);
+                        if (root.inPageNoteEditing) {
+                            var pin = root.pinAt(pageSlot.index, point);
+                            root.hoverNote(pin, pin ? pageMouse.mapToItem(root, pin.x * root.pageScale, pin.y * root.pageScale) : Qt.point(0, 0));
+                        }
+                        return;
+                    }
                     if (!dragging && Math.hypot(point.x - pressPoint.x, point.y - pressPoint.y) * root.pageScale < 3) return;
                     dragging = true;
                     if (root.noteTool) return;
@@ -886,7 +1189,11 @@ Rectangle {
                 }
                 onReleased: function(mouse) {
                     var released = toPoints(mouse);
-                    if (root.noteTool) { root.clearSelection(); root.placeNoteAt(pageSlot.index, released); return; }
+                    if (root.noteTool) {
+                        root.clearSelection();
+                        root.placeNoteAt(pageSlot.index, released, pageMouse.mapToItem(root, mouse.x, mouse.y));
+                        return;
+                    }
                     if (pressPin) {
                         var pin = pressPin;
                         pressPin = null;
@@ -900,7 +1207,10 @@ Rectangle {
                         } else {
                             root.clearSelection();
                             root.selectPin(pin);
-                            root.revealInNotesRequested(pin.index);
+                            if (root.inPageNoteEditing) {
+                                var anchor = pageMouse.mapToItem(root, pin.x * root.pageScale, pin.y * root.pageScale);
+                                root.openNoteDraft(pageSlot.index, Qt.point(pin.x, pin.y), anchor, pin.index);
+                            } else root.revealInNotesRequested(pin.index);
                         }
                         return;
                     }
@@ -914,16 +1224,230 @@ Rectangle {
                     if (mark) root.revealInNotesRequested(mark.index);
                 }
                 onDoubleClicked: function(mouse) {
+                    if (root.inPageNoteEditing && (root.noteTool || root.pinAt(pageSlot.index, toPoints(mouse)))) {
+                        mouse.accepted = false;
+                        return;
+                    }
                     wordClick = true;
                     root.setSelection(pageSlot.index, root.session.wordAt(pageSlot.index, toPoints(mouse)));
                     if (root.markingMode) root.markWithTool();
                 }
-                onExited: hoverLink = null
+                onExited: { hoverLink = null; root.clearNoteHover(); }
                 // The platform's context-menu gesture (right-click, Control-click,
                 // the Menu key); the selection is kept, as in Preview.
                 ContextMenu.onRequested: function(position) {
                     var point = Qt.point(position.x / root.pageScale, position.y / root.pageScale);
                     root.showPageMenu(pageMouse, position, root.linkAt(pageSlot.links, point), root.pinAt(pageSlot.index, point) || root.markAt(pageSlot.index, point));
+                }
+            }
+        }
+    }
+
+    Label {
+        id: activeToolHint
+        objectName: "pdfActiveToolHint"
+        visible: root.macToolbar && root.ready && (root.noteTool || root.markingMode)
+        anchors.horizontalCenter: pages.horizontalCenter
+        anchors.top: pages.top
+        anchors.topMargin: 8
+        width: Math.min(implicitWidth, Math.max(0, pages.width - 16))
+        horizontalAlignment: Text.AlignHCenter
+        elide: Text.ElideRight
+        topPadding: 5; bottomPadding: 5; leftPadding: 10; rightPadding: 10
+        text: root.noteTool ? "Click the page to add a note" :
+            root.markTool === "underline" ? "Select text to underline" :
+            root.markTool === "strike" ? "Select text to strike through" : "Highlight mode · Select text"
+        color: backend.palette.text
+        z: 2
+        background: Rectangle {
+            radius: height / 2
+            color: backend.palette.popover
+            border.color: backend.palette.focus
+        }
+    }
+
+    Rectangle {
+        objectName: "pdfNoteHover"
+        visible: root.hoverReady && !!root.hoveredNote && !root.noteDraftOpen && !pageMenu.visible
+        width: Math.max(0, Math.min(252, pages.width - 16))
+        height: previewContent.implicitHeight + 20
+        x: Math.max(pages.x + 8, Math.min(root.hoverAnchor.x + 12, pages.x + pages.width - width - 8))
+        y: root.hoverAnchor.y + 14 + height <= pages.y + pages.height - 8
+            ? root.hoverAnchor.y + 14 : Math.max(pages.y + 8, root.hoverAnchor.y - height - 14)
+        z: 4
+        color: backend.palette.popover
+        border.color: backend.palette.border
+        radius: 8
+
+        Column {
+            id: previewContent
+            width: parent.width - 20
+            anchors.centerIn: parent
+            spacing: 4
+            Text {
+                objectName: "pdfNoteHoverAuthor"
+                width: parent.width
+                text: root.hoveredNote && root.hoveredNote.author ? root.hoveredNote.author : "PDF note"
+                textFormat: Text.PlainText
+                color: backend.palette.text
+                font.weight: Font.DemiBold
+                elide: Text.ElideRight
+            }
+            Text {
+                objectName: "pdfNoteHoverText"
+                width: parent.width
+                text: root.hoveredNote ? root.hoveredNote.text || "Empty note" : ""
+                textFormat: Text.PlainText
+                color: backend.palette.text
+                wrapMode: Text.Wrap
+                maximumLineCount: 5
+                elide: Text.ElideRight
+            }
+        }
+    }
+
+    Popup {
+        id: noteEditor
+        objectName: "pdfNoteEditor"
+        parent: root
+        modal: true
+        dim: false
+        focus: true
+        closePolicy: Popup.CloseOnEscape
+        property int page: -1
+        property int noteIndex: -1
+        property point point
+        property point anchor
+        property point dragOffset
+        property string author
+        property string created
+        property string marker
+        property string original
+        property string errorText
+        readonly property int gap: 12
+        width: Math.min(316, Math.max(180, pages.width - 2 * gap))
+        x: Math.max(pages.x + gap, Math.min(pages.x + pages.width - width - gap,
+            startX + dragOffset.x))
+        readonly property real startX: anchor.x + gap + width <= pages.x + pages.width ? anchor.x + gap : anchor.x - gap - width
+        y: Math.max(pages.y + gap, Math.min(anchor.y - 16 + dragOffset.y, pages.y + pages.height - height - gap))
+        padding: 12
+        onOpened: noteInput.forceActiveFocus(Qt.PopupFocusReason)
+        onClosed: if (root.visible && root.ready) root.focusPages()
+
+        background: Rectangle {
+            radius: 11
+            color: root.darkMode ? backend.palette.popover : "#fff8dc"
+            border.color: backend.palette.border
+        }
+        contentItem: ColumnLayout {
+            spacing: 8
+            Item {
+                Layout.fillWidth: true
+                Layout.preferredHeight: 26
+                MouseArea {
+                    objectName: "pdfNoteDragHandle"
+                    anchors.fill: parent
+                    cursorShape: pressed ? Qt.ClosedHandCursor : Qt.OpenHandCursor
+                    property point pressAt
+                    property point initialOffset
+                    onPressed: function(mouse) {
+                        pressAt = mapToItem(root, mouse.x, mouse.y);
+                        initialOffset = noteEditor.dragOffset;
+                    }
+                    onPositionChanged: function(mouse) {
+                        if (!pressed) return;
+                        var at = mapToItem(root, mouse.x, mouse.y);
+                        noteEditor.dragOffset = Qt.point(initialOffset.x + at.x - pressAt.x,
+                                                         initialOffset.y + at.y - pressAt.y);
+                    }
+                }
+                Label {
+                    anchors.centerIn: parent
+                    text: root.session && noteEditor.page >= 0 ? "Note · Page " + root.session.pageLabel(noteEditor.page) : "Note"
+                    color: backend.palette.text
+                    font.weight: Font.DemiBold
+                }
+                ToolbarButton {
+                    objectName: "pdfNoteClose"
+                    anchors.left: parent.left
+                    anchors.verticalCenter: parent.verticalCenter
+                    width: 26; height: 26; iconSize: 14
+                    iconName: "close"
+                    iconColor: root.darkMode ? "#ff9b9b" : "#ad3333"
+                    hint: "Close without applying changes"
+                    onClicked: noteEditor.close()
+                }
+                ToolbarButton {
+                    objectName: "pdfNoteDelete"
+                    anchors.right: parent.right
+                    anchors.verticalCenter: parent.verticalCenter
+                    width: 26; height: 26; iconSize: 14
+                    iconName: "delete"
+                    iconColor: root.darkMode ? "#ffd76e" : "#805900"
+                    hint: "Delete note"
+                    visible: noteEditor.noteIndex >= 0
+                    onClicked: root.deleteDraftNote()
+                }
+            }
+            ScrollView {
+                Layout.fillWidth: true
+                Layout.preferredHeight: 106
+                contentWidth: availableWidth
+                TextArea {
+                    id: noteInput
+                    objectName: "pdfNoteInput"
+                    textFormat: TextEdit.PlainText
+                    wrapMode: TextEdit.Wrap
+                    placeholderText: "Write a note…"
+                    Accessible.name: "PDF note text"
+                    color: backend.palette.text
+                    topPadding: 8; bottomPadding: 8; leftPadding: 8; rightPadding: 8
+                    background: null
+                    selectByMouse: true
+                    onTextChanged: noteEditor.errorText = ""
+                }
+            }
+            Label {
+                visible: text !== ""
+                Layout.fillWidth: true
+                wrapMode: Text.WordWrap
+                text: noteEditor.errorText
+                color: backend.palette.text
+            }
+            RowLayout {
+                Layout.fillWidth: true
+                ColumnLayout {
+                    Layout.fillWidth: true
+                    visible: noteEditor.noteIndex >= 0
+                    spacing: 2
+                    Label {
+                        Layout.fillWidth: true
+                        visible: text !== ""
+                        text: noteEditor.author
+                        textFormat: Text.PlainText
+                        color: backend.palette.muted
+                        font.pixelSize: 11
+                        elide: Text.ElideRight
+                    }
+                    Label {
+                        objectName: "pdfNoteCreated"
+                        Layout.fillWidth: true
+                        text: {
+                            var date = new Date(noteEditor.created);
+                            return isNaN(date.getTime()) ? "Creation date unavailable" : Qt.formatDateTime(date, "d MMM yyyy · HH:mm");
+                        }
+                        color: backend.palette.muted
+                        font.pixelSize: 11
+                        elide: Text.ElideRight
+                    }
+                }
+                Item { Layout.fillWidth: true; visible: noteEditor.noteIndex < 0 }
+                ToolbarButton {
+                    objectName: "pdfNoteDone"
+                    text: "Done"
+                    hint: "Apply note"
+                    enabled: noteInput.text.trim() !== ""
+                    onClicked: root.finishNote()
                 }
             }
         }
@@ -1030,17 +1554,39 @@ Rectangle {
         // The mark under the pointer ({index, kind, colour, …}), or null.
         property var mark: null
         readonly property bool onHighlight: !!mark && mark.kind === "highlight"
-        readonly property bool hasSelection: root.selectionText !== ""
+        property var note: null
+        readonly property bool hasNote: !!note && !!note.marker
+        onClosed: note = null
+        readonly property string copyText: hasNote ? (note && note.body ? note.body : "") : root.selectionText
+        readonly property bool hasSelection: !hasNote && root.selectionText !== ""
         readonly property string findLabel: {
             var text = root.selectionText.replace(/\s+/g, " ").trim();
             return text.length > 24 ? text.slice(0, 24).trim() + "…" : text;
         }
-        CompactMenuItem { objectName: "pdfContextCopy"; text: "Copy"; enabled: root.selectionText !== ""; onTriggered: { pageMenu.close(); root.copySelection(); } }
-        CompactMenuItem { objectName: "pdfContextCopyQuote"; text: "Copy as Markdown Quote"; enabled: root.selectionText !== ""; onTriggered: { pageMenu.close(); root.copyMarkdownQuote(); } }
+        CompactMenuItem {
+            objectName: "pdfContextCopy"
+            text: pageMenu.hasNote ? "Copy Note Text" : "Copy"
+            enabled: pageMenu.copyText.trim() !== ""
+            onTriggered: {
+                if (pageMenu.hasNote) root.session.copyText(pageMenu.copyText);
+                else root.copySelection();
+                pageMenu.close();
+            }
+        }
+        CompactMenuItem {
+            objectName: "pdfContextCopyQuote"
+            text: "Copy as Markdown Quote"
+            enabled: pageMenu.copyText.trim() !== ""
+            onTriggered: {
+                if (pageMenu.hasNote) root.session.copyMarkdownQuote(pageMenu.mark.page, pageMenu.copyText);
+                else root.copyMarkdownQuote();
+                pageMenu.close();
+            }
+        }
         CompactMenuItem {
             objectName: "pdfContextFind"
             text: "Find “" + pageMenu.findLabel + "” in PDF"
-            visible: root.selectionText !== ""
+            visible: pageMenu.hasSelection
             height: visible ? implicitHeight : 0
             onTriggered: { pageMenu.close(); root.openFind(true); }
         }

@@ -58,6 +58,9 @@ Item {
                 selectionColor: backend.palette.selection
                 selectedTextColor: "white"
                 leftPadding: 12; rightPadding: 12
+                topPadding: 0; bottomPadding: 0
+                topInset: 0; bottomInset: 0
+                verticalAlignment: TextInput.AlignVCenter
                 selectByMouse: true
                 clip: true
                 background: Rectangle {
@@ -151,6 +154,9 @@ Item {
                 selectionColor: backend.palette.selection
                 selectedTextColor: "white"
                 leftPadding: 12; rightPadding: 12
+                topPadding: 0; bottomPadding: 0
+                topInset: 0; bottomInset: 0
+                verticalAlignment: TextInput.AlignVCenter
                 selectByMouse: true
                 clip: true
                 background: Rectangle {

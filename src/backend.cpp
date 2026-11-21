@@ -2513,8 +2513,18 @@ bool Backend::failPdfSave(const QString &message) {
     return false;
 }
 
+bool Backend::pdfSaveNeedsOverwrite() const {
+    return m_pdfSaveError == PdfFiles::changedOnDiskError();
+}
+
+bool Backend::openPdfRecoveryFolder() const {
+    if (!m_pdf.active()) return false;
+    const QString folder = PdfFiles::recoveryFolderFor(pdfRecoveryFolder(), m_pdf.url().toLocalFile());
+    return !folder.isEmpty() && QFileInfo(folder).isDir() && QDesktopServices::openUrl(QUrl::fromLocalFile(folder));
+}
+
 // Saving pending page edits: conflict check, verified write, recovery copy, atomic replace (PdfFiles), then
-// the session rebases on the saved bytes and the notes are renumbered as one edit and saved with the PDF.
+// the session starts fresh history on the saved bytes. If the notes change, their history starts fresh too.
 bool Backend::savePdf(bool force) {
     if (!m_pdf.active() || !m_pdf.pagesModified()) return true;
     const bool hadMessage = !m_pdfSaveError.isEmpty() || !m_pdfSaveNotice.isEmpty();
@@ -2530,7 +2540,7 @@ bool Backend::savePdf(bool force) {
     const QByteArray onDisk = disk.readAll();
     disk.close();
     if (!force && onDisk != m_pdf.baselineBytes())
-        return failPdfSave(QStringLiteral("The PDF changed on disk. Your page changes were not saved."));
+        return failPdfSave(PdfFiles::changedOnDiskError());
     PdfFiles::Options options;
     options.path = path;
     options.bytes = m_pdf.workingBytes();
@@ -2569,7 +2579,7 @@ bool Backend::savePdf(bool force) {
     m_pdf.adoptWorkingAsBaseline(); // the file watcher then finds the file equal to the baseline: no reload
     m_pdf.savedToDisk();
     setStatus(QStringLiteral("Saved %1").arg(m_pdf.fileName()));
-    if (!edit.isEmpty() && !applyNotesEdit(edit)) {
+    if (!edit.isEmpty() && !applyNotesEdit(edit, /*resetHistory=*/true)) {
         m_pdfSaveNotice = QStringLiteral("The PDF was saved, but its notes could not be renumbered.");
         emit pdfSaveErrorChanged();
         return true;
@@ -2582,8 +2592,11 @@ bool Backend::savePdf(bool force) {
         if (m_modified) {
             m_pdfSaveNotice = QStringLiteral("The PDF was saved, but its notes were not: %1").arg(m_status);
             emit pdfSaveErrorChanged();
+            return true;
         }
     }
+    if (!edit.isEmpty())
+        setStatus(QStringLiteral("Saved %1. Page references in the notes changed, so notes undo history was cleared.").arg(m_pdf.fileName()));
     return true;
 }
 
@@ -4727,7 +4740,7 @@ void Backend::setStyleReviewWords(const QString &customWords,
     m_highlighter->setReviewSpans(spans);
 }
 
-bool Backend::applyNotesEdit(const PdfNotes::Edit &edit) {
+bool Backend::applyNotesEdit(const PdfNotes::Edit &edit, bool resetHistory) {
     if (!m_document || edit.isEmpty()) return false;
     const int length = currentDocumentText().size();
     int previousEnd = 0;
@@ -4738,6 +4751,15 @@ bool Backend::applyNotesEdit(const PdfNotes::Edit &edit) {
     // The page gets the whole edit as one change set (one step of its history)
     // rather than one push per change.
     const bool toLive = m_liveMirrorValid && m_editorBridge->isReady();
+    QTextCursor liveSelection;
+    if (resetHistory && toLive && m_editorBridge->lastSelectionStart() >= 0) {
+        const int start = qMin(m_editorBridge->lastSelectionStart(), length);
+        const int end = qMin(m_editorBridge->lastSelectionEnd(), length);
+        const bool reversed = m_editorBridge->lastCursor() == m_editorBridge->lastSelectionStart();
+        liveSelection = QTextCursor(m_document);
+        liveSelection.setPosition(reversed ? end : start);
+        liveSelection.setPosition(reversed ? start : end, QTextCursor::KeepAnchor);
+    }
     m_applyingNotesEdit = true;
     QTextCursor cursor(m_document);
     cursor.beginEditBlock();
@@ -4748,7 +4770,18 @@ bool Backend::applyNotesEdit(const PdfNotes::Edit &edit) {
     }
     cursor.endEditBlock();
     m_applyingNotesEdit = false;
-    if (toLive) {
+    if (resetHistory) {
+        m_document->clearUndoRedoStacks();
+        m_typographyUndoRanges.clear();
+        m_observedUndoSteps = 0;
+        ++m_liveDocumentGeneration;
+        if (m_liveMirrorValid) {
+            m_liveMirror = currentDocumentText();
+            m_editorBridge->loadDocument(m_liveMirror);
+            if (!liveSelection.isNull())
+                m_editorBridge->placeSelection(liveSelection.anchor(), liveSelection.position());
+        }
+    } else if (toLive) {
         QJsonArray changes;
         for (const PdfNotes::Change &change : edit)
             changes.append(QJsonObject{{"from", change.position}, {"to", change.position + change.removed}, {"insert", change.inserted}});

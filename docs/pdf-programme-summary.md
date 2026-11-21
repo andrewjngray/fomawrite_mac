@@ -71,8 +71,9 @@ All of the repository records above are committed and pushed on both branches.
 
 ## 6. What is required to complete the build cycle (Phase 3 = cycle 166)
 
-### Decision needed from Andrew first
-**⌘Z after saving page edits.** Undoing the notes renumbering would leave old page numbers against the saved PDF, so marks land on the wrong pages. Recommendation: make the renumbering edit not undoable (⌘Z skips it; earlier typing can still be undone). Fallback if the editor cannot do that cleanly in Source and Live: clear the notes' undo history at save.
+### Save and Undo decision
+
+After a successful PDF page save, page-edit Undo and Redo start fresh. Source and Live start fresh notes histories only when Save rewrites page references or coordinates. A failed PDF write preserves both histories.
 
 ### Cycle 166 scope (from the plan, §4.3–4.4 and the cycle 165 record)
 - Thumbnails: multi-select, drag to reorder, context menu.

@@ -319,6 +319,15 @@ Rectangle {
                         }
                     }
                 }
+                Drag.active: pdfDrag.active
+                Drag.dragType: Drag.Automatic
+                Drag.supportedActions: Qt.CopyAction
+                Drag.mimeData: pdf ? { "text/uri-list": modelData.url.toString() + "\r\n" } : ({})
+                DragHandler {
+                    id: pdfDrag
+                    enabled: entry.pdf
+                    target: null
+                }
                 TapHandler {
                     acceptedButtons: Qt.RightButton
                     onTapped: (eventPoint) => contextMenu.showFor(entry, {url: entry.modelData.url, name: entry.modelData.name, directory: entry.modelData.directory, available: true}, false, eventPoint.position)

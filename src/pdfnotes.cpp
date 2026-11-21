@@ -428,15 +428,32 @@ Edit insertMark(const QString &text, const Mark &mark, const QString &pdfFileNam
 }
 
 QString noteMarkerLine(const Note &note) {
-    return QStringLiteral("<!-- fomawrite:pdf note page=%1 at=%2,%3 -->").arg(note.page).arg(note.x).arg(note.y);
+    QString marker = QStringLiteral("<!-- fomawrite:pdf note page=%1 at=%2,%3").arg(note.page).arg(note.x).arg(note.y);
+    if (!note.author.isEmpty())
+        marker += QStringLiteral(" author=") + QString::fromLatin1(QUrl::toPercentEncoding(note.author, {}, "-"));
+    if (!note.created.isEmpty()) marker += QStringLiteral(" created=") + note.created;
+    return marker + QStringLiteral(" -->");
 }
 
-NoteInsert insertNote(const QString &text, const Note &note, const QString &pdfFileName, const QString &pageLabel) {
-    if (note.page < 1) return {};
+bool canUseNoteBody(const QString &body) {
+    if (body.trimmed().isEmpty()) return false;
+    // A popover edits one note. Make sure a heading, marker or open fence
+    // cannot end that note early or swallow the marker that follows it.
+    const QString prefix = noteMarkerLine(Note{}) + QLatin1Char('\n');
+    const QString probe = prefix + body + QLatin1Char('\n') + prefix;
+    const Document parsed = parse(probe);
+    return parsed.items.size() == 2 && parsed.items.first().end == prefix.size() + body.size() + 1;
+}
+
+NoteInsert insertNote(const QString &text, const Note &note, const QString &pdfFileName, const QString &pageLabel,
+                      const QString &body) {
+    if (note.page < 1 || (!body.isEmpty() && !canUseNoteBody(body))) return {};
     const QString eol = eolOf(text);
     const QString marker = noteMarkerLine(note);
+    QString bodyLines = body;
+    bodyLines.replace(QLatin1Char('\n'), eol);
     NoteInsert result;
-    result.edit = insertItem(text, note.page, std::numeric_limits<int>::max(), marker + eol + eol, pdfFileName, pageLabel, eol);
+    result.edit = insertItem(text, note.page, std::numeric_limits<int>::max(), marker + eol + bodyLines + eol, pdfFileName, pageLabel, eol);
     int delta = 0;
     for (const Change &change : std::as_const(result.edit)) {
         const int at = int(change.inserted.indexOf(marker));
@@ -444,6 +461,16 @@ NoteInsert insertNote(const QString &text, const Note &note, const QString &pdfF
         delta += int(change.inserted.size()) - change.removed;
     }
     return result;
+}
+
+Edit replaceNoteBody(const QString &text, const Item &item, const QString &body) {
+    if (item.kind != QLatin1String("note") || !canUseNoteBody(body)) return {};
+    const QString eol = eolOf(text);
+    QString bodyLines = body;
+    bodyLines.replace(QLatin1Char('\n'), eol);
+    if (item.hasBody) return {{item.bodyStart, item.contentEnd - item.bodyStart, bodyLines}};
+    if (item.markerLineEnd == item.markerEnd) bodyLines.prepend(eol);
+    return {{item.markerLineEnd, 0, bodyLines + eol}};
 }
 
 Edit moveNote(const QString &text, const Item &item, int x, int y) {
@@ -457,7 +484,7 @@ Edit moveNote(const QString &text, const Item &item, int x, int y) {
     return {{item.keysEnd, 0, QStringLiteral(" at=") + value}};
 }
 
-Edit removeMark(const QString &text, const Item &item, const QString &writtenQuote) {
+Edit removeMark(const QString &text, const Item &item, const QString &writtenQuote, bool deleteNoteBody) {
     const int length = int(text.size());
     if (item.markerStart < 0 || item.markerLineEnd > length || item.markerLineEnd <= item.markerStart) return {};
     static const QRegularExpression stillAMarker(QStringLiteral("^ {0,3}<!--[ \\t]*fomawrite:pdf[ \\t]"));
@@ -472,14 +499,14 @@ Edit removeMark(const QString &text, const Item &item, const QString &writtenQuo
         const QStringView line = QStringView(text).mid(item.markerLineEnd, nl < 0 ? length - item.markerLineEnd : nl - item.markerLineEnd);
         if (isBlank(line)) afterBlank = nl < 0 ? length : nl + 1;
     }
-    // A note's own text is the writer's: only an empty note goes whole.
-    const bool whole = isNote ? !item.hasBody
+    // Removing a pin keeps writing alive. Deleting the note explicitly removes its body.
+    const bool whole = isNote ? deleteNoteBody || !item.hasBody
         : isTextMarkup(item.kind) && item.hasQuote && item.quoteEnd <= length
             && !normalised(writtenQuote).isEmpty() && normalised(item.quote) == normalised(writtenQuote);
     QPair<int, int> range{item.markerStart, isNote ? afterBlank : item.markerLineEnd};
     if (whole) {
         int from = item.markerStart;
-        const int to = isNote ? afterBlank : item.quoteEnd;
+        const int to = isNote ? qMax(afterBlank, item.contentEnd) : item.quoteEnd;
         for (const Section &section : document.sections) {
             if (section.headingLineEnd > item.markerStart || item.markerStart >= section.end || section.page != item.page) continue;
             if (isGeneratedHeading(section.heading, item.page)
@@ -680,6 +707,9 @@ Edit renumber(const QString &text, const QString &pdfFileName, const QList<PageR
                 changes.append({line.start + int(plain.capturedStart(2)), int(plain.capturedLength(2)), QString::number(remap->newPage)});
         }
     }
+    changes.removeIf([&](const Change &change) {
+        return QStringView(text).mid(change.position, change.removed) == change.inserted;
+    });
     std::sort(changes.begin(), changes.end(), [](const Change &a, const Change &b) { return a.position < b.position; });
     return changes;
 }

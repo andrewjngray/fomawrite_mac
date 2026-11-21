@@ -131,7 +131,7 @@ Edit insertMark(const QString &text, const Mark &mark, const QString &pdfFileNam
 // Applying insertMark and then removeMark to the result restores the original
 // text byte for byte, except for a text that already held the header line but
 // no marks, which loses the header line.
-Edit removeMark(const QString &text, const Item &item, const QString &writtenQuote);
+Edit removeMark(const QString &text, const Item &item, const QString &writtenQuote, bool deleteNoteBody = false);
 // The edit that sets the item's colour= value (adding the key when absent).
 Edit recolourMark(const QString &text, const Item &item, const QString &colour);
 
@@ -141,6 +141,8 @@ struct Note {
     int page = 1; // 1-based
     int x = 0;
     int y = 0;
+    QString author{};
+    QString created{}; // UTC timestamp in ISO 8601 format
 };
 QString noteMarkerLine(const Note &note);
 struct NoteInsert {
@@ -148,8 +150,11 @@ struct NoteInsert {
     int caret = -1; // in the edited text: the line after the marker, where the note's text goes
 };
 // The edit that adds a note after the existing items of its page (page heading
-// created and ordered as for marks): the marker and an empty text line.
-NoteInsert insertNote(const QString &text, const Note &note, const QString &pdfFileName, const QString &pageLabel);
+// created and ordered as for marks): the marker and its body.
+NoteInsert insertNote(const QString &text, const Note &note, const QString &pdfFileName, const QString &pageLabel,
+                      const QString &body = {});
+bool canUseNoteBody(const QString &body);
+Edit replaceNoteBody(const QString &text, const Item &item, const QString &body);
 // The edit that sets the note's at= value (adding the key when absent); only
 // those bytes change.
 Edit moveNote(const QString &text, const Item &item, int x, int y);

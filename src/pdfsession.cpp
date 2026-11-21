@@ -331,8 +331,9 @@ void PdfSession::reloadFromDisk() {
         watch();
         return;
     }
-    if (ready() && (!m_undo.isEmpty() || !m_redo.isEmpty()) && !m_baselineBytes.isEmpty()) {
-        QFile now(path); // what was just saved: the history stays
+    if (ready() && !m_baselineBytes.isEmpty()) {
+        // File and directory notifications can arrive after our own save.
+        QFile now(path);
         if (now.open(QIODevice::ReadOnly) && now.readAll() == m_baselineBytes) { watch(); return; }
     }
     if (!QFileInfo::exists(path)) {
@@ -852,6 +853,11 @@ QVector<PdfSession::PageOrigin> composed(const QVector<PdfSession::PageOrigin> &
 }
 }
 
+bool PdfSession::pageEditNeedsSignatureConsent() const {
+    return !m_signedEditsAllowed && ready() && !m_working.bytes.isEmpty()
+        && PdfEditor::check(m_working.bytes) == PdfEditor::Refusal::Signed;
+}
+
 bool PdfSession::rotatePages(const QList<int> &pages, int degreesClockwise) {
     if (!canEditPages()) return false;
     const PdfEditor::Result r = PdfEditor::rotate(m_working.bytes, pages, degreesClockwise, m_signedEditsAllowed);
@@ -913,24 +919,7 @@ bool PdfSession::redoPageEdit() {
 
 bool PdfSession::adoptWorkingAsBaseline() {
     if (!ready() || m_working.bytes.isEmpty()) return false;
-    const QVector<PageOrigin> old = m_working.map;
-    const auto rebase = [&](EditState &state) {
-        for (PageOrigin &entry : state.map) {
-            int found = -1;
-            if (entry.origin >= 0)
-                for (int j = 0; j < old.size() && found < 0; ++j)
-                    if (old.at(j).origin == entry.origin) found = j;
-            if (found < 0) entry = {-1, 0};
-            else entry = {found, mod360(entry.rotation - old.at(found).rotation)};
-        }
-    };
-    for (EditState &state : m_undo) rebase(state);
-    for (EditState &state : m_redo) rebase(state);
-    m_baselineBytes = m_working.bytes;
-    m_baselinePages = old.size();
-    for (int i = 0; i < old.size(); ++i) m_working.map[i] = {i, 0};
-    updateModified();
-    emit pageEditsChanged();
+    resetEditState(m_working.bytes, m_working.map.size());
     return true;
 }
 

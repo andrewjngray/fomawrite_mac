@@ -52,7 +52,12 @@ public:
     // 0-based, clamped to the page) after the page's existing items: one edit
     // with the marker and an empty text line. Returns the caret position for
     // the note's text in the edited text, or -1.
-    Q_INVOKABLE int placeNote(int page, double x, double y);
+    Q_INVOKABLE int placeNote(int page, double x, double y, const QString &body = {}, const QString &author = {});
+    // The full body and marker for the popover, including text beyond the pin preview.
+    Q_INVOKABLE QVariantMap noteDraft(int index);
+    Q_INVOKABLE bool validNoteDraft(const QString &body) const;
+    Q_INVOKABLE bool editNote(int index, const QString &marker, const QString &previous, const QString &body);
+    Q_INVOKABLE bool deleteNote(int index, const QString &marker, const QString &previous);
     // Rewrites only the note's at= value (one edit); `index` is an items entry's index.
     Q_INVOKABLE bool moveNote(int index, double x, double y);
     // Where the item's body starts in the current text (the caret goes there), or -1.
@@ -81,6 +86,7 @@ private:
     };
     Current current() const;
     int currentIndex(const Current &now, int index) const;
+    int matchingNoteIndex(const Current &now, int index, const QString &marker, const QString &previous) const;
     QString pageText(int page) const; // 1-based; empty when there is no such page
     QVariantList rects(int page, int start, int length) const;
     bool ready() const;

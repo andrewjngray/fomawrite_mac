@@ -249,10 +249,15 @@ void FomawriteTest::pdfPaneToolbarFoldsWithoutOverlapAtEveryWidth() {
     QVERIFY(p.open(f.url("geometry.pdf")));
     p.w.layout->setProperty("layoutMode", 1);
     QTRY_COMPARE(p.w.layout->property("effectiveLayoutMode").toInt(), 1);
-    const QStringList names{"pdfThumbnailsToggle", "pdfZoomOut", "pdfActualSize", "pdfZoomIn", "pdfFitWidth",
+    QStringList names{"pdfThumbnailsToggle", "pdfZoomOut", "pdfActualSize", "pdfZoomIn", "pdfFitWidth",
                             "pdfPageField", "pdfPageCount", "pdfInspectorButton", "pdfFindButton", "pdfToolbarOverflow"};
-    const QStringList foldOrder{"pdfActualSize", "pdfFitWidth", "pdfThumbnailsToggle", "pdfInspectorButton"};
-    const QStringList overflowItems{"pdfOverflowActualSize", "pdfOverflowFitWidth", "pdfOverflowThumbnails", "pdfOverflowInspector"};
+    QStringList foldOrder{"pdfActualSize", "pdfFitWidth", "pdfThumbnailsToggle", "pdfInspectorButton"};
+    QStringList overflowItems{"pdfOverflowActualSize", "pdfOverflowFitWidth", "pdfOverflowThumbnails", "pdfOverflowInspector"};
+#ifdef Q_OS_MACOS
+    names << "pdfZoomModes" << "pdfRotate" << "pdfNote";
+    foldOrder << "pdfRotate";
+    overflowItems << "pdfOverflowRotateLeft";
+#endif
     auto *toolbar = p.item("pdfToolbar"); QVERIFY(toolbar);
     for (const int width : {320, 420, 600, 900}) {
         p.w.layout->setProperty("previewWidth", width);
@@ -298,6 +303,10 @@ void FomawriteTest::pdfPaneToolbarFoldsWithoutOverlapAtEveryWidth() {
                 QVERIFY(entry);
                 QCOMPARE(entry->isVisible(), hiddenControls.at(i));
             }
+#ifdef Q_OS_MACOS
+            QCOMPARE(toolbar->findChild<QQuickItem *>("pdfOverflowFitPage")->isVisible(), hiddenControls.at(1));
+            QCOMPARE(toolbar->findChild<QQuickItem *>("pdfOverflowRotateRight")->isVisible(), hiddenControls.last());
+#endif
             QMetaObject::invokeMethod(menu, "close");
             QTRY_VERIFY(!menu->property("opened").toBool());
         }

@@ -276,15 +276,17 @@ void FomawriteTest::pdfPagesFileChangedOnDiskWhileEditingIsFlagged() {
     QCOMPARE(t.session.baselineBytes(), cycle165Marked(5));
 }
 
-void FomawriteTest::pdfPagesAdoptingTheWorkingStateRebasesTheHistory() {
+void FomawriteTest::pdfPagesAdoptingTheWorkingStateClearsTheHistory() {
     Cycle165Session s;
-    const QByteArray original = cycle165Marked(3);
-    QVERIFY(s.open(original));
+    QVERIFY(s.open(cycle165Marked(3)));
     QVERIFY(s.session.rotatePages({1}, 90));
-    const QByteArray afterRotate = s.session.workingBytes();
     QVERIFY(s.session.removePages({0}));
     const QByteArray adopted = s.session.workingBytes();
+    QVERIFY(s.session.rotatePages({1}, 180));
+    QVERIFY(s.session.undoPageEdit());
     CYCLE165_MAP(s.session.pageMap(), {{1, 90}, {2, 0}});
+    QVERIFY(s.session.canUndoPageEdit());
+    QVERIFY(s.session.canRedoPageEdit());
 
     QVERIFY(s.session.adoptWorkingAsBaseline());
     QCOMPARE(s.session.baselineBytes(), adopted);
@@ -292,24 +294,8 @@ void FomawriteTest::pdfPagesAdoptingTheWorkingStateRebasesTheHistory() {
     CYCLE165_MAP(s.session.pageMap(), {{0, 0}, {1, 0}});
     QCOMPARE(s.session.baselinePageCount(), 2);
     QVERIFY(!s.session.pagesModified());
-    QVERIFY(s.session.canUndoPageEdit());
-
-    // Undo restores the earlier bytes exactly, relative to the new baseline.
-    QVERIFY(s.session.undoPageEdit());
-    QCOMPARE(s.session.workingBytes(), afterRotate);
-    QVERIFY(s.session.pagesModified());
-    QCOMPARE(s.session.pageCount(), 3);
-    CYCLE165_MAP(s.session.pageMap(), {{-1, 0}, {0, 0}, {1, 0}});
-    QVERIFY(s.session.undoPageEdit());
-    QCOMPARE(s.session.workingBytes(), original);
-    QVERIFY(s.session.pagesModified());
-    CYCLE165_MAP(s.session.pageMap(), {{-1, 0}, {0, 270}, {1, 0}});
-    // Redo goes forward again, and back to the baseline's own state it is unmodified.
-    QVERIFY(s.session.redoPageEdit());
-    QVERIFY(s.session.redoPageEdit());
-    QCOMPARE(s.session.workingBytes(), adopted);
-    QVERIFY(!s.session.pagesModified());
-    CYCLE165_MAP(s.session.pageMap(), {{0, 0}, {1, 0}});
+    QVERIFY(!s.session.undoPageEdit());
+    QVERIFY(!s.session.redoPageEdit());
 }
 
 void FomawriteTest::pdfPagesTextIndicesDoNotChangeWithRotation() {

@@ -20,8 +20,8 @@ ApplicationWindow {
     visible: true
     font.family: Qt.platform.os === "osx" ? Qt.application.font.family : "Helvetica Neue"
     font.pixelSize: 13
-    // In PDF mode the window is named after the PDF; "*" still means unsaved notes.
-    title: (backend.modified ? "* " : "") + (backend.pdf.active ? backend.pdf.fileName : backend.fileName) + " - Fomawrite"
+    // The window is named after the PDF in PDF mode.
+    title: (documentModified ? "* " : "") + (backend.pdf.active ? backend.pdf.fileName : backend.fileName) + " - Fomawrite"
 
     readonly property bool isMac: Qt.platform.os === "osx"
     readonly property bool darkMode: backend.darkMode
@@ -92,13 +92,23 @@ ApplicationWindow {
         return pdfOwnsKeyboard && workspaceLayout.liveEditEnabled && liveEditorLoader.item !== null && backend.liveMirrorsDocument();
     }
     function undoEditing() {
+        if (pdfReader && pdfReader.noteDraftOpen) { pdfReader.undoNoteDraft(); return; }
         // The Live editor keeps its own history; undoing the mirrored document
         // underneath it would diverge the two. Route to the page instead.
+        if (pdfOwnsKeyboard && (pdfPagesModified || backend.pdf.canRedoPageEdit)) {
+            pdfReader.undoPages();
+            return;
+        }
         if (canFormatLive || notesHistoryInLive()) { backend.editorBridge.requestUndo(); return; }
         if (editTarget === editor) editor.cursorPosition = backend.undoSource(editor.cursorPosition);
         else editTarget.undo();
     }
     function redoEditing() {
+        if (pdfReader && pdfReader.noteDraftOpen) { pdfReader.redoNoteDraft(); return; }
+        if (pdfOwnsKeyboard && (pdfPagesModified || backend.pdf.canRedoPageEdit)) {
+            pdfReader.redoPages();
+            return;
+        }
         if (canFormatLive || notesHistoryInLive()) { backend.editorBridge.requestRedo(); return; }
         if (editTarget === editor) editor.cursorPosition = backend.redoSource(editor.cursorPosition);
         else editTarget.redo();
@@ -488,6 +498,8 @@ ApplicationWindow {
         id: workspaceLayout
         objectName: "workspaceLayout"
         availableWidth: Math.max(0, win.width - 3)
+        // PDF Split can use the compact Source controls to leave more room for navigation.
+        splitSourceMinimumWidth: win.isMac && win.pdfMode ? 360 : 480
         activeSurface: win.lastWritingSurface
     }
     Connections {
@@ -521,6 +533,39 @@ ApplicationWindow {
     // shows its notes. Opening a PDF starts in PDF only, or split when it has
     // notes; leaving PDF mode restores the arrangement chosen before it.
     readonly property bool pdfMode: backend.pdf.active
+    readonly property bool pdfPagesModified: pdfMode && backend.pdf.pagesModified
+    readonly property bool documentModified: backend.modified || pdfPagesModified
+    property bool savingPdf: false
+
+    function saveDocument() {
+        if (pdfReader && pdfReader.noteDraftOpen && !pdfReader.finishNote()) return;
+        if (pdfPagesModified) savePdfPages(false);
+        else backend.save();
+    }
+
+    function cancelPendingDocumentAction() {
+        pendingAction = "";
+        pendingOpenFragment = "";
+        awaitingPendingSave = false;
+        backend.cancelQuit();
+    }
+
+    function savePdfPages(overwrite) {
+        savingPdf = true;
+        var saved = backend.savePdf(overwrite);
+        savingPdf = false;
+        if (!saved && backend.pdfSaveNeedsOverwrite && !overwrite) {
+            pdfOverwriteDialog.open();
+            return false;
+        }
+        if (!saved || backend.pdfSaveNotice !== "" || backend.modified) {
+            showNavigationNotice(saved ? backend.pdfSaveNotice : backend.pdfSaveError);
+            cancelPendingDocumentAction();
+            return false;
+        }
+        if (pendingAction !== "") completePendingAction();
+        return true;
+    }
     readonly property Item previewSlotItem: pdfMode && pdfReaderSlot.item ? pdfReaderSlot : previewPane
     readonly property var pdfReader: pdfMode ? pdfReaderSlot.item : null
     // Keyboard focus is in the PDF pane (its pages, toolbar or find bar).
@@ -528,7 +573,7 @@ ApplicationWindow {
     readonly property bool pdfFindOpen: !!pdfReader && pdfReader.findOpen
     // The PDF menu and toolbar commands. A command that needs the pane shows it first.
     function pdfCommand(command) {
-        if (!pdfReader) return;
+        if (!pdfReader || pdfReader.noteDraftOpen) return;
         var marking = command === "highlight" || command === "underline" || command === "strike";
         if (command !== "thumbnails" && command !== "copyQuote" && !marking) revealPdfPane();
         var reader = pdfReader;
@@ -543,9 +588,18 @@ ApplicationWindow {
         case "zoomOut": reader.zoomOut(); break;
         case "actualSize": reader.actualSize(); break;
         case "fitWidth": reader.fitWidth(); break;
+        case "fitPage": reader.fitPage(); break;
         case "thumbnails": reader.toggleThumbnails(); break;
         case "inspector": Qt.callLater(reader.showInspector); break;
         case "find": Qt.callLater(reader.openFind, false); break;
+        case "rotateLeft": reader.rotateSelectedPages(-90); break;
+        case "rotateRight": reader.rotateSelectedPages(90); break;
+        case "deletePages": reader.removeSelectedPages(); break;
+        case "insertPages": reader.choosePagesToInsert(); break;
+        case "exportPages": reader.choosePageExport(); break;
+        case "undoPages": reader.undoPages(); break;
+        case "redoPages": reader.redoPages(); break;
+        case "recovery": if (!backend.openPdfRecoveryFolder()) showNavigationNotice("No previous PDF copies are available."); break;
         }
     }
     // Notes and page follow each other (Cycle 164). A click on a mark or pin
@@ -738,7 +792,7 @@ ApplicationWindow {
         if (workspaceLayout.effectiveLayoutMode !== 1) return;
         beginDocumentViewportTransition(true);
         var total = editorPane.width + previewSlotItem.width;
-        workspaceLayout.updateWidth("preview", Math.max(320, Math.min(total / 2, total - 480)));
+        workspaceLayout.updateWidth("preview", Math.max(320, Math.min(total / 2, total - workspaceLayout.splitSourceMinimumWidth)));
     }
     // Layout and editing choice are independent. Preview-only is a reading
     // action; returning to editing restores the last chosen arrangement.
@@ -965,7 +1019,7 @@ ApplicationWindow {
             case "newWindow": backend.newWindow(); break;
             case "open": backend.openDialog(); break;
             case "openPath": openPathDialog.open(); break;
-            case "save": backend.save(); break;
+            case "save": win.saveDocument(); break;
             case "saveAs": backend.saveAsDialog(); break;
             case "duplicate": fileNameDialog.showFor(false); break;
             case "rename": fileNameDialog.showFor(true); break;
@@ -1294,7 +1348,7 @@ ApplicationWindow {
         id: formatPopover
         x: Math.max(0, editorPane.x + 12)
         y: Math.max(0, win.contentItem.height - height - 38)
-        CompactMenuItem { objectName: "saveButton"; text: "Save"; onTriggered: backend.save() }
+        CompactMenuItem { objectName: "saveButton"; text: "Save"; onTriggered: win.saveDocument() }
         CompactMenuItem { objectName: "openButton"; text: "Open…"; onTriggered: backend.openDialog() }
         CompactMenuItem { text: "Open by Path…"; onTriggered: openPathDialog.open() }
         MenuSeparator {}
@@ -1590,8 +1644,9 @@ ApplicationWindow {
     color: pageColor
 
     function prepareQuit() {
+        if (pdfReader && pdfReader.noteDraftOpen) { backend.cancelQuit(); return; }
         pendingAction = "quit";
-        if (backend.modified) unsavedChangesDialog.open();
+        if (documentModified) unsavedChangesDialog.open();
         else completePendingAction();
     }
     function commitQuit() {
@@ -1600,7 +1655,8 @@ ApplicationWindow {
         close();
     }
     onClosing: function(close) {
-        if (closeConfirmed || !backend.modified) {
+        if (pdfReader && pdfReader.noteDraftOpen) { close.accepted = false; return; }
+        if (closeConfirmed || !documentModified) {
             backend.notifyWindowClosed();
             return;
         }
@@ -1746,10 +1802,11 @@ ApplicationWindow {
     }
 
     function requestHistory(direction) {
+        if (pdfReader && pdfReader.noteDraftOpen) return;
         backend.rememberCursor(editor.cursorPosition);
         pendingHistoryDirection = direction;
         pendingAction = "history";
-        if (backend.modified) unsavedChangesDialog.open();
+        if (documentModified) unsavedChangesDialog.open();
         else completePendingAction();
     }
 
@@ -1844,6 +1901,7 @@ ApplicationWindow {
     }
 
     function requestOpen(url) {
+        if (pdfReader && pdfReader.noteDraftOpen) return false;
         var parts = documentLinkParts(url);
         if (parts.fragment !== "" && (parts.url === "" || parts.url === String(backend.fileUrl)))
             return navigateDocumentFragment(parts.fragment);
@@ -1853,7 +1911,7 @@ ApplicationWindow {
             revealPdfPane();
             return openDocumentTarget(parts.url, parts.fragment);
         }
-        if (!backend.modified) return openDocumentTarget(parts.url, parts.fragment);
+        if (!documentModified) return openDocumentTarget(parts.url, parts.fragment);
         pendingOpenUrl = parts.url;
         pendingOpenFragment = parts.fragment;
         pendingAction = "open";
@@ -1862,12 +1920,14 @@ ApplicationWindow {
     }
 
     function requestNewDocument() {
+        if (pdfReader && pdfReader.noteDraftOpen) return;
         pendingAction = "new";
-        if (backend.modified) unsavedChangesDialog.open();
+        if (documentModified) unsavedChangesDialog.open();
         else completePendingAction();
     }
 
     function requestCreateDocument(name, inNewWindow) {
+        if (pdfReader && pdfReader.noteDraftOpen) return;
         workspaceLayout.filesVisible = true;
         if (inNewWindow) {
             var file = backend.library.createDocument(name);
@@ -1876,7 +1936,7 @@ ApplicationWindow {
         }
         pendingFileName = name;
         pendingAction = "create";
-        if (backend.modified) unsavedChangesDialog.open();
+        if (documentModified) unsavedChangesDialog.open();
         else completePendingAction();
     }
 
@@ -2055,7 +2115,7 @@ ApplicationWindow {
     Shortcut {
         sequence: "Ctrl+S"
         context: Qt.WindowShortcut
-        onActivated: backend.save()
+        onActivated: win.saveDocument()
     }
 
     Shortcut {
@@ -2191,9 +2251,10 @@ ApplicationWindow {
             saveFileDialog.open();
         }
 
-        function onSaveFailed() { win.awaitingPendingSave = false; win.pendingAction = ""; }
+        function onSaveFailed() { if (!win.savingPdf) { win.awaitingPendingSave = false; win.pendingAction = ""; } }
 
         function onSaveSucceeded() {
+            if (win.savingPdf) return;
             win.awaitingPendingSave = false;
             if (win.pendingAction !== "")
                 win.completePendingAction();
@@ -2692,7 +2753,9 @@ ApplicationWindow {
         id: unsavedChangesDialog
         objectName: "unsavedChangesPrompt"
         pendingAction: win.pendingAction
-        fileName: backend.fileName
+        fileName: win.pdfPagesModified ? backend.pdf.fileName : backend.fileName
+        pdfPagesModified: win.pdfPagesModified
+        notesModified: backend.modified
         darkMode: win.darkMode
         textScale: win.textScale
         textColor: win.textColor
@@ -2708,10 +2771,32 @@ ApplicationWindow {
         }
 
         onSaveRequested: {
-            win.awaitingPendingSave = true;
-            backend.save();
+            if (win.pdfPagesModified) win.savePdfPages(false);
+            else {
+                win.awaitingPendingSave = true;
+                backend.save();
+            }
         }
-        onCancelRequested: { win.pendingAction = ""; win.pendingOpenFragment = ""; backend.cancelQuit(); }
+        onCancelRequested: win.cancelPendingDocumentAction()
+    }
+
+    Dialog {
+        id: pdfOverwriteDialog
+        objectName: "pdfOverwriteDialog"
+        title: "PDF changed on disk"
+        modal: true
+        anchors.centerIn: parent
+        width: Math.min(420, win.width - 48)
+        contentItem: Label {
+            wrapMode: Text.WordWrap
+            text: "Replace the version on disk with your page changes? A copy of the version you replace will be kept in Previous PDF Copies."
+        }
+        footer: DialogButtonBox {
+            Button { text: "Cancel"; DialogButtonBox.buttonRole: DialogButtonBox.RejectRole }
+            Button { text: "Replace PDF"; DialogButtonBox.buttonRole: DialogButtonBox.AcceptRole }
+        }
+        onAccepted: win.savePdfPages(true)
+        onRejected: win.cancelPendingDocumentAction()
     }
 
     ExternalChangeDialog {
@@ -2822,7 +2907,7 @@ ApplicationWindow {
             visible: workspaceLayout.effectiveOrganizerVisible
             SplitView.preferredWidth: workspaceLayout.effectiveOrganizerWidth
             SplitView.minimumWidth: 184
-            SplitView.maximumWidth: 288
+            SplitView.maximumWidth: workspaceLayout.organizerMaximumWidth
             OrganizerPane {
                 id: organizerPane
                 anchors.fill: parent
@@ -2840,7 +2925,7 @@ ApplicationWindow {
             visible: workspaceLayout.effectiveFilesVisible
             SplitView.preferredWidth: workspaceLayout.effectiveFileWidth
             SplitView.minimumWidth: 232
-            SplitView.maximumWidth: 420
+            SplitView.maximumWidth: workspaceLayout.fileMaximumWidth
             LibraryPane {
                 id: libraryPane
                 anchors.fill: parent
@@ -2859,7 +2944,7 @@ ApplicationWindow {
             color: win.sourceSurfaceColor
             visible: workspaceLayout.effectiveLayoutMode !== 2
             SplitView.fillWidth: true
-            SplitView.minimumWidth: workspaceLayout.effectiveLayoutMode === 1 ? 480 : 320
+            SplitView.minimumWidth: workspaceLayout.effectiveLayoutMode === 1 ? workspaceLayout.splitSourceMinimumWidth : 320
 
         FormatBar {
             id: formatBar
@@ -3710,6 +3795,7 @@ ApplicationWindow {
             sourceComponent: PdfReader {
                 session: backend.pdf
                 marks: backend.pdfMarks
+                noteAuthor: workspaceSettings.authorshipProfileName
                 bottomInset: documentFooter.height
                 darkMode: win.darkMode
                 onOpenUrlRequested: function(link) { backend.openExternalUrl(link); }
@@ -3743,8 +3829,46 @@ ApplicationWindow {
         }
     }
 
-    // SplitView consumes pointer events on its delegates. Own both gestures in
-    // this narrow document gutter; navigation dividers retain native resizing.
+    // Qt's native sidebar dividers only take spare width from the fill pane.
+    // In Split, let a sidebar also borrow from the adjoining visible panes.
+    Repeater {
+        model: ["organizer", "files"]
+        delegate: MouseArea {
+            required property string modelData
+            readonly property Item sidebar: modelData === "organizer" ? organizerSlot : filesSlot
+            visible: sidebar.visible && editorPane.visible && win.previewSlotItem.visible
+            objectName: modelData + "SplitResize"
+            x: workspaceSplit.x + sidebar.x + sidebar.width - 4
+            y: workspaceSplit.y
+            width: 9
+            height: Math.max(0, workspaceSplit.height - documentFooter.height)
+            z: 1
+            acceptedButtons: Qt.LeftButton
+            hoverEnabled: true
+            preventStealing: true
+            cursorShape: Qt.SplitHCursor
+            property real pressX
+            property var startingWidths: null
+            onPressed: function(mouse) {
+                pressX = mapToItem(win.contentItem, mouse.x, mouse.y).x;
+                startingWidths = workspaceLayout.splitResizeWidths();
+            }
+            onPositionChanged: function(mouse) {
+                if (!pressed || !startingWidths) return;
+                var delta = mapToItem(win.contentItem, mouse.x, mouse.y).x - pressX;
+                workspaceLayout.resizeSplitSidebar(modelData, startingWidths[modelData] + delta, startingWidths);
+            }
+            onReleased: startingWidths = null
+            onCanceled: startingWidths = null
+            Rectangle {
+                x: 4; width: 1; height: parent.height
+                visible: parent.containsMouse || parent.pressed
+                color: backend.palette.focus
+            }
+        }
+    }
+
+    // The document gutter also keeps reading position and supports double-click to balance.
     MouseArea {
         id: documentDividerGestures
         objectName: "documentDividerGestures"
@@ -3780,7 +3904,7 @@ ApplicationWindow {
             if (!pressed || balanceOnRelease || !readingAnchors) return;
             var delta = mapToItem(win.contentItem, mouse.x, mouse.y).x - pressSceneX;
             var total = editorPane.width + win.previewSlotItem.width;
-            var next = Math.max(320, Math.min(total - 480, pressPreviewWidth - delta));
+            var next = Math.max(320, Math.min(total - workspaceLayout.splitSourceMinimumWidth, pressPreviewWidth - delta));
             if (Math.abs(next - win.previewSlotItem.width) < 0.5) return;
             preserveReadingPosition();
             workspaceLayout.updateWidth("preview", next);
@@ -3826,7 +3950,7 @@ ApplicationWindow {
         layoutMode: workspaceLayout.effectiveLayoutMode
         pdfMode: win.pdfMode
         liveEditing: workspaceLayout.liveEditEnabled
-        canSplit: workspaceLayout.availableWidth >= 800
+        canSplit: workspaceLayout.availableWidth >= workspaceLayout.splitSourceMinimumWidth + 320
         sourcePaneWidth: editorPane.visible ? editorPane.width : 0
         previewPaneStart: win.previewSlotItem.visible ? win.previewSlotItem.x - x : width
         writingAppearance: workspaceLayout.liveEditEnabled ? backend.publishingThemeName : win.codeAppearance ? "Code" : win.activeWritingAppearance === "editorial" ? "Editorial" : win.activeWritingAppearance === "book" ? "Book" : win.activeWritingAppearance === "omawrite" ? "Omawrite" : "Manuscript"
@@ -3864,6 +3988,10 @@ ApplicationWindow {
             var url = droppedDocument(drop.urls);
             if (url === null) { drop.accepted = false; return; }
             drop.acceptProposedAction();
+            if (win.pdfReader && /\.pdf$/i.test(String(url))) {
+                var point = fileDropArea.mapToItem(win.pdfReader, drop.x, drop.y);
+                if (win.pdfReader.dropPdfOnThumbnails(url, point)) return;
+            }
             win.requestOpen(url);
         }
     }

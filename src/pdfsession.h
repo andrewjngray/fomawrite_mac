@@ -160,6 +160,7 @@ public:
     // Page edits. Each refuses (false, pageEditError says why) a PDF that is not ready, too large to hold in
     // memory, damaged, password protected, or signed while signedEditsAllowed is false. A change that changes
     // nothing returns true and records no undo step. `before` is a working page index, 0..pageCount.
+    Q_INVOKABLE bool pageEditNeedsSignatureConsent() const;
     Q_INVOKABLE bool rotatePages(const QList<int> &pages, int degreesClockwise);
     Q_INVOKABLE bool removePages(const QList<int> &pages);
     Q_INVOKABLE bool movePages(const QList<int> &pages, int before);
@@ -179,8 +180,7 @@ public:
     QByteArray workingBytes() const { return m_working.bytes; }
     QVector<PageOrigin> pageMap() const { return m_working.map; }
     int baselinePageCount() const { return m_baselinePages; }
-    // The working document becomes the baseline (after it was saved): the map is the identity, pagesModified
-    // false, and every state on the undo and redo stacks is rebased onto the new baseline.
+    // After a successful write, make the working document the baseline and clear page undo and redo.
     bool adoptWorkingAsBaseline();
     // After the working bytes were written to the file: the changed-on-disk flag clears and the new file is watched.
     void savedToDisk();

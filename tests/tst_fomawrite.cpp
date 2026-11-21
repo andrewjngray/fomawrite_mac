@@ -219,7 +219,7 @@ private slots:
     void pdfPagesUndoAndRedoRestoreExactBytesWithinABound();
     void pdfPagesRefusalsLeaveTheStateUntouched();
     void pdfPagesFileChangedOnDiskWhileEditingIsFlagged();
-    void pdfPagesAdoptingTheWorkingStateRebasesTheHistory();
+    void pdfPagesAdoptingTheWorkingStateClearsTheHistory();
     void pdfPagesTextIndicesDoNotChangeWithRotation();
     void pdfPagesMarksAndPinsStayOnTheirContent();
     void pdfPagesMarkingWhilePendingWritesBaselineNumbers();
@@ -229,14 +229,19 @@ private slots:
     void pdfSavingFailuresLeaveEverythingAsItWas();
     void pdfSavingVerifiesTheFileItWrote();
     void pdfSavingRefusesAFileThatChangedOnDisk();
-    void pdfSavingDoesNotReloadOrDropTheUndoHistory();
-    void pdfSavingUndoAfterSaveThenSavingAgainRestoresTheOldBytes();
+    void pdfSavingDoesNotReloadThePdf();
+    void pdfSavingResetsPageHistoryAndKeepsUnchangedNotesHistory();
     void pdfSavingRenumbersTheNotesAndMarksStayOnTheirContent();
     void pdfSavingRewritesHeadingsAndRemovedPagesAndKeepsEverythingElse();
-    void pdfSavingRenumbersWithOneEditorUndoStepAndKeepsWindowsLineBreaksOnDisk();
+    void pdfSavingRenumbersAndClearsSourceHistoryAndKeepsWindowsLineBreaks();
+    void pdfSavingResetsLiveNotesHistoryOnlyWhenReferencesChange();
     void pdfSavingSavesTheNotesDocumentWhenItHasATarget();
     void pdfSavingKeepsMarkingIntoTheRightSectionAfterAReorder();
     void pdfSavingExportsPagesWithoutChangingTheSession();
+    void pdfPageControlsEditTheSelectedPagesAndSave();
+    void pdfPageSavePromptsBeforeSwitchingAndReplacing();
+    void pdfPageControlsAskBeforeChangingASignedPdf();
+    void pdfThumbnailPointerDragReordersPages();
     void pdfSessionLoadsRefusesAndUnlocks();
     void pdfSessionReportsPageSizesLabelsAndText();
     void pdfSessionSelectionGeometryMatchesTheSpikeMapping();
@@ -295,6 +300,18 @@ private slots:
     void pdfCaretIntoAnItemShowsItOnThePage();
     void pdfDragSelectingFromAHighlightStillSelects();
     void pdfNoteToolButtonMenuItemAndShortcut();
+#ifdef Q_OS_MACOS
+    void pdfToolbarRotatesCurrentAndSelectedPages();
+    void pdfToolbarMakesTheActiveToolClear();
+    void pdfFitPageShowsWholePageAndRemembersTheMode();
+    void splitSourceFindCentersTypedText();
+    void pdfNotePinCopiesAndShowsAHoverCard();
+    void pdfNoteCardDragsAndKeepsCreationDetails();
+    void pdfSplitNavigationDividersBorrowRoomAtTheSourceMinimum();
+    void pdfSplitFitsWiderSidebarsInTheSameWindow();
+    void pdfNoteDraftCommitsAndCancelsInPdfOnlyView();
+    void pdfNoteDraftEditsTheFullBodyWithoutTouchingOtherNotes();
+#endif
     void pdfReanchoredMarksAreDrawnAtTheQuoteAndRemovable();
     void pdfUnplacedItemsAreNotDrawnAndAreListed();
     void pdfClickingAnUnplacedRowRevealsItInTheNotes();
@@ -5471,3 +5488,13 @@ int main(int argc, char **argv) {
 #include "cycle165-pdf-editor.inc"
 #include "cycle165-pdf-pages.inc"
 #include "cycle165-pdf-saving.inc"
+#include "cycle166-pdf-controls.inc"
+#include "cycle167-pdf-note-editor.inc"
+
+#include "cycle168-pdf-toolbar.inc"
+
+#include "cycle169-pdf-note-card.inc"
+
+#include "cycle170-split-resizing.inc"
+
+#include "cycle171-pdf-widths.inc"
