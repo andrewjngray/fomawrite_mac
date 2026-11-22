@@ -70,7 +70,7 @@ macx {
 SOURCES += ../src/pdfsession.cpp ../src/pdfpageitem.cpp ../src/pdfnotes.cpp ../src/pdfmarks.cpp ../src/pdffiles.cpp
 HEADERS += ../src/pdfsession.h ../src/pdfpageitem.h ../src/pdfnotes.h ../src/pdfmarks.h ../src/pdffiles.h
 HEADERS += pdffixtures.h
-win32: LIBS += -lpsapi
+win32: LIBS += -lpsapi -lshell32
 
 # PDF page operations over qpdf (Cycle 165). qpdf is found through pkg-config
 # (Homebrew on macOS; vcpkg's lib/pkgconfig on Windows, with PKG_CONFIG_PATH

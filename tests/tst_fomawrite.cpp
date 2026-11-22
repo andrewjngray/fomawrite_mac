@@ -107,6 +107,8 @@ private slots:
     void publishingSharedThemePdfPreservesPaperBreaksDraftAndUndo();
     void publishingAsyncPreviewKeepsLatestRequest();
     void publishingComponentColdPdfLoadsActualDocument();
+    void publishingPdfRightClickOffersLinkedFileActions();
+    void publishingWebRightClickOffersBrowserAndCopyAddress();
     void publishingComponentReplacementLoadsWithoutCaptureFrames();
     void publishingComponentSwitchRejectsStalePdfResults();
     void publishingComponentRapidSwitchModesAndHiddenRejectStaleResults();
@@ -6467,3 +6469,5 @@ int main(int argc, char **argv) {
 #include "cycle170-split-resizing.inc"
 
 #include "cycle171-pdf-widths.inc"
+
+#include "cycle172-preview-links.inc"

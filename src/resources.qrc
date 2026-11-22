@@ -66,6 +66,7 @@
         <file>NativeMenuBar.qml</file>
         <file>WindowsMenuBar.qml</file>
         <file>PublishingPreview.qml</file>
+        <file>PreviewLinkMenu.qml</file>
         <file>WindowsPaginatedPreview.qml</file>
         <file>PdfReader.qml</file>
         <file>PdfToolbar.qml</file>

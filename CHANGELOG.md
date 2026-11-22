@@ -4,6 +4,7 @@ One line per cycle, newest first. Each line links to the cycle's record under `r
 
 ## 0.3.0 development series (Cycles 97–)
 
+- **172** — Preview link actions (in review). Right-click links in PDF and Web Preview to open their destinations, copy an address or path, or act on a linked local file. [Record](research/cycle-172/README.md)
 - **171** — Wider sidebars in Mac PDF Split (in review). Let Source compact to 360 px and raise the Library and file-list caps. [Record](research/cycle-171/README.md)
 - **170** — Split pane divider resizing (in review). The Library and file-list dividers can borrow unused width from Preview when Source reaches its minimum. [Record](research/cycle-170/README.md)
 - **169** — Mac Source Find and PDF note cards (in review). Centre search text, copy and preview notes from their pins, and move the editor with its creation details visible. [Record](research/cycle-169/README.md)

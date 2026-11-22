@@ -1,5 +1,9 @@
 # Windows workstream status
 
+## Cycle 172 — 22 November 2026
+
+Build `0.3.0-dev67` adds right-click actions to the Web and PDF publishing previews. The Windows **Open With…** command opens the system app chooser. ARM64 and x64 verification is pending.
+
 ## Cycle 171 — 22 November 2026
 
 Build `0.3.0-dev66` adds the PDF note editor and hover preview, toolbar Rotate and Fit Page, Source Find alignment, and wider PDF Split sidebars. Both native jobs passed (ARM64 528 and x64 528 Qt checks with zero failures or skips), including deployed-app checks. The launch and update job also passed. Both downloaded packages were verified against their CI artifact and package manifests. [Windows CI](https://github.com/andrewjngray/fomawrite_mac/actions/runs/44946256820)

@@ -38,4 +38,5 @@ void macIgnoreWord(const QString &word);
 void macSpeakText(const QString &text);
 void macStopSpeaking();
 bool shareMacFile(QWindow *window, const QString &path);
+QVariantList macApplicationsForFile(const QString &path);
 #endif

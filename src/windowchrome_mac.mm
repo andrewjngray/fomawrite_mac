@@ -1,5 +1,6 @@
 #include "macbridge.h"
 #include <QVariantMap>
+#include <QUrl>
 #include <QFile>
 #include <QGuiApplication>
 #include <QScreen>
@@ -301,4 +302,19 @@ bool shareMacFile(QWindow *window, const QString &path) {
     picker = [[NSSharingServicePicker alloc] initWithItems:@[url]];
     [picker showRelativeToRect:NSMakeRect(20, 20, 1, 1) ofView:view preferredEdge:NSMinYEdge];
     return true;
+}
+
+QVariantList macApplicationsForFile(const QString &path) {
+    @autoreleasepool {
+        NSWorkspace *workspace = [NSWorkspace sharedWorkspace];
+        NSURL *file = [NSURL fileURLWithPath:path.toNSString()];
+        QVariantList applications;
+        for (NSURL *application in [workspace URLsForApplicationsToOpenURL:file]) {
+            NSString *name = [[NSFileManager defaultManager] displayNameAtPath:application.path];
+            applications.append(QVariantMap{{QStringLiteral("name"), QString::fromNSString(name)},
+                                            {QStringLiteral("url"), QUrl::fromLocalFile(QString::fromNSString(application.path))}});
+            if (applications.size() >= 20) break;
+        }
+        return applications;
+    }
 }

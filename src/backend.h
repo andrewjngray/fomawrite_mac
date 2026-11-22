@@ -366,6 +366,8 @@ public:
     Q_INVOKABLE QVariantList hiddenRangesAt(int position) const;
     Q_INVOKABLE void setSearchHighlight(const QString &query, int currentMatchStart);
     Q_INVOKABLE void openExternalUrl(const QUrl &url);
+    Q_INVOKABLE QVariantMap previewLinkInfo(const QUrl &url) const;
+    Q_INVOKABLE bool previewLinkAction(const QUrl &url, const QString &action, const QUrl &argument = {});
     Q_INVOKABLE QVariantMap windowGeometry() const;
     Q_INVOKABLE void saveWindowGeometry(int x, int y, int width, int height, bool maximized);
 
