@@ -1,0 +1,252 @@
+---
+import Layout from '../layouts/Layout.astro';
+import Nav from '../components/Nav.astro';
+import Footer from '../components/Footer.astro';
+---
+
+<Layout title="About - Fomawrite" description="About Fomawrite and its mission">
+  <Nav />
+  
+  <main>
+    <div class="container">
+      <header class="page-header">
+        <h1>About Fomawrite</h1>
+        <p>A personal Markdown writing app where plain files are the only truth</p>
+      </header>
+
+      <div class="content">
+        <section class="content-section">
+          <h2>The Mission</h2>
+          <p>Fomawrite is a personal Markdown writing app for macOS in which plain <code>.md</code> files are the only truth.</p>
+          
+          <div class="mission-points">
+            <div class="mission-point">
+              <h3>The file is the truth</h3>
+              <p>Documents are saved byte-exactly, with no hidden state, no proprietary format and nothing the file cannot carry. Anything another Markdown tool wrote can be opened, edited and saved without being rewritten.</p>
+            </div>
+
+            <div class="mission-point">
+              <h3>One text, several ways to work on it</h3>
+              <p>The same document can be edited as literal source (iA Writer style, including code), edited with its Markdown rendered in place (Typora style), or read as the published result. Switching between them is instant and loses nothing: not the caret, not the selection, not a byte.</p>
+            </div>
+
+            <div class="mission-point">
+              <h3>Publishing is first class</h3>
+              <p>Typora CSS themes, real Web output and real PDF, previewed as they will export.</p>
+            </div>
+
+            <div class="mission-point">
+              <h3>Calm</h3>
+              <p>Typography and focus come before chrome. Nothing interrupts writing.</p>
+            </div>
+
+            <div class="mission-point">
+              <h3>Small enough to trust</h3>
+              <p>This is a one-person product built with AI help. It must stay small enough that its behavior can be verified end to end, and every change ships with a test that would have failed before it.</p>
+            </div>
+          </div>
+        </section>
+
+        <section class="content-section">
+          <h2>Current Focus</h2>
+          <p>The current measure of progress is a single question: <strong>is Live good enough to be the daily editor?</strong></p>
+          <p>Advancing means finding that out by writing real documents in it, fixing what that reveals, and only then deciding what else the mission needs. A cycle that adds capability without moving that question forward is not progress.</p>
+        </section>
+
+        <section class="content-section">
+          <h2>History</h2>
+          <p>Fomawrite grew from the MIT-licensed <a href="https://github.com/omacom/omawrite" target="_blank" rel="noopener noreferrer">Omawrite project</a>. That history and attribution remain in this repository.</p>
+          <p>The product was renamed to Fomawrite in Cycle 60 (September 2024). The earlier Mac 0.2.0 RC1 download uses the old name and predates the later menu cycles.</p>
+        </section>
+
+        <section class="content-section">
+          <h2>Technology</h2>
+          <p>Fomawrite is built with:</p>
+          <ul>
+            <li><strong>Qt Quick/QML</strong> for the interface</li>
+            <li><strong>C++</strong> for document I/O and formatting</li>
+            <li><strong>CodeMirror 6</strong> for the Live editor</li>
+            <li><strong>Qt WebEngine (Chromium)</strong> for Web/PDF rendering</li>
+            <li><strong>MD4C</strong> for semantic HTML generation</li>
+            <li><strong>Harper</strong> (Automattic) for offline grammar checking</li>
+          </ul>
+          <p>The development uses Homebrew Qt 6.11.2 on Apple Silicon. The macOS deployment target is 14.0.</p>
+        </section>
+
+        <section class="content-section">
+          <h2>Testing</h2>
+          <p>Current build has <strong>288 regression tests</strong> in the Qt suite and <strong>321 tests</strong> in the editor page suite.</p>
+          <p>Every behavioral fix ships with a test that fails on the previous code and passes on the new code (red/green verification). The mission requires that the product stay small enough to verify end to end.</p>
+        </section>
+
+        <section class="content-section">
+          <h2>Attribution</h2>
+          <p>The upstream Omawrite code is copyright David Heinemeier Hansson and remains under the <a href="https://opensource.org/licenses/MIT" target="_blank" rel="noopener noreferrer">MIT license</a>.</p>
+          <p>Bundled iA Writer Mono fonts are copyright Information Architects Inc., based on IBM Plex, and remain under the <a href="https://scripts.sil.org/OFL" target="_blank" rel="noopener noreferrer">SIL Open Font License</a>.</p>
+          <p>Semantic publishing uses <a href="https://github.com/mity/md4c" target="_blank" rel="noopener noreferrer">MD4C 0.5.3</a>, copyright Martin Mitáš, under the MIT license.</p>
+        </section>
+
+        <section class="content-section">
+          <h2>Open Source</h2>
+          <p>Fomawrite is open source and available on GitHub:</p>
+          <p><a href="https://github.com/andrewjngray/fomawrite_mac" class="button secondary" target="_blank" rel="noopener noreferrer">View Repository</a></p>
+        </section>
+
+        <section class="content-section">
+          <h2>Owner</h2>
+          <p>Fomawrite is built and maintained by Andrew Gray with AI assistance.</p>
+        </section>
+      </div>
+    </div>
+  </main>
+  
+  <Footer />
+</Layout>
+
+<style>
+  main {
+    min-height: calc(100vh - 64px);
+    padding: var(--spacing-2xl) 0;
+  }
+
+  .container {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 0 var(--spacing-md);
+  }
+
+  .page-header {
+    margin-bottom: var(--spacing-2xl);
+  }
+
+  .page-header h1 {
+    font-size: clamp(2.5rem, 5vw, 3.5rem);
+    margin-bottom: var(--spacing-xs);
+  }
+
+  .page-header p {
+    font-size: 1.125rem;
+    color: var(--color-text-muted);
+  }
+
+  .content {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-2xl);
+  }
+
+  .content-section {
+    padding: var(--spacing-lg);
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+  }
+
+  .content-section h2 {
+    font-size: 1.75rem;
+    margin-bottom: var(--spacing-sm);
+    color: var(--color-text);
+  }
+
+  .content-section h3 {
+    font-size: 1.25rem;
+    margin-bottom: var(--spacing-xs);
+    color: var(--color-text);
+  }
+
+  .content-section p {
+    font-size: 0.9375rem;
+    color: var(--color-text-muted);
+    line-height: 1.6;
+    margin-bottom: var(--spacing-sm);
+  }
+
+  .content-section p:last-child {
+    margin-bottom: 0;
+  }
+
+  .content-section ul {
+    list-style: none;
+    padding-left: 0;
+    margin: var(--spacing-sm) 0;
+  }
+
+  .content-section li {
+    padding: 0.5rem 0 0.5rem 1.5rem;
+    position: relative;
+    color: var(--color-text-muted);
+    font-size: 0.9375rem;
+    line-height: 1.6;
+  }
+
+  .content-section li::before {
+    content: '•';
+    position: absolute;
+    left: 0;
+    color: var(--color-accent);
+  }
+
+  .content-section a {
+    color: var(--color-accent);
+    text-decoration: none;
+  }
+
+  .content-section a:hover {
+    text-decoration: underline;
+  }
+
+  .mission-points {
+    display: grid;
+    gap: var(--spacing-lg);
+    margin-top: var(--spacing-md);
+  }
+
+  .mission-point {
+    padding: var(--spacing-md);
+    background: var(--color-bg);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+  }
+
+  .mission-point h3 {
+    font-size: 1.125rem;
+    margin-bottom: var(--spacing-xs);
+    color: var(--color-accent);
+  }
+
+  .mission-point p {
+    margin-bottom: 0;
+  }
+
+  .button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.75rem 1.5rem;
+    border-radius: var(--radius-md);
+    font-weight: 500;
+    font-size: 0.9375rem;
+    text-decoration: none;
+    transition: all 0.2s ease;
+  }
+
+  .button.secondary {
+    background: var(--color-bg);
+    color: var(--color-text);
+    border: 1px solid var(--color-border);
+  }
+
+  .button.secondary:hover {
+    background: var(--color-surface-hover);
+    border-color: var(--color-accent);
+    text-decoration: none;
+  }
+
+  code {
+    font-family: ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Consolas, 'DejaVu Sans Mono', monospace;
+    font-size: 0.875em;
+    background: var(--color-bg);
+    padding: 0.125rem 0.375rem;
+    border-radius: 0.25rem;
+  }
+</style>
