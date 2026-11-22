@@ -19,3 +19,5 @@ The PDF publishing preview drew clickable link regions and only handled the prim
 Mac build 172 was promoted from source commit `455c67f`. The ARM64 archive hashes verified. The signed distribution and Applications copies have identical executables, and the installed copy passed the four focused Preview groups with eight settled pane captures.
 
 [Mac CI](https://github.com/andrewjngray/fomawrite_mac/actions/runs/44987281122) passed with 421 Qt checks, zero failures and 12 skips. Both Preview link regressions ran and passed. The editor bundle job also passed.
+
+[Windows CI](https://github.com/andrewjngray/fomawrite_mac/actions/runs/44987778374) passed at `2cd5b19`. ARM64 and x64 each passed 530 Qt tests with zero failures or skips, and both deployed-app checks passed. Both package manifests verified before the regular launcher switched to 172. Both architectures were staged in the Parallels VM.
