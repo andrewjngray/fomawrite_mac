@@ -50,5 +50,24 @@
   "paneChromeChecks": 3,
   "editingLayoutChecks": 5,
   "publishingThemeChecks": 12,
-  "previewPaintChecks": 8
+  "previewPaintChecks": 8,
+  "installed": {
+    "app": "/Applications/Fomawrite.app",
+    "version": "0.3.0-dev67",
+    "build": "172",
+    "bundleIdentifier": "io.github.andrewjngray.fomawrite",
+    "executableSha256": "bf9030a3ecdbc820cecf6e987999d61c9af602cf47add1a4630555830d917a98",
+    "signatureVerified": true,
+    "passed": true,
+    "publishingThemeChecks": 4,
+    "previewPaintChecks": 8
+  },
+  "distribution": {
+    "app": "dist/Fomawrite.app",
+    "executableSha256": "bf9030a3ecdbc820cecf6e987999d61c9af602cf47add1a4630555830d917a98",
+    "archive": "dist/releases/mac-v0.3.0-dev67/Fomawrite-Mac-arm64.zip",
+    "archiveSha256": "bf865029bac2644b6d28e2dbdd6b57564ed5828481f8891d19c82d0d816be000",
+    "architecture": "arm64",
+    "source": "455c67f5fad3f4d4c9d7c15585e85b9967c9d90f"
+  }
 }

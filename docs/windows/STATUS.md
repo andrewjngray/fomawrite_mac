@@ -1,5 +1,9 @@
 # Windows workstream status
 
+## Cycle 173 — 22 November 2026
+
+Build `0.3.0-dev68` improves the response of the scroll wheel in PDF publishing Preview. ARM64 and x64 verification is in progress. The regular launcher selects build 172 until both builds qualify.
+
 ## Cycle 172 — 22 November 2026
 
 Build `0.3.0-dev67` adds right-click actions to the Web and PDF publishing previews. The Windows **Open With…** command opens the system app chooser. ARM64 and x64 each passed 530 Qt checks with zero failures or skips. Both deployed-app checks and the launch/update job passed. Both package manifests and archive digests verified. [Windows CI](https://github.com/andrewjngray/fomawrite_mac/actions/runs/44987778374)
