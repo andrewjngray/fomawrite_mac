@@ -2,7 +2,7 @@
 
 ## Cycle 173 — 22 November 2026
 
-Build `0.3.0-dev68` improves the response of the scroll wheel in PDF publishing Preview. ARM64 and x64 verification is in progress. The regular launcher selects build 172 until both builds qualify.
+Build `0.3.0-dev68` improves the response of the scroll wheel in PDF publishing Preview. ARM64 and x64 each passed 531 Qt checks with zero failures or skips and passed the deployed desktop checks. Both verified packages are staged in Parallels, and the regular launcher now selects build 173. The same ARM64 VM wheel inputs moved 36 and 144 screen pixels on build 172, then 60 and 240 on build 173. [Windows CI](https://github.com/andrewjngray/fomawrite_mac/actions/runs/44992240980)
 
 ## Cycle 172 — 22 November 2026
 
