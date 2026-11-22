@@ -2,7 +2,9 @@
 
 ## Cycle 172 — 22 November 2026
 
-Build `0.3.0-dev67` adds right-click actions to the Web and PDF publishing previews. The Windows **Open With…** command opens the system app chooser. ARM64 and x64 verification is pending.
+Build `0.3.0-dev67` adds right-click actions to the Web and PDF publishing previews. The Windows **Open With…** command opens the system app chooser. ARM64 and x64 each passed 530 Qt checks with zero failures or skips. Both deployed-app checks and the launch/update job passed. Both package manifests and archive digests verified. [Windows CI](https://github.com/andrewjngray/fomawrite_mac/actions/runs/44987778374)
+
+The regular launcher now selects build 172. Both packages are under `dist/windows-testing/downloads/44987778374/` and were staged in Parallels. The VM selects ARM64 automatically.
 
 ## Cycle 171 — 22 November 2026
 
