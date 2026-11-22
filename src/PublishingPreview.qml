@@ -81,6 +81,44 @@ Rectangle {
     signal templateMenuRequested(var anchor)
     color: renderer.palette.page
 
+    function followPdfLink(link, page, location) {
+        viewportInteraction();
+        if (page < 0) {
+            linkRequested(link);
+            return;
+        }
+        var destination = pages.itemAt(page);
+        if (destination) previewScroll.contentY = destination.y + location.y * destination.pageScale;
+    }
+
+    function followWebLink(link) {
+        viewportInteraction();
+        var value = String(link);
+        var fragment = value.indexOf("#");
+        var base = value.split("#")[0];
+        if (fragment >= 0 && (base === "" || base === String(root.webOutputUrl).split("#")[0]
+                || base === String(root.documentBaseUrl).split("#")[0]))
+            jumpToAnchor(value.slice(fragment + 1));
+        else linkRequested(link);
+    }
+
+    function showLinkMenu(position, link, page, location, fromWeb, internal) {
+        linkMenuLoader.active = true;
+        linkMenuLoader.item.showFor(root, position, link, page, location, fromWeb, internal);
+    }
+
+    Loader {
+        id: linkMenuLoader
+        active: false
+        sourceComponent: PreviewLinkMenu {
+            renderer: root.renderer
+            onOpenRequested: function(link, page, location, fromWeb) {
+                if (fromWeb) root.followWebLink(link);
+                else root.followPdfLink(link, page, location);
+            }
+        }
+    }
+
     function focusRenderedSurface() {
         if (publishingMode === "pdf") previewScroll.forceActiveFocus();
         else web.forceActiveFocus();
@@ -379,12 +417,9 @@ Rectangle {
                             width: rectangle.width * paper.pageScale
                             height: rectangle.height * paper.pageScale
                             cursorShape: Qt.PointingHandCursor
-                            onClicked: {
-                                root.viewportInteraction();
-                                if (page >= 0) {
-                                    var destination = pages.itemAt(page);
-                                    if (destination) previewScroll.contentY = destination.y + location.y * Math.max(0.1, (previewScroll.width - 32) / Math.max(1, pdf.pagePointSize(page).width)) * root.zoom;
-                                } else root.linkRequested(url);
+                            onClicked: root.followPdfLink(url, page, location)
+                            ContextMenu.onRequested: function(position) {
+                                root.showLinkMenu(mapToItem(root, position.x, position.y), url, page, location, false, page >= 0);
                             }
                         }
                     }
@@ -414,16 +449,20 @@ Rectangle {
             }
             if (request.navigationType === WebEngineView.LinkClickedNavigation) {
                 request.action = WebEngineView.IgnoreRequest;
-                root.viewportInteraction();
-                var link = String(request.url);
-                if (link.charAt(0) === "#") root.jumpToAnchor(link.slice(1));
-                else if (String(request.url).split("#")[0] === String(root.documentBaseUrl).split("#")[0] && link.indexOf("#") >= 0)
-                    root.jumpToAnchor(link.slice(link.indexOf("#") + 1));
-                else root.linkRequested(request.url);
+                root.followWebLink(request.url);
             }
         }
         onNewWindowRequested: function(request) { root.linkRequested(request.requestedUrl); }
-        onContextMenuRequested: function(request) { request.accepted = true; }
+        onContextMenuRequested: function(request) {
+            request.accepted = true;
+            var link = String(request.linkUrl);
+            if (link === "") return;
+            var base = link.split("#")[0];
+            var internal = link.includes("#") && (base === "" || base === String(root.webOutputUrl).split("#")[0]
+                || base === String(root.documentBaseUrl).split("#")[0]);
+            root.showLinkMenu(web.mapToItem(root, request.position.x, request.position.y),
+                             request.linkUrl, -1, Qt.point(0, 0), true, internal);
+        }
         onLoadingChanged: function(info) {
             if (root.appliedRevision !== root.refreshRevision || root.publishingMode !== "web" || String(info.url) !== String(root.outputUrl)) return;
             if (info.status === WebEngineView.LoadSucceededStatus) {

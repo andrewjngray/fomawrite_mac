@@ -3071,6 +3071,107 @@ void Backend::setSearchHighlight(const QString &query, int currentMatchStart) {
         m_highlighter->setSearch(query, currentMatchStart);
 }
 
+namespace {
+constexpr qint64 LinkedTextLimit = 8 * 1024 * 1024;
+
+QUrl linkedLocalFile(const QUrl &url) {
+    if (!url.isLocalFile() || (!url.host().isEmpty() && url.host() != QStringLiteral("localhost"))
+        || !QDir::isAbsolutePath(url.toLocalFile())) return {};
+    return QUrl::fromLocalFile(QDir::cleanPath(url.toLocalFile()));
+}
+
+bool linkedFileIsText(const QFileInfo &info) {
+    if (!info.isFile() || !info.isReadable() || info.size() > LinkedTextLimit) return false;
+    const auto mime = QMimeDatabase().mimeTypeForFile(info, QMimeDatabase::MatchExtension);
+    return mime.inherits(QStringLiteral("text/plain")) || mime.inherits(QStringLiteral("application/json"))
+        || mime.inherits(QStringLiteral("application/xml"));
+}
+
+bool isExternalPreviewLink(const QUrl &url) {
+    const auto scheme = url.scheme();
+    return url.isValid() && (scheme == QStringLiteral("http") || scheme == QStringLiteral("https") || scheme == QStringLiteral("mailto"));
+}
+}
+
+QVariantMap Backend::previewLinkInfo(const QUrl &url) const {
+    const QUrl local = linkedLocalFile(url);
+    if (local.isEmpty()) return {{QStringLiteral("web"), isExternalPreviewLink(url)}};
+    const QFileInfo info(local.toLocalFile());
+    const bool available = info.isFile() || info.isDir();
+    QVariantMap result{{QStringLiteral("local"), true}, {QStringLiteral("available"), available},
+                       {QStringLiteral("file"), info.isFile()}, {QStringLiteral("text"), linkedFileIsText(info)}};
+    if (info.isFile()) {
+        const QString suffix = info.suffix().isEmpty() ? QString() : QLatin1Char('.') + info.suffix();
+        result.insert(QStringLiteral("suggestedCopy"), QUrl::fromLocalFile(
+            info.absoluteDir().filePath(info.completeBaseName() + QStringLiteral(" copy") + suffix)));
+    }
+#ifdef Q_OS_MACOS
+    if (info.isFile()) result.insert(QStringLiteral("applications"), macApplicationsForFile(info.absoluteFilePath()));
+#endif
+    return result;
+}
+
+bool Backend::previewLinkAction(const QUrl &url, const QString &action, const QUrl &argument) {
+    const auto fail = [this](const QString &message) { setStatus(message); return false; };
+    if (isExternalPreviewLink(url)) {
+        if (action == QStringLiteral("copyAddress")) {
+            QGuiApplication::clipboard()->setText(url.toString(QUrl::FullyEncoded));
+            return true;
+        }
+        if (action == QStringLiteral("open") && QDesktopServices::openUrl(url)) return true;
+        return fail(QStringLiteral("Could not open this link."));
+    }
+    const QUrl local = linkedLocalFile(url);
+    if (local.isEmpty()) return fail(QStringLiteral("This link does not point to a supported file or web address."));
+    if (action == QStringLiteral("copyPath")) return m_library.copyPath(local);
+    const QFileInfo info(local.toLocalFile());
+    if (!info.isFile() && !info.isDir()) return fail(QStringLiteral("The linked file or folder is unavailable."));
+    if (action == QStringLiteral("open"))
+        return QDesktopServices::openUrl(local) || fail(QStringLiteral("Could not open the linked item."));
+    if (action == QStringLiteral("reveal"))
+        return m_library.showInFileManager(local) || fail(QStringLiteral("Could not show the linked item in the file manager."));
+#ifdef Q_OS_MACOS
+    if (action == QStringLiteral("openWith") && info.isFile()) {
+        for (const QVariant &choice : macApplicationsForFile(info.absoluteFilePath())) {
+            if (choice.toMap().value(QStringLiteral("url")).toUrl() != argument) continue;
+            if (QProcess::startDetached(QStringLiteral("/usr/bin/open"),
+                    {QStringLiteral("-a"), argument.toLocalFile(), info.absoluteFilePath()})) return true;
+            break;
+        }
+        return fail(QStringLiteral("Could not open the linked file with the selected app."));
+    }
+#endif
+    if (action == QStringLiteral("copyContents") && linkedFileIsText(info)) {
+        QFile file(info.absoluteFilePath());
+        if (!file.open(QIODevice::ReadOnly)) return fail(QStringLiteral("Could not read the linked file."));
+        const QByteArray bytes = file.read(LinkedTextLimit + 1);
+        QStringDecoder decoder(QStringDecoder::Utf8, QStringConverter::Flag::Stateless);
+        const QString text = decoder.decode(bytes);
+        if (file.error() != QFileDevice::NoError || bytes.size() > LinkedTextLimit
+                || decoder.hasError() || text.contains(QChar::Null))
+            return fail(QStringLiteral("Copy File Contents requires a UTF-8 text file up to 8 MiB."));
+        QGuiApplication::clipboard()->setText(text);
+        return true;
+    }
+    if (action == QStringLiteral("save") && info.isFile()) {
+        const QUrl destination = linkedLocalFile(argument);
+        if (destination.isEmpty() || QFileInfo(destination.toLocalFile()) == info)
+            return fail(QStringLiteral("Choose a different local filename for the copy."));
+        QFile input(info.absoluteFilePath());
+        QSaveFile output(destination.toLocalFile());
+        const QString error = QStringLiteral("Could not save a copy of the linked file.");
+        if (!input.open(QIODevice::ReadOnly) || !output.open(QIODevice::WriteOnly)) return fail(error);
+        while (!input.atEnd()) {
+            const QByteArray chunk = input.read(256 * 1024);
+            if (chunk.isEmpty() || output.write(chunk) != chunk.size()) return fail(error);
+        }
+        if (input.error() != QFileDevice::NoError || !output.commit()) return fail(error);
+        setStatus(QStringLiteral("Saved a copy of %1.").arg(info.fileName()));
+        return true;
+    }
+    return fail(QStringLiteral("That action is unavailable for this link."));
+}
+
 void Backend::openExternalUrl(const QUrl &url) {
     const QString scheme = url.scheme().toLower();
     if (scheme == QStringLiteral("http") || scheme == QStringLiteral("https")

@@ -3780,7 +3780,7 @@ ApplicationWindow {
                 if (win.opensInWindow(resolved))
                     win.requestOpen(resolved);
                 else
-                    backend.openExternalUrl(resolved);
+                    backend.previewLinkAction(resolved, "open");
             }
         }
         // The PDF in PDF mode; nothing is created otherwise.

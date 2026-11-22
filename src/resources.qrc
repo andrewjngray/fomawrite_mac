@@ -65,6 +65,7 @@
         <file>editor/dist/fonts/KaTeX_Typewriter-Regular.woff2</file>
         <file>NativeMenuBar.qml</file>
         <file>PublishingPreview.qml</file>
+        <file>PreviewLinkMenu.qml</file>
         <file>PdfReader.qml</file>
         <file>PdfToolbar.qml</file>
         <file>PdfToolMenuItem.qml</file>
