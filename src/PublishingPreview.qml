@@ -427,6 +427,27 @@ Rectangle {
             }
         }
     }
+    MouseArea {
+        anchors.fill: previewScroll
+        visible: previewScroll.visible
+        acceptedButtons: Qt.NoButton
+        onWheel: function(wheel) {
+            // Move proportionally even when a wheel sends fractions of a detent.
+            // Keep native pixel scrolling and horizontal or modified gestures.
+            wheel.accepted = wheel.pixelDelta.x === 0 && wheel.pixelDelta.y === 0
+                && wheel.angleDelta.x === 0 && wheel.angleDelta.y !== 0 && wheel.modifiers === Qt.NoModifier;
+            if (!wheel.accepted) return;
+
+            root.userInteraction();
+            previewScroll.cancelFlick();
+            const lines = Application.styleHints.wheelScrollLines;
+            const distancePerDetent = lines < 0 ? previewScroll.height : lines * 40;
+            const pixels = wheel.angleDelta.y / 120 * distancePerDetent;
+            const maxY = Math.max(0, previewScroll.contentHeight - previewScroll.height);
+            previewScroll.contentY = Math.max(0, Math.min(maxY, previewScroll.contentY - pixels));
+        }
+    }
+
     WebEngineView {
         id: web
         objectName: root.renderedObjectName

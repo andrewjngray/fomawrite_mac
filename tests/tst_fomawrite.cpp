@@ -3,6 +3,7 @@
 #include "workspace.h"
 #include <QtConcurrent>
 #include <QtTest>
+#include <QStyleHints>
 #include <cmath>
 #include <QProcess>
 #include <QScopeGuard>
@@ -73,6 +74,7 @@ private slots:
     void publishingSharedThemePdfPreservesPaperBreaksDraftAndUndo();
     void publishingAsyncPreviewKeepsLatestRequest();
     void publishingComponentColdPdfLoadsActualDocument();
+    void publishingPdfWheelMovesProportionally();
     void publishingPdfRightClickOffersLinkedFileActions();
     void publishingWebRightClickOffersBrowserAndCopyAddress();
     void publishingComponentReplacementLoadsWithoutCaptureFrames();
@@ -5502,3 +5504,4 @@ int main(int argc, char **argv) {
 #include "cycle171-pdf-widths.inc"
 
 #include "cycle172-preview-links.inc"
+#include "cycle173-pdf-scroll.inc"
