@@ -41,6 +41,7 @@ macx {
     QMAKE_MACOSX_DEPLOYMENT_TARGET = 14.0
 } else:win32 {
     SOURCES += src/systemtheme_win.cpp
+    RC_ICONS = $$PWD/windows/Fomawrite.ico
     LIBS += -lshell32
 } else:linux {
     SOURCES += src/systemtheme.cpp

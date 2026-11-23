@@ -4,6 +4,7 @@ One line per cycle, newest first. Each line links to the cycle's record under `r
 
 ## 0.3.0 development series (Cycles 97–)
 
+- **174 (Windows)** — Register Fomawrite for Markdown Open with and use the Fomawrite icon in Explorer and setup. [Record](docs/windows/STATUS.md#cycle-174--markdown-open-with-and-icon--23-november-2026)
 - **173** — PDF Preview wheel scrolling. Move in proportion to small and full wheel steps, including on Windows. [Record](research/cycle-173/README.md)
 - **172** — Preview link actions (in review). Right-click links in PDF and Web Preview to open their destinations, copy an address or path, or act on a linked local file. [Record](research/cycle-172/README.md)
 - **171** — Wider sidebars in Mac PDF Split (in review). Let Source compact to 360 px and raise the Library and file-list caps. [Record](research/cycle-171/README.md)

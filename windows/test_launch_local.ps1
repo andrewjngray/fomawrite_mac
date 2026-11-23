@@ -12,6 +12,10 @@ $previousLocalAppData = $env:LOCALAPPDATA
 $checks = New-Object 'System.Collections.Generic.List[string]'
 $heldLock = $null
 $blockingJob = $null
+function Start-Process {
+    [CmdletBinding()]param([string]$FilePath, [string]$WorkingDirectory, [switch]$PassThru)
+    [pscustomobject]@{ Id = 4242 }
+}
 function Hash([string]$Path) { (Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash.ToLowerInvariant() }
 function Assert([bool]$Condition, [string]$Message) { if (-not $Condition) { throw $Message } }
 function Reject([scriptblock]$Action, [string]$Message, [string]$ExpectedReason) {
@@ -110,6 +114,26 @@ try {
     Assert ($third.reusedCache -eq $false -and $third.localPackage -ne $first.localPackage) 'Different manifest reused an old version directory.'
     Assert ((Hash $first.localExecutable) -eq $files['Fomawrite.exe']) 'Staging a different manifest altered the previous version.'
     $checks.Add('manifest-version-staging-preserves-previous-cache')
+
+    $helper = Join-Path $package 'register-markdown.ps1'
+    @'
+param([string]$Executable, [string]$IconSource)
+if ((Split-Path -Parent $IconSource) -cne (Split-Path -Parent $Executable) -or
+    [IO.File]::ReadAllText($IconSource) -cne 'synthetic icon') { throw 'The verified icon was not supplied' }
+[IO.File]::WriteAllText((Join-Path $env:LOCALAPPDATA 'registration.txt'), $Executable)
+'@ | Set-Content -LiteralPath $helper -Encoding UTF8
+    $changed['register-markdown.ps1'] = Hash $helper
+    $icon = Join-Path $package 'Fomawrite.ico'
+    [IO.File]::WriteAllText($icon, 'synthetic icon')
+    $changed['Fomawrite.ico'] = Hash $icon
+    Write-Manifest $changed
+    $registrationLog = Join-Path $cacheHome 'registration.txt'
+    $registrationStage = (& $driver -Package $package -StageOnly) | ConvertFrom-Json
+    Assert (-not (Test-Path -LiteralPath $registrationLog)) 'Staging a package registered it prematurely.'
+    $registered = (& $driver -Package $package) | ConvertFrom-Json
+    Assert ($registered.processId -eq 4242 -and $registered.localExecutable -ceq $registrationStage.localExecutable -and
+        [IO.File]::ReadAllText($registrationLog) -ceq $registrationStage.localExecutable) 'The ZIP launcher did not register the verified staged executable.'
+    $checks.Add('normal-zip-launch-registers-the-verified-executable')
 
     Assert (-not @(Get-ChildItem -LiteralPath (Join-Path $cacheHome 'Fomawrite\Portable') -Directory | Where-Object Name -Like '*.staging-*').Count) 'Temporary staging directories remained.'
     $checks.Add('temporary-staging-is-cleaned')

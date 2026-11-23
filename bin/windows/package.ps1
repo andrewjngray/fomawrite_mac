@@ -16,7 +16,10 @@ Copy-Item -LiteralPath $exe -Destination (Join-Path $stage 'Fomawrite.exe')
 Invoke-Checked (Join-Path $QtRoot 'bin/windeployqt.exe') @('--release', '--no-compiler-runtime', '--qmldir', (Join-Path $RepoRoot 'src'), '--dir', $stage, (Join-Path $stage 'Fomawrite.exe'))
 # The double-click starter stages verified files onto Windows-local storage.
 # Include both helpers before manifest creation so their hashes are bound too.
-Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'launch-local.ps1') -Destination (Join-Path $stage 'launch-local.ps1')
+Copy-Item -LiteralPath (Join-Path $RepoRoot 'windows/Fomawrite.ico') -Destination $stage
+foreach ($script in @('launch-local.ps1', 'register-markdown.ps1')) {
+    Copy-Item -LiteralPath (Join-Path $PSScriptRoot $script) -Destination (Join-Path $stage $script)
+}
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'START-FOMAWRITE.cmd') -Destination (Join-Path $stage 'START-FOMAWRITE.cmd')
 # windeployqt may bundle a vc_redist installer rather than app-local DLLs. A
 # portable ZIP must launch without elevation or an installed development kit.

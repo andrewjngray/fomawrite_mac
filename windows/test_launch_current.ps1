@@ -68,6 +68,11 @@ function Write-Last([string]$Path, [string]$Executable) {
 try {
     New-Item -ItemType Directory -Path (Join-Path $repository 'bin\windows'), $cacheHome -Force | Out-Null
     Copy-Item -LiteralPath $stagerPath -Destination (Join-Path $repository 'bin\windows\launch-local.ps1')
+    @'
+param([string]$Executable, [string]$IconSource)
+[IO.File]::AppendAllText((Join-Path $env:LOCALAPPDATA 'registrations.txt'), $Executable + [Environment]::NewLine)
+'@ | Set-Content -LiteralPath (Join-Path $repository 'bin\windows\register-markdown.ps1') -Encoding UTF8
+    $registrationLog = Join-Path $cacheHome 'registrations.txt'
     $env:LOCALAPPDATA = $cacheHome
     $env:APPDATA = Join-Path $fixture 'roaming app data'
     $env:USERPROFILE = Join-Path $fixture 'user profile'
@@ -162,6 +167,7 @@ try {
     $lastHash = Hash $lastLaunch
     $stagedAgain = (& $driver -RepositoryRoot $repository -StageOnly) | ConvertFrom-Json
     Assert ((Hash $lastLaunch) -eq $lastHash -and -not (Test-Path -LiteralPath $destinationWorkspace) -and (Hash $sourceWorkspace) -eq $sourceHash) 'StageOnly migrated, remembered or altered production state.'
+    Assert (-not (Test-Path -LiteralPath $registrationLog)) 'Stage-only launch wrote an Explorer association.'
     $checks.Add('stage-only-never-reads-or-migrates-existing-workspace')
 
     foreach ($badReceipt in @('{broken', '{"schemaVersion":2,"localExecutable":"C:\\outside.exe"}', '{"schemaVersion":1,"localExecutable":"C:\\outside.exe"}')) {
@@ -192,7 +198,9 @@ try {
     $remembered = [IO.File]::ReadAllText($lastLaunch) | ConvertFrom-Json
     Assert ($updated.workspaceCopied -and $script:processCalls.Count -eq 1 -and $remembered.localExecutable -eq $second.localExecutable) 'New build did not migrate and remember its previous workspace.'
     Assert ((Hash $sourceWorkspace) -eq $sourceHash -and (Hash $destinationWorkspace) -eq $sourceHash -and (Hash $orphanRecovery) -eq $orphanHash) 'Workspace was rewritten, moved or orphan recovery was changed.'
+    Assert ((Get-Content -LiteralPath $registrationLog) -ceq $second.localExecutable) 'Normal launch registered a path other than the new verified executable.'
     $checks.Add('closed-old-version-workspace-copies-byte-exactly-once')
+    $checks.Add('normal-launch-registers-only-new-verified-executable')
 
     $destinationText = '{"version":1,"windows":[{"url":"file:///C:/existing.md"}]}'
     [IO.File]::WriteAllText($destinationWorkspace, $destinationText)

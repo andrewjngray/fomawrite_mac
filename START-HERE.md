@@ -20,6 +20,12 @@ Double-click **Update.command** to update the downloaded builds without launchin
 Windows Launch uses the local downloads; it does not sign in to GitHub or download
 new builds itself. Run Update.command or Launch.command on the Mac to fetch them.
 
+## Open Markdown from Explorer
+
+After launching Fomawrite once, right-click an `.md` file and choose **Open with**
+to select the Windows app. The installer adds it during setup. Windows keeps
+your current default until you select a different app.
+
 ## Your documents
 
 Choose your writing folder using the app's Folder button. Shared Mac documents

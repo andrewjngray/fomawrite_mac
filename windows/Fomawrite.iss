@@ -29,15 +29,18 @@ AppPublisherURL=https://github.com/andrewjngray/fomawrite_mac
 VersionInfoVersion={#AppNumericVersion}
 VersionInfoDescription=Fomawrite internal Windows installer
 VersionInfoProductName=Fomawrite
-VersionInfoProductVersion={#AppVersion}
+VersionInfoProductVersion={#AppNumericVersion}
+VersionInfoProductTextVersion={#AppVersion}
 DefaultDirName={localappdata}\Programs\Fomawrite-{#Architecture}
 DefaultGroupName=Fomawrite ({#Architecture})
 PrivilegesRequired=lowest
+ChangesAssociations=yes
 DisableProgramGroupPage=yes
 AllowNoIcons=yes
 CloseApplications=yes
 RestartApplications=no
-UninstallDisplayIcon={app}\Fomawrite.exe
+SetupIconFile=Fomawrite.ico
+UninstallDisplayIcon={app}\Fomawrite.ico
 UninstallDisplayName=Fomawrite ({#Architecture})
 OutputDir={#OutputDir}
 OutputBaseFilename=Fomawrite-{#AppVersion}-windows-{#Architecture}-{#BuildCommit}-setup
@@ -57,11 +60,20 @@ ArchitecturesInstallIn64BitMode=x64compatible
 #endif
 
 [Files]
-Source: "{#StageDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "{#StageDir}\*"; DestDir: "{app}"; Excludes: "Fomawrite.ico"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "Fomawrite.ico"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
 Name: "{group}\Fomawrite"; Filename: "{app}\Fomawrite.exe"
 Name: "{group}\Uninstall Fomawrite"; Filename: "{uninstallexe}"
 
-; No automatic launch, document associations, settings cleanup, or user-data
-; deletion. Normal launch and upgrade/uninstall are separate acceptance gates.
+[Registry]
+#define MarkdownProgId "Fomawrite.Markdown.Setup." + Architecture
+Root: HKCU; Subkey: "Software\Classes\{#MarkdownProgId}"; ValueType: string; ValueData: "Fomawrite Markdown Document"; Flags: uninsdeletekey
+Root: HKCU; Subkey: "Software\Classes\{#MarkdownProgId}\Application"; ValueType: string; ValueName: "ApplicationName"; ValueData: "Fomawrite (Windows {#Architecture})"
+Root: HKCU; Subkey: "Software\Classes\{#MarkdownProgId}\Application"; ValueType: string; ValueName: "ApplicationIcon"; ValueData: """{app}\Fomawrite.ico"",0"
+Root: HKCU; Subkey: "Software\Classes\{#MarkdownProgId}\DefaultIcon"; ValueType: string; ValueData: """{app}\Fomawrite.ico"",0"
+Root: HKCU; Subkey: "Software\Classes\{#MarkdownProgId}\shell\open\command"; ValueType: string; ValueData: """{app}\Fomawrite.exe"" ""%1"""
+Root: HKCU; Subkey: "Software\Classes\.md\OpenWithProgids"; ValueType: string; ValueName: "{#MarkdownProgId}"; ValueData: ""; Flags: uninsdeletevalue
+
+; No automatic launch, settings cleanup, or user-data deletion.

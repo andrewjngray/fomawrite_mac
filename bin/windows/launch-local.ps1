@@ -120,6 +120,17 @@ function Invoke-LocalLaunch {
     if (-not $StageOnly) {
         $process = Start-Process -FilePath $localExecutable -WorkingDirectory $destination -PassThru
         $receipt.processId = $process.Id
+        # Legacy ZIPs have no registration helper. New ZIPs use the verified copy.
+        $registrationPath = Join-Path $destination 'register-markdown.ps1'
+        if ($manifest.files.PSObject.Properties['register-markdown.ps1'] -and
+            $manifest.files.PSObject.Properties['Fomawrite.ico']) {
+            try {
+                $registration = [ScriptBlock]::Create([IO.File]::ReadAllText($registrationPath))
+                & $registration -Executable $localExecutable -IconSource (Join-Path $destination 'Fomawrite.ico')
+            } catch {
+                Write-Warning ('Could not add Fomawrite to Markdown Open with: ' + $_.Exception.Message)
+            }
+        }
     }
     $receipt | ConvertTo-Json -Compress
 }

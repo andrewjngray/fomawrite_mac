@@ -177,6 +177,12 @@ function Invoke-CurrentLaunch {
         if ($document) { $options.ArgumentList = '"' + $document + '"' }
         $process = Start-Process @options
         Save-LastLaunch $lastLaunchPath $receipt.localExecutable
+        try {
+            $registration = [ScriptBlock]::Create([IO.File]::ReadAllText((Join-Path $root 'bin\windows\register-markdown.ps1')))
+            & $registration -Executable $receipt.localExecutable -IconSource (Join-Path $root 'windows\Fomawrite.ico')
+        } catch {
+            Write-Warning ('Could not add Fomawrite to Markdown Open with: ' + $_.Exception.Message)
+        }
         $receipt | Add-Member -NotePropertyName processId -NotePropertyValue $(if ($currentProcesses.Count -gt 0) { $currentProcesses[0].Id } else { $process.Id })
         $receipt | Add-Member -NotePropertyName alreadyRunning -NotePropertyValue ($currentProcesses.Count -gt 0)
         if ($currentProcesses.Count -gt 0 -and -not $document) { Write-Host 'The running build has been asked to bring your window forward.' }

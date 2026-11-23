@@ -1,5 +1,15 @@
 # Windows workstream status
 
+## Cycle 174 — Markdown Open With and icon — 23 November 2026
+
+Windows build `0.3.0-dev69` carries these changes. ARM64 and x64 CI verification is pending.
+
+The normal Windows launcher and future portable ZIPs register the verified local executable as **Fomawrite (Windows)** for `.md` files in the current user profile. The installer registers its own architecture-specific entry at setup and removes that entry at uninstall. Both paths preserve the current Markdown default.
+
+Windows Shell enumerated the native ARM64 portable build 173 as a recommended Markdown handler. The current-launcher suite passed 20 checks and the standalone ZIP launcher suite passed 10. An ARM64 setup EXE built from the verified cycle 173 package passed a disposable per-user install and uninstall. The installed registry command quoted the file argument, and uninstall preserved the existing default and portable entry.
+
+The Open With entry uses the Windows ICO derived from the existing Fomawrite artwork. Shell successfully extracted it for the current build 173 executable, which has no embedded icon. Future Windows executables use the same ICO as a qmake resource. The refreshed ARM64 installer passed install and uninstall, including the installed icon and both Shell icon references.
+
 ## Cycle 173 — 22 November 2026
 
 Build `0.3.0-dev68` improves the response of the scroll wheel in PDF publishing Preview. ARM64 and x64 each passed 531 Qt checks with zero failures or skips and passed the deployed desktop checks. Both verified packages are staged in Parallels, and the regular launcher now selects build 173. The same ARM64 VM wheel inputs moved 36 and 144 screen pixels on build 172, then 60 and 240 on build 173. [Windows CI](https://github.com/andrewjngray/fomawrite_mac/actions/runs/44992240980) The [companion CI workflow](https://github.com/andrewjngray/fomawrite_mac/actions/runs/44992240844) passed on retry after an existing Live selection timing check failed on the first run.
