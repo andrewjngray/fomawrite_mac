@@ -2,7 +2,9 @@
 
 ## Cycle 174 — Markdown Open With and icon — 23 November 2026
 
-Windows build `0.3.0-dev69` carries these changes. ARM64 and x64 CI verification is pending.
+Windows build `0.3.0-dev69` at `03f86affb099` is current in the launcher. ARM64 and x64 each passed 531 Qt regression tests with zero failures or skips, the native desktop checks, and the launcher workflow. [Windows CI](https://github.com/andrewjngray/fomawrite_mac/actions/runs/45119086857) and [companion CI](https://github.com/andrewjngray/fomawrite_mac/actions/runs/45119086823) passed.
+
+Both verified packages were staged in Parallels. Each executable contains the embedded icon, and the running ARM64 build is registered with Windows for Markdown Open with. The ARM64 and x64 installers in `dist/windows-testing/installers/` both passed per-user install and uninstall in Parallels, with the existing default and portable association preserved. Their copied files match the installer SHA-256 manifests.
 
 The normal Windows launcher and future portable ZIPs register the verified local executable as **Fomawrite (Windows)** for `.md` files in the current user profile. The installer registers its own architecture-specific entry at setup and removes that entry at uninstall. Both paths preserve the current Markdown default.
 
